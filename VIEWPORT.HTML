@@ -33,7 +33,7 @@
     .app{
       height:100vh;
       display:grid;
-      grid-template-columns: 420px 1fr;
+      grid-template-columns: 440px 1fr;
     }
     .panel{
       background:linear-gradient(180deg,var(--panel),var(--panel2));
@@ -286,7 +286,7 @@
     }
     .cellBtn.danger:hover{ background:#2b0f0f; border-color:#743030; }
     .scrollBody{
-      max-height:320px;
+      max-height:300px;
       overflow:auto;
     }
   </style>
@@ -309,17 +309,27 @@
         <button id="toolPointOnLine">Point on Line</button>
         <button id="toolPan">Pan</button>
       </div>
+
+      <div class="grid2" style="margin-top:8px;">
+        <button id="undoBtn">Undo</button>
+        <button id="redoBtn">Redo</button>
+      </div>
+
       <div class="grid2" style="margin-top:8px;">
         <button id="zoomExtents" class="ok">Zoom Extents</button>
         <button id="zoomAllAndCenter">Center (0,0)</button>
       </div>
+
       <div class="hint">
-        Multi-select: hold <b>Shift</b> while clicking points/lines. Drag moves selected point (last clicked) or a selected line.
+        <b>Locked by default:</b> points/lines won’t drag-move unless you <b>double-click</b> them to toggle “movable”.
+        <br>Multi-select: hold <b>Shift</b> while clicking points/lines.
       </div>
       <div class="kbd">
+        <div><span>Toggle movable</span><code>DblClick</code></div>
         <div><span>Pan while holding</span><code>Space</code></div>
+        <div><span>Undo</span><code>Ctrl+Z</code></div>
+        <div><span>Redo</span><code>Ctrl+Y</code></div>
         <div><span>Delete selected</span><code>Del</code></div>
-        <div><span>Add/Toggle select</span><code>Shift</code></div>
         <div><span>Zoom</span><code>Wheel</code></div>
       </div>
     </div>
@@ -430,7 +440,7 @@
         <span>select lines (Shift for multi)</span>
       </div>
       <div class="grid2">
-        <button id="extendToIntersect" class="primary">Extend → Intersect</button>
+        <button id="extendToIntersect" class="primary">Extend → Intersect (new point)</button>
         <button id="trimToIntersect">Trim (grip) → Intersect</button>
       </div>
       <div class="grid2" style="margin-top:8px;">
@@ -438,8 +448,8 @@
         <button id="trimOverlap">Trim Overlap (colinear)</button>
       </div>
       <div class="hint">
-        • <b>Extend → Intersect</b> will ONLY extend (never shorten). If the intersection is already on the segment, it does nothing.
-        <br>• <b>Trim</b> uses the selected line’s grip (nearest endpoint where you clicked) and can shorten.
+        • <b>Extend → Intersect</b> creates a <b>new point</b> at the intersection and re-ends the active line there (original endpoint point does not move).
+        <br>• <b>Trim</b> uses the selected line’s grip (nearest endpoint where you clicked) and shortens by moving that endpoint.
       </div>
     </div>
 
@@ -503,7 +513,7 @@
                 <th style="width:60px;">Z</th>
                 <th style="width:90px;">Code</th>
                 <th>Notes</th>
-                <th style="width:92px;">Actions</th>
+                <th style="width:110px;">Actions</th>
               </tr>
             </thead>
             <tbody id="pointsTbody"></tbody>
@@ -524,6 +534,8 @@
       <span class="pill"><b>Mouse</b> <span id="hudMouse">x: 0, y: 0</span></span>
       <span class="pill"><b>Scale</b> <span id="hudZoom">1.00</span></span>
       <span class="pill"><b>Sel</b> <span id="hudSel" class="clip">none</span></span>
+      <span class="pill"><b>Undo</b> <span id="hudUndo">0</span></span>
+      <span class="pill"><b>Redo</b> <span id="hudRedo">0</span></span>
     </div>
   </div>
 </div>
@@ -545,7 +557,7 @@
   const isEditableTarget = (t) => {
     if (!t) return false;
     const tag = (t.tagName || "").toUpperCase();
-    return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
+    return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable || tag === "SELECT";
   };
 
   function setStatus(msg, kind="") {
@@ -697,6 +709,8 @@
   const hudMouse = $("#hudMouse");
   const hudZoom = $("#hudZoom");
   const hudSel = $("#hudSel");
+  const hudUndo = $("#hudUndo");
+  const hudRedo = $("#hudRedo");
   const selSummary = $("#selSummary");
   const toolHint = $("#toolHint");
 
@@ -704,8 +718,8 @@
   // Model
   // -------------------------
   let nextId = 1;
-  const points = new Map(); // id -> {id,num,x,y,z,code,notes}
-  const lines = new Map();  // id -> {id,a,b}
+  const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable}
+  const lines = new Map();  // id -> {id,a,b,movable}
 
   // Selection
   let selectedPointId = null;   // primary (last clicked point)
@@ -715,10 +729,7 @@
 
   // Construction
   let tool = "select";
-  let construction = {
-    startPointId: null,
-    startPointId2: null
-  };
+  let construction = { startPointId: null, startPointId2: null };
 
   // View transform
   const MIN_SCALE = 0.0005;
@@ -739,6 +750,104 @@
     dragObj: null
   };
 
+  // -------------------------
+  // Undo/Redo history (snapshot-based)
+  // -------------------------
+  const history = {
+    undo: [],
+    redo: [],
+    max: 200,
+    push(label="") {
+      this.undo.push({ state: serializeState(), label, ts: Date.now() });
+      if (this.undo.length > this.max) this.undo.shift();
+      this.redo.length = 0;
+      updateUndoRedoHUD();
+    },
+    undoAction() {
+      if (!this.undo.length) { setStatus("Nothing to undo.", "warn"); return; }
+      const cur = serializeState();
+      const prev = this.undo.pop().state;
+      this.redo.push({ state: cur, label:"", ts: Date.now() });
+      restoreState(prev);
+      setStatus("Undo.", "ok");
+      updateUndoRedoHUD();
+    },
+    redoAction() {
+      if (!this.redo.length) { setStatus("Nothing to redo.", "warn"); return; }
+      const cur = serializeState();
+      const next = this.redo.pop().state;
+      this.undo.push({ state: cur, label:"", ts: Date.now() });
+      restoreState(next);
+      setStatus("Redo.", "ok");
+      updateUndoRedoHUD();
+    },
+    popUndoIfNoOp(markerState) {
+      // markerState: serialized JSON string of state after push, before operation
+      // If current state equals markerState, remove last undo entry.
+      const now = serializeState();
+      if (now === markerState && this.undo.length) {
+        this.undo.pop();
+        updateUndoRedoHUD();
+      }
+    }
+  };
+
+  function serializeState() {
+    const pts = Array.from(points.values()).map(p => ({...p}));
+    const lns = Array.from(lines.values()).map(l => ({...l}));
+    return JSON.stringify({
+      nextId,
+      points: pts,
+      lines: lns,
+      selection: {
+        selectedPointId,
+        selectedPointIds: [...selectedPointIds],
+        selectedLines: selectedLines.map(s => ({...s})),
+        lastSelectedLineId
+      },
+      construction: {...construction},
+      view: {...view}
+    });
+  }
+
+  function restoreState(json) {
+    const s = JSON.parse(json);
+    nextId = s.nextId ?? 1;
+
+    points.clear();
+    for (const p of (s.points || [])) points.set(p.id, {...p});
+
+    lines.clear();
+    for (const l of (s.lines || [])) lines.set(l.id, {...l});
+
+    selectedPointId = s.selection?.selectedPointId ?? null;
+    selectedPointIds = s.selection?.selectedPointIds ?? [];
+    selectedLines = s.selection?.selectedLines ?? [];
+    lastSelectedLineId = s.selection?.lastSelectedLineId ?? null;
+
+    construction = s.construction ?? { startPointId:null, startPointId2:null };
+
+    if (s.view) {
+      view.scale = s.view.scale ?? view.scale;
+      view.panX = s.view.panX ?? view.panX;
+      view.panY = s.view.panY ?? view.panY;
+    }
+
+    updatePointEditorFromSelection();
+    schedulePointsTableRender();
+    updateUndoRedoHUD();
+  }
+
+  function updateUndoRedoHUD() {
+    hudUndo.textContent = String(history.undo.length);
+    hudRedo.textContent = String(history.redo.length);
+    $("#undoBtn").disabled = history.undo.length === 0;
+    $("#redoBtn").disabled = history.redo.length === 0;
+  }
+
+  // -------------------------
+  // Transform helpers
+  // -------------------------
   function worldToScreen(x,y){
     return {
       x: (x * view.scale) + view.panX,
@@ -774,7 +883,7 @@
     return false;
   }
 
-  function addPoint({num, x, y, z=0, code="", notes=""}) {
+  function addPoint({num, x, y, z=0, code="", notes="", movable=false}) {
     const id = nextId++;
     points.set(id, {
       id,
@@ -783,15 +892,16 @@
       y: Number(y),
       z: Number(z),
       code: String(code ?? ""),
-      notes: String(notes ?? "")
+      notes: String(notes ?? ""),
+      movable: !!movable
     });
     schedulePointsTableRender();
     return id;
   }
 
-  function addLine(aPointId, bPointId) {
+  function addLine(aPointId, bPointId, movable=false) {
     const id = nextId++;
-    lines.set(id, { id, a: aPointId, b: bPointId });
+    lines.set(id, { id, a: aPointId, b: bPointId, movable: !!movable });
     return id;
   }
 
@@ -857,59 +967,34 @@
   }
 
   function setSelectionFromPick({pointId=null, linePick=null, additive=false}) {
-    // POINT selection
     if (pointId != null) {
-      if (!additive) {
-        selectedPointIds = [pointId];
-      } else {
+      if (!additive) selectedPointIds = [pointId];
+      else {
         const idx = selectedPointIds.indexOf(pointId);
-        if (idx >= 0) {
-          // toggle off
-          selectedPointIds.splice(idx, 1);
-        } else {
-          selectedPointIds.push(pointId);
-        }
+        if (idx >= 0) selectedPointIds.splice(idx, 1);
+        else selectedPointIds.push(pointId);
       }
       selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length-1] : null;
-
-      if (!additive) {
-        selectedLines = [];
-        lastSelectedLineId = null;
-      }
-
+      if (!additive) { selectedLines = []; lastSelectedLineId = null; }
       updatePointEditorFromSelection();
-      setStatus(selectedPointId ? `Selected point(s): ${selectedPointIds.map(id=>points.get(id)?.num ?? "?").join(", ")}` : "Point deselected.", "ok");
       schedulePointsTableRender();
       return;
     }
 
-    // LINE selection
     if (linePick) {
-      if (!additive) {
-        selectedLines = [{ lineId: linePick.lineId, grip: linePick.grip, t: linePick.t }];
-      } else {
+      if (!additive) selectedLines = [{ lineId: linePick.lineId, grip: linePick.grip, t: linePick.t }];
+      else {
         const idx = selectedLines.findIndex(s => s.lineId === linePick.lineId);
-        if (idx >= 0) {
-          // toggle off
-          selectedLines.splice(idx, 1);
-        } else {
-          selectedLines.push({ lineId: linePick.lineId, grip: linePick.grip, t: linePick.t });
-        }
+        if (idx >= 0) selectedLines.splice(idx, 1);
+        else selectedLines.push({ lineId: linePick.lineId, grip: linePick.grip, t: linePick.t });
       }
       lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : null;
-
-      if (!additive) {
-        selectedPointIds = [];
-        selectedPointId = null;
-      }
-
+      if (!additive) { selectedPointIds = []; selectedPointId = null; }
       updatePointEditorFromSelection();
-      setStatus(selectedLines.length ? `Selected ${selectedLines.length} line(s).` : "Line deselected.", "ok");
       schedulePointsTableRender();
       return;
     }
 
-    // Empty click
     if (!additive) {
       selectedPointIds = [];
       selectedPointId = null;
@@ -917,7 +1002,6 @@
       lastSelectedLineId = null;
       updatePointEditorFromSelection();
       schedulePointsTableRender();
-      setStatus("Selection cleared.", "");
     }
   }
 
@@ -963,7 +1047,8 @@
     ctx.lineWidth = 1;
     ctx.strokeStyle = "#fff";
     for (const ln of lines.values()) {
-      const a = points.get(ln.a), b = points.get(ln.b);
+      const a = points.get(ln.a);
+      const b = points.get(ln.b);
       if (!a || !b) continue;
       const sa = worldToScreen(a.x,a.y);
       const sb = worldToScreen(b.x,b.y);
@@ -971,9 +1056,22 @@
       ctx.moveTo(sa.x, sa.y);
       ctx.lineTo(sb.x, sb.y);
       ctx.stroke();
+
+      // show "movable" hint: faint yellow dash near mid
+      if (ln.movable) {
+        const mx = (sa.x+sb.x)/2, my=(sa.y+sb.y)/2;
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,213,74,0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(mx-6, my);
+        ctx.lineTo(mx+6, my);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
-    // highlight lines
+    // highlight selected lines
     if (selectedLines.length) {
       ctx.save();
       ctx.lineWidth = 2;
@@ -992,7 +1090,7 @@
 
         const gripPt = (s.grip === "a") ? a : b;
         const sg = worldToScreen(gripPt.x, gripPt.y);
-        ctx.fillStyle = "rgba(255,213,74,0.15)";
+        ctx.fillStyle = "rgba(255,213,74,0.12)";
         ctx.strokeStyle = "#ffd54a";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -1017,6 +1115,17 @@
       ctx.lineTo(sp.x+5, sp.y-5);
       ctx.stroke();
 
+      // movable hint: small yellow ring
+      if (p.movable) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,213,74,0.95)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, 8, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // labels
       ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
       ctx.textBaseline = "middle";
@@ -1034,7 +1143,7 @@
       }
     }
 
-    // highlight selected points (all)
+    // highlight selected points
     if (selectedPointIds.length) {
       ctx.save();
       for (const pid of selectedPointIds) {
@@ -1057,6 +1166,7 @@
     hudMouse.textContent = `x: ${fmt(mouse.wx)}, y: ${fmt(mouse.wy)}`;
     hudZoom.textContent = `${view.scale.toFixed(4)} px/unit`;
     updateSelectionHUD();
+    updateUndoRedoHUD();
 
     requestAnimationFrame(draw);
   }
@@ -1178,8 +1288,12 @@
   $("#toolPointOnLine").addEventListener("click", ()=>setTool("pointOnLine"));
   $("#toolPan").addEventListener("click", ()=>setTool("pan"));
 
+  $("#undoBtn").addEventListener("click", ()=>history.undoAction());
+  $("#redoBtn").addEventListener("click", ()=>history.redoAction());
+
   $("#zoomExtents").addEventListener("click", () => zoomExtents());
   $("#zoomAllAndCenter").addEventListener("click", () => {
+    history.push("center");
     const rect = canvas.getBoundingClientRect();
     view.panX = rect.width * 0.5;
     view.panY = rect.height * 0.5;
@@ -1206,13 +1320,14 @@
 
   function doDeleteSelected() {
     if (selectedPointIds.length) {
+      history.push("delete points");
       const nums = selectedPointIds.map(id => points.get(id)?.num ?? "?");
-      // delete in reverse to keep primary logic simple
       for (const id of [...selectedPointIds].reverse()) deletePoint(id);
       setStatus(`Deleted point(s): ${nums.join(", ")}.`, "warn");
       return;
     }
     if (selectedLines.length) {
+      history.push("delete lines");
       const ids = selectedLines.map(s=>s.lineId);
       for (const id of ids) deleteLine(id);
       setStatus(`Deleted ${ids.length} line(s).`, "warn");
@@ -1225,6 +1340,7 @@
     const rect = canvas.getBoundingClientRect();
     const cx = rect.width*0.5, cy = rect.height*0.5;
     if (selectedPointId && points.has(selectedPointId)) {
+      history.push("focus point");
       const p = points.get(selectedPointId);
       view.panX = cx - p.x*view.scale;
       view.panY = cy + p.y*view.scale;
@@ -1235,6 +1351,7 @@
       const ln = lines.get(lastSelectedLineId);
       const a = points.get(ln.a), b = points.get(ln.b);
       if (a && b) {
+        history.push("focus line");
         const mx = (a.x+b.x)/2, my=(a.y+b.y)/2;
         view.panX = cx - mx*view.scale;
         view.panY = cy + my*view.scale;
@@ -1265,12 +1382,15 @@
       setStatus("Select a point to apply edits.", "warn");
       return;
     }
+    history.push("edit point");
     const p = points.get(selectedPointId);
 
     const newNum = String($("#ptNum").value || p.num).trim();
     if (newNum !== p.num) {
       if (pointNumberExists(newNum, p.id)) {
         setStatus(`Point number ${newNum} already exists.`, "warn");
+        history.undoAction(); // roll back push if invalid
+        history.redo.pop();   // keep redo consistent (undoAction pushed redo)
         return;
       }
       p.num = newNum;
@@ -1294,6 +1414,7 @@
       setStatus("No points to zoom to.", "warn");
       return;
     }
+    history.push("zoom extents");
     let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
     for (const p of points.values()) {
       minX = Math.min(minX, p.x);
@@ -1363,6 +1484,8 @@
     if (!Number.isFinite(d) || d <= 0) { setStatus("Distance must be a positive number.", "warn"); return; }
     if (az == null) { setStatus("Bearing/Azimuth not recognized.", "warn"); return; }
 
+    history.push("line dist/bearing");
+
     const sp = points.get(startId);
     const dx = Math.sin(az);
     const dy = Math.cos(az);
@@ -1373,10 +1496,9 @@
     const z = parseNum($("#ptZ").value, 0);
     const code = String($("#ptCode").value || "");
     const notes = String($("#ptNotes").value || "");
-    const pid2 = addPoint({ num, x:x2, y:y2, z, code, notes });
-    const lid = addLine(startId, pid2);
+    const pid2 = addPoint({ num, x:x2, y:y2, z, code, notes, movable:false });
+    const lid = addLine(startId, pid2, false);
 
-    // selection update
     selectedPointIds = [pid2];
     selectedPointId = pid2;
     selectedLines = [{ lineId: lid, grip: "b", t: 1 }];
@@ -1398,20 +1520,21 @@
       return;
     }
 
+    history.push("line between points");
+
     let created = 0;
     let lastLine = null;
 
     if (ids.length === 2) {
-      lastLine = addLine(ids[0], ids[1]);
+      lastLine = addLine(ids[0], ids[1], false);
       created = 1;
     } else {
       for (let i=0; i<ids.length-1; i++) {
-        lastLine = addLine(ids[i], ids[i+1]);
+        lastLine = addLine(ids[i], ids[i+1], false);
         created++;
       }
     }
 
-    // select last created line (keep point selection)
     selectedLines = lastLine ? [{ lineId: lastLine, grip:"b", t: 1 }] : [];
     lastSelectedLineId = lastLine;
 
@@ -1435,6 +1558,14 @@
     return { aSel, bSel, la, lb, a1, a2, b1, b2 };
   }
 
+  function intersectionPointDefaults() {
+    const z = parseNum($("#ptZ").value, 0);
+    let code = String($("#ptCode").value || "").trim();
+    const notes = String($("#ptNotes").value || "").trim();
+    if (!code) code = "INT";
+    return { z, code, notes };
+  }
+
   $("#extendToIntersect").addEventListener("click", () => {
     const s = getTwoSelectedLines();
     if (!s) { setStatus("Select two lines (Shift-click) to extend.", "warn"); return; }
@@ -1442,10 +1573,9 @@
     const hit = lineLineIntersection(s.a1, s.a2, s.b1, s.b2);
     if (!hit) { setStatus("Lines are parallel/colinear; no unique intersection.", "warn"); return; }
 
-    // Extend-only behavior: never shorten.
-    // Compute intersection parameter along ACTIVE line (the last selected line).
-    const active = s.bSel;
-    const ln = lines.get(active.lineId);
+    // Active = last selected line
+    const activeSel = s.bSel;
+    const ln = lines.get(activeSel.lineId);
     const A = points.get(ln.a), B = points.get(ln.b);
     if (!A || !B) return;
 
@@ -1456,12 +1586,32 @@
       return;
     }
 
-    // If t < 0 -> extend A to hit; if t > 1 -> extend B to hit
-    if (t < 0) { A.x = hit.x; A.y = hit.y; }
-    else { B.x = hit.x; B.y = hit.y; }
+    history.push("extend to intersect (new point)");
 
-    schedulePointsTableRender();
-    setStatus(`Extended active line to intersection at (${fmt(hit.x)}, ${fmt(hit.y)}).`, "ok");
+    // Create NEW point at intersection (do not move existing endpoint point)
+    const num = resolveDesiredPointNumber($("#ptNum").value);
+    const { z, code, notes } = intersectionPointDefaults();
+    const pidNew = addPoint({ num, x: hit.x, y: hit.y, z, code, notes, movable:false });
+
+    // If t<0, extension is beyond A-end -> re-end A at new point (A becomes interior, unchanged)
+    // If t>1, extension is beyond B-end -> re-end B at new point
+    if (t < 0) ln.a = pidNew;
+    else ln.b = pidNew;
+
+    // keep line's movable flag as-is
+    // Selection: select new point + active line
+    selectedPointIds = [pidNew];
+    selectedPointId = pidNew;
+    selectedLines = [{ lineId: ln.id, grip: (t < 0 ? "a" : "b"), t: clamp(t,0,1) }];
+    lastSelectedLineId = ln.id;
+    updatePointEditorFromSelection();
+    clearPointNumberField();
+
+    setStatus(
+      `Extended active line to intersection WITHOUT moving the original endpoint.\n` +
+      `Created point ${points.get(pidNew).num} at (${fmt(hit.x)}, ${fmt(hit.y)}).`,
+      "ok"
+    );
   });
 
   $("#trimToIntersect").addEventListener("click", () => {
@@ -1470,7 +1620,9 @@
     const hit = lineLineIntersection(s.a1, s.a2, s.b1, s.b2);
     if (!hit) { setStatus("Lines are parallel/colinear; no unique intersection.", "warn"); return; }
 
-    // Trim uses grip on ACTIVE line
+    history.push("trim to intersect");
+
+    // Trim uses grip on ACTIVE line (moves that endpoint)
     const active = s.bSel;
     const ln = lines.get(active.lineId);
     const gripPid = (active.grip === "a") ? ln.a : ln.b;
@@ -1487,11 +1639,13 @@
     const hit = lineLineIntersection(s.a1, s.a2, s.b1, s.b2);
     if (!hit) { setStatus("Lines are parallel/colinear; no unique intersection.", "warn"); return; }
 
+    history.push("create point at intersection");
+
     const num = resolveDesiredPointNumber($("#ptNum").value);
     const z = parseNum($("#ptZ").value, 0);
     const code = String($("#ptCode").value || "");
     const notes = String($("#ptNotes").value || "");
-    const pid = addPoint({ num, x: hit.x, y: hit.y, z, code, notes });
+    const pid = addPoint({ num, x: hit.x, y: hit.y, z, code, notes, movable:false });
 
     selectedPointIds = [pid];
     selectedPointId = pid;
@@ -1509,6 +1663,8 @@
 
     const ov = isColinearOverlap(s.a1,s.a2,s.b1,s.b2);
     if (!ov) { setStatus("No colinear overlap detected (or lines not colinear).", "warn"); return; }
+
+    history.push("trim overlap");
 
     const active = s.bSel;
     const ln = lines.get(active.lineId);
@@ -1570,6 +1726,8 @@
     const L = Math.hypot(vx,vy);
     if (L < EPS) { setStatus("Line is too short.", "warn"); return; }
 
+    history.push("point on line");
+
     const t = station / L;
     const x = A.x + vx * t;
     const y = A.y + vy * t;
@@ -1584,7 +1742,7 @@
     const z = parseNum($("#ptZ").value, 0);
     const code = String($("#ptCode").value || "");
     const notes = String($("#ptNotes").value || "");
-    const pid = addPoint({ num, x:x2, y:y2, z, code, notes });
+    const pid = addPoint({ num, x:x2, y:y2, z, code, notes, movable:false });
 
     selectedPointIds = [pid];
     selectedPointId = pid;
@@ -1601,6 +1759,7 @@
       setStatus("Select a line first.", "warn");
       return;
     }
+    history.push("swap line ends");
     const ln = lines.get(lastSelectedLineId);
     const tmp = ln.a; ln.a = ln.b; ln.b = tmp;
     setStatus("Swapped line ends A ↔ B.", "ok");
@@ -1649,6 +1808,8 @@
     const text = await f.text();
     const rows = parseCSV(text);
     if (!rows.length) { setStatus("CSV appears empty.", "warn"); return; }
+
+    history.push("csv import");
 
     let startRow = 0;
     let idx = { num:0, x:1, y:2, z:3, code:4, notes:5 };
@@ -1711,7 +1872,7 @@
         }
       }
 
-      const pid = addPoint({ num, x, y, z, code, notes });
+      const pid = addPoint({ num, x, y, z, code, notes, movable:false });
       byNum.set(String(num), pid);
       added++;
     }
@@ -1723,7 +1884,6 @@ Renamed: ${renamed}
 Skipped: ${skipped}`, "ok");
 
     $("#csvIn").value = "";
-
     schedulePointsTableRender();
     if ($("#autoZoomAfterImport").checked) zoomExtents();
   });
@@ -1782,13 +1942,9 @@ Skipped: ${skipped}`, "ok");
       });
     }
 
-    if (pointsSortMode === "num") {
-      arr.sort((a,b)=> (Number(a.num)||0) - (Number(b.num)||0));
-    } else if (pointsSortMode === "id") {
-      arr.sort((a,b)=>a.id-b.id);
-    } else if (pointsSortMode === "code") {
-      arr.sort((a,b)=>String(a.code).localeCompare(String(b.code)));
-    }
+    if (pointsSortMode === "num") arr.sort((a,b)=> (Number(a.num)||0) - (Number(b.num)||0));
+    else if (pointsSortMode === "id") arr.sort((a,b)=>a.id-b.id);
+    else if (pointsSortMode === "code") arr.sort((a,b)=>String(a.code).localeCompare(String(b.code)));
     return arr;
   }
 
@@ -1802,43 +1958,34 @@ Skipped: ${skipped}`, "ok");
       const tr = document.createElement("tr");
       if (selectedPointIds.includes(p.id)) tr.classList.add("sel");
 
-      // helper: input cell
-      const cellInput = (value, field, widthPx=null) => {
+      const cellInput = (value, field) => {
         const td = document.createElement("td");
         const inp = document.createElement("input");
         inp.className = "cellInput";
         inp.value = value;
         inp.dataset.pid = p.id;
         inp.dataset.field = field;
-        if (widthPx) inp.style.width = widthPx+"px";
-        inp.addEventListener("keydown", (e) => {
-          // prevent canvas hotkeys while editing
-          e.stopPropagation();
-        });
+        inp.addEventListener("keydown", (e) => e.stopPropagation());
         inp.addEventListener("input", onPointCellInput);
         td.appendChild(inp);
         return { td, inp };
       };
 
-      // Number (special validation)
-      const numCell = cellInput(p.num, "num", 70);
-      // X/Y/Z
-      const xCell = cellInput(p.x, "x", 88);
-      const yCell = cellInput(p.y, "y", 88);
-      const zCell = cellInput(p.z, "z", 56);
-      // Code/Notes
-      const codeCell = cellInput(p.code, "code", 88);
+      const numCell = cellInput(p.num, "num");
+      const xCell = cellInput(p.x, "x");
+      const yCell = cellInput(p.y, "y");
+      const zCell = cellInput(p.z, "z");
+      const codeCell = cellInput(p.code, "code");
       const notesCell = cellInput(p.notes, "notes");
 
-      // actions
       const tdAct = document.createElement("td");
       tdAct.style.whiteSpace = "nowrap";
+
       const btnSel = document.createElement("button");
       btnSel.className = "cellBtn";
       btnSel.textContent = "Select";
       btnSel.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         selectedPointIds = [p.id];
         selectedPointId = p.id;
         selectedLines = [];
@@ -1848,18 +1995,31 @@ Skipped: ${skipped}`, "ok");
         setStatus(`Selected point ${p.num}.`, "ok");
       });
 
+      const btnMov = document.createElement("button");
+      btnMov.className = "cellBtn";
+      btnMov.style.marginLeft = "6px";
+      btnMov.textContent = p.movable ? "Lock" : "Unlock";
+      btnMov.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        history.push("toggle point movable");
+        p.movable = !p.movable;
+        schedulePointsTableRender();
+        setStatus(`Point ${p.num} is now ${p.movable ? "MOVABLE" : "LOCKED"}.`, "ok");
+      });
+
       const btnDel = document.createElement("button");
       btnDel.className = "cellBtn danger";
       btnDel.style.marginLeft = "6px";
       btnDel.textContent = "Delete";
       btnDel.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
+        history.push("delete point");
         deletePoint(p.id);
         setStatus(`Deleted point ${p.num}.`, "warn");
       });
 
       tdAct.appendChild(btnSel);
+      tdAct.appendChild(btnMov);
       tdAct.appendChild(btnDel);
 
       tr.appendChild(numCell.td);
@@ -1872,7 +2032,6 @@ Skipped: ${skipped}`, "ok");
 
       frag.appendChild(tr);
 
-      // Validate number input (unique) on render
       if (pointNumberExists(numCell.inp.value, p.id)) numCell.inp.classList.add("bad");
     }
 
@@ -1887,29 +2046,25 @@ Skipped: ${skipped}`, "ok");
     const p = points.get(pid);
     if (!p) return;
 
+    // Snapshot once at first change in a focus session
+    if (!inp._historyPushed) {
+      history.push("edit point table");
+      inp._historyPushed = true;
+      setTimeout(() => { inp._historyPushed = false; }, 0);
+    }
+
     if (field === "num") {
       const raw = String(inp.value).trim();
-      if (!raw) {
-        inp.classList.add("bad");
-        return;
-      }
-      if (pointNumberExists(raw, p.id)) {
-        inp.classList.add("bad");
-        return;
-      }
+      if (!raw || pointNumberExists(raw, p.id)) { inp.classList.add("bad"); return; }
       inp.classList.remove("bad");
       p.num = raw;
-      // If selected, also update point editor fields
       if (selectedPointId === pid) $("#ptNum").value = raw;
       return;
     }
 
     if (field === "x" || field === "y" || field === "z") {
       const val = Number(String(inp.value).trim());
-      if (!Number.isFinite(val)) {
-        inp.classList.add("bad");
-        return;
-      }
+      if (!Number.isFinite(val)) { inp.classList.add("bad"); return; }
       inp.classList.remove("bad");
       p[field] = val;
       if (selectedPointId === pid) {
@@ -1987,19 +2142,47 @@ Skipped: ${skipped}`, "ok");
       doDeleteSelected();
     }
 
-    if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (e.key === "1") setTool("select");
-      if (e.key === "2") setTool("addPoint");
-      if (e.key === "3") setTool("line2pt");
-      if (e.key === "4") setTool("lineDB");
-      if (e.key === "5") setTool("pointOnLine");
-      if (e.key === "6") setTool("pan");
+    // Undo/Redo
+    if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey) {
+      const key = e.key.toLowerCase();
+      if (key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) history.redoAction();
+        else history.undoAction();
+      } else if (key === "y") {
+        e.preventDefault();
+        history.redoAction();
+      }
     }
   });
 
   window.addEventListener("keyup", (e) => {
     if (e.code === "Space") keys.space = false;
     if (e.key === "Shift") keys.shift = false;
+  });
+
+  // Double-click toggles movable on a point/line
+  canvas.addEventListener("dblclick", (e) => {
+    updateMouseFromEvent(e);
+    const pid = pickPoint(mouse.x, mouse.y, 10);
+    const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
+
+    if (pid) {
+      history.push("toggle point movable");
+      const p = points.get(pid);
+      p.movable = !p.movable;
+      setStatus(`Point ${p.num} is now ${p.movable ? "MOVABLE (drag enabled)" : "LOCKED (drag disabled)"}.`, "ok");
+      schedulePointsTableRender();
+      return;
+    }
+    if (lpick) {
+      history.push("toggle line movable");
+      const ln = lines.get(lpick.lineId);
+      ln.movable = !ln.movable;
+      setStatus(`Line ${ln.id} is now ${ln.movable ? "MOVABLE (drag enabled)" : "LOCKED (drag disabled)"}.`, "ok");
+      schedulePointsTableRender();
+      return;
+    }
   });
 
   canvas.addEventListener("mousedown", (e) => {
@@ -2020,13 +2203,25 @@ Skipped: ${skipped}`, "ok");
     if (tool === "select") {
       if (pid) {
         setSelectionFromPick({pointId: pid, additive});
-        // drag primary point only (last selected)
-        if (selectedPointId === pid) beginDrag({type:"point", id: pid});
+        // Drag only if point is movable
+        const p = points.get(pid);
+        if (selectedPointId === pid && p?.movable) {
+          const marker = serializeState();
+          history.push("move point");
+          mouse._dragUndoMarker = marker;
+          beginDrag({type:"point", id: pid, _moved:false});
+        }
         return;
       }
       if (lpick) {
         setSelectionFromPick({linePick: lpick, additive});
-        beginDrag({type:"line", id: lpick.lineId});
+        const ln = lines.get(lpick.lineId);
+        if (ln?.movable) {
+          const marker = serializeState();
+          history.push("move line");
+          mouse._dragUndoMarker = marker;
+          beginDrag({type:"line", id: lpick.lineId, _moved:false});
+        }
         return;
       }
       setSelectionFromPick({pointId:null, linePick:null, additive});
@@ -2034,11 +2229,12 @@ Skipped: ${skipped}`, "ok");
     }
 
     if (tool === "addPoint") {
+      history.push("add point");
       const num = resolveDesiredPointNumber($("#ptNum").value);
       const z = parseNum($("#ptZ").value, 0);
       const code = String($("#ptCode").value || "");
       const notes = String($("#ptNotes").value || "");
-      const pidNew = addPoint({ num, x: mouse.wx, y: mouse.wy, z, code, notes });
+      const pidNew = addPoint({ num, x: mouse.wx, y: mouse.wy, z, code, notes, movable:false });
 
       selectedPointIds = [pidNew];
       selectedPointId = pidNew;
@@ -2054,13 +2250,14 @@ Skipped: ${skipped}`, "ok");
 
     if (tool === "line2pt") {
       if (!construction.startPointId) {
+        history.push("line 2pt start");
         if (pid) {
           construction.startPointId = pid;
           setStatus(`Line start set: point ${points.get(pid).num}. Click endpoint (point or empty space).`, "ok");
           return;
         } else {
           const num = nextOpenPointNumber();
-          const pidNew = addPoint({ num, x: mouse.wx, y: mouse.wy, z:0, code:"", notes:"" });
+          const pidNew = addPoint({ num, x: mouse.wx, y: mouse.wy, z:0, code:"", notes:"", movable:false });
           construction.startPointId = pidNew;
           selectedPointIds = [pidNew];
           selectedPointId = pidNew;
@@ -2069,16 +2266,17 @@ Skipped: ${skipped}`, "ok");
           return;
         }
       } else {
+        history.push("line 2pt end");
         let endId = pid;
         if (!endId) {
           const num = nextOpenPointNumber();
-          endId = addPoint({ num, x: mouse.wx, y: mouse.wy, z:0, code:"", notes:"" });
+          endId = addPoint({ num, x: mouse.wx, y: mouse.wy, z:0, code:"", notes:"", movable:false });
         }
         if (endId === construction.startPointId) {
           setStatus("Endpoint cannot be the same as start point.", "warn");
           return;
         }
-        const lid = addLine(construction.startPointId, endId);
+        const lid = addLine(construction.startPointId, endId, false);
         selectedLines = [{ lineId: lid, grip:"b", t: 1 }];
         lastSelectedLineId = lid;
         selectedPointIds = [endId];
@@ -2132,8 +2330,15 @@ Skipped: ${skipped}`, "ok");
       const pid = mouse.dragObj.id;
       const p = points.get(pid);
       if (!p) return;
+
+      if (!mouse.dragObj._orig) mouse.dragObj._orig = { x:p.x, y:p.y };
       p.x = mouse.wx;
       p.y = mouse.wy;
+
+      if (Math.abs(p.x - mouse.dragObj._orig.x) > 1e-12 || Math.abs(p.y - mouse.dragObj._orig.y) > 1e-12) {
+        mouse.dragObj._moved = true;
+      }
+
       if (selectedPointId === pid) {
         $("#ptX").value = p.x;
         $("#ptY").value = p.y;
@@ -2159,6 +2364,9 @@ Skipped: ${skipped}`, "ok");
       a.y = mouse.dragObj._orig.ay + dy;
       b.x = mouse.dragObj._orig.bx + dx;
       b.y = mouse.dragObj._orig.by + dy;
+
+      if (Math.abs(dx) > 1e-12 || Math.abs(dy) > 1e-12) mouse.dragObj._moved = true;
+
       schedulePointsTableRender();
       return;
     }
@@ -2167,6 +2375,16 @@ Skipped: ${skipped}`, "ok");
   canvas.addEventListener("mouseup", () => {
     mouse.down = false;
     if (mouse.drag) {
+      // If no movement happened, remove the undo entry we pushed
+      if (mouse.dragObj && mouse.dragObj.type !== "pan") {
+        if (!mouse.dragObj._moved) {
+          // last push was the move action
+          history.undo.pop();
+          updateUndoRedoHUD();
+        } else {
+          setStatus("Move committed. (Undo available)", "ok");
+        }
+      }
       endDrag();
       updatePointEditorFromSelection();
       schedulePointsTableRender();
@@ -2189,7 +2407,6 @@ Skipped: ${skipped}`, "ok");
     view.panX = mouse.x - before.x * view.scale;
     view.panY = mouse.y + before.y * view.scale;
 
-    setStatus(`Scale: ${view.scale.toFixed(6)} px/unit`, "");
   }, {passive:false});
 
   // -------------------------
@@ -2237,19 +2454,34 @@ Skipped: ${skipped}`, "ok");
     setTool("select");
     updatePointEditorFromSelection();
     schedulePointsTableRender();
+    updateUndoRedoHUD();
     requestAnimationFrame(draw);
 
     setStatus(
       "Ready.\n" +
-      "New in this build:\n" +
-      "• Multi-point selection (Shift-click) + Line Between Selected Points uses selected set.\n" +
-      "• Extend → Intersect now extends only (never trims).\n" +
-      "• Points List table: view + edit all points inline.",
+      "Changes in this build:\n" +
+      "• Extend → Intersect now creates a NEW point at intersection; original endpoint point does not move.\n" +
+      "• Drag-move is LOCKED by default; double-click a point/line to toggle MOVABLE.\n" +
+      "• Undo/Redo added (Ctrl+Z / Ctrl+Y, buttons).",
       "ok"
     );
   }
 
   boot();
+
+  // -------------------------
+  // (Re)usable: Create point numbers
+  // -------------------------
+  function resolveDesiredPointNumber(inputValue) {
+    const raw = String(inputValue ?? "").trim();
+    if (!raw) return nextOpenPointNumber();
+    const requested = Number(raw);
+    if (!Number.isFinite(requested)) return nextOpenPointNumber();
+    const reqInt = Math.max(1, Math.floor(requested));
+    if (!pointNumberExists(String(reqInt))) return reqInt;
+    return nextOpenPointNumber(reqInt);
+  }
+
 })();
 </script>
 </body>
