@@ -21,6 +21,7 @@
       --ok:#46d36b;
       --border:#2a2a2a;
       --bad:#ff4d4d;
+      --overlay: rgba(0,0,0,0.55);
     }
     *{ box-sizing:border-box; }
     body{
@@ -194,10 +195,7 @@
       border-radius:6px;
       border:1px solid #2a2a2a;
     }
-    .mini{
-      font-size:10px;
-      color:var(--muted);
-    }
+    .mini{ font-size:10px; color:var(--muted); }
     .sep{ height:1px; background:var(--border); margin:8px 0; }
     .inline{
       display:flex;
@@ -216,12 +214,74 @@
       width:16px; height:16px; padding:0;
     }
 
-    /* Points list */
+    /* Modal (Points Manager) */
+    .modalOverlay{
+      position:fixed;
+      inset:0;
+      background:var(--overlay);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+      padding:18px;
+    }
+    .hidden{ display:none !important; }
+    .modalWindow{
+      position:absolute;
+      width:min(1100px, calc(100vw - 36px));
+      height:min(640px, calc(100vh - 36px));
+      min-width: 720px;
+      min-height: 360px;
+      background:linear-gradient(180deg,#0f0f0f,#0b0b0b);
+      border:1px solid var(--border);
+      border-radius:14px;
+      box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+      overflow:hidden;
+      resize:both;
+    }
+    .modalHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      background:#0c0c0c;
+      cursor:move;
+      user-select:none;
+      gap:10px;
+    }
+    .modalHeader b{ font-size:12px; letter-spacing:.3px; }
+    .modalHeader .right{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .modalHeader .right .pill{ pointer-events:none; }
+    .modalHeader button{
+      cursor:pointer;
+      padding:6px 10px;
+      border-radius:10px;
+      background:#141414;
+      border:1px solid #2a2a2a;
+    }
+    .modalHeader button:hover{ background:#1a1a1a; border-color:#3a3a3a; }
+    .modalBody{
+      padding:10px;
+      height:calc(100% - 44px);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
     .tableWrap{
       border:1px solid var(--border);
-      border-radius:10px;
+      border-radius:12px;
       overflow:hidden;
       background:#0b0b0b;
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      min-height: 0;
     }
     .tableTools{
       display:flex;
@@ -232,51 +292,53 @@
       align-items:center;
       flex-wrap:wrap;
     }
-    .tableTools input{ flex:1; min-width:140px; }
+    .tableTools input{ flex:1; min-width:220px; }
     table{
       width:100%;
       border-collapse:collapse;
-      font-size:11px;
+      font-size:12px;
     }
     thead th{
       position:sticky;
       top:0;
       background:#0f0f0f;
       border-bottom:1px solid var(--border);
-      padding:6px 6px;
+      padding:8px 8px;
       text-align:left;
       color:var(--muted);
       font-weight:600;
       z-index:1;
+      white-space:nowrap;
     }
     tbody td{
       border-bottom:1px solid #1a1a1a;
-      padding:6px;
+      padding:7px 8px;
       vertical-align:middle;
     }
     tbody tr:hover{ background:#0f0f0f; }
     tbody tr.sel{ outline:1px solid #5c4b14; background:#151006; }
     .cellInput{
       width:100%;
-      padding:6px 6px;
-      border-radius:7px;
+      padding:7px 8px;
+      border-radius:10px;
       border:1px solid #2a2a2a;
       background:#0b0b0b;
       color:var(--text);
-      font-size:11px;
+      font-size:12px;
     }
     .cellInput.bad{
       border-color: var(--bad);
       box-shadow: 0 0 0 1px rgba(255,77,77,0.25) inset;
     }
     .cellBtn{
-      padding:6px 8px;
-      border-radius:8px;
+      padding:7px 10px;
+      border-radius:10px;
       border:1px solid #2a2a2a;
       background:#121212;
       color:var(--text);
-      font-size:11px;
+      font-size:12px;
       cursor:pointer;
+      white-space:nowrap;
     }
     .cellBtn:hover{ border-color:#3a3a3a; background:#171717; }
     .cellBtn.danger{
@@ -286,8 +348,9 @@
     }
     .cellBtn.danger:hover{ background:#2b0f0f; border-color:#743030; }
     .scrollBody{
-      max-height:300px;
       overflow:auto;
+      flex:1;
+      min-height: 0;
     }
   </style>
 </head>
@@ -322,10 +385,13 @@
 
       <div class="hint">
         <b>Locked by default:</b> points/lines won’t drag-move unless you <b>double-click</b> them to toggle “movable”.
-        <br>Multi-select: hold <b>Shift</b> while clicking points/lines.
+        <br><b>Multi-select:</b> hold <b>Shift</b> while clicking.
+        <br><b>Window select:</b> click-drag in empty space (Select tool) to marquee-select points + lines.
       </div>
       <div class="kbd">
         <div><span>Toggle movable</span><code>DblClick</code></div>
+        <div><span>Marquee select</span><code>Drag</code></div>
+        <div><span>Add to selection</span><code>Shift</code></div>
         <div><span>Pan while holding</span><code>Space</code></div>
         <div><span>Undo</span><code>Ctrl+Z</code></div>
         <div><span>Redo</span><code>Ctrl+Y</code></div>
@@ -396,7 +462,7 @@
         <button id="focusSelected">Center on Selection</button>
       </div>
       <div class="hint">
-        Point marker: <span style="color:var(--pt)">red X</span> · Number: <span style="color:var(--num)">white</span> · Code: <span style="color:var(--code)">green</span> · Notes: <span style="color:var(--notes)">blue</span>
+        Marker: <span style="color:var(--pt)">red X</span> · Number: <span style="color:var(--num)">white</span> · Code: <span style="color:var(--code)">green</span> · Notes: <span style="color:var(--notes)">blue</span>
       </div>
     </div>
 
@@ -421,7 +487,6 @@
         Bearing formats accepted:
         <br>• Quadrant: <b>N15-15-15W</b>, <b>N15.1515W</b>, <b>S12-30E</b>
         <br>• Azimuth degrees from North (clockwise): <b>123.45</b>
-        <br>(No degree symbol required.)
       </div>
       <div class="sep"></div>
       <div class="grid2">
@@ -492,39 +557,18 @@
 
     <div class="section">
       <div class="title">
-        <b>Points List</b>
-        <span>edit inline</span>
+        <b>Points Manager</b>
+        <span id="pointsCount">0 points</span>
       </div>
-
-      <div class="tableWrap">
-        <div class="tableTools">
-          <input id="ptFilter" placeholder="Filter: number / code / notes" />
-          <button id="refreshPoints" class="cellBtn">Refresh</button>
-          <button id="sortPoints" class="cellBtn">Sort: Num</button>
-        </div>
-
-        <div class="scrollBody">
-          <table>
-            <thead>
-              <tr>
-                <th style="width:78px;">#</th>
-                <th style="width:90px;">X</th>
-                <th style="width:90px;">Y</th>
-                <th style="width:60px;">Z</th>
-                <th style="width:90px;">Code</th>
-                <th>Notes</th>
-                <th style="width:110px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="pointsTbody"></tbody>
-          </table>
-        </div>
+      <div class="grid2">
+        <button id="openPointsManager" class="primary">Open Points List / Editor</button>
+        <button id="closePointsManager" disabled>Close</button>
       </div>
-
       <div class="hint">
-        Editing updates immediately (with validation for point number uniqueness).
+        Opens a resizable modal for wide columns (number, X, Y, Z, code, notes) without squeezing the sidebar.
       </div>
     </div>
+
   </div>
 
   <div class="canvasWrap">
@@ -536,6 +580,51 @@
       <span class="pill"><b>Sel</b> <span id="hudSel" class="clip">none</span></span>
       <span class="pill"><b>Undo</b> <span id="hudUndo">0</span></span>
       <span class="pill"><b>Redo</b> <span id="hudRedo">0</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- Points Manager Modal -->
+<div id="pointsModal" class="modalOverlay hidden" aria-hidden="true">
+  <div id="pointsModalWindow" class="modalWindow">
+    <div id="pointsModalHeader" class="modalHeader">
+      <b>Points Manager</b>
+      <div class="right">
+        <span class="pill"><b>Total</b> <span id="modalPointsCount">0</span></span>
+        <button id="pointsModalClose" class="cellBtn">Close</button>
+      </div>
+    </div>
+
+    <div class="modalBody">
+      <div class="tableWrap">
+        <div class="tableTools">
+          <input id="ptFilter" placeholder="Filter: number / code / notes" />
+          <button id="refreshPoints" class="cellBtn">Refresh</button>
+          <button id="sortPoints" class="cellBtn">Sort: Num</button>
+          <span class="pill"><b>Tip</b> <span class="clip">Shift-click + drag window to multi-select</span></span>
+        </div>
+
+        <div class="scrollBody">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:90px;">#</th>
+                <th style="width:140px;">X</th>
+                <th style="width:140px;">Y</th>
+                <th style="width:110px;">Z</th>
+                <th style="width:140px;">Code</th>
+                <th>Notes</th>
+                <th style="width:240px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pointsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="hint">
+        Edits validate point number uniqueness. Press <b>Esc</b> to close the modal.
+      </div>
     </div>
   </div>
 </div>
@@ -559,6 +648,7 @@
     const tag = (t.tagName || "").toUpperCase();
     return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable || tag === "SELECT";
   };
+  const $ = (q)=>document.querySelector(q);
 
   function setStatus(msg, kind="") {
     const el = $("#status");
@@ -566,6 +656,9 @@
     el.className = "status" + (kind ? " " + kind : "");
   }
 
+  // -------------------------
+  // Bearing parsing
+  // -------------------------
   function parseQuadrantAngleDegrees(midRaw) {
     let mid = String(midRaw ?? "").trim();
     if (!mid) return null;
@@ -604,11 +697,13 @@
     const raw = String(input ?? "").trim();
     if (!raw) return null;
 
+    // numeric azimuth
     if (/^[+-]?\d+(\.\d+)?$/.test(raw)) {
       const deg = parseFloat(raw);
       return (deg * Math.PI) / 180;
     }
 
+    // quadrant
     const m = raw.trim().toUpperCase().match(/^([NS])\s*(.+?)\s*([EW])$/);
     if (!m) return null;
 
@@ -647,6 +742,9 @@
     return `${q1}${d}-${String(m).padStart(2,"0")}-${String(sRound.toFixed(3)).padStart(6,"0")}${q2}`;
   }
 
+  // -------------------------
+  // Geometry helpers
+  // -------------------------
   function lineLineIntersection(p1, p2, p3, p4) {
     const x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
     const x3=p3.x, y3=p3.y, x4=p4.x, y4=p4.y;
@@ -697,11 +795,56 @@
     return { useX, oMin, oMax };
   }
 
+  function rectNorm(x0,y0,x1,y1){
+    return {
+      minX: Math.min(x0,x1),
+      maxX: Math.max(x0,x1),
+      minY: Math.min(y0,y1),
+      maxY: Math.max(y0,y1),
+      w: Math.abs(x1-x0),
+      h: Math.abs(y1-y0),
+      cx: (x0+x1)/2,
+      cy: (y0+y1)/2
+    };
+  }
+  function pointInRect(p, r){
+    return p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY && p.y <= r.maxY;
+  }
+  function orient(a,b,c){
+    return (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x);
+  }
+  function onSeg(a,b,c){
+    return Math.min(a.x,b.x)-EPS <= c.x && c.x <= Math.max(a.x,b.x)+EPS &&
+           Math.min(a.y,b.y)-EPS <= c.y && c.y <= Math.max(a.y,b.y)+EPS;
+  }
+  function segIntersect(a,b,c,d){
+    const o1 = orient(a,b,c);
+    const o2 = orient(a,b,d);
+    const o3 = orient(c,d,a);
+    const o4 = orient(c,d,b);
+
+    if ((o1>0 && o2<0 || o1<0 && o2>0) && (o3>0 && o4<0 || o3<0 && o4>0)) return true;
+    if (Math.abs(o1) < EPS && onSeg(a,b,c)) return true;
+    if (Math.abs(o2) < EPS && onSeg(a,b,d)) return true;
+    if (Math.abs(o3) < EPS && onSeg(c,d,a)) return true;
+    if (Math.abs(o4) < EPS && onSeg(c,d,b)) return true;
+    return false;
+  }
+  function segIntersectsRect(p1,p2,r){
+    if (pointInRect(p1,r) || pointInRect(p2,r)) return true;
+    const topL = {x:r.minX,y:r.minY}, topR = {x:r.maxX,y:r.minY};
+    const botL = {x:r.minX,y:r.maxY}, botR = {x:r.maxX,y:r.maxY};
+    // Edges (note: in screen coords, y grows down, but intersection math is unaffected)
+    if (segIntersect(p1,p2, topL, topR)) return true;
+    if (segIntersect(p1,p2, topR, botR)) return true;
+    if (segIntersect(p1,p2, botR, botL)) return true;
+    if (segIntersect(p1,p2, botL, topL)) return true;
+    return false;
+  }
+
   // -------------------------
   // DOM
   // -------------------------
-  const $ = (q)=>document.querySelector(q);
-
   const canvas = $("#c");
   const ctx = canvas.getContext("2d");
 
@@ -714,6 +857,15 @@
   const selSummary = $("#selSummary");
   const toolHint = $("#toolHint");
 
+  const pointsCount = $("#pointsCount");
+  const modal = $("#pointsModal");
+  const modalWindow = $("#pointsModalWindow");
+  const modalHeader = $("#pointsModalHeader");
+  const modalClose = $("#pointsModalClose");
+  const modalPointsCount = $("#modalPointsCount");
+  const openPointsManagerBtn = $("#openPointsManager");
+  const closePointsManagerBtn = $("#closePointsManager");
+
   // -------------------------
   // Model
   // -------------------------
@@ -722,14 +874,14 @@
   const lines = new Map();  // id -> {id,a,b,movable}
 
   // Selection
-  let selectedPointId = null;   // primary (last clicked point)
-  let selectedPointIds = [];    // ordered selection (last is primary)
+  let selectedPointId = null;   // primary point
+  let selectedPointIds = [];    // multi points (ordered)
   let selectedLines = [];       // [{ lineId, grip, t }]
   let lastSelectedLineId = null;
 
   // Construction
   let tool = "select";
-  let construction = { startPointId: null, startPointId2: null };
+  let construction = { startPointId: null };
 
   // View transform
   const MIN_SCALE = 0.0005;
@@ -751,7 +903,7 @@
   };
 
   // -------------------------
-  // Undo/Redo history (snapshot-based)
+  // Undo/Redo (snapshot-based)
   // -------------------------
   const history = {
     undo: [],
@@ -780,15 +932,6 @@
       restoreState(next);
       setStatus("Redo.", "ok");
       updateUndoRedoHUD();
-    },
-    popUndoIfNoOp(markerState) {
-      // markerState: serialized JSON string of state after push, before operation
-      // If current state equals markerState, remove last undo entry.
-      const now = serializeState();
-      if (now === markerState && this.undo.length) {
-        this.undo.pop();
-        updateUndoRedoHUD();
-      }
     }
   };
 
@@ -806,7 +949,8 @@
         lastSelectedLineId
       },
       construction: {...construction},
-      view: {...view}
+      view: {...view},
+      modal: { open: !modal.classList.contains("hidden"), left: modalWindow.style.left, top: modalWindow.style.top, w: modalWindow.style.width, h: modalWindow.style.height }
     });
   }
 
@@ -825,7 +969,7 @@
     selectedLines = s.selection?.selectedLines ?? [];
     lastSelectedLineId = s.selection?.lastSelectedLineId ?? null;
 
-    construction = s.construction ?? { startPointId:null, startPointId2:null };
+    construction = s.construction ?? { startPointId:null };
 
     if (s.view) {
       view.scale = s.view.scale ?? view.scale;
@@ -836,6 +980,15 @@
     updatePointEditorFromSelection();
     schedulePointsTableRender();
     updateUndoRedoHUD();
+    updateCounts();
+
+    // Restore modal geometry (don’t auto-open/close during undo/redo; keep current visibility)
+    if (s.modal) {
+      if (s.modal.left) modalWindow.style.left = s.modal.left;
+      if (s.modal.top) modalWindow.style.top = s.modal.top;
+      if (s.modal.w) modalWindow.style.width = s.modal.w;
+      if (s.modal.h) modalWindow.style.height = s.modal.h;
+    }
   }
 
   function updateUndoRedoHUD() {
@@ -861,6 +1014,9 @@
     };
   }
 
+  // -------------------------
+  // Model helpers
+  // -------------------------
   function getMaxPointNumber() {
     let m = 0;
     for (const p of points.values()) m = Math.max(m, Number(p.num) || 0);
@@ -882,6 +1038,15 @@
     }
     return false;
   }
+  function resolveDesiredPointNumber(inputValue) {
+    const raw = String(inputValue ?? "").trim();
+    if (!raw) return nextOpenPointNumber();
+    const requested = Number(raw);
+    if (!Number.isFinite(requested)) return nextOpenPointNumber();
+    const reqInt = Math.max(1, Math.floor(requested));
+    if (!pointNumberExists(String(reqInt))) return reqInt;
+    return nextOpenPointNumber(reqInt);
+  }
 
   function addPoint({num, x, y, z=0, code="", notes="", movable=false}) {
     const id = nextId++;
@@ -896,12 +1061,14 @@
       movable: !!movable
     });
     schedulePointsTableRender();
+    updateCounts();
     return id;
   }
 
   function addLine(aPointId, bPointId, movable=false) {
     const id = nextId++;
     lines.set(id, { id, a: aPointId, b: bPointId, movable: !!movable });
+    updateCounts();
     return id;
   }
 
@@ -917,12 +1084,14 @@
     lastSelectedLineId = lines.has(lastSelectedLineId) ? lastSelectedLineId : null;
     updatePointEditorFromSelection();
     schedulePointsTableRender();
+    updateCounts();
   }
 
   function deleteLine(lid) {
     lines.delete(lid);
     selectedLines = selectedLines.filter(s => s.lineId !== lid);
     if (lastSelectedLineId === lid) lastSelectedLineId = null;
+    updateCounts();
   }
 
   // -------------------------
@@ -966,51 +1135,11 @@
     return best ? { lineId: best, grip: bestGrip, t: bestT } : null;
   }
 
-  function setSelectionFromPick({pointId=null, linePick=null, additive=false}) {
-    if (pointId != null) {
-      if (!additive) selectedPointIds = [pointId];
-      else {
-        const idx = selectedPointIds.indexOf(pointId);
-        if (idx >= 0) selectedPointIds.splice(idx, 1);
-        else selectedPointIds.push(pointId);
-      }
-      selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length-1] : null;
-      if (!additive) { selectedLines = []; lastSelectedLineId = null; }
-      updatePointEditorFromSelection();
-      schedulePointsTableRender();
-      return;
-    }
-
-    if (linePick) {
-      if (!additive) selectedLines = [{ lineId: linePick.lineId, grip: linePick.grip, t: linePick.t }];
-      else {
-        const idx = selectedLines.findIndex(s => s.lineId === linePick.lineId);
-        if (idx >= 0) selectedLines.splice(idx, 1);
-        else selectedLines.push({ lineId: linePick.lineId, grip: linePick.grip, t: linePick.t });
-      }
-      lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : null;
-      if (!additive) { selectedPointIds = []; selectedPointId = null; }
-      updatePointEditorFromSelection();
-      schedulePointsTableRender();
-      return;
-    }
-
-    if (!additive) {
-      selectedPointIds = [];
-      selectedPointId = null;
-      selectedLines = [];
-      lastSelectedLineId = null;
-      updatePointEditorFromSelection();
-      schedulePointsTableRender();
-    }
-  }
-
   function selectionSummary() {
     const pts = selectedPointIds.length ? `Pts:${selectedPointIds.length} [${selectedPointIds.map(id=>points.get(id)?.num ?? "?").join(", ")}]` : "";
     const lns = selectedLines.length ? `Lines:${selectedLines.length}` : "";
     return [pts, lns].filter(Boolean).join(" + ") || "none";
   }
-
   function updateSelectionHUD() {
     const s = selectionSummary();
     selSummary.textContent = s;
@@ -1031,6 +1160,96 @@
       view.panX = rect.width * 0.5;
       view.panY = rect.height * 0.5;
     }
+  }
+
+  function pickGridStep() {
+    const targetPx = 80;
+    const step = targetPx / Math.max(view.scale, MIN_SCALE);
+    const pow = Math.pow(10, Math.floor(Math.log10(step)));
+    const candidates = [1,2,5,10].map(m => m*pow);
+    let best = candidates[0], bestErr = Math.abs(best - step);
+    for (const c of candidates) {
+      const err = Math.abs(c - step);
+      if (err < bestErr) { bestErr = err; best = c; }
+    }
+    return best;
+  }
+
+  function drawGrid(W,H) {
+    const stepWorld = pickGridStep();
+    const stepPx = stepWorld * view.scale;
+    if (stepPx < 30) return;
+
+    const leftWorld = screenToWorld(0,0).x;
+    const rightWorld = screenToWorld(W,0).x;
+    const topWorld = screenToWorld(0,0).y;
+    const botWorld = screenToWorld(0,H).y;
+
+    const x0 = Math.floor(leftWorld/stepWorld)*stepWorld;
+    const x1 = Math.ceil(rightWorld/stepWorld)*stepWorld;
+    const y0 = Math.floor(botWorld/stepWorld)*stepWorld;
+    const y1 = Math.ceil(topWorld/stepWorld)*stepWorld;
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.lineWidth = 1;
+
+    for (let x = x0; x <= x1; x += stepWorld) {
+      const sx = worldToScreen(x,0).x;
+      ctx.beginPath();
+      ctx.moveTo(sx,0);
+      ctx.lineTo(sx,H);
+      ctx.stroke();
+    }
+    for (let y = y0; y <= y1; y += stepWorld) {
+      const sy = worldToScreen(0,y).y;
+      ctx.beginPath();
+      ctx.moveTo(0,sy);
+      ctx.lineTo(W,sy);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawCrosshair(W,H) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    ctx.moveTo(mouse.x, 0);
+    ctx.lineTo(mouse.x, H);
+    ctx.moveTo(0, mouse.y);
+    ctx.lineTo(W, mouse.y);
+    ctx.stroke();
+
+    const snapId = pickPoint(mouse.x, mouse.y, 10);
+    const boxSize = 14;
+    ctx.strokeStyle = snapId ? "rgba(255,213,74,0.9)" : "rgba(255,255,255,0.4)";
+    ctx.beginPath();
+    if (snapId) {
+      const p = points.get(snapId);
+      const sp = worldToScreen(p.x,p.y);
+      ctx.rect(sp.x - boxSize/2, sp.y - boxSize/2, boxSize, boxSize);
+    } else {
+      ctx.rect(mouse.x - boxSize/2, mouse.y - boxSize/2, boxSize, boxSize);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawMarquee() {
+    if (!mouse.drag || mouse.dragObj?.type !== "marquee") return;
+    const r = rectNorm(mouse.dragObj.x0, mouse.dragObj.y0, mouse.dragObj.x1, mouse.dragObj.y1);
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,213,74,0.95)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6,4]);
+    ctx.strokeRect(r.minX, r.minY, r.maxX-r.minX, r.maxY-r.minY);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(255,213,74,0.08)";
+    ctx.fillRect(r.minX, r.minY, r.maxX-r.minX, r.maxY-r.minY);
+    ctx.restore();
   }
 
   function draw() {
@@ -1057,7 +1276,6 @@
       ctx.lineTo(sb.x, sb.y);
       ctx.stroke();
 
-      // show "movable" hint: faint yellow dash near mid
       if (ln.movable) {
         const mx = (sa.x+sb.x)/2, my=(sa.y+sb.y)/2;
         ctx.save();
@@ -1115,7 +1333,7 @@
       ctx.lineTo(sp.x+5, sp.y-5);
       ctx.stroke();
 
-      // movable hint: small yellow ring
+      // movable hint ring
       if (p.movable) {
         ctx.save();
         ctx.strokeStyle = "rgba(255,213,74,0.95)";
@@ -1159,6 +1377,9 @@
       ctx.restore();
     }
 
+    // marquee (selection window)
+    drawMarquee();
+
     // crosshair & snap box
     drawCrosshair(W,H);
 
@@ -1169,82 +1390,6 @@
     updateUndoRedoHUD();
 
     requestAnimationFrame(draw);
-  }
-
-  function drawGrid(W,H) {
-    const stepWorld = pickGridStep();
-    const stepPx = stepWorld * view.scale;
-    if (stepPx < 30) return;
-
-    const leftWorld = screenToWorld(0,0).x;
-    const rightWorld = screenToWorld(W,0).x;
-    const topWorld = screenToWorld(0,0).y;
-    const botWorld = screenToWorld(0,H).y;
-
-    const x0 = Math.floor(leftWorld/stepWorld)*stepWorld;
-    const x1 = Math.ceil(rightWorld/stepWorld)*stepWorld;
-    const y0 = Math.floor(botWorld/stepWorld)*stepWorld;
-    const y1 = Math.ceil(topWorld/stepWorld)*stepWorld;
-
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.lineWidth = 1;
-
-    for (let x = x0; x <= x1; x += stepWorld) {
-      const sx = worldToScreen(x,0).x;
-      ctx.beginPath();
-      ctx.moveTo(sx,0);
-      ctx.lineTo(sx,H);
-      ctx.stroke();
-    }
-    for (let y = y0; y <= y1; y += stepWorld) {
-      const sy = worldToScreen(0,y).y;
-      ctx.beginPath();
-      ctx.moveTo(0,sy);
-      ctx.lineTo(W,sy);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  function pickGridStep() {
-    const targetPx = 80;
-    const step = targetPx / Math.max(view.scale, MIN_SCALE);
-    const pow = Math.pow(10, Math.floor(Math.log10(step)));
-    const candidates = [1,2,5,10].map(m => m*pow);
-    let best = candidates[0], bestErr = Math.abs(best - step);
-    for (const c of candidates) {
-      const err = Math.abs(c - step);
-      if (err < bestErr) { bestErr = err; best = c; }
-    }
-    return best;
-  }
-
-  function drawCrosshair(W,H) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    ctx.moveTo(mouse.x, 0);
-    ctx.lineTo(mouse.x, H);
-    ctx.moveTo(0, mouse.y);
-    ctx.lineTo(W, mouse.y);
-    ctx.stroke();
-
-    const snapId = pickPoint(mouse.x, mouse.y, 10);
-    const boxSize = 14;
-    ctx.strokeStyle = snapId ? "rgba(255,213,74,0.9)" : "rgba(255,255,255,0.4)";
-    ctx.beginPath();
-    if (snapId) {
-      const p = points.get(snapId);
-      const sp = worldToScreen(p.x,p.y);
-      ctx.rect(sp.x - boxSize/2, sp.y - boxSize/2, boxSize, boxSize);
-    } else {
-      ctx.rect(mouse.x - boxSize/2, mouse.y - boxSize/2, boxSize, boxSize);
-    }
-    ctx.stroke();
-    ctx.restore();
   }
 
   // -------------------------
@@ -1300,7 +1445,14 @@
     setStatus("Centered view on (0,0).", "ok");
   });
 
-  $("#clearSelection").addEventListener("click", () => {
+  $("#clearSelection").addEventListener("click", () => clearSelection());
+  $("#clearConstruction").addEventListener("click", () => {
+    construction.startPointId = null;
+    setStatus("Construction cleared.", "");
+  });
+  $("#deleteSelected").addEventListener("click", () => doDeleteSelected());
+
+  function clearSelection() {
     selectedPointIds = [];
     selectedPointId = null;
     selectedLines = [];
@@ -1308,32 +1460,27 @@
     updatePointEditorFromSelection();
     schedulePointsTableRender();
     setStatus("Selection cleared.", "");
-  });
-
-  $("#clearConstruction").addEventListener("click", () => {
-    construction.startPointId = null;
-    construction.startPointId2 = null;
-    setStatus("Construction cleared.", "");
-  });
-
-  $("#deleteSelected").addEventListener("click", () => doDeleteSelected());
+  }
 
   function doDeleteSelected() {
-    if (selectedPointIds.length) {
-      history.push("delete points");
-      const nums = selectedPointIds.map(id => points.get(id)?.num ?? "?");
-      for (const id of [...selectedPointIds].reverse()) deletePoint(id);
-      setStatus(`Deleted point(s): ${nums.join(", ")}.`, "warn");
-      return;
-    }
-    if (selectedLines.length) {
-      history.push("delete lines");
-      const ids = selectedLines.map(s=>s.lineId);
-      for (const id of ids) deleteLine(id);
-      setStatus(`Deleted ${ids.length} line(s).`, "warn");
-      return;
-    }
-    setStatus("Nothing selected.", "warn");
+    const hasPts = selectedPointIds.length > 0;
+    const hasLns = selectedLines.length > 0;
+    if (!hasPts && !hasLns) { setStatus("Nothing selected.", "warn"); return; }
+
+    history.push("delete selected");
+
+    // Delete points first (will also delete incident lines),
+    // then delete remaining explicitly-selected lines that still exist.
+    const pointIds = [...selectedPointIds];
+    const lineIds = [...new Set(selectedLines.map(s => s.lineId))];
+
+    // Clear selection early to avoid churn during deletes
+    clearSelection();
+
+    for (const pid of pointIds) deletePoint(pid);
+    for (const lid of lineIds) if (lines.has(lid)) deleteLine(lid);
+
+    setStatus(`Deleted ${pointIds.length} point(s) and ${lineIds.length} line(s) (where applicable).`, "warn");
   }
 
   $("#focusSelected").addEventListener("click", () => {
@@ -1362,6 +1509,83 @@
     setStatus("Nothing to center on.", "warn");
   });
 
+  // -------------------------
+  // Modal (Points Manager)
+  // -------------------------
+  function modalIsOpen(){ return !modal.classList.contains("hidden"); }
+
+  function openModal() {
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden","false");
+    closePointsManagerBtn.disabled = false;
+
+    // center modal (only if not positioned yet)
+    if (!modalWindow.style.left || !modalWindow.style.top) {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const w = Math.min(1100, vw - 36);
+      const h = Math.min(640, vh - 36);
+      modalWindow.style.width = w + "px";
+      modalWindow.style.height = h + "px";
+      modalWindow.style.left = Math.max(18, (vw - w)/2) + "px";
+      modalWindow.style.top = Math.max(18, (vh - h)/2) + "px";
+    }
+
+    schedulePointsTableRender();
+    updateCounts();
+    $("#ptFilter").focus();
+  }
+
+  function closeModal() {
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden","true");
+    closePointsManagerBtn.disabled = true;
+  }
+
+  openPointsManagerBtn.addEventListener("click", openModal);
+  closePointsManagerBtn.addEventListener("click", closeModal);
+  modalClose.addEventListener("click", closeModal);
+
+  // click outside window closes
+  modal.addEventListener("mousedown", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  // ESC closes modal
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modalIsOpen() && !isEditableTarget(e.target)) {
+      e.preventDefault();
+      closeModal();
+    }
+  });
+
+  // draggable modal header
+  let modalDrag = null;
+  modalHeader.addEventListener("mousedown", (e) => {
+    // avoid starting drag when clicking the close button
+    if (e.target.closest("button") || isEditableTarget(e.target)) return;
+    e.preventDefault();
+    const rect = modalWindow.getBoundingClientRect();
+    modalDrag = {
+      offX: e.clientX - rect.left,
+      offY: e.clientY - rect.top
+    };
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!modalDrag) return;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const r = modalWindow.getBoundingClientRect();
+    let left = e.clientX - modalDrag.offX;
+    let top = e.clientY - modalDrag.offY;
+    left = clamp(left, 10 - r.width + 80, vw - 80);
+    top = clamp(top, 10, vh - 60);
+    modalWindow.style.left = left + "px";
+    modalWindow.style.top = top + "px";
+  });
+  window.addEventListener("mouseup", ()=>{ modalDrag = null; });
+
+  // -------------------------
+  // Point editor panel
+  // -------------------------
   function updatePointEditorFromSelection() {
     const p = selectedPointId ? points.get(selectedPointId) : null;
     if (p) {
@@ -1382,20 +1606,18 @@
       setStatus("Select a point to apply edits.", "warn");
       return;
     }
-    history.push("edit point");
     const p = points.get(selectedPointId);
 
-    const newNum = String($("#ptNum").value || p.num).trim();
-    if (newNum !== p.num) {
-      if (pointNumberExists(newNum, p.id)) {
-        setStatus(`Point number ${newNum} already exists.`, "warn");
-        history.undoAction(); // roll back push if invalid
-        history.redo.pop();   // keep redo consistent (undoAction pushed redo)
-        return;
-      }
-      p.num = newNum;
+    // Validate first, then push history
+    const proposedNum = String($("#ptNum").value || p.num).trim();
+    if (proposedNum !== p.num && pointNumberExists(proposedNum, p.id)) {
+      setStatus(`Point number ${proposedNum} already exists.`, "warn");
+      return;
     }
 
+    history.push("edit point");
+
+    p.num = proposedNum;
     p.x = parseNum($("#ptX").value, p.x);
     p.y = parseNum($("#ptY").value, p.y);
     p.z = parseNum($("#ptZ").value, p.z);
@@ -1404,10 +1626,11 @@
 
     schedulePointsTableRender();
     setStatus(`Updated point ${p.num}.`, "ok");
+    updateCounts();
   });
 
   // -------------------------
-  // View: Zoom extents
+  // Zoom extents
   // -------------------------
   function zoomExtents() {
     if (points.size === 0) {
@@ -1448,30 +1671,349 @@
   }
 
   // -------------------------
-  // Line creation
+  // CSV import / export
   // -------------------------
-  $("#setStartFromSel").addEventListener("click", () => {
-    if (!selectedPointId) {
-      setStatus("Select a start point first.", "warn");
+  function parseCSV(text) {
+    const rows = [];
+    let i=0, field="", row=[], inQuotes=false;
+
+    const pushField = () => { row.push(field); field=""; };
+    const pushRow = () => { rows.push(row); row=[]; };
+
+    while (i < text.length) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i+1] === '"') { field += '"'; i+=2; continue; }
+          inQuotes = false; i++; continue;
+        } else {
+          field += c; i++; continue;
+        }
+      } else {
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { pushField(); i++; continue; }
+        if (c === '\n') { pushField(); pushRow(); i++; continue; }
+        if (c === '\r') { i++; continue; }
+        field += c; i++; continue;
+      }
+    }
+    pushField();
+    pushRow();
+    if (rows.length && rows[rows.length-1].every(v => String(v).trim()==="")) rows.pop();
+    return rows;
+  }
+  function normalizeHeader(h) {
+    return String(h||"").trim().toLowerCase().replace(/\s+/g,"");
+  }
+  function csvEscape(v) {
+    const s = String(v ?? "");
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
+  }
+
+  $("#csvIn").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const text = await f.text();
+    const rows = parseCSV(text);
+    if (!rows.length) { setStatus("CSV appears empty.", "warn"); return; }
+
+    history.push("csv import");
+
+    let startRow = 0;
+    let idx = { num:0, x:1, y:2, z:3, code:4, notes:5 };
+    const h = rows[0].map(normalizeHeader);
+    const headerLikely = h.includes("number") || h.includes("num") || h.includes("x") || h.includes("y");
+    if (headerLikely) {
+      startRow = 1;
+      const map = new Map(h.map((v,i)=>[v,i]));
+      const pick = (...names)=> {
+        for (const n of names) if (map.has(n)) return map.get(n);
+        return null;
+      };
+      idx.num = pick("number","num","pt","point","pointnumber") ?? 0;
+      idx.x = pick("x","e","east","easting") ?? 1;
+      idx.y = pick("y","n","north","northing") ?? 2;
+      idx.z = pick("z","elev","elevation") ?? 3;
+      idx.code = pick("code","desc","description") ?? 4;
+      idx.notes = pick("notes","note","comments","comment") ?? 5;
+    }
+
+    const mode = $("#importMode").value;
+    const byNum = new Map();
+    for (const p of points.values()) byNum.set(String(p.num), p.id);
+
+    let added=0, updated=0, skipped=0, renamed=0;
+
+    for (let r = startRow; r < rows.length; r++) {
+      const row = rows[r];
+      const numRaw = (row[idx.num] ?? "").toString().trim();
+      const xRaw = row[idx.x];
+      const yRaw = row[idx.y];
+      if (!numRaw || xRaw==null || yRaw==null) { skipped++; continue; }
+
+      const x = Number(String(xRaw).trim());
+      const y = Number(String(yRaw).trim());
+      if (!Number.isFinite(x) || !Number.isFinite(y)) { skipped++; continue; }
+
+      const z = parseNum(row[idx.z], 0);
+      const code = String(row[idx.code] ?? "");
+      const notes = String(row[idx.notes] ?? "");
+
+      let num = numRaw;
+
+      if (byNum.has(num)) {
+        if (mode === "merge") {
+          const pid = byNum.get(num);
+          const p = points.get(pid);
+          p.x = x; p.y = y; p.z = z; p.code = code; p.notes = notes;
+          updated++;
+          continue;
+        }
+        if (mode === "skip") { skipped++; continue; }
+        if (mode === "rename") {
+          const open = nextOpenPointNumber(1);
+          num = String(open);
+          renamed++;
+        }
+      }
+
+      const pid = addPoint({ num, x, y, z, code, notes, movable:false });
+      byNum.set(String(num), pid);
+      added++;
+    }
+
+    setStatus(`CSV import done.
+Added: ${added}
+Updated: ${updated}
+Renamed: ${renamed}
+Skipped: ${skipped}`, "ok");
+
+    $("#csvIn").value = "";
+    schedulePointsTableRender();
+    if ($("#autoZoomAfterImport").checked) zoomExtents();
+  });
+
+  $("#exportCsv").addEventListener("click", () => {
+    const rows = [];
+    rows.push(["number","x","y","z","code","notes"]);
+    const sorted = Array.from(points.values()).sort((a,b)=>Number(a.num)-Number(b.num));
+    for (const p of sorted) rows.push([p.num, p.x, p.y, p.z, p.code, p.notes].map(v => csvEscape(v)));
+    const csv = rows.map(r=>r.join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "points.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus("Exported points.csv", "ok");
+  });
+
+  // -------------------------
+  // Points table (modal) — inline editing
+  // -------------------------
+  let pointsSortMode = "num";
+  let pointsTableDirty = true;
+  let pointsTableRaf = null;
+
+  function schedulePointsTableRender() {
+    pointsTableDirty = true;
+    if (pointsTableRaf) return;
+    pointsTableRaf = requestAnimationFrame(() => {
+      pointsTableRaf = null;
+      if (pointsTableDirty) renderPointsTable();
+      pointsTableDirty = false;
+    });
+  }
+
+  function getFilteredSortedPoints() {
+    const filter = String($("#ptFilter").value || "").trim().toLowerCase();
+    let arr = Array.from(points.values());
+
+    if (filter) {
+      arr = arr.filter(p => {
+        const hay = `${p.num} ${p.code} ${p.notes}`.toLowerCase();
+        return hay.includes(filter);
+      });
+    }
+
+    if (pointsSortMode === "num") arr.sort((a,b)=> (Number(a.num)||0) - (Number(b.num)||0));
+    else if (pointsSortMode === "id") arr.sort((a,b)=>a.id-b.id);
+    else if (pointsSortMode === "code") arr.sort((a,b)=>String(a.code).localeCompare(String(b.code)));
+    return arr;
+  }
+
+  function renderPointsTable() {
+    // Only render when modal is open (avoids unnecessary DOM churn)
+    if (!modalIsOpen()) return;
+
+    const tbody = $("#pointsTbody");
+    const frag = document.createDocumentFragment();
+    tbody.innerHTML = "";
+
+    const arr = getFilteredSortedPoints();
+    for (const p of arr) {
+      const tr = document.createElement("tr");
+      if (selectedPointIds.includes(p.id)) tr.classList.add("sel");
+
+      const cellInput = (value, field) => {
+        const td = document.createElement("td");
+        const inp = document.createElement("input");
+        inp.className = "cellInput";
+        inp.value = value;
+        inp.dataset.pid = p.id;
+        inp.dataset.field = field;
+        inp.addEventListener("keydown", (e) => e.stopPropagation());
+        inp.addEventListener("input", onPointCellInput);
+        td.appendChild(inp);
+        return { td, inp };
+      };
+
+      const numCell = cellInput(p.num, "num");
+      const xCell = cellInput(p.x, "x");
+      const yCell = cellInput(p.y, "y");
+      const zCell = cellInput(p.z, "z");
+      const codeCell = cellInput(p.code, "code");
+      const notesCell = cellInput(p.notes, "notes");
+
+      const tdAct = document.createElement("td");
+      tdAct.style.whiteSpace = "nowrap";
+
+      const btnSel = document.createElement("button");
+      btnSel.className = "cellBtn";
+      btnSel.textContent = "Select";
+      btnSel.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        selectedPointIds = [p.id];
+        selectedPointId = p.id;
+        selectedLines = [];
+        lastSelectedLineId = null;
+        updatePointEditorFromSelection();
+        schedulePointsTableRender();
+        setStatus(`Selected point ${p.num}.`, "ok");
+      });
+
+      const btnMov = document.createElement("button");
+      btnMov.className = "cellBtn";
+      btnMov.style.marginLeft = "8px";
+      btnMov.textContent = p.movable ? "Lock" : "Unlock";
+      btnMov.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        history.push("toggle point movable");
+        p.movable = !p.movable;
+        schedulePointsTableRender();
+        setStatus(`Point ${p.num} is now ${p.movable ? "MOVABLE" : "LOCKED"}.`, "ok");
+      });
+
+      const btnDel = document.createElement("button");
+      btnDel.className = "cellBtn danger";
+      btnDel.style.marginLeft = "8px";
+      btnDel.textContent = "Delete";
+      btnDel.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        history.push("delete point");
+        deletePoint(p.id);
+        setStatus(`Deleted point ${p.num}.`, "warn");
+      });
+
+      tdAct.appendChild(btnSel);
+      tdAct.appendChild(btnMov);
+      tdAct.appendChild(btnDel);
+
+      tr.appendChild(numCell.td);
+      tr.appendChild(xCell.td);
+      tr.appendChild(yCell.td);
+      tr.appendChild(zCell.td);
+      tr.appendChild(codeCell.td);
+      tr.appendChild(notesCell.td);
+      tr.appendChild(tdAct);
+
+      frag.appendChild(tr);
+
+      if (pointNumberExists(numCell.inp.value, p.id)) numCell.inp.classList.add("bad");
+    }
+
+    tbody.appendChild(frag);
+    updateSelectionHUD();
+    updateCounts();
+  }
+
+  // History push debounce (per typing burst)
+  let tableEditPushed = false;
+  let tableEditTimer = null;
+
+  function pushTableEditHistoryOnce() {
+    if (tableEditPushed) return;
+    tableEditPushed = true;
+    history.push("edit point table");
+    clearTimeout(tableEditTimer);
+    tableEditTimer = setTimeout(()=>{ tableEditPushed = false; }, 900);
+  }
+
+  function onPointCellInput(e) {
+    const inp = e.target;
+    const pid = Number(inp.dataset.pid);
+    const field = inp.dataset.field;
+    const p = points.get(pid);
+    if (!p) return;
+
+    pushTableEditHistoryOnce();
+
+    if (field === "num") {
+      const raw = String(inp.value).trim();
+      if (!raw || pointNumberExists(raw, p.id)) { inp.classList.add("bad"); return; }
+      inp.classList.remove("bad");
+      p.num = raw;
+      if (selectedPointId === pid) $("#ptNum").value = raw;
+      updateCounts();
       return;
     }
+
+    if (field === "x" || field === "y" || field === "z") {
+      const val = Number(String(inp.value).trim());
+      if (!Number.isFinite(val)) { inp.classList.add("bad"); return; }
+      inp.classList.remove("bad");
+      p[field] = val;
+      if (selectedPointId === pid) {
+        if (field === "x") $("#ptX").value = val;
+        if (field === "y") $("#ptY").value = val;
+        if (field === "z") $("#ptZ").value = val;
+      }
+      return;
+    }
+
+    if (field === "code" || field === "notes") {
+      inp.classList.remove("bad");
+      p[field] = String(inp.value);
+      if (selectedPointId === pid) {
+        if (field === "code") $("#ptCode").value = p.code;
+        if (field === "notes") $("#ptNotes").value = p.notes;
+      }
+      return;
+    }
+  }
+
+  $("#ptFilter").addEventListener("input", () => schedulePointsTableRender());
+  $("#refreshPoints").addEventListener("click", () => schedulePointsTableRender());
+  $("#sortPoints").addEventListener("click", () => {
+    pointsSortMode = (pointsSortMode === "num") ? "code" : (pointsSortMode === "code" ? "id" : "num");
+    $("#sortPoints").textContent = `Sort: ${pointsSortMode === "num" ? "Num" : (pointsSortMode === "code" ? "Code" : "ID")}`;
+    schedulePointsTableRender();
+  });
+
+  // -------------------------
+  // Line creation & ops (unchanged behavior)
+  // -------------------------
+  $("#setStartFromSel").addEventListener("click", () => {
+    if (!selectedPointId) { setStatus("Select a start point first.", "warn"); return; }
     construction.startPointId = selectedPointId;
     setStatus(`Start point set to ${points.get(selectedPointId)?.num ?? "?"}.`, "ok");
   });
 
-  function resolveDesiredPointNumber(inputValue) {
-    const raw = String(inputValue ?? "").trim();
-    if (!raw) return nextOpenPointNumber();
-    const requested = Number(raw);
-    if (!Number.isFinite(requested)) return nextOpenPointNumber();
-    const reqInt = Math.max(1, Math.floor(requested));
-    if (!pointNumberExists(String(reqInt))) return reqInt;
-    return nextOpenPointNumber(reqInt);
-  }
-
-  function clearPointNumberField() {
-    $("#ptNum").value = "";
-  }
+  function clearPointNumberField() { $("#ptNum").value = ""; }
 
   $("#makeLineDB").addEventListener("click", () => {
     const startId = construction.startPointId ?? selectedPointId;
@@ -1511,14 +2053,11 @@
 
   $("#lineBetweenSelected").addEventListener("click", () => {
     if (selectedPointIds.length < 2) {
-      setStatus("Select at least two points (Shift-click to multi-select).", "warn");
+      setStatus("Select at least two points (Shift-click to multi-select, or window-drag).", "warn");
       return;
     }
     const ids = selectedPointIds.filter(id => points.has(id));
-    if (ids.length < 2) {
-      setStatus("Selected points are invalid.", "warn");
-      return;
-    }
+    if (ids.length < 2) { setStatus("Selected points are invalid.", "warn"); return; }
 
     history.push("line between points");
 
@@ -1542,9 +2081,6 @@
     setStatus(`Created ${created} line(s) using point selection order:\n${nums.join(" → ")}`, "ok");
   });
 
-  // -------------------------
-  // Line ops: extend / trim / intersection / overlap
-  // -------------------------
   function getTwoSelectedLines() {
     if (selectedLines.length < 2) return null;
     const aSel = selectedLines[selectedLines.length - 2];
@@ -1573,14 +2109,12 @@
     const hit = lineLineIntersection(s.a1, s.a2, s.b1, s.b2);
     if (!hit) { setStatus("Lines are parallel/colinear; no unique intersection.", "warn"); return; }
 
-    // Active = last selected line
     const activeSel = s.bSel;
     const ln = lines.get(activeSel.lineId);
     const A = points.get(ln.a), B = points.get(ln.b);
     if (!A || !B) return;
 
     const t = pointOnLineParam({x:hit.x,y:hit.y}, A, B);
-
     if (t >= 0 && t <= 1) {
       setStatus("Intersection already lies on the active segment. (Extend does nothing.)", "ok");
       return;
@@ -1588,21 +2122,16 @@
 
     history.push("extend to intersect (new point)");
 
-    // Create NEW point at intersection (do not move existing endpoint point)
     const num = resolveDesiredPointNumber($("#ptNum").value);
     const { z, code, notes } = intersectionPointDefaults();
     const pidNew = addPoint({ num, x: hit.x, y: hit.y, z, code, notes, movable:false });
 
-    // If t<0, extension is beyond A-end -> re-end A at new point (A becomes interior, unchanged)
-    // If t>1, extension is beyond B-end -> re-end B at new point
     if (t < 0) ln.a = pidNew;
     else ln.b = pidNew;
 
-    // keep line's movable flag as-is
-    // Selection: select new point + active line
     selectedPointIds = [pidNew];
     selectedPointId = pidNew;
-    selectedLines = [{ lineId: ln.id, grip: (t < 0 ? "a" : "b"), t: clamp(t,0,1) }];
+    selectedLines = [{ lineId: ln.id, grip: (t < 0 ? "a" : "b"), t: 0.5 }];
     lastSelectedLineId = ln.id;
     updatePointEditorFromSelection();
     clearPointNumberField();
@@ -1622,7 +2151,6 @@
 
     history.push("trim to intersect");
 
-    // Trim uses grip on ACTIVE line (moves that endpoint)
     const active = s.bSel;
     const ln = lines.get(active.lineId);
     const gripPid = (active.grip === "a") ? ln.a : ln.b;
@@ -1766,335 +2294,6 @@
   });
 
   // -------------------------
-  // CSV import / export
-  // -------------------------
-  function parseCSV(text) {
-    const rows = [];
-    let i=0, field="", row=[], inQuotes=false;
-
-    const pushField = () => { row.push(field); field=""; };
-    const pushRow = () => { rows.push(row); row=[]; };
-
-    while (i < text.length) {
-      const c = text[i];
-      if (inQuotes) {
-        if (c === '"') {
-          if (text[i+1] === '"') { field += '"'; i+=2; continue; }
-          inQuotes = false; i++; continue;
-        } else {
-          field += c; i++; continue;
-        }
-      } else {
-        if (c === '"') { inQuotes = true; i++; continue; }
-        if (c === ',') { pushField(); i++; continue; }
-        if (c === '\n') { pushField(); pushRow(); i++; continue; }
-        if (c === '\r') { i++; continue; }
-        field += c; i++; continue;
-      }
-    }
-    pushField();
-    pushRow();
-    if (rows.length && rows[rows.length-1].every(v => String(v).trim()==="")) rows.pop();
-    return rows;
-  }
-
-  function normalizeHeader(h) {
-    return String(h||"").trim().toLowerCase().replace(/\s+/g,"");
-  }
-
-  $("#csvIn").addEventListener("change", async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const text = await f.text();
-    const rows = parseCSV(text);
-    if (!rows.length) { setStatus("CSV appears empty.", "warn"); return; }
-
-    history.push("csv import");
-
-    let startRow = 0;
-    let idx = { num:0, x:1, y:2, z:3, code:4, notes:5 };
-    const h = rows[0].map(normalizeHeader);
-    const headerLikely = h.includes("number") || h.includes("num") || h.includes("x") || h.includes("y");
-    if (headerLikely) {
-      startRow = 1;
-      const map = new Map(h.map((v,i)=>[v,i]));
-      const pick = (...names)=> {
-        for (const n of names) if (map.has(n)) return map.get(n);
-        return null;
-      };
-      idx.num = pick("number","num","pt","point","pointnumber") ?? 0;
-      idx.x = pick("x","e","east","easting") ?? 1;
-      idx.y = pick("y","n","north","northing") ?? 2;
-      idx.z = pick("z","elev","elevation") ?? 3;
-      idx.code = pick("code","desc","description") ?? 4;
-      idx.notes = pick("notes","note","comments","comment") ?? 5;
-    }
-
-    const mode = $("#importMode").value;
-    const byNum = new Map();
-    for (const p of points.values()) byNum.set(String(p.num), p.id);
-
-    let added=0, updated=0, skipped=0, renamed=0;
-
-    for (let r = startRow; r < rows.length; r++) {
-      const row = rows[r];
-      const numRaw = (row[idx.num] ?? "").toString().trim();
-      const xRaw = row[idx.x];
-      const yRaw = row[idx.y];
-      if (!numRaw || xRaw==null || yRaw==null) { skipped++; continue; }
-
-      const x = Number(String(xRaw).trim());
-      const y = Number(String(yRaw).trim());
-      if (!Number.isFinite(x) || !Number.isFinite(y)) { skipped++; continue; }
-
-      const z = parseNum(row[idx.z], 0);
-      const code = String(row[idx.code] ?? "");
-      const notes = String(row[idx.notes] ?? "");
-
-      let num = numRaw;
-
-      if (byNum.has(num)) {
-        if (mode === "merge") {
-          const pid = byNum.get(num);
-          const p = points.get(pid);
-          p.x = x; p.y = y; p.z = z; p.code = code; p.notes = notes;
-          updated++;
-          continue;
-        }
-        if (mode === "skip") {
-          skipped++;
-          continue;
-        }
-        if (mode === "rename") {
-          const open = nextOpenPointNumber(1);
-          num = String(open);
-          renamed++;
-        }
-      }
-
-      const pid = addPoint({ num, x, y, z, code, notes, movable:false });
-      byNum.set(String(num), pid);
-      added++;
-    }
-
-    setStatus(`CSV import done.
-Added: ${added}
-Updated: ${updated}
-Renamed: ${renamed}
-Skipped: ${skipped}`, "ok");
-
-    $("#csvIn").value = "";
-    schedulePointsTableRender();
-    if ($("#autoZoomAfterImport").checked) zoomExtents();
-  });
-
-  $("#exportCsv").addEventListener("click", () => {
-    const rows = [];
-    rows.push(["number","x","y","z","code","notes"]);
-    const sorted = Array.from(points.values()).sort((a,b)=>Number(a.num)-Number(b.num));
-    for (const p of sorted) {
-      rows.push([p.num, p.x, p.y, p.z, p.code, p.notes].map(v => csvEscape(v)));
-    }
-    const csv = rows.map(r=>r.join(",")).join("\n");
-    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "points.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    setStatus("Exported points.csv", "ok");
-  });
-
-  function csvEscape(v) {
-    const s = String(v ?? "");
-    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
-    return s;
-  }
-
-  // -------------------------
-  // Points List (table) — inline editing
-  // -------------------------
-  let pointsSortMode = "num";
-  let pointsTableDirty = true;
-  let pointsTableRaf = null;
-
-  function schedulePointsTableRender() {
-    pointsTableDirty = true;
-    if (pointsTableRaf) return;
-    pointsTableRaf = requestAnimationFrame(() => {
-      pointsTableRaf = null;
-      if (pointsTableDirty) renderPointsTable();
-      pointsTableDirty = false;
-    });
-  }
-
-  function getFilteredSortedPoints() {
-    const filter = String($("#ptFilter").value || "").trim().toLowerCase();
-    let arr = Array.from(points.values());
-
-    if (filter) {
-      arr = arr.filter(p => {
-        const hay = `${p.num} ${p.code} ${p.notes}`.toLowerCase();
-        return hay.includes(filter);
-      });
-    }
-
-    if (pointsSortMode === "num") arr.sort((a,b)=> (Number(a.num)||0) - (Number(b.num)||0));
-    else if (pointsSortMode === "id") arr.sort((a,b)=>a.id-b.id);
-    else if (pointsSortMode === "code") arr.sort((a,b)=>String(a.code).localeCompare(String(b.code)));
-    return arr;
-  }
-
-  function renderPointsTable() {
-    const tbody = $("#pointsTbody");
-    const frag = document.createDocumentFragment();
-    tbody.innerHTML = "";
-
-    const arr = getFilteredSortedPoints();
-    for (const p of arr) {
-      const tr = document.createElement("tr");
-      if (selectedPointIds.includes(p.id)) tr.classList.add("sel");
-
-      const cellInput = (value, field) => {
-        const td = document.createElement("td");
-        const inp = document.createElement("input");
-        inp.className = "cellInput";
-        inp.value = value;
-        inp.dataset.pid = p.id;
-        inp.dataset.field = field;
-        inp.addEventListener("keydown", (e) => e.stopPropagation());
-        inp.addEventListener("input", onPointCellInput);
-        td.appendChild(inp);
-        return { td, inp };
-      };
-
-      const numCell = cellInput(p.num, "num");
-      const xCell = cellInput(p.x, "x");
-      const yCell = cellInput(p.y, "y");
-      const zCell = cellInput(p.z, "z");
-      const codeCell = cellInput(p.code, "code");
-      const notesCell = cellInput(p.notes, "notes");
-
-      const tdAct = document.createElement("td");
-      tdAct.style.whiteSpace = "nowrap";
-
-      const btnSel = document.createElement("button");
-      btnSel.className = "cellBtn";
-      btnSel.textContent = "Select";
-      btnSel.addEventListener("click", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        selectedPointIds = [p.id];
-        selectedPointId = p.id;
-        selectedLines = [];
-        lastSelectedLineId = null;
-        updatePointEditorFromSelection();
-        schedulePointsTableRender();
-        setStatus(`Selected point ${p.num}.`, "ok");
-      });
-
-      const btnMov = document.createElement("button");
-      btnMov.className = "cellBtn";
-      btnMov.style.marginLeft = "6px";
-      btnMov.textContent = p.movable ? "Lock" : "Unlock";
-      btnMov.addEventListener("click", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        history.push("toggle point movable");
-        p.movable = !p.movable;
-        schedulePointsTableRender();
-        setStatus(`Point ${p.num} is now ${p.movable ? "MOVABLE" : "LOCKED"}.`, "ok");
-      });
-
-      const btnDel = document.createElement("button");
-      btnDel.className = "cellBtn danger";
-      btnDel.style.marginLeft = "6px";
-      btnDel.textContent = "Delete";
-      btnDel.addEventListener("click", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        history.push("delete point");
-        deletePoint(p.id);
-        setStatus(`Deleted point ${p.num}.`, "warn");
-      });
-
-      tdAct.appendChild(btnSel);
-      tdAct.appendChild(btnMov);
-      tdAct.appendChild(btnDel);
-
-      tr.appendChild(numCell.td);
-      tr.appendChild(xCell.td);
-      tr.appendChild(yCell.td);
-      tr.appendChild(zCell.td);
-      tr.appendChild(codeCell.td);
-      tr.appendChild(notesCell.td);
-      tr.appendChild(tdAct);
-
-      frag.appendChild(tr);
-
-      if (pointNumberExists(numCell.inp.value, p.id)) numCell.inp.classList.add("bad");
-    }
-
-    tbody.appendChild(frag);
-    updateSelectionHUD();
-  }
-
-  function onPointCellInput(e) {
-    const inp = e.target;
-    const pid = Number(inp.dataset.pid);
-    const field = inp.dataset.field;
-    const p = points.get(pid);
-    if (!p) return;
-
-    // Snapshot once at first change in a focus session
-    if (!inp._historyPushed) {
-      history.push("edit point table");
-      inp._historyPushed = true;
-      setTimeout(() => { inp._historyPushed = false; }, 0);
-    }
-
-    if (field === "num") {
-      const raw = String(inp.value).trim();
-      if (!raw || pointNumberExists(raw, p.id)) { inp.classList.add("bad"); return; }
-      inp.classList.remove("bad");
-      p.num = raw;
-      if (selectedPointId === pid) $("#ptNum").value = raw;
-      return;
-    }
-
-    if (field === "x" || field === "y" || field === "z") {
-      const val = Number(String(inp.value).trim());
-      if (!Number.isFinite(val)) { inp.classList.add("bad"); return; }
-      inp.classList.remove("bad");
-      p[field] = val;
-      if (selectedPointId === pid) {
-        if (field === "x") $("#ptX").value = val;
-        if (field === "y") $("#ptY").value = val;
-        if (field === "z") $("#ptZ").value = val;
-      }
-      return;
-    }
-
-    if (field === "code" || field === "notes") {
-      inp.classList.remove("bad");
-      p[field] = String(inp.value);
-      if (selectedPointId === pid) {
-        if (field === "code") $("#ptCode").value = p.code;
-        if (field === "notes") $("#ptNotes").value = p.notes;
-      }
-      return;
-    }
-  }
-
-  $("#ptFilter").addEventListener("input", () => schedulePointsTableRender());
-  $("#refreshPoints").addEventListener("click", () => schedulePointsTableRender());
-  $("#sortPoints").addEventListener("click", () => {
-    pointsSortMode = (pointsSortMode === "num") ? "code" : (pointsSortMode === "code" ? "id" : "num");
-    $("#sortPoints").textContent = `Sort: ${pointsSortMode === "num" ? "Num" : (pointsSortMode === "code" ? "Code" : "ID")}`;
-    schedulePointsTableRender();
-  });
-
-  // -------------------------
   // Canvas interaction
   // -------------------------
   function updateMouseFromEvent(e) {
@@ -2116,17 +2315,16 @@ Skipped: ${skipped}`, "ok");
     mouse.dragStartWorldX = mouse.wx;
     mouse.dragStartWorldY = mouse.wy;
   }
-
   function endDrag() {
     mouse.drag = false;
     mouse.dragObj = null;
   }
 
+  const keys = { space:false, shift:false };
+
   function toolIsPan() {
     return tool === "pan" || keys.space || mouse.button === 1;
   }
-
-  const keys = { space:false, shift:false };
 
   window.addEventListener("keydown", (e) => {
     const typing = isEditableTarget(e.target);
@@ -2186,6 +2384,7 @@ Skipped: ${skipped}`, "ok");
   });
 
   canvas.addEventListener("mousedown", (e) => {
+    if (modalIsOpen()) return; // modal covers, but be explicit
     updateMouseFromEvent(e);
     mouse.down = true;
     mouse.button = e.button;
@@ -2202,29 +2401,57 @@ Skipped: ${skipped}`, "ok");
 
     if (tool === "select") {
       if (pid) {
-        setSelectionFromPick({pointId: pid, additive});
-        // Drag only if point is movable
+        // click select point
+        if (!additive) { selectedLines = []; lastSelectedLineId = null; }
+        const idx = selectedPointIds.indexOf(pid);
+        if (!additive) selectedPointIds = [pid];
+        else {
+          if (idx >= 0) selectedPointIds.splice(idx,1);
+          else selectedPointIds.push(pid);
+        }
+        selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length-1] : null;
+        updatePointEditorFromSelection();
+        schedulePointsTableRender();
+
+        // drag only if movable
         const p = points.get(pid);
         if (selectedPointId === pid && p?.movable) {
-          const marker = serializeState();
           history.push("move point");
-          mouse._dragUndoMarker = marker;
           beginDrag({type:"point", id: pid, _moved:false});
         }
         return;
       }
+
       if (lpick) {
-        setSelectionFromPick({linePick: lpick, additive});
+        // click select line
+        if (!additive) { selectedPointIds = []; selectedPointId = null; }
+        const idx = selectedLines.findIndex(s => s.lineId === lpick.lineId);
+        if (!additive) selectedLines = [{ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t }];
+        else {
+          if (idx >= 0) selectedLines.splice(idx,1);
+          else selectedLines.push({ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t });
+        }
+        lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : null;
+        updatePointEditorFromSelection();
+        schedulePointsTableRender();
+
+        // drag if movable
         const ln = lines.get(lpick.lineId);
         if (ln?.movable) {
-          const marker = serializeState();
           history.push("move line");
-          mouse._dragUndoMarker = marker;
           beginDrag({type:"line", id: lpick.lineId, _moved:false});
         }
         return;
       }
-      setSelectionFromPick({pointId:null, linePick:null, additive});
+
+      // empty space: begin marquee selection
+      if (e.button === 0) {
+        beginDrag({type:"marquee", x0: mouse.x, y0: mouse.y, x1: mouse.x, y1: mouse.y, additive});
+        return;
+      }
+
+      // otherwise clear selection (right-click etc)
+      if (!additive) clearSelection();
       return;
     }
 
@@ -2305,8 +2532,11 @@ Skipped: ${skipped}`, "ok");
 
     if (tool === "pointOnLine") {
       if (lpick) {
-        setSelectionFromPick({ linePick: lpick, additive });
+        if (!additive) { selectedPointIds = []; selectedPointId = null; selectedLines = []; }
+        selectedLines = [{ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t }];
+        lastSelectedLineId = lpick.lineId;
         setStatus("Line selected for station/offset. Enter station/offset and click 'Create Point'.", "ok");
+        schedulePointsTableRender();
         return;
       }
       setStatus("Select a line (click near it).", "warn");
@@ -2315,6 +2545,7 @@ Skipped: ${skipped}`, "ok");
   });
 
   canvas.addEventListener("mousemove", (e) => {
+    if (modalIsOpen()) return;
     updateMouseFromEvent(e);
     if (!mouse.drag) return;
 
@@ -2323,6 +2554,12 @@ Skipped: ${skipped}`, "ok");
       const dy = mouse.y - mouse.dragStartY;
       view.panX = mouse.dragStartPanX + dx;
       view.panY = mouse.dragStartPanY + dy;
+      return;
+    }
+
+    if (mouse.dragObj?.type === "marquee") {
+      mouse.dragObj.x1 = mouse.x;
+      mouse.dragObj.y1 = mouse.y;
       return;
     }
 
@@ -2372,30 +2609,88 @@ Skipped: ${skipped}`, "ok");
     }
   });
 
+  function applyMarqueeSelection(obj) {
+    const r = rectNorm(obj.x0, obj.y0, obj.x1, obj.y1);
+
+    // If tiny drag, treat as click-empty: clear selection (unless additive)
+    if (r.w < 3 && r.h < 3) {
+      if (!obj.additive) clearSelection();
+      return;
+    }
+
+    const ptsIn = [];
+    for (const p of points.values()) {
+      const sp = worldToScreen(p.x,p.y);
+      if (sp.x >= r.minX && sp.x <= r.maxX && sp.y >= r.minY && sp.y <= r.maxY) ptsIn.push(p.id);
+    }
+
+    const lnsIn = [];
+    const rectCenter = {x:r.cx, y:r.cy};
+    for (const ln of lines.values()) {
+      const a = points.get(ln.a), b = points.get(ln.b);
+      if (!a || !b) continue;
+      const sa = worldToScreen(a.x,a.y);
+      const sb = worldToScreen(b.x,b.y);
+
+      if (segIntersectsRect(sa, sb, r)) {
+        const grip = (dist2(rectCenter.x,rectCenter.y, sa.x,sa.y) <= dist2(rectCenter.x,rectCenter.y, sb.x,sb.y)) ? "a" : "b";
+        lnsIn.push({ lineId: ln.id, grip, t: 0.5 });
+      }
+    }
+
+    if (!obj.additive) {
+      selectedPointIds = ptsIn;
+      selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length-1] : null;
+      selectedLines = lnsIn;
+      lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : null;
+    } else {
+      // additive union (no toggle)
+      const setPts = new Set(selectedPointIds);
+      for (const id of ptsIn) if (!setPts.has(id)) selectedPointIds.push(id);
+      selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length-1] : selectedPointId;
+
+      const setLns = new Set(selectedLines.map(s=>s.lineId));
+      for (const s of lnsIn) if (!setLns.has(s.lineId)) selectedLines.push(s);
+      lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : lastSelectedLineId;
+    }
+
+    updatePointEditorFromSelection();
+    schedulePointsTableRender();
+    setStatus(`Window selected: ${ptsIn.length} point(s), ${lnsIn.length} line(s).`, "ok");
+  }
+
   canvas.addEventListener("mouseup", () => {
     mouse.down = false;
-    if (mouse.drag) {
-      // If no movement happened, remove the undo entry we pushed
-      if (mouse.dragObj && mouse.dragObj.type !== "pan") {
-        if (!mouse.dragObj._moved) {
-          // last push was the move action
-          history.undo.pop();
-          updateUndoRedoHUD();
-        } else {
-          setStatus("Move committed. (Undo available)", "ok");
-        }
-      }
+    if (!mouse.drag) return;
+
+    if (mouse.dragObj?.type === "marquee") {
+      applyMarqueeSelection(mouse.dragObj);
       endDrag();
-      updatePointEditorFromSelection();
+      return;
+    }
+
+    if (mouse.dragObj && mouse.dragObj.type !== "pan") {
+      if (!mouse.dragObj._moved) {
+        // remove last undo entry if nothing moved
+        history.undo.pop();
+        updateUndoRedoHUD();
+      } else {
+        setStatus("Move committed. (Undo available)", "ok");
+      }
       schedulePointsTableRender();
     }
+
+    endDrag();
+    updatePointEditorFromSelection();
   });
+
   canvas.addEventListener("mouseleave", () => {
     mouse.down = false;
     endDrag();
   });
 
   canvas.addEventListener("wheel", (e) => {
+    if (modalIsOpen()) return;
     e.preventDefault();
     updateMouseFromEvent(e);
 
@@ -2406,12 +2701,16 @@ Skipped: ${skipped}`, "ok");
 
     view.panX = mouse.x - before.x * view.scale;
     view.panY = mouse.y + before.y * view.scale;
-
   }, {passive:false});
 
   // -------------------------
-  // Derived info / tool hint
+  // Counts / tool hint enrichment
   // -------------------------
+  function updateCounts() {
+    pointsCount.textContent = `${points.size} point${points.size===1?"":"s"} / ${lines.size} line${lines.size===1?"":"s"}`;
+    modalPointsCount.textContent = String(points.size);
+  }
+
   function updateDerivedSelectionInfo() {
     if (lastSelectedLineId && lines.has(lastSelectedLineId)) {
       const ln = lines.get(lastSelectedLineId);
@@ -2453,34 +2752,22 @@ Skipped: ${skipped}`, "ok");
     window.addEventListener("resize", resize);
     setTool("select");
     updatePointEditorFromSelection();
-    schedulePointsTableRender();
     updateUndoRedoHUD();
+    updateCounts();
     requestAnimationFrame(draw);
 
     setStatus(
       "Ready.\n" +
-      "Changes in this build:\n" +
-      "• Extend → Intersect now creates a NEW point at intersection; original endpoint point does not move.\n" +
-      "• Drag-move is LOCKED by default; double-click a point/line to toggle MOVABLE.\n" +
-      "• Undo/Redo added (Ctrl+Z / Ctrl+Y, buttons).",
+      "New in this build:\n" +
+      "• Points List/Editor moved into a resizable modal (Open Points Manager).\n" +
+      "• Window (marquee) selection: Select tool → drag in empty space to select points + lines.\n" +
+      "  Hold Shift while dragging to add to selection.\n" +
+      "• Delete now removes BOTH selected points and lines in one action.",
       "ok"
     );
   }
 
   boot();
-
-  // -------------------------
-  // (Re)usable: Create point numbers
-  // -------------------------
-  function resolveDesiredPointNumber(inputValue) {
-    const raw = String(inputValue ?? "").trim();
-    if (!raw) return nextOpenPointNumber();
-    const requested = Number(raw);
-    if (!Number.isFinite(requested)) return nextOpenPointNumber();
-    const reqInt = Math.max(1, Math.floor(requested));
-    if (!pointNumberExists(String(reqInt))) return reqInt;
-    return nextOpenPointNumber(reqInt);
-  }
 
 })();
 </script>
