@@ -419,9 +419,31 @@
           </select>
         </label>
       </div>
+
+      <!-- ADDED: coordinate order selector (fixes X/Y swap root cause for headerless N,E CSVs) -->
+      <div class="row" style="margin-top:8px;">
+        <label style="flex:1;">
+          Coordinate columns (headerless CSV only)
+          <select id="csvCoordOrder">
+            <option value="xy">Assume X,Y (Easting,Northing)</option>
+            <option value="yx">Assume Y,X (Northing,Easting) — swap on import</option>
+          </select>
+        </label>
+      </div>
+
       <div class="inline" style="margin-top:8px;">
         <label><input id="autoZoomAfterImport" type="checkbox" checked /> Auto-zoom after import</label>
       </div>
+
+      <!-- ADDED: one-click repair for already imported swapped datasets -->
+      <div class="row" style="margin-top:8px;">
+        <button id="swapXYAll" class="danger" style="flex:1;">Swap X↔Y for ALL Points</button>
+      </div>
+      <div class="hint mini">
+        If your drawing came in “transposed”, that’s X/Y swapped in the point data (common when a headerless CSV is N,E instead of E,N).
+        This button fixes existing points (Undo works). For future imports, set “Coordinate columns” to Y,X.
+      </div>
+
       <div class="row" style="margin-top:8px;">
         <button id="exportCsv" class="ok" style="flex:1;">Export Points CSV</button>
       </div>
@@ -1469,12 +1491,9 @@
 
     history.push("delete selected");
 
-    // Delete points first (will also delete incident lines),
-    // then delete remaining explicitly-selected lines that still exist.
     const pointIds = [...selectedPointIds];
     const lineIds = [...new Set(selectedLines.map(s => s.lineId))];
 
-    // Clear selection early to avoid churn during deletes
     clearSelection();
 
     for (const pid of pointIds) deletePoint(pid);
@@ -1519,7 +1538,6 @@
     modal.setAttribute("aria-hidden","false");
     closePointsManagerBtn.disabled = false;
 
-    // center modal (only if not positioned yet)
     if (!modalWindow.style.left || !modalWindow.style.top) {
       const vw = window.innerWidth, vh = window.innerHeight;
       const w = Math.min(1100, vw - 36);
@@ -1545,12 +1563,10 @@
   closePointsManagerBtn.addEventListener("click", closeModal);
   modalClose.addEventListener("click", closeModal);
 
-  // click outside window closes
   modal.addEventListener("mousedown", (e) => {
     if (e.target === modal) closeModal();
   });
 
-  // ESC closes modal
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && modalIsOpen() && !isEditableTarget(e.target)) {
       e.preventDefault();
@@ -1558,10 +1574,8 @@
     }
   });
 
-  // draggable modal header
   let modalDrag = null;
   modalHeader.addEventListener("mousedown", (e) => {
-    // avoid starting drag when clicking the close button
     if (e.target.closest("button") || isEditableTarget(e.target)) return;
     e.preventDefault();
     const rect = modalWindow.getBoundingClientRect();
@@ -1608,7 +1622,6 @@
     }
     const p = points.get(selectedPointId);
 
-    // Validate first, then push history
     const proposedNum = String($("#ptNum").value || p.num).trim();
     if (proposedNum !== p.num && pointNumberExists(proposedNum, p.id)) {
       setStatus(`Point number ${proposedNum} already exists.`, "warn");
@@ -1711,6 +1724,20 @@
     return s;
   }
 
+  // ADDED: Swap all points X/Y (undoable)
+  $("#swapXYAll").addEventListener("click", () => {
+    if (points.size === 0) { setStatus("No points to swap.", "warn"); return; }
+    history.push("swap x y all");
+    for (const p of points.values()) {
+      const t = p.x;
+      p.x = p.y;
+      p.y = t;
+    }
+    schedulePointsTableRender();
+    updatePointEditorFromSelection();
+    setStatus("Swapped X↔Y for ALL points. (Undo available)", "ok");
+  });
+
   $("#csvIn").addEventListener("change", async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -1723,7 +1750,7 @@
     let startRow = 0;
     let idx = { num:0, x:1, y:2, z:3, code:4, notes:5 };
     const h = rows[0].map(normalizeHeader);
-    const headerLikely = h.includes("number") || h.includes("num") || h.includes("x") || h.includes("y");
+    const headerLikely = h.includes("number") || h.includes("num") || h.includes("x") || h.includes("y") || h.includes("northing") || h.includes("easting") || h.includes("n") || h.includes("e");
     if (headerLikely) {
       startRow = 1;
       const map = new Map(h.map((v,i)=>[v,i]));
@@ -1740,10 +1767,13 @@
     }
 
     const mode = $("#importMode").value;
+    const coordOrder = $("#csvCoordOrder").value; // "xy" | "yx" (used ONLY when header is absent)
+
     const byNum = new Map();
     for (const p of points.values()) byNum.set(String(p.num), p.id);
 
     let added=0, updated=0, skipped=0, renamed=0;
+    let swappedApplied = 0;
 
     for (let r = startRow; r < rows.length; r++) {
       const row = rows[r];
@@ -1752,9 +1782,17 @@
       const yRaw = row[idx.y];
       if (!numRaw || xRaw==null || yRaw==null) { skipped++; continue; }
 
-      const x = Number(String(xRaw).trim());
-      const y = Number(String(yRaw).trim());
+      let x = Number(String(xRaw).trim());
+      let y = Number(String(yRaw).trim());
       if (!Number.isFinite(x) || !Number.isFinite(y)) { skipped++; continue; }
+
+      // FIX: root cause for headerless N,E files
+      // If there is NO real header and user says columns are Y,X (N,E),
+      // then swap parsed values so internal point data remains x=easting, y=northing.
+      if (!headerLikely && coordOrder === "yx") {
+        const t = x; x = y; y = t;
+        swappedApplied++;
+      }
 
       const z = parseNum(row[idx.z], 0);
       const code = String(row[idx.code] ?? "");
@@ -1787,7 +1825,8 @@
 Added: ${added}
 Updated: ${updated}
 Renamed: ${renamed}
-Skipped: ${skipped}`, "ok");
+Skipped: ${skipped}
+Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     $("#csvIn").value = "";
     schedulePointsTableRender();
@@ -1847,7 +1886,6 @@ Skipped: ${skipped}`, "ok");
   }
 
   function renderPointsTable() {
-    // Only render when modal is open (avoids unnecessary DOM churn)
     if (!modalIsOpen()) return;
 
     const tbody = $("#pointsTbody");
@@ -1941,7 +1979,6 @@ Skipped: ${skipped}`, "ok");
     updateCounts();
   }
 
-  // History push debounce (per typing burst)
   let tableEditPushed = false;
   let tableEditTimer = null;
 
@@ -2326,6 +2363,14 @@ Skipped: ${skipped}`, "ok");
     return tool === "pan" || keys.space || mouse.button === 1;
   }
 
+  // ADDED: hard-reset keys/drag on blur so Space-pan can't get "stuck"
+  window.addEventListener("blur", () => {
+    keys.space = false;
+    keys.shift = false;
+    mouse.down = false;
+    endDrag();
+  });
+
   window.addEventListener("keydown", (e) => {
     const typing = isEditableTarget(e.target);
 
@@ -2340,7 +2385,6 @@ Skipped: ${skipped}`, "ok");
       doDeleteSelected();
     }
 
-    // Undo/Redo
     if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey) {
       const key = e.key.toLowerCase();
       if (key === "z") {
@@ -2359,7 +2403,6 @@ Skipped: ${skipped}`, "ok");
     if (e.key === "Shift") keys.shift = false;
   });
 
-  // Double-click toggles movable on a point/line
   canvas.addEventListener("dblclick", (e) => {
     updateMouseFromEvent(e);
     const pid = pickPoint(mouse.x, mouse.y, 10);
@@ -2384,7 +2427,7 @@ Skipped: ${skipped}`, "ok");
   });
 
   canvas.addEventListener("mousedown", (e) => {
-    if (modalIsOpen()) return; // modal covers, but be explicit
+    if (modalIsOpen()) return;
     updateMouseFromEvent(e);
     mouse.down = true;
     mouse.button = e.button;
@@ -2401,7 +2444,6 @@ Skipped: ${skipped}`, "ok");
 
     if (tool === "select") {
       if (pid) {
-        // click select point
         if (!additive) { selectedLines = []; lastSelectedLineId = null; }
         const idx = selectedPointIds.indexOf(pid);
         if (!additive) selectedPointIds = [pid];
@@ -2413,7 +2455,6 @@ Skipped: ${skipped}`, "ok");
         updatePointEditorFromSelection();
         schedulePointsTableRender();
 
-        // drag only if movable
         const p = points.get(pid);
         if (selectedPointId === pid && p?.movable) {
           history.push("move point");
@@ -2423,7 +2464,6 @@ Skipped: ${skipped}`, "ok");
       }
 
       if (lpick) {
-        // click select line
         if (!additive) { selectedPointIds = []; selectedPointId = null; }
         const idx = selectedLines.findIndex(s => s.lineId === lpick.lineId);
         if (!additive) selectedLines = [{ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t }];
@@ -2435,7 +2475,6 @@ Skipped: ${skipped}`, "ok");
         updatePointEditorFromSelection();
         schedulePointsTableRender();
 
-        // drag if movable
         const ln = lines.get(lpick.lineId);
         if (ln?.movable) {
           history.push("move line");
@@ -2444,13 +2483,11 @@ Skipped: ${skipped}`, "ok");
         return;
       }
 
-      // empty space: begin marquee selection
       if (e.button === 0) {
         beginDrag({type:"marquee", x0: mouse.x, y0: mouse.y, x1: mouse.x, y1: mouse.y, additive});
         return;
       }
 
-      // otherwise clear selection (right-click etc)
       if (!additive) clearSelection();
       return;
     }
@@ -2612,7 +2649,6 @@ Skipped: ${skipped}`, "ok");
   function applyMarqueeSelection(obj) {
     const r = rectNorm(obj.x0, obj.y0, obj.x1, obj.y1);
 
-    // If tiny drag, treat as click-empty: clear selection (unless additive)
     if (r.w < 3 && r.h < 3) {
       if (!obj.additive) clearSelection();
       return;
@@ -2644,7 +2680,6 @@ Skipped: ${skipped}`, "ok");
       selectedLines = lnsIn;
       lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : null;
     } else {
-      // additive union (no toggle)
       const setPts = new Set(selectedPointIds);
       for (const id of ptsIn) if (!setPts.has(id)) selectedPointIds.push(id);
       selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length-1] : selectedPointId;
@@ -2659,7 +2694,8 @@ Skipped: ${skipped}`, "ok");
     setStatus(`Window selected: ${ptsIn.length} point(s), ${lnsIn.length} line(s).`, "ok");
   }
 
-  canvas.addEventListener("mouseup", () => {
+  // ADDED: common mouseup handler + window-level mouseup to prevent stuck pan/drags
+  function handleMouseUpCommon() {
     mouse.down = false;
     if (!mouse.drag) return;
 
@@ -2671,7 +2707,6 @@ Skipped: ${skipped}`, "ok");
 
     if (mouse.dragObj && mouse.dragObj.type !== "pan") {
       if (!mouse.dragObj._moved) {
-        // remove last undo entry if nothing moved
         history.undo.pop();
         updateUndoRedoHUD();
       } else {
@@ -2682,6 +2717,17 @@ Skipped: ${skipped}`, "ok");
 
     endDrag();
     updatePointEditorFromSelection();
+  }
+
+  canvas.addEventListener("mouseup", (e) => {
+    if (modalIsOpen()) return;
+    handleMouseUpCommon();
+  });
+
+  window.addEventListener("mouseup", (e) => {
+    // Only run if the mouseup didn't occur on the canvas itself (prevents double-fire)
+    if (e.target === canvas) return;
+    handleMouseUpCommon();
   });
 
   canvas.addEventListener("mouseleave", () => {
@@ -2758,11 +2804,11 @@ Skipped: ${skipped}`, "ok");
 
     setStatus(
       "Ready.\n" +
-      "New in this build:\n" +
-      "• Points List/Editor moved into a resizable modal (Open Points Manager).\n" +
-      "• Window (marquee) selection: Select tool → drag in empty space to select points + lines.\n" +
-      "  Hold Shift while dragging to add to selection.\n" +
-      "• Delete now removes BOTH selected points and lines in one action.",
+      "This build preserves your baseline interaction.\n" +
+      "Fixes added:\n" +
+      "• CSV headerless N,E vs E,N import control (prevents X/Y swapped point data).\n" +
+      "• Swap X↔Y for ALL points (Undoable) for already-imported transposed datasets.\n" +
+      "• Pan/drag release robustness (window mouseup + blur reset).",
       "ok"
     );
   }
