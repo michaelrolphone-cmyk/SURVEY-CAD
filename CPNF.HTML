@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PLSS Aliquots + Corner Types (Geometry) + Ada CP&F</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#101823; --text:#e8eef7; --muted:#a9b6c7;
+      --accent:#6aa9ff; --danger:#ff6a6a; --ok:#84ffb1;
+    }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #app { height:100%; display:grid; grid-template-columns: 460px 1fr; }
+    #panel{
+      background:var(--panel);
+      border-right:1px solid rgba(255,255,255,.08);
+      padding:14px;
+      overflow:auto;
+      overflow-x:hidden;
+      box-sizing:border-box;
+    }
+    #map{ height:100%; }
+    h1{ font-size:16px; margin:0 0 10px; }
+    .small{ font-size:12px; color:var(--muted); line-height:1.35; }
+    .row{ display:flex; gap:8px; align-items:center; margin:10px 0; flex-wrap:wrap; }
+    input[type="text"]{
+      flex:1; min-width:240px;
+      background:#0c141f; border:1px solid rgba(255,255,255,.12);
+      color:var(--text); padding:10px; border-radius:10px; outline:none; box-sizing:border-box;
+    }
+    button{
+      background:#1a2a3d; color:var(--text);
+      border:1px solid rgba(255,255,255,.14);
+      padding:10px 12px; border-radius:10px; cursor:pointer; white-space:nowrap;
+    }
+    button:hover{ border-color:rgba(255,255,255,.25); }
+
+    .card{
+      background:#0c141f;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;
+      padding:10px;
+      margin:10px 0;
+      overflow:hidden;
+      box-sizing:border-box;
+    }
+    .card h2{ font-size:13px; margin:0 0 8px; color:#d8e6ff; }
+    .divider{ height:1px; background:rgba(255,255,255,.08); margin:12px 0; }
+
+    .kv{
+      display:grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap:6px 10px;
+      font-size:12px;
+      align-items:start;
+    }
+    .kv > div{ min-width:0; }
+    .kv > div:nth-child(odd){ color:var(--muted); }
+    .kv > div:nth-child(even){ overflow-wrap:anywhere; word-break:break-word; }
+
+    a{ color:var(--accent); text-decoration:none; overflow-wrap:anywhere; word-break:break-word; }
+    a:hover{ text-decoration:underline; }
+
+    code{
+      display:block; max-width:100%;
+      overflow-wrap:anywhere; word-break:break-all;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.08);
+      padding:6px 8px; border-radius:10px; margin-top:6px;
+      color:#cfe0ff;
+    }
+
+    .pill{
+      display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.14); color:var(--muted); margin-left:6px;
+    }
+    .err{ color:var(--danger); }
+    .ok{ color:var(--ok); }
+
+    /* Map labels */
+    .plss-label{
+      pointer-events:none;
+      user-select:none;
+      background: rgba(10,14,20,0.70);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: #eaf1ff;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.1;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+    .plss-label.section { font-weight: 800; font-size: 13px; }
+    .plss-label.aliquot { font-weight: 650; font-size: 11px; opacity: 0.95; }
+    .plss-label.corner  { font-weight: 900; font-size: 10px; padding: 1px 5px; }
+
+    /* CP&F list */
+    .cpf-list{ display:flex; flex-direction:column; gap:8px; }
+    .cpf-item{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:10px;
+      padding:8px;
+      background: rgba(255,255,255,.03);
+    }
+    .cpf-item .top{
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+      font-size:12px; color:#d8e6ff; font-weight:700;
+    }
+    .cpf-item .meta{
+      display:grid;
+      grid-template-columns: 120px minmax(0,1fr);
+      gap:4px 10px;
+      margin-top:6px;
+      font-size:12px;
+    }
+    .cpf-item .meta div:nth-child(odd){ color:var(--muted); }
+    .cpf-item .meta div:nth-child(even){ overflow-wrap:anywhere; word-break:break-word; min-width:0; }
+
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="panel">
+    <h1>PLSS (Geometry Labels) + Ada CP&F</h1>
+    <div class="small">
+      Labels are computed from the section polygon using the standard 1×1 / 2×2 / 4×4 subdivision grid:
+      <span class="pill">SEC</span> corners,
+      <span class="pill">1/4</span> side midpoints,
+      <span class="pill">CTR</span> center,
+      <span class="pill">1/16</span> other grid nodes.
+      <div class="small" style="margin-top:6px;">
+        Aliquot labels are computed from centroid position (NE/NW/SE/SW, NENE…)
+      </div>
+    </div>
+
+    <div class="row">
+      <input id="addr" type="text" placeholder="Address (e.g., 200 W Front St, Boise, ID)" />
+      <button id="go">Go</button>
+      <button id="fit">Fit</button>
+      <button id="clear">Clear</button>
+      <button id="toggleLabels">Toggle Labels</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card">
+      <h2>Status</h2>
+      <div id="status" class="small">Idle.</div>
+      <div class="small" style="margin-top:6px;">
+        Click an aliquot to select. Click a corner marker to list CP&F records for that corner.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Section</h2>
+      <div id="sectionInfo" class="small">None loaded.</div>
+    </div>
+
+    <div class="card">
+      <h2>Aliquots</h2>
+      <div id="aliquotInfo" class="small">None loaded.</div>
+      <div class="divider"></div>
+      <div class="small" style="color:#d8e6ff; font-weight:800; margin-bottom:6px;">Selected Aliquot</div>
+      <div id="selectedAliquotInfo" class="small">Click an aliquot polygon.</div>
+    </div>
+
+    <div class="card">
+      <h2>Selected Corner</h2>
+      <div id="cornerInfo" class="small">Click a corner marker.</div>
+    </div>
+
+    <div class="card">
+      <h2>Ada CP&F Records</h2>
+      <div id="cpfInfo" class="small">Select a corner to query CP&F.</div>
+      <div class="small" style="margin-top:8px;">PDF base:</div>
+      <code id="pdfBase"></code>
+    </div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+(() => {
+  // ---------------------------
+  // CONFIG
+  // ---------------------------
+  const BLM_FIRST_DIV_LAYER  = "https://gis.blm.gov/idarcgis/rest/services/realty/BLM_ID_CADNSDI_PLSS_First_Division/MapServer/0";
+  const BLM_SECOND_DIV_LAYER = "https://gis.blm.gov/idarcgis/rest/services/realty/BLM_ID_CADNSDI_PLSS_Second_Division/FeatureServer/0";
+  const BLM_PLSS_POINT_LAYER = "https://gis.blm.gov/idarcgis/rest/services/realty/BLM_ID_CADNSDI_PLSS_Point/FeatureServer/0";
+
+  const ADA_PORTAL_BASE = "https://gisprod.adacounty.id.gov/arcgis";
+  const ADA_CPF_WEBMAP_ITEM_ID = "019521c7932442f0b4b581f641cbf236";
+  const ADA_APP_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/";
+  const ADA_APP_DEEP_LINK_PREFIX = "https://gisprod.adacounty.id.gov/apps/acdscpf/#data_s=id%3AdataSource_1-1929c86d6a3-layer-4%3A";
+  const ADA_CPF_PDF_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/";
+
+  // Geometry labeling tolerances (normalized 0..1 space)
+  const GRID = [0, 0.25, 0.5, 0.75, 1];
+  const NODE_TOL = 0.045; // ~70m on a 1600m section; adjust if needed
+
+  // ---------------------------
+  // UI
+  // ---------------------------
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status");
+  const sectionInfoEl = $("sectionInfo");
+  const aliquotInfoEl = $("aliquotInfo");
+  const selectedAliquotInfoEl = $("selectedAliquotInfo");
+  const cornerInfoEl = $("cornerInfo");
+  const cpfInfoEl = $("cpfInfo");
+  $("pdfBase").textContent = ADA_CPF_PDF_BASE;
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+  function setStatus(msg, cls="") {
+    statusEl.className = "small " + cls;
+    statusEl.textContent = msg;
+  }
+
+  // ---------------------------
+  // MAP (SVG for reliable hit-testing)
+  // ---------------------------
+  const map = L.map("map", { preferCanvas:false }).setView([43.615, -116.202], 12);
+
+  map.createPane("basePane");    map.getPane("basePane").style.zIndex = 200;
+  map.createPane("sectionPane"); map.getPane("sectionPane").style.zIndex = 300;
+  map.createPane("aliquotPane"); map.getPane("aliquotPane").style.zIndex = 350;
+  map.createPane("cornerPane");  map.getPane("cornerPane").style.zIndex  = 400;
+  map.createPane("labelPane");   map.getPane("labelPane").style.zIndex   = 450;
+  map.getPane("labelPane").style.pointerEvents = "none";
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 20, pane:"basePane" }).addTo(map);
+
+  const svgRenderer = L.svg({ padding: 0.5 });
+
+  // Section polygon should NOT be interactive
+  const gSection = L.geoJSON(null, {
+    pane:"sectionPane",
+    interactive:false,
+    renderer: svgRenderer,
+    style: { weight: 3, opacity: 0.9, fillOpacity: 0.05 }
+  }).addTo(map);
+
+  let gAliquots = null; // rebuilt per run
+  const gCorners = L.layerGroup([], { pane:"cornerPane" }).addTo(map);
+  const gLabels  = L.layerGroup([], { pane:"labelPane" }).addTo(map);
+
+  const state = {
+    sectionFeature: null,
+    sectionFrame: null,
+    sectionAreaM2: null,
+    aliquotFC: null,
+    cornersFC: null,
+    lastBounds: null,
+    labelsVisible: true
+  };
+
+  // Selection state (aliquots)
+  let selectedAliquotLayer = null;
+  let selectedAliquotFeature = null;
+
+  // Prevent "map click clears selection" after clicking a polygon
+  let suppressNextMapClick = false;
+
+  // ---------------------------
+  // Networking helpers
+  // ---------------------------
+  async function fetchJson(url, opts={}) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 25000);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, ...opts });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
+      const j = await res.json();
+      if (j && j.error) throw new Error((j.error.message || "ArcGIS error") + (j.error.code ? ` (${j.error.code})` : ""));
+      return j;
+    } finally { clearTimeout(t); }
+  }
+
+  function arcgisQueryUrl(layerUrl, paramsObj) {
+    const base = layerUrl.endsWith("/query") ? layerUrl : (layerUrl.replace(/\/$/, "") + "/query");
+    const u = new URL(base);
+    for (const [k,v] of Object.entries(paramsObj)) {
+      if (v === undefined || v === null) continue;
+      u.searchParams.set(k, typeof v === "string" ? v : JSON.stringify(v));
+    }
+    return u.toString();
+  }
+
+  function featureSetToGeoJson(fs) {
+    const features = (fs?.features ?? []).map(f => {
+      const g = f.geometry;
+      let geom = null;
+      if (g?.x !== undefined && g?.y !== undefined) geom = { type:"Point", coordinates:[g.x, g.y] };
+      else if (g?.rings) geom = { type:"Polygon", coordinates: g.rings.map(r => r.map(([x,y]) => [x,y])) };
+      return { type:"Feature", geometry: geom, properties: { ...(f.attributes ?? {}) } };
+    }).filter(f => f.geometry);
+    return { type:"FeatureCollection", features };
+  }
+
+  function esriPoint(lng, lat) { return { x: lng, y: lat, spatialReference: { wkid: 4326 } }; }
+
+  function esriGeomFromGeoJsonPolygon(geojsonPoly) {
+    if (!geojsonPoly) return null;
+    if (geojsonPoly.type === "Polygon") return { rings: geojsonPoly.coordinates, spatialReference: { wkid: 4326 } };
+    if (geojsonPoly.type === "MultiPolygon") return { rings: geojsonPoly.coordinates[0], spatialReference: { wkid: 4326 } };
+    return null;
+  }
+
+  // ---------------------------
+  // JSONP for Ada (CORS bypass)
+  // ---------------------------
+  function jsonp(url, params = {}, timeoutMs = 25000) {
+    return new Promise((resolve, reject) => {
+      const cb = "__jsonp_cb_" + Math.random().toString(36).slice(2);
+      const u = new URL(url);
+      Object.entries(params).forEach(([k,v]) => u.searchParams.set(k, v));
+      u.searchParams.set("callback", cb);
+
+      const script = document.createElement("script");
+      let done = false;
+
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true; cleanup();
+        reject(new Error("JSONP timeout (callback never returned)"));
+      }, timeoutMs);
+
+      function cleanup() {
+        clearTimeout(timer);
+        try { delete window[cb]; } catch {}
+        if (script && script.parentNode) script.parentNode.removeChild(script);
+      }
+
+      window[cb] = (data) => {
+        if (done) return;
+        done = true; cleanup();
+        if (data && data.error) reject(new Error((data.error.message || "ArcGIS error") + (data.error.code ? ` (${data.error.code})` : "")));
+        else resolve(data);
+      };
+
+      script.onerror = () => {
+        if (done) return;
+        done = true; cleanup();
+        reject(new Error("JSONP network error (script load failed)"));
+      };
+
+      script.src = u.toString();
+      document.head.appendChild(script);
+    });
+  }
+
+  // ---------------------------
+  // Geocode
+  // ---------------------------
+  async function geocodeAddress(addr) {
+    const u = new URL("https://nominatim.openstreetmap.org/search");
+    u.searchParams.set("q", addr);
+    u.searchParams.set("format", "json");
+    u.searchParams.set("limit", "1");
+    u.searchParams.set("addressdetails", "1");
+    const j = await fetchJson(u.toString(), { headers: { "Accept":"application/json" }});
+    if (!j || !j.length) throw new Error("No geocode results.");
+    return { lat: parseFloat(j[0].lat), lon: parseFloat(j[0].lon), display: j[0].display_name };
+  }
+
+  // ---------------------------
+  // Section frame (geometry-based local coords)
+  // ---------------------------
+  function dot(a,b){ return a.x*b.x + a.y*b.y; }
+  function norm(a){ return Math.hypot(a.x, a.y); }
+  function scale(a,s){ return {x:a.x*s, y:a.y*s}; }
+  function sub(a,b){ return {x:a.x-b.x, y:a.y-b.y}; }
+  function add(a,b){ return {x:a.x+b.x, y:a.y+b.y}; }
+
+  function projectLL(lon, lat) {
+    const p = L.Projection.SphericalMercator.project(L.latLng(lat, lon));
+    return { x: p.x, y: p.y };
+  }
+
+  function buildSectionFrame(sectionFeature) {
+    const ring = sectionFeature?.geometry?.coordinates?.[0];
+    if (!ring || ring.length < 4) return null;
+
+    // drop duplicate closing coordinate if present
+    const ring2 = (ring.length > 3 && ring[0][0] === ring[ring.length-1][0] && ring[0][1] === ring[ring.length-1][1])
+      ? ring.slice(0, -1) : ring;
+
+    const pts = ring2.map(([lon,lat]) => projectLL(lon,lat));
+    const n = pts.length;
+
+    // centroid
+    let c = {x:0,y:0};
+    for (const p of pts) c = add(c,p);
+    c = scale(c, 1/n);
+
+    // covariance
+    let sxx=0, syy=0, sxy=0;
+    for (const p of pts) {
+      const d = sub(p,c);
+      sxx += d.x*d.x; syy += d.y*d.y; sxy += d.x*d.y;
+    }
+    sxx /= n; syy /= n; sxy /= n;
+
+    // eigenvector for largest eigenvalue of [[sxx,sxy],[sxy,syy]]
+    const tr = sxx + syy;
+    const det = sxx*syy - sxy*sxy;
+    const disc = Math.max(0, (tr*tr)/4 - det);
+    const lam1 = tr/2 + Math.sqrt(disc);
+
+    let u;
+    if (Math.abs(sxy) > 1e-9) u = { x: lam1 - syy, y: sxy };
+    else u = (sxx >= syy) ? {x:1,y:0} : {x:0,y:1};
+
+    const un = norm(u) || 1;
+    u = scale(u, 1/un);
+    let v = { x: -u.y, y: u.x };
+
+    // orient axes to "east-ish" and "north-ish"
+    const east = {x:1,y:0};
+    const north = {x:0,y:1};
+    if (dot(u, east) < 0) u = scale(u, -1);
+    v = { x: -u.y, y: u.x };
+    if (dot(v, north) < 0) v = scale(v, -1);
+
+    // extents
+    let minU=Infinity, maxU=-Infinity, minV=Infinity, maxV=-Infinity;
+    for (const p of pts) {
+      const uu = dot(p,u);
+      const vv = dot(p,v);
+      if (uu < minU) minU = uu;
+      if (uu > maxU) maxU = uu;
+      if (vv < minV) minV = vv;
+      if (vv > maxV) maxV = vv;
+    }
+
+    const du = maxU - minU;
+    const dv = maxV - minV;
+    if (!(du > 0 && dv > 0)) return null;
+
+    function normXYFromLL(lon, lat) {
+      const p = projectLL(lon,lat);
+      const uu = dot(p,u), vv = dot(p,v);
+      return { x: (uu - minU) / du, y: (vv - minV) / dv };
+    }
+
+    return { u, v, minU, maxU, minV, maxV, du, dv, centroid: c, normXYFromLL };
+  }
+
+  function nearestGrid(val) {
+    let best = GRID[0], bestD = Infinity;
+    for (const g of GRID) {
+      const d = Math.abs(val - g);
+      if (d < bestD) { bestD = d; best = g; }
+    }
+    return { g: best, d: bestD };
+  }
+
+  // Corner type purely from where the point falls on the section subdivision grid
+  function cornerTypeFromNormXY(x,y) {
+    // snap to nearest canonical node
+    const nx = nearestGrid(x);
+    const ny = nearestGrid(y);
+
+    if (nx.d > NODE_TOL || ny.d > NODE_TOL) return "COR";
+
+    const gx = nx.g, gy = ny.g;
+
+    // Center
+    if (Math.abs(gx-0.5) <= NODE_TOL && Math.abs(gy-0.5) <= NODE_TOL) return "CTR";
+
+    // Section corners
+    const xEdge = (gx === 0 || gx === 1);
+    const yEdge = (gy === 0 || gy === 1);
+    if (xEdge && yEdge) return "SEC";
+
+    // Quarter corners (midpoints of section sides)
+    const isQuarter = (
+      (gx === 0.5 && yEdge) ||
+      (gy === 0.5 && xEdge)
+    );
+    if (isQuarter) return "1/4";
+
+    // Everything else on the 5x5 node grid is 1/16-type
+    return "1/16";
+  }
+
+  // Aliquot labeling from centroid position + area ratio
+  function aliquotLabelFromGeometry(normXY, areaRatio) {
+    const x = normXY.x, y = normXY.y;
+
+    const primary = (y >= 0.5 ? "N" : "S") + (x >= 0.5 ? "E" : "W"); // NE/NW/SE/SW
+
+    // If it looks like a quarter (about 1/4 area), label as NE/NW/SE/SW
+    if (areaRatio != null && areaRatio > 0.18 && areaRatio < 0.33) return primary;
+
+    // Otherwise label as 1/16-ish by subdividing each half into halves again
+    const x2 = (x >= 0.5) ? (x - 0.5) / 0.5 : x / 0.5;  // 0..1 inside primary E/W half
+    const y2 = (y >= 0.5) ? (y - 0.5) / 0.5 : y / 0.5;  // 0..1 inside primary N/S half
+    const secondary = (y2 >= 0.5 ? "N" : "S") + (x2 >= 0.5 ? "E" : "W");
+
+    return primary + secondary; // e.g., NENE, NWSE, etc.
+  }
+
+  // ---------------------------
+  // Labels
+  // ---------------------------
+  function addTextLabel(lat, lon, text, kind) {
+    const icon = L.divIcon({ className: "plss-label " + kind, html: esc(text), iconSize: null });
+    return L.marker([lat, lon], { icon, pane:"labelPane", interactive:false }).addTo(gLabels);
+  }
+
+  function centroidLatLng(feature) {
+    try {
+      const c = turf.centroid(feature);
+      const [lon, lat] = c.geometry.coordinates;
+      return { lat, lon };
+    } catch { return null; }
+  }
+
+  function getSectionNumberFromAttrs(props) {
+    // Only accept true 1..36 candidates; otherwise return null (do not lie with serial IDs)
+    const keys = Object.keys(props || {});
+    const candidates = keys.filter(k => /(^SEC$|SECTION|SECT)/i.test(k));
+    for (const k of candidates) {
+      const v = props[k];
+      const n = (typeof v === "number") ? Math.trunc(v) : parseInt(String(v).match(/\d+/)?.[0] || "", 10);
+      if (Number.isInteger(n) && n >= 1 && n <= 36) return n;
+    }
+    return null;
+  }
+
+  function rebuildLabels() {
+    gLabels.clearLayers();
+    if (!state.labelsVisible || !state.sectionFeature || !state.sectionFrame) return;
+
+    // Section label
+    const secNo = getSectionNumberFromAttrs(state.sectionFeature.properties || {});
+    const cSec = centroidLatLng(state.sectionFeature);
+    if (cSec) addTextLabel(cSec.lat, cSec.lon, secNo ? `SEC ${secNo}` : "SEC", "section");
+
+    // Aliquot labels
+    if (state.aliquotFC?.features?.length) {
+      for (const f of state.aliquotFC.features) {
+        const c = centroidLatLng(f);
+        if (!c) continue;
+
+        const a = turf.area(f);
+        const ratio = state.sectionAreaM2 ? (a / state.sectionAreaM2) : null;
+        const nxy = state.sectionFrame.normXYFromLL(c.lon, c.lat);
+        const label = aliquotLabelFromGeometry(nxy, ratio);
+
+        addTextLabel(c.lat, c.lon, label, "aliquot");
+      }
+    }
+
+    // Corner labels (type only)
+    if (state.cornersFC?.features?.length) {
+      for (const f of state.cornersFC.features) {
+        if (!f.geometry || f.geometry.type !== "Point") continue;
+        const [lon, lat] = f.geometry.coordinates;
+        const nxy = state.sectionFrame.normXYFromLL(lon, lat);
+        const typ = cornerTypeFromNormXY(nxy.x, nxy.y);
+        addTextLabel(lat, lon, typ, "corner");
+      }
+    }
+  }
+
+  // ---------------------------
+  // Sidebar renderers
+  // ---------------------------
+  function setSectionInfo(feature) {
+    const p = feature?.properties || {};
+    const secNo = getSectionNumberFromAttrs(p);
+    const rows = [
+      ["Section", secNo != null ? secNo : "(unknown)"],
+      ["PLSSID", p.PLSSID ?? ""],
+      ["TWN / RNG", [p.TWN, p.RNG].filter(Boolean).join(" / ") || ""],
+      ["County / State", [p.COUNTY, p.STATE].filter(Boolean).join(", ") || ""],
+    ];
+    sectionInfoEl.innerHTML = `<div class="kv">${rows.map(([k,v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join("")}</div>`;
+  }
+
+  function setAliquotInfo(fc) {
+    const n = fc?.features?.length ?? 0;
+    aliquotInfoEl.innerHTML = `
+      <div class="small">${n} aliquot polygons loaded.</div>
+      <div class="small" style="margin-top:6px;">Click an aliquot polygon to select it (click will NOT be cleared by map click).</div>
+    `;
+  }
+
+  function setSelectedAliquotInfo(feature, extra={}) {
+    if (!feature || !state.sectionFrame) {
+      selectedAliquotInfoEl.textContent = "Click an aliquot polygon.";
+      return;
+    }
+    const c = centroidLatLng(feature);
+    let label = "(unknown)";
+    let areaAc = null, ratio = null;
+    try {
+      const a = turf.area(feature);
+      ratio = state.sectionAreaM2 ? (a / state.sectionAreaM2) : null;
+      areaAc = a / 4046.8564224;
+      if (c) {
+        const nxy = state.sectionFrame.normXYFromLL(c.lon, c.lat);
+        label = aliquotLabelFromGeometry(nxy, ratio);
+      }
+    } catch {}
+
+    const rows = [
+      ["Derived Label", label],
+      ["Area (ac)", areaAc != null ? areaAc.toFixed(3) : ""],
+      ["Area Ratio", ratio != null ? ratio.toFixed(4) : ""],
+      ["PLSSID", feature.properties?.PLSSID ?? ""]
+    ];
+    selectedAliquotInfoEl.innerHTML = `<div class="kv">${rows.map(([k,v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join("")}</div>`;
+  }
+
+  function setCornerInfo(pointFeature) {
+    if (!pointFeature || !state.sectionFrame) {
+      cornerInfoEl.textContent = "Click a corner marker.";
+      return;
+    }
+    const [lon, lat] = pointFeature.geometry.coordinates;
+    const nxy = state.sectionFrame.normXYFromLL(lon, lat);
+    const typ = cornerTypeFromNormXY(nxy.x, nxy.y);
+
+    const rows = [
+      ["Derived Type", typ],
+      ["Norm XY", `x=${nxy.x.toFixed(3)}, y=${nxy.y.toFixed(3)}`],
+      ["Lat/Lon", `${lat.toFixed(6)}, ${lon.toFixed(6)}`],
+      ["PLSSID", pointFeature.properties?.PLSSID ?? ""]
+    ];
+    cornerInfoEl.innerHTML = `<div class="kv">${rows.map(([k,v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join("")}</div>`;
+  }
+
+  // ---------------------------
+  // BLM queries
+  // ---------------------------
+  async function loadSectionAtPoint(lat, lon) {
+    const qUrl = arcgisQueryUrl(BLM_FIRST_DIV_LAYER, {
+      f:"json",
+      where:"1=1",
+      geometry: esriPoint(lon, lat),
+      geometryType:"esriGeometryPoint",
+      inSR:4326,
+      spatialRel:"esriSpatialRelIntersects",
+      outFields:"*",
+      returnGeometry:true,
+      outSR:4326
+    });
+    const fs = await fetchJson(qUrl);
+    const gj = featureSetToGeoJson(fs);
+    if (!gj.features.length) throw new Error("No PLSS section found at that point.");
+    return gj.features[0];
+  }
+
+  async function loadAliquotsInSection(sectionFeature) {
+    const esriPoly = esriGeomFromGeoJsonPolygon(sectionFeature.geometry);
+    if (!esriPoly) throw new Error("Section geometry not usable for aliquot query.");
+    const qUrl = arcgisQueryUrl(BLM_SECOND_DIV_LAYER, {
+      f:"json",
+      where:"1=1",
+      geometry: esriPoly,
+      geometryType:"esriGeometryPolygon",
+      inSR:4326,
+      spatialRel:"esriSpatialRelIntersects",
+      outFields:"*",
+      returnGeometry:true,
+      outSR:4326
+    });
+    const fs = await fetchJson(qUrl);
+    return featureSetToGeoJson(fs);
+  }
+
+  async function loadCornersInSection(sectionFeature) {
+    const esriPoly = esriGeomFromGeoJsonPolygon(sectionFeature.geometry);
+    if (!esriPoly) throw new Error("Section geometry not usable for corner query.");
+    const qUrl = arcgisQueryUrl(BLM_PLSS_POINT_LAYER, {
+      f:"json",
+      where:"1=1",
+      geometry: esriPoly,
+      geometryType:"esriGeometryPolygon",
+      inSR:4326,
+      spatialRel:"esriSpatialRelIntersects",
+      outFields:"*",
+      returnGeometry:true,
+      outSR:4326
+    });
+    const fs = await fetchJson(qUrl);
+    return featureSetToGeoJson(fs);
+  }
+
+  // ---------------------------
+  // Ada CP&F (return MANY records, not just one)
+  // ---------------------------
+  let cpfLayerUrl = null;
+  let cpfLayerMeta = null;
+
+  async function discoverAdaCpfLayerViaJsonp() {
+    const itemDataUrl = `${ADA_PORTAL_BASE}/sharing/rest/content/items/${ADA_CPF_WEBMAP_ITEM_ID}/data`;
+    const wm = await jsonp(itemDataUrl, { f:"pjson" }, 25000);
+
+    const candidates = [];
+    function walk(arr) {
+      if (!Array.isArray(arr)) return;
+      for (const ol of arr) {
+        if (ol?.url) candidates.push({ title: ol.title || "", url: ol.url });
+        if (ol?.layers) walk(ol.layers);
+      }
+    }
+    walk(wm?.operationalLayers);
+    if (!candidates.length) throw new Error("Ada web map returned no operational layer URLs.");
+
+    async function meta(url) { return await jsonp(url.replace(/\?+.*$/,""), { f:"pjson" }, 25000); }
+    function hasInstrument(fields) {
+      return Array.isArray(fields) && fields.some(f => /instr|instrument/i.test(f.name || "") || /instr|instrument/i.test(f.alias || ""));
+    }
+
+    for (const cand of candidates) {
+      const base = cand.url.replace(/\/+$/,"");
+      const m = await meta(base).catch(() => null);
+      if (!m) continue;
+
+      if (Array.isArray(m.layers) && m.layers.length) {
+        for (const lyr of m.layers) {
+          const lyrUrl = `${base}/${lyr.id}`;
+          const lm = await meta(lyrUrl).catch(() => null);
+          if (!lm) continue;
+          if (/esriGeometryPoint/i.test(lm.geometryType || "") && hasInstrument(lm.fields)) return { layerUrl: lyrUrl, layerMeta: lm };
+        }
+      }
+      if (/esriGeometryPoint/i.test(m.geometryType || "") && hasInstrument(m.fields)) return { layerUrl: base, layerMeta: m };
+    }
+
+    // fallback
+    for (const cand of candidates) {
+      const base = cand.url.replace(/\/+$/,"");
+      const m = await meta(base).catch(() => null);
+      if (!m) continue;
+
+      if (Array.isArray(m.layers) && m.layers.length) {
+        for (const lyr of m.layers) {
+          const lyrUrl = `${base}/${lyr.id}`;
+          const lm = await meta(lyrUrl).catch(() => null);
+          if (!lm) continue;
+          if (/esriGeometryPoint/i.test(lm.geometryType || "")) return { layerUrl: lyrUrl, layerMeta: lm };
+        }
+      }
+      if (/esriGeometryPoint/i.test(m.geometryType || "")) return { layerUrl: base, layerMeta: m };
+    }
+
+    throw new Error("Could not identify a CP&F point layer URL.");
+  }
+
+  function pickField(attrs, layerMeta, patterns) {
+    const keys = Object.keys(attrs || {});
+    const fields = layerMeta?.fields || [];
+    for (const re of patterns) {
+      const k = keys.find(x => re.test(x));
+      if (k) return k;
+      const f = fields.find(ff => re.test(ff.name || "") || re.test(ff.alias || ""));
+      if (f && attrs[f.name] !== undefined) return f.name;
+    }
+    return null;
+  }
+
+  function canonicalizeUrl(u) {
+    try {
+      const url = new URL(u);
+      url.hash = "";
+      // normalize case-insensitively for path as well (helps .PDF/.pdf duplicates)
+      return (url.origin + url.pathname).toLowerCase() + (url.search ? url.search.toLowerCase() : "");
+    } catch {
+      return String(u).trim().toLowerCase();
+    }
+  }
+
+  function buildPdfLinks(instrument, maybeUrl, maybeFileName) {
+    const out = [];
+    const seen = new Set();
+
+    function add(u) {
+      if (!u) return;
+      const s = String(u).trim();
+      if (!s) return;
+      const key = canonicalizeUrl(s);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(s);
+    }
+
+    // explicit URL field
+    if (maybeUrl) {
+      const s = String(maybeUrl).trim();
+      if (/^https?:\/\//i.test(s)) add(s);
+      else if (/\.pdf$/i.test(s)) add(ADA_CPF_PDF_BASE + s.replace(/^\/+/,""));
+    }
+
+    // explicit filename
+    if (maybeFileName) {
+      const s = String(maybeFileName).trim();
+      if (/^https?:\/\//i.test(s)) add(s);
+      else if (/\.pdf$/i.test(s)) add(ADA_CPF_PDF_BASE + s.replace(/^\/+/,""));
+      else add(ADA_CPF_PDF_BASE + encodeURIComponent(s) + ".pdf");
+    }
+
+    // fallback by instrument (single canonical .pdf; do NOT add .PDF duplicate)
+    if (instrument) {
+      const inst = String(instrument).trim();
+      if (inst) add(ADA_CPF_PDF_BASE + encodeURIComponent(inst) + ".pdf");
+    }
+
+    return out;
+  }
+
+  function parseBestDate(attrs, meta) {
+    const dateField = pickField(attrs, meta, [/rec.*date/i, /record.*date/i, /file.*date/i, /date/i]);
+    const yearField = pickField(attrs, meta, [/year/i]);
+
+    let dt = null;
+    if (dateField && attrs[dateField]) {
+      const v = attrs[dateField];
+      if (typeof v === "number") dt = new Date(v);            // epoch ms (common in Esri)
+      else {
+        const s = String(v);
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) dt = d;
+      }
+    }
+    if (!dt && yearField && attrs[yearField]) {
+      const y = parseInt(String(attrs[yearField]).match(/\d{4}/)?.[0] || "", 10);
+      if (y >= 1800 && y <= 2200) dt = new Date(Date.UTC(y,0,1));
+    }
+    return dt;
+  }
+
+  async function adaCpfQueryMany(lat, lon, maxMeters = 250) {
+    if (!cpfLayerUrl) throw new Error("CP&F layer URL not initialized.");
+    const radii = [5, 10, 25, 50, 100, 150, maxMeters];
+
+    for (const r of radii) {
+      const q = await jsonp(cpfLayerUrl.replace(/\/+$/,"") + "/query", {
+        f:"pjson",
+        where:"1=1",
+        geometry: JSON.stringify(esriPoint(lon, lat)),
+        geometryType:"esriGeometryPoint",
+        inSR:"4326",
+        spatialRel:"esriSpatialRelIntersects",
+        distance:String(r),
+        units:"esriSRUnit_Meter",
+        outFields:"*",
+        returnGeometry:"true",
+        outSR:"4326"
+      }, 25000).catch(() => null);
+
+      if (!q?.features?.length) continue;
+
+      // compute distances; keep all
+      const here = turf.point([lon, lat]);
+      const feats = q.features.map(f => {
+        const gx = f.geometry?.x, gy = f.geometry?.y;
+        const distM = (gx != null && gy != null)
+          ? turf.distance(here, turf.point([gx, gy]), { units:"meters" })
+          : null;
+        return { f, distM };
+      });
+
+      // restrict to within radius + small epsilon, just in case
+      const kept = feats.filter(x => x.distM == null || x.distM <= (r + 0.5));
+
+      return { radiusUsedM: r, results: kept };
+    }
+
+    return { radiusUsedM: null, results: [] };
+  }
+
+  function renderCpfRecords(list, radiusUsedM) {
+    if (!list || !list.length) {
+      cpfInfoEl.innerHTML = `<div class="small err">No CP&F records found near this corner.</div>`;
+      return;
+    }
+
+    const meta = cpfLayerMeta || {};
+    const instField = (attrs) => pickField(attrs, meta, [/^instrument$/i, /instr/i, /instrument_?no/i, /inst_?no/i]);
+    const pdfUrlField = (attrs) => pickField(attrs, meta, [/pdf/i, /doc/i, /document/i, /hyperlink/i, /url/i, /link/i]);
+    const pdfNameField = (attrs) => pickField(attrs, meta, [/file/i, /filename/i, /pdfname/i]);
+    const oidField = (attrs) => pickField(attrs, meta, [/^objectid$/i, /object\s*id/i, /fid/i]);
+
+    // Build records
+    const records = list.map(({f, distM}) => {
+      const attrs = f.attributes || {};
+      const instrument = instField(attrs) ? attrs[instField(attrs)] : null;
+      const pdfUrl = pdfUrlField(attrs) ? attrs[pdfUrlField(attrs)] : null;
+      const pdfName = pdfNameField(attrs) ? attrs[pdfNameField(attrs)] : null;
+      const oid = oidField(attrs) ? attrs[oidField(attrs)] : null;
+
+      const dt = parseBestDate(attrs, meta);
+      const dtStr = dt ? dt.toISOString().slice(0,10) : "";
+
+      const pdfLinks = buildPdfLinks(instrument, pdfUrl, pdfName);
+
+      const adaAppLink = (oid !== null && oid !== undefined)
+        ? (ADA_APP_DEEP_LINK_PREFIX + encodeURIComponent(oid))
+        : ADA_APP_BASE;
+
+      return { instrument, dt, dtStr, distM, pdfLinks, adaAppLink };
+    });
+
+    // Sort: newest date first, then instrument desc, then nearest
+    records.sort((a,b) => {
+      const ta = a.dt ? a.dt.getTime() : -Infinity;
+      const tb = b.dt ? b.dt.getTime() : -Infinity;
+      if (ta !== tb) return tb - ta;
+
+      const ia = a.instrument ? String(a.instrument) : "";
+      const ib = b.instrument ? String(b.instrument) : "";
+      if (ia !== ib) return ib.localeCompare(ia, undefined, { numeric:true });
+
+      const da = a.distM ?? Infinity;
+      const db = b.distM ?? Infinity;
+      return da - db;
+    });
+
+    // Render
+    const head = `
+      <div class="small">
+        Found <b>${records.length}</b> record(s)
+        ${radiusUsedM ? `within <b>${radiusUsedM}m</b>` : ""}
+        (sorted newest-first when date is available).
+      </div>
+      <div class="divider"></div>
+    `;
+
+    const items = records.map((r, idx) => {
+      const inst = r.instrument != null ? esc(r.instrument) : `<span class="err">Unknown</span>`;
+      const date = r.dtStr ? esc(r.dtStr) : `<span class="small">(no date field)</span>`;
+      const dist = (r.distM != null) ? `${r.distM.toFixed(1)} m` : "(n/a)";
+
+      const pdfHtml = (r.pdfLinks && r.pdfLinks.length)
+        ? r.pdfLinks.map((u,i) => `<div><a href="${esc(u)}" target="_blank" rel="noopener">PDF${r.pdfLinks.length>1 ? ` (${i+1})` : ""}</a></div>`).join("")
+        : `<span class="err">No PDF link</span>`;
+
+      return `
+        <div class="cpf-item">
+          <div class="top">Record ${idx+1} <span class="pill">${dist}</span></div>
+          <div class="meta">
+            <div>Instrument</div><div>${inst}</div>
+            <div>Date</div><div>${date}</div>
+            <div>PDF</div><div>${pdfHtml}</div>
+            <div>Map</div><div><a href="${esc(r.adaAppLink)}" target="_blank" rel="noopener">Open in Ada CP&F</a></div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    cpfInfoEl.innerHTML = head + `<div class="cpf-list">${items}</div>`;
+  }
+
+  // ---------------------------
+  // Aliquot selection
+  // ---------------------------
+  function clearAliquotSelection() {
+    if (selectedAliquotLayer && gAliquots) gAliquots.resetStyle(selectedAliquotLayer);
+    selectedAliquotLayer = null;
+    selectedAliquotFeature = null;
+    setSelectedAliquotInfo(null);
+  }
+
+  function selectAliquot(layer, feature) {
+    if (selectedAliquotLayer && selectedAliquotLayer !== layer && gAliquots) {
+      gAliquots.resetStyle(selectedAliquotLayer);
+    }
+    selectedAliquotLayer = layer;
+    selectedAliquotFeature = feature;
+
+    layer.setStyle({ weight: 4, opacity: 0.95, fillOpacity: 0.24 });
+    try { layer.bringToFront(); } catch {}
+
+    setSelectedAliquotInfo(feature);
+  }
+
+  // ---------------------------
+  // Main flow
+  // ---------------------------
+  function clearAll() {
+    gSection.clearLayers();
+    if (gAliquots) { gAliquots.remove(); gAliquots = null; }
+    gCorners.clearLayers();
+    gLabels.clearLayers();
+
+    state.sectionFeature = null;
+    state.sectionFrame = null;
+    state.sectionAreaM2 = null;
+    state.aliquotFC = null;
+    state.cornersFC = null;
+    state.lastBounds = null;
+
+    clearAliquotSelection();
+
+    sectionInfoEl.textContent = "None loaded.";
+    aliquotInfoEl.textContent = "None loaded.";
+    selectedAliquotInfoEl.textContent = "Click an aliquot polygon.";
+    cornerInfoEl.textContent = "Click a corner marker.";
+    cpfInfoEl.textContent = "Select a corner to query CP&F.";
+  }
+
+  function fitAll() { if (state.lastBounds) map.fitBounds(state.lastBounds.pad(0.12)); }
+
+  async function run(addr) {
+    clearAll();
+
+    setStatus("Geocoding address…");
+    const g = await geocodeAddress(addr);
+    map.setView([g.lat, g.lon], 16);
+
+    setStatus("Finding section (BLM First Division)…");
+    const section = await loadSectionAtPoint(g.lat, g.lon);
+    state.sectionFeature = section;
+
+    // frame + areas
+    state.sectionFrame = buildSectionFrame(section);
+    state.sectionAreaM2 = (() => { try { return turf.area(section); } catch { return null; } })();
+
+    gSection.addData(section);
+    setSectionInfo(section);
+
+    if (!state.sectionFrame) {
+      setStatus("Loaded section, but could not compute section frame for geometry labeling.", "err");
+      return;
+    }
+
+    setStatus("Loading aliquots (BLM Second Division)…");
+    const aliquots = await loadAliquotsInSection(section);
+    state.aliquotFC = aliquots;
+    setAliquotInfo(aliquots);
+
+    // Build interactive aliquot layer
+    gAliquots = L.geoJSON(aliquots, {
+      pane:"aliquotPane",
+      interactive:true,
+      renderer: svgRenderer,
+      style: () => ({
+        weight: 1.5,
+        opacity: 0.85,
+        fillOpacity: 0.14,
+        bubblingMouseEvents: false // critical: do not bubble to map
+      }),
+      onEachFeature: (feature, layer) => {
+        // ensure bubbling off even if style changes
+        layer.options.bubblingMouseEvents = false;
+
+        layer.on("click", (ev) => {
+          suppressNextMapClick = true;
+          // stop DOM event too (belt + suspenders)
+          if (ev && ev.originalEvent) {
+            L.DomEvent.stopPropagation(ev.originalEvent);
+            L.DomEvent.preventDefault(ev.originalEvent);
+          }
+          selectAliquot(layer, feature);
+        });
+
+        layer.on("mouseover", () => {
+          if (layer !== selectedAliquotLayer) layer.setStyle({ weight: 2.5, fillOpacity: 0.18 });
+        });
+
+        layer.on("mouseout", () => {
+          if (layer === selectedAliquotLayer) return;
+          if (gAliquots) gAliquots.resetStyle(layer);
+        });
+      }
+    }).addTo(map);
+
+    // Map click clears selection, but NOT right after clicking an aliquot
+    map.off("click");
+    map.on("click", () => {
+      if (suppressNextMapClick) { suppressNextMapClick = false; return; }
+      clearAliquotSelection();
+    });
+
+    setStatus("Loading corners (BLM PLSS Point)…");
+    const corners = await loadCornersInSection(section);
+    state.cornersFC = corners;
+
+    gCorners.clearLayers();
+    for (const f of corners.features) {
+      if (!f.geometry || f.geometry.type !== "Point") continue;
+      const [lon, lat] = f.geometry.coordinates;
+
+      const nxy = state.sectionFrame.normXYFromLL(lon, lat);
+      const typ = cornerTypeFromNormXY(nxy.x, nxy.y);
+
+      const m = L.circleMarker([lat, lon], { radius: 5, weight: 2, fillOpacity: 0.9, pane:"cornerPane" }).addTo(gCorners);
+      m.bindTooltip(typ, { direction:"top", opacity:0.9, permanent:false });
+
+      m.on("click", async () => {
+        setCornerInfo(f);
+
+        if (!cpfLayerUrl) {
+          cpfInfoEl.innerHTML = `
+            <div class="small err">Ada CP&F layer not available (JSONP blocked or discovery failed).</div>
+            <div class="small" style="margin-top:6px;"><a href="${esc(ADA_APP_BASE)}" target="_blank" rel="noopener">Open Ada CP&F app</a></div>
+          `;
+          return;
+        }
+
+        cpfInfoEl.innerHTML = `<div class="small">Querying Ada CP&F records near this corner…</div>`;
+        try {
+          const hit = await adaCpfQueryMany(lat, lon);
+          renderCpfRecords(hit.results, hit.radiusUsedM);
+        } catch (e) {
+          cpfInfoEl.innerHTML = `<div class="small err">CP&F query failed: ${esc(e.message || e)}</div>`;
+        }
+      });
+    }
+
+    // Labels computed from geometry
+    rebuildLabels();
+
+    // Fit bounds
+    const b = gSection.getBounds();
+    if (b && b.isValid()) {
+      state.lastBounds = b;
+      map.fitBounds(b.pad(0.12));
+    }
+
+    setStatus(`Loaded. ${g.display}`, "ok");
+  }
+
+  // ---------------------------
+  // Ada CP&F init
+  // ---------------------------
+  (async () => {
+    setStatus("Initializing Ada CP&F layer (JSONP)…");
+    try {
+      const picked = await discoverAdaCpfLayerViaJsonp();
+      cpfLayerUrl = picked.layerUrl;
+      cpfLayerMeta = picked.layerMeta;
+      setStatus("Ready. Ada CP&F layer discovered.", "ok");
+    } catch (e) {
+      cpfLayerUrl = null;
+      cpfLayerMeta = null;
+      setStatus(`Ready (without Ada CP&F). JSONP discovery failed: ${e.message || e}`, "err");
+    }
+  })();
+
+  // ---------------------------
+  // UI wiring
+  // ---------------------------
+  $("go").addEventListener("click", async () => {
+    const addr = $("addr").value.trim();
+    if (!addr) return;
+    try { await run(addr); } catch (e) { setStatus(`Error: ${e.message || e}`, "err"); }
+  });
+  $("addr").addEventListener("keydown", (ev) => { if (ev.key === "Enter") $("go").click(); });
+  $("clear").addEventListener("click", () => { clearAll(); setStatus("Cleared."); });
+  $("fit").addEventListener("click", () => fitAll());
+  $("toggleLabels").addEventListener("click", () => { state.labelsVisible = !state.labelsVisible; rebuildLabels(); });
+
+})();
+</script>
+</body>
+</html>
