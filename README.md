@@ -55,7 +55,7 @@ Optional endpoint overrides:
 - `findRosNearPoint(lon, lat, searchMeters?)`
 - `loadSectionAtPoint(lon, lat)`
 - `loadAliquotsInSection(sectionFeature)`
-- `lookupByAddress(address)`
+- `lookupByAddress(address)` (accepts addresses like `5707 W Castle Dr, Boise ID`; trailing state in the city segment is normalized before querying Ada County address records)
 
 ### Utility exports
 

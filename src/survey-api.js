@@ -27,7 +27,7 @@ export function parseAddress(rawAddress) {
   const raw = normalizeSpaces(rawAddress);
   const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
   const streetPart = (parts[0] || "").toUpperCase();
-  const cityPart = parts[1] || "";
+  const cityPart = (parts[1] || "").replace(/\s+[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/i, "");
 
   const tokens = streetPart.split(/\s+/).filter(Boolean);
   const house = /^\d+[A-Z]?$/.test(tokens[0] || "") ? tokens.shift() : "";
@@ -277,7 +277,12 @@ export class SurveyCadClient {
   }
 
   async lookupByAddress(address) {
-    const addressFeature = await this.findBestAddressFeature(address);
+    let addressFeature = null;
+    try {
+      addressFeature = await this.findBestAddressFeature(address);
+    } catch {
+      addressFeature = null;
+    }
     let geocode = null;
 
     if (!addressFeature) {
