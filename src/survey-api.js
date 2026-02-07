@@ -254,7 +254,7 @@ export class SurveyCadClient {
     return fs.features[0];
   }
 
-  async loadAliquotsInSection(sectionFeature) {
+  async loadAliquotsInSection(sectionFeature, outSR = 4326) {
     const rings = sectionFeature?.geometry?.rings;
     if (!rings?.length) throw new Error("Section geometry missing rings.");
 
@@ -265,7 +265,7 @@ export class SurveyCadClient {
       spatialRel: "esriSpatialRelIntersects",
       outFields: "*",
       returnGeometry: true,
-      outSR: 4326,
+      outSR,
     });
 
     const fs = await this.fetchJson(url);

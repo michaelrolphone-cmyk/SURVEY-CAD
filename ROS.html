@@ -315,7 +315,7 @@
         <div class="h">Map + Results</div>
         <div class="row">
           <button id="btnExportGeo" class="secondary" disabled>Export GeoJSON</button>
-          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports parcel vertices as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Parcel CSV (IDW ft)</button>
+          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports parcel vertices plus aliquot centroids as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Parcel + Aliquots CSV (IDW ft)</button>
         </div>
       </div>
 
@@ -337,7 +337,8 @@
 </div>
 
 <script type="module">
-import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./src/browser-survey-client.js";
+import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint } from "./src/browser-survey-client.js";
+import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.js";
 
 (() => {
   // -----------------------------
@@ -509,6 +510,51 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
     return true;
   }
 
+  function normalizedAliquotLabel(feature, sectionFeature) {
+    const attrs = feature?.attributes || {};
+    if (attrs.ALIQUOT) return String(attrs.ALIQUOT).toUpperCase();
+
+    const ring = feature?.geometry?.rings?.[0] || [];
+    const secRing = sectionFeature?.geometry?.rings?.[0] || [];
+    if (!ring.length || !secRing.length) return 'ALIQUOT';
+
+    const center = centroidOfPolygon(feature.geometry);
+    if (!center) return 'ALIQUOT';
+
+    let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+    for (const [x, y] of secRing) {
+      xmin = Math.min(xmin, x);
+      ymin = Math.min(ymin, y);
+      xmax = Math.max(xmax, x);
+      ymax = Math.max(ymax, y);
+    }
+    if (!isFinite(xmin) || !isFinite(ymin) || !isFinite(xmax) || !isFinite(ymax)) return 'ALIQUOT';
+
+    const nx = (center.x - xmin) / Math.max(1e-9, xmax - xmin);
+    const ny = (center.y - ymin) / Math.max(1e-9, ymax - ymin);
+
+    const h = nx >= 0.5 ? 'E' : 'W';
+    const v = ny >= 0.5 ? 'N' : 'S';
+    return `${v}${h}`;
+  }
+
+  function drawAliquots(aliquotFeatures, sectionFeature) {
+    layers.aliquots.clearLayers();
+    for (const feature of aliquotFeatures) {
+      const gj = arcPolygonToGeoJSON(feature.geometry);
+      const label = normalizedAliquotLabel(feature, sectionFeature);
+      const layer = L.geoJSON(gj, { style: { color: '#6aa9ff', weight: 1.5, fillOpacity: 0.08 } });
+      layer.eachLayer((l) => {
+        l.bindPopup(`<b>Aliquot</b><br/>${escapeHtml(label)}`);
+        l.on('click', () => {
+          state.selectedAliquot = feature;
+          log(`Selected aliquot: ${label}`);
+        });
+      });
+      layers.aliquots.addLayer(layer);
+    }
+  }
+
   // -----------------------------
   // Address parsing
   // -----------------------------
@@ -560,6 +606,7 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
     section: L.layerGroup().addTo(map),
     township: L.layerGroup().addTo(map),
     ros: L.layerGroup().addTo(map),
+    aliquots: L.layerGroup().addTo(map),
   };
 
   function clearMapLayers() {
@@ -592,6 +639,9 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
     sectionFeature: null,
     townshipFeature: null,
     rosFeatures: [],
+    aliquotFeatures: [],
+    aliquotFeatures2243: [],
+    selectedAliquot: null,
     exportGeoJSON: null,
     lastLonLat: null
   };
@@ -910,111 +960,13 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
-  function csvEscape(s) {
-    const v = String(s ?? "");
-    if (/[,"\n]/.test(v)) return `"${v.replace(/"/g,'""')}"`;
-    return v;
-  }
-
-  function almostSame(a,b,eps=1e-9) {
-    return Math.abs(a-b) <= eps;
-  }
-
-  function stripClosingDup(ring) {
-    if (!ring || ring.length < 2) return ring || [];
-    const a = ring[0];
-    const b = ring[ring.length - 1];
-    if (almostSame(a[0], b[0]) && almostSame(a[1], b[1])) return ring.slice(0, -1);
-    return ring;
-  }
-
-  function buildExportGeoJSON() {
-    const fc = { type:"FeatureCollection", features:[] };
-
-    if (state.addressFeature?.geometry) {
-      fc.features.push({
-        type:"Feature",
-        properties: Object.assign({ _layer: "address" }, state.addressFeature.attributes||{}),
-        geometry: { type:"Point", coordinates:[state.addressFeature.geometry.x, state.addressFeature.geometry.y] }
-      });
-    }
-    if (state.parcelFeature?.geometry?.rings) {
-      const feat = arcPolygonToGeoJSON(state.parcelFeature.geometry);
-      feat.properties = Object.assign({ _layer: "parcel" }, state.parcelFeature.attributes||{});
-      fc.features.push(feat);
-    }
-    const addPoly = (f, name) => {
-      if (!f?.geometry?.rings) return;
-      const feat = arcPolygonToGeoJSON(f.geometry);
-      feat.properties = Object.assign({ _layer: name }, f.attributes||{});
-      fc.features.push(feat);
-    };
-    addPoly(state.subdivisionFeature, "subdivision");
-    addPoly(state.sectionFeature, "section");
-    addPoly(state.townshipFeature, "township");
-
-    for (const f of (state.rosFeatures||[])) {
-      const g = f.geometry;
-      if (!g) continue;
-      let geo = null;
-      if (g.x != null && g.y != null) geo = { type:"Point", coordinates:[g.x,g.y] };
-      else if (g.paths) geo = { type:"LineString", coordinates: g.paths[0].map(([x,y])=>[x,y]) };
-      else if (g.rings) geo = { type:"Polygon", coordinates: g.rings.map(r=>r.map(([x,y])=>[x,y])) };
-      if (!geo) continue;
-
-      fc.features.push({
-        type:"Feature",
-        properties: Object.assign({ _layer:"ros" }, f.attributes||{}),
-        geometry: geo
-      });
-    }
-    return fc;
-  }
-
-  // Carlson-style PNEZD:
-  //   POINT,NORTHING(Y),EASTING(X),ELEV,DESCRIPTION
-  function buildParcelCsvPNEZD(parcel2243, startPoint=1) {
-    const rings = parcel2243?.geometry?.rings || [];
-    if (!rings.length) throw new Error("Parcel export geometry missing rings.");
-
-    const attrs = parcel2243.attributes || {};
-    const pid =
-      attrs.PARCEL || attrs.Parcel || attrs.PIN || attrs.Pin || attrs.RP || attrs.AIN || attrs.APN ||
-      attrs.PARCEL_ID || attrs.PARCELID || attrs.PARCELNO || "";
-
-    const lines = [];
-    let pn = startPoint;
-
-    for (let ri=0; ri<rings.length; ri++) {
-      const ring = stripClosingDup(rings[ri]);
-      for (let vi=0; vi<ring.length; vi++) {
-        // ArcGIS rings are [x,y] = [E,N] in projected coords.
-        const e = Number(ring[vi][0]);
-        const n = Number(ring[vi][1]);
-        if (!isFinite(e) || !isFinite(n)) continue;
-
-        const desc = `PARCEL_VERTEX${pid ? " " + pid : ""} R${ri+1} V${vi+1}`;
-        const z = 0.000;
-
-        // IMPORTANT: output is P,N,E,Z,D
-        lines.push([
-          pn,
-          n.toFixed(3),
-          e.toFixed(3),
-          z.toFixed(3),
-          csvEscape(desc)
-        ].join(","));
-
-        pn++;
-      }
-    }
-
-    if (!lines.length) throw new Error("No vertices emitted for parcel CSV.");
-    return lines.join("\n") + "\n";
-  }
-
   async function fetchParcelGeometry2243FromPoint(lon, lat) {
     return fetchParcelNearPoint(lon, lat, EXPORT_OUT_SR, 150);
+  }
+
+  async function fetchAliquotsAtPoint(lon, lat, outSR = 4326) {
+    const payload = await loadAliquotsAtPoint(lon, lat, outSR);
+    return payload?.aliquots || [];
   }
 
   // -----------------------------
@@ -1069,6 +1021,9 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
     $("btnExportParcelCSV").disabled = true;
     state.exportGeoJSON = null;
     state.parcelFeature2243 = null;
+    state.aliquotFeatures = [];
+    state.aliquotFeatures2243 = [];
+    state.selectedAliquot = null;
     setSummaryCards([]);
     clearMapLayers();
 
@@ -1133,6 +1088,15 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
       state.sectionFeature = section;
       state.townshipFeature = township;
 
+      try {
+        state.aliquotFeatures = await fetchAliquotsAtPoint(lon, lat, 4326);
+        drawAliquots(state.aliquotFeatures, section);
+        log(`Aliquots loaded: ${state.aliquotFeatures.length}`);
+      } catch (e) {
+        state.aliquotFeatures = [];
+        log(`Aliquot lookup failed: ${e.message || e}`, "warn");
+      }
+
       if (subdiv) drawPolygonFeature(subdiv, layers.subdivision, { style: () => ({ color:"#9ab0ff", weight:2, fillOpacity:0.04 }) }, "Subdivision");
       if (section) drawPolygonFeature(section, layers.section, { style: () => ({ color:"#ffcc66", weight:2, fillOpacity:0.03, dashArray:"6 6" }) }, "Section");
       if (township) drawPolygonFeature(township, layers.township, { style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02, dashArray:"3 8" }) }, "Township");
@@ -1179,8 +1143,15 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
         [
           ["Centroid", `${c.y.toFixed(7)}, ${c.x.toFixed(7)}`],
           ["Attrs", `${Object.keys(pAttrs).length} fields`],
-          ["Export", `Parcel CSV will be P,N,E,Z,D in EPSG:${EXPORT_OUT_SR} (ID West ftUS)`],
+          ["Export", `Parcel + aliquot CSV will be P,N,E,Z,D in EPSG:${EXPORT_OUT_SR} (ID West ftUS)`],
         ],
+        []
+      ));
+
+      cards.push(card(
+        "Aliquots",
+        "CPNF-style aliquot lookup",
+        [["Count", String(state.aliquotFeatures.length)]],
         []
       ));
 
@@ -1208,14 +1179,15 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
       try {
         log(`Fetching parcel export geometry in EPSG:${EXPORT_OUT_SR}...`);
         state.parcelFeature2243 = await fetchParcelGeometry2243FromPoint(lon, lat);
+        state.aliquotFeatures2243 = await fetchAliquotsAtPoint(lon, lat, EXPORT_OUT_SR);
         if (state.parcelFeature2243?.geometry?.rings?.length) {
           $("btnExportParcelCSV").disabled = false;
-          log("Parcel export geometry ready (IDW ft).");
+          log(`Parcel export geometry ready (IDW ft). Aliquot points ready: ${state.aliquotFeatures2243.length}.`);
         } else {
           log("Parcel export geometry not available (no rings).", "warn");
         }
       } catch (e) {
-        log(`Parcel export geometry fetch failed: ${e.message || e}`, "warn");
+        log(`Parcel/aliquot export geometry fetch failed: ${e.message || e}`, "warn");
       }
 
       invalidateMapSoon("lookup complete");
@@ -1242,6 +1214,9 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
     state.exportGeoJSON = null;
     state.parcelFeature = null;
     state.parcelFeature2243 = null;
+    state.aliquotFeatures = [];
+    state.aliquotFeatures2243 = [];
+    state.selectedAliquot = null;
     state.lastLonLat = null;
     $("pdfFindings").style.display = "none";
     $("pdfFindings").textContent = "";
@@ -1259,10 +1234,12 @@ import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./
       if (!state.parcelFeature2243) {
         throw new Error("Parcel export geometry not loaded yet. Run Lookup again.");
       }
-      // Your required order: P,N,E,Z,D and start at point 1.
-      const csv = buildParcelCsvPNEZD(state.parcelFeature2243, 1);
-      downloadText(csv, "parcel_vertices_idw_ft_pnezd.csv", "text/csv");
-      log("Exported parcel CSV (PNEZD, IDW ft).");
+      // Export order: P,N,E,Z,D and start at point 1.
+      const parcelPart = buildParcelCsvPNEZD(state.parcelFeature2243, 1);
+      const aliquotPart = buildAliquotCsvRowsPNEZD(state.aliquotFeatures2243, parcelPart.nextPoint);
+      const csv = `${parcelPart.csv}${aliquotPart.csv}`;
+      downloadText(csv, "parcel_vertices_and_aliquots_idw_ft_pnezd.csv", "text/csv");
+      log(`Exported parcel CSV (PNEZD, IDW ft) with ${aliquotPart.count} aliquot coordinate row(s).`);
     } catch (e) {
       log(`Parcel CSV export failed: ${e.message || e}`, "bad");
       console.error(e);

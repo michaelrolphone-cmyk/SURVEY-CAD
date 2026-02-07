@@ -34,6 +34,6 @@ export async function loadSectionAtPoint(lon, lat) {
   return payload.section || null;
 }
 
-export async function loadAliquotsAtPoint(lon, lat) {
-  return requestJson('/api/aliquots', { lon, lat });
+export async function loadAliquotsAtPoint(lon, lat, outSR = 4326) {
+  return requestJson('/api/aliquots', { lon, lat, outSR });
 }
