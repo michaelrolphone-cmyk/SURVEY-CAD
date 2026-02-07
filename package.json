@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "cli": "node src/cli.js"
+    "cli": "node src/cli.js",
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
