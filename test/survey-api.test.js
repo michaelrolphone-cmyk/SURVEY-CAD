@@ -101,6 +101,16 @@ test('parseAddress and SQL where builder', () => {
   assert.match(where, /UPPER\(CITY\) LIKE 'BOISE%'/);
 });
 
+
+
+test('parseAddress strips trailing state abbreviation from city', () => {
+  const parsed = parseAddress('5707 W Castle Dr, Boise ID');
+  assert.equal(parsed.city, 'Boise');
+  const where = buildAddressWhere(parsed);
+  assert.match(where, /UPPER\(CITY\) LIKE 'BOISE%'/);
+  assert.doesNotMatch(where, /BOISE ID/);
+});
+
 test('arcgisQueryUrl serializes objects as JSON', () => {
   const url = arcgisQueryUrl('https://x/y/24', { geometry: { x: 1, y: 2 }, where: '1=1' });
   assert.match(url, /geometry=%7B%22x%22%3A1%2C%22y%22%3A2%7D/);
@@ -119,7 +129,7 @@ test('pointInPolygon handles holes', () => {
 });
 
 test('client lookup, section, and aliquot flows', async () => {
-  const { server, port, requests, server, port, headers } = await createMockServer();
+  const { server, port, requests, headers } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
   const client = new SurveyCadClient({
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
