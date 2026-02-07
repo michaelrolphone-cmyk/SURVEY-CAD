@@ -185,3 +185,22 @@ test('server lookup succeeds when geocode provider fails but address layer resol
     await new Promise((resolve) => upstream.server.close(resolve));
   }
 });
+
+
+test('server returns validation error when lookup cannot resolve coordinates', async () => {
+  const client = {
+    async lookupByAddress() {
+      throw new Error('Unable to locate this address from county records or geocoder.');
+    },
+  };
+  const app = await startApiServer(client);
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('5707 W Castle Dr, Boise ID')}`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /Unable to locate this address/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});

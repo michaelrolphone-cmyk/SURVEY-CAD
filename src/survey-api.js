@@ -55,6 +55,15 @@ export function buildAddressWhere(parsed) {
   return clauses.length ? clauses.join(" AND ") : "1=1";
 }
 
+export function buildFallbackAddressWhere(parsed) {
+  const p = typeof parsed === "string" ? parseAddress(parsed) : parsed;
+  const clauses = [];
+  if (p.house) clauses.push(`ADDRNUM = '${escapeSql(p.house)}'`);
+  if (p.streetName) clauses.push(`UPPER(STREETNAME) LIKE '${escapeSql(p.streetName)}%'`);
+  if (p.city) clauses.push(`UPPER(CITY) LIKE '${escapeSql(p.city.toUpperCase())}%'`);
+  return clauses.length ? clauses.join(" AND ") : "1=1";
+}
+
 function escapeSql(v) {
   return String(v).replace(/'/g, "''");
 }
@@ -169,15 +178,24 @@ export class SurveyCadClient {
 
   async findBestAddressFeature(rawAddress) {
     const parsed = parseAddress(rawAddress);
-    const where = buildAddressWhere(parsed);
     const response = await this.arcQuery(this.config.layers.address, {
-      where,
+      where: buildAddressWhere(parsed),
       outFields: "*",
       returnGeometry: true,
       outSR: 4326,
     });
 
-    const features = response.features || [];
+    let features = response.features || [];
+    if (!features.length) {
+      const fallbackResponse = await this.arcQuery(this.config.layers.address, {
+        where: buildFallbackAddressWhere(parsed),
+        outFields: "*",
+        returnGeometry: true,
+        outSR: 4326,
+      });
+      features = fallbackResponse.features || [];
+    }
+
     if (!features.length) return null;
 
     const scored = features
@@ -284,19 +302,18 @@ export class SurveyCadClient {
       addressFeature = null;
     }
     let geocode = null;
-
-    if (!addressFeature) {
+    try {
       geocode = await this.geocodeAddress(address);
-    } else {
-      try {
-        geocode = await this.geocodeAddress(address);
-      } catch {
-        geocode = null;
-      }
+    } catch {
+      geocode = null;
     }
 
     const lon = addressFeature?.geometry?.x ?? geocode?.lon;
     const lat = addressFeature?.geometry?.y ?? geocode?.lat;
+
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+      throw new Error("Unable to locate this address from county records or geocoder.");
+    }
 
     const parcel = await this.findParcelNearPoint(lon, lat);
     if (!parcel) {
