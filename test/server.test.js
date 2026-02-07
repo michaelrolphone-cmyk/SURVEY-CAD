@@ -135,3 +135,22 @@ test('server validates required parameters', async () => {
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+
+test('server maps upstream HTTP errors to bad gateway', async () => {
+  const client = {
+    async lookupByAddress() {
+      throw new Error('HTTP 403: https://nominatim.openstreetmap.org/search?q=test');
+    },
+  };
+  const app = await startApiServer(client);
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(res.status, 502);
+    const body = await res.json();
+    assert.match(body.error, /HTTP 403/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});

@@ -5,11 +5,13 @@ import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, point
 
 function createMockServer() {
   const requests = [];
+  const headers = { geocodeUserAgent: null };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
 
     if (url.pathname === '/geocode') {
+      headers.geocodeUserAgent = req.headers['user-agent'] || null;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify([{ lat: '43.61', lon: '-116.20', display_name: 'Boise' }]));
       return;
@@ -76,7 +78,7 @@ function createMockServer() {
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address();
-      resolve({ server, port: addr.port, requests });
+      resolve({ server, port: addr.port, requests, headers });
     });
   });
 }
@@ -109,7 +111,7 @@ test('pointInPolygon handles holes', () => {
 });
 
 test('client lookup, section, and aliquot flows', async () => {
-  const { server, port } = await createMockServer();
+  const { server, port, headers } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
   const client = new SurveyCadClient({
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
@@ -122,12 +124,31 @@ test('client lookup, section, and aliquot flows', async () => {
     const lookup = await client.lookupByAddress('100 Main St, Boise');
     assert.equal(lookup.parcel.attributes.PARCEL, 'R12345');
     assert.equal(lookup.ros.length, 1);
+    assert.match(headers.geocodeUserAgent || '', /survey-cad\/1\.0/);
 
     const section = await client.loadSectionAtPoint(-116.2, 43.61);
     assert.equal(section.attributes.SEC, 1);
 
     const aliquots = await client.loadAliquotsInSection(section);
     assert.equal(aliquots[0].attributes.ALIQUOT, 'NWNW');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
+test('geocodeAddress sends configured nominatim user agent', async () => {
+  const { server, port, headers } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode`,
+    nominatimUserAgent: 'survey-cad-test/2.0',
+  });
+
+  try {
+    await client.geocodeAddress('100 Main St, Boise');
+    assert.equal(headers.geocodeUserAgent, 'survey-cad-test/2.0');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
