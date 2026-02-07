@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import SurveyCadClient from './survey-api.js';
@@ -39,7 +39,7 @@ function parseLonLat(urlObj) {
 async function serveStaticFile(urlPath, staticDir, res) {
   const requested = decodeURIComponent(urlPath === '/' ? '/VIEWPORT.HTML' : urlPath);
   const safePath = requested.replace(/^\/+/, '');
-  const absPath = path.resolve(staticDir, safePath);
+  const absPath = await resolveStaticPath(staticDir, safePath);
 
   if (!absPath.startsWith(path.resolve(staticDir))) {
     sendJson(res, 403, { error: 'Forbidden path.' });
@@ -55,6 +55,37 @@ async function serveStaticFile(urlPath, staticDir, res) {
   } catch {
     sendJson(res, 404, { error: 'Not found.' });
   }
+}
+
+async function resolveStaticPath(staticDir, safePath) {
+  const base = path.resolve(staticDir);
+  const initialPath = path.resolve(base, safePath);
+
+  if (initialPath.startsWith(base)) {
+    try {
+      await readFile(initialPath);
+      return initialPath;
+    } catch {
+      // Fall through and attempt case-insensitive matching.
+    }
+  }
+
+  const segments = safePath.split('/').filter(Boolean);
+  let currentDir = base;
+
+  for (const segment of segments) {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+    const matched = entries.find((entry) => entry.name === segment)
+      || entries.find((entry) => entry.name.toLowerCase() === segment.toLowerCase());
+
+    if (!matched) {
+      return initialPath;
+    }
+
+    currentDir = path.resolve(currentDir, matched.name);
+  }
+
+  return currentDir;
 }
 
 export function createSurveyServer({ client = new SurveyCadClient(), staticDir = DEFAULT_STATIC_DIR } = {}) {
