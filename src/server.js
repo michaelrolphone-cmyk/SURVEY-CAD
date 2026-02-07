@@ -1,0 +1,135 @@
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import SurveyCadClient from './survey-api.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DEFAULT_STATIC_DIR = path.resolve(__dirname, '..');
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8',
+};
+
+function sendJson(res, statusCode, payload) {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(payload));
+}
+
+function parseLonLat(urlObj) {
+  const lon = Number(urlObj.searchParams.get('lon'));
+  const lat = Number(urlObj.searchParams.get('lat'));
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+    throw new Error('Valid numeric lon and lat query parameters are required.');
+  }
+  return { lon, lat };
+}
+
+async function serveStaticFile(urlPath, staticDir, res) {
+  const requested = decodeURIComponent(urlPath === '/' ? '/VIEWPORT.HTML' : urlPath);
+  const safePath = requested.replace(/^\/+/, '');
+  const absPath = path.resolve(staticDir, safePath);
+
+  if (!absPath.startsWith(path.resolve(staticDir))) {
+    sendJson(res, 403, { error: 'Forbidden path.' });
+    return;
+  }
+
+  try {
+    const body = await readFile(absPath);
+    const ext = path.extname(absPath).toLowerCase();
+    res.statusCode = 200;
+    res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
+    res.end(body);
+  } catch {
+    sendJson(res, 404, { error: 'Not found.' });
+  }
+}
+
+export function createSurveyServer({ client = new SurveyCadClient(), staticDir = DEFAULT_STATIC_DIR } = {}) {
+  return createServer(async (req, res) => {
+    if (!req.url) {
+      sendJson(res, 400, { error: 'Missing request URL.' });
+      return;
+    }
+
+    const urlObj = new URL(req.url, 'http://localhost');
+
+    try {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { error: 'Only GET is supported.' });
+        return;
+      }
+
+      if (urlObj.pathname === '/health') {
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/lookup') {
+        const address = urlObj.searchParams.get('address');
+        if (!address) throw new Error('address query parameter is required.');
+        const payload = await client.lookupByAddress(address);
+        sendJson(res, 200, payload);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/geocode') {
+        const address = urlObj.searchParams.get('address');
+        if (!address) throw new Error('address query parameter is required.');
+        const payload = await client.geocodeAddress(address);
+        sendJson(res, 200, payload);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/section') {
+        const { lon, lat } = parseLonLat(urlObj);
+        const section = await client.loadSectionAtPoint(lon, lat);
+        sendJson(res, 200, { section });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/aliquots') {
+        const { lon, lat } = parseLonLat(urlObj);
+        const section = await client.loadSectionAtPoint(lon, lat);
+        if (!section) {
+          sendJson(res, 404, { error: 'No section found at requested coordinates.' });
+          return;
+        }
+        const aliquots = await client.loadAliquotsInSection(section);
+        sendJson(res, 200, { section, aliquots });
+        return;
+      }
+
+      await serveStaticFile(urlObj.pathname, staticDir, res);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message || 'Bad request.' });
+    }
+  });
+}
+
+export function startServer({ port = Number(process.env.PORT) || 3000, host = '0.0.0.0', ...opts } = {}) {
+  const server = createSurveyServer(opts);
+  return new Promise((resolve) => {
+    server.listen(port, host, () => resolve(server));
+  });
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer().then((server) => {
+    const addr = server.address();
+    const display = typeof addr === 'string' ? addr : `${addr.address}:${addr.port}`;
+    console.log(`survey-cad server listening on ${display}`);
+  });
+}

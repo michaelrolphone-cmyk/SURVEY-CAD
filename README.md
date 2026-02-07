@@ -1,12 +1,34 @@
-# SURVEY-CAD Node Library
+# SURVEY-CAD Node Library + Heroku Web App
 
-This repository now includes a reusable Node.js library extracted from `ROS.html` and `CPNF.HTML` data-access logic, without modifying those HTML files.
+This repository includes:
+- A reusable Node.js surveying client in `src/survey-api.js`.
+- A CLI in `src/cli.js`.
+- A Heroku-compatible web server in `src/server.js` that serves the repository HTML files statically and exposes the surveying library as JSON API endpoints.
 
 ## Install / Run
 
 ```bash
+npm install
 npm test
 npm run cli -- --help
+npm start
+```
+
+The server binds to `PORT` (Heroku-compatible) and defaults to `3000` locally.
+
+## Heroku Deployment
+
+The repo is configured with:
+- `Procfile` (`web: npm start`)
+- `npm start` script (`node src/server.js`)
+- Node engine requirement in `package.json`
+
+Example deploy commands:
+
+```bash
+heroku create <your-app-name>
+git push heroku <your-branch>:main
+heroku open
 ```
 
 ## API
@@ -43,14 +65,35 @@ Optional endpoint overrides:
 - `pointInPolygon(pointXY, esriPolygonGeom)`
 - `haversineMeters(lat1, lon1, lat2, lon2)`
 
-## Endpoint coverage
+## Web Server Endpoints
 
-This library supports the same endpoint types used in the HTML tools:
+Base entrypoint: `npm start` (or `node src/server.js`)
 
-- Geocoding endpoint (Nominatim-style JSON): `GET /search?q=...&format=json`
-- Ada ArcGIS feature queries for address, parcels, section, township, subdivision, ROS
-- BLM First Division (section polygon at point)
-- BLM Second Division (aliquots in section polygon)
+### Health check
+
+```bash
+curl "http://localhost:3000/health"
+```
+
+### API endpoints
+
+```bash
+curl "http://localhost:3000/api/geocode?address=1600%20W%20Front%20St%2C%20Boise"
+curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
+curl "http://localhost:3000/api/section?lon=-116.2&lat=43.61"
+curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
+```
+
+### Static HTML files
+
+Any repository-root file can be requested directly. Examples:
+
+```bash
+curl "http://localhost:3000/ROS.html"
+curl "http://localhost:3000/CPNF.HTML"
+```
+
+`/` defaults to `VIEWPORT.HTML`.
 
 ## CLI Commands
 
@@ -62,4 +105,4 @@ node src/cli.js section --lat 43.61 --lon -116.20
 node src/cli.js aliquots --lat 43.61 --lon -116.20
 ```
 
-All commands print JSON to stdout.
+All CLI commands print JSON to stdout.
