@@ -315,6 +315,7 @@
         <div class="h">Map + Results</div>
         <div class="row">
           <button id="btnExportGeo" class="secondary" disabled>Export GeoJSON</button>
+          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports parcel vertices as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Parcel CSV (IDW ft)</button>
         </div>
       </div>
 
@@ -349,6 +350,10 @@
     sections: 20,
     parcels: 24,
   };
+
+  // EPSG:2243 (NAD83 / Idaho West ftUS) for export.
+  // We do NOT client-project; we request outSR=2243 from the server (no CORS via JSONP).
+  const EXPORT_OUT_SR = 2243;
 
   // pdf.js worker
   if (!window.pdfjsLib) {
@@ -561,7 +566,6 @@
 
   // ---- Leaflet display fix helpers ----
   function invalidateMapSoon(reason="") {
-    // multiple invalidations covers layout shifts + font load + async panel sizing
     requestAnimationFrame(() => map.invalidateSize());
     setTimeout(() => map.invalidateSize(), 50);
     setTimeout(() => map.invalidateSize(), 250);
@@ -580,12 +584,14 @@
   // -----------------------------
   const state = {
     addressFeature: null,
-    parcelFeature: null,
+    parcelFeature: null,        // displayed (outSR 4326)
+    parcelFeature2243: null,    // export geometry (outSR 2243)
     subdivisionFeature: null,
     sectionFeature: null,
     townshipFeature: null,
     rosFeatures: [],
-    exportGeoJSON: null
+    exportGeoJSON: null,
+    lastLonLat: null
   };
 
   function setSummaryCards(cards) {
@@ -696,7 +702,7 @@
   // -----------------------------
   // Parcel query (point+distance)
   // -----------------------------
-  async function findParcelNearPoint(lon, lat) {
+  async function findParcelNearPoint(lon, lat, outSR=4326) {
     const distances = [0, 10, 30, 150];
     let best = null;
 
@@ -705,7 +711,7 @@
         where: "1=1",
         outFields: "*",
         returnGeometry: true,
-        outSR: 4326,
+        outSR,
         geometry: `${lon},${lat}`,
         geometryType: "esriGeometryPoint",
         inSR: 4326,
@@ -716,26 +722,31 @@
         params.units = "esriSRUnit_Meter";
       }
 
-      log(`Parcel search: point+distance ${d}m`);
+      log(`Parcel search: point+distance ${d}m (outSR=${outSR})`);
       const resp = await arcQuery(LAYERS.parcels, params);
       const feats = resp?.features || [];
       log(`Parcel candidates @ ${d}m: ${feats.length}`);
 
       if (feats.length) {
-        const pointXY = [lon, lat];
-        const containing = feats.find(f => pointInPolygon(pointXY, f.geometry));
-        if (containing) { best = containing; break; }
+        if (outSR === 4326) {
+          const pointXY = [lon, lat];
+          const containing = feats.find(f => pointInPolygon(pointXY, f.geometry));
+          if (containing) { best = containing; break; }
 
-        let nearest = null;
-        let bestDist = Infinity;
-        for (const f of feats) {
-          const c = centroidOfPolygon(f.geometry);
-          if (!c) continue;
-          const meters = haversineMeters(lat, lon, c.y, c.x);
-          if (meters < bestDist) { bestDist = meters; nearest = f; }
+          let nearest = null;
+          let bestDist = Infinity;
+          for (const f of feats) {
+            const c = centroidOfPolygon(f.geometry);
+            if (!c) continue;
+            const meters = haversineMeters(lat, lon, c.y, c.x);
+            if (meters < bestDist) { bestDist = meters; nearest = f; }
+          }
+          best = nearest || feats[0];
+          break;
+        } else {
+          best = feats[0];
+          break;
         }
-        best = nearest || feats[0];
-        break;
       }
     }
     return best;
@@ -871,7 +882,7 @@
   }
 
   // -----------------------------
-  // Export
+  // Export helpers
   // -----------------------------
   function downloadJson(obj, filename) {
     const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
@@ -883,6 +894,36 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  function downloadText(text, filename, mime="text/plain") {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  function csvEscape(s) {
+    const v = String(s ?? "");
+    if (/[,"\n]/.test(v)) return `"${v.replace(/"/g,'""')}"`;
+    return v;
+  }
+
+  function almostSame(a,b,eps=1e-9) {
+    return Math.abs(a-b) <= eps;
+  }
+
+  function stripClosingDup(ring) {
+    if (!ring || ring.length < 2) return ring || [];
+    const a = ring[0];
+    const b = ring[ring.length - 1];
+    if (almostSame(a[0], b[0]) && almostSame(a[1], b[1])) return ring.slice(0, -1);
+    return ring;
   }
 
   function buildExportGeoJSON() {
@@ -926,6 +967,53 @@
       });
     }
     return fc;
+  }
+
+  // Carlson-style PNEZD:
+  //   POINT,NORTHING(Y),EASTING(X),ELEV,DESCRIPTION
+  function buildParcelCsvPNEZD(parcel2243, startPoint=1) {
+    const rings = parcel2243?.geometry?.rings || [];
+    if (!rings.length) throw new Error("Parcel export geometry missing rings.");
+
+    const attrs = parcel2243.attributes || {};
+    const pid =
+      attrs.PARCEL || attrs.Parcel || attrs.PIN || attrs.Pin || attrs.RP || attrs.AIN || attrs.APN ||
+      attrs.PARCEL_ID || attrs.PARCELID || attrs.PARCELNO || "";
+
+    const lines = [];
+    let pn = startPoint;
+
+    for (let ri=0; ri<rings.length; ri++) {
+      const ring = stripClosingDup(rings[ri]);
+      for (let vi=0; vi<ring.length; vi++) {
+        // ArcGIS rings are [x,y] = [E,N] in projected coords.
+        const e = Number(ring[vi][0]);
+        const n = Number(ring[vi][1]);
+        if (!isFinite(e) || !isFinite(n)) continue;
+
+        const desc = `PARCEL_VERTEX${pid ? " " + pid : ""} R${ri+1} V${vi+1}`;
+        const z = 0.000;
+
+        // IMPORTANT: output is P,N,E,Z,D
+        lines.push([
+          pn,
+          n.toFixed(3),
+          e.toFixed(3),
+          z.toFixed(3),
+          csvEscape(desc)
+        ].join(","));
+
+        pn++;
+      }
+    }
+
+    if (!lines.length) throw new Error("No vertices emitted for parcel CSV.");
+    return lines.join("\n") + "\n";
+  }
+
+  async function fetchParcelGeometry2243FromPoint(lon, lat) {
+    const p = await findParcelNearPoint(lon, lat, EXPORT_OUT_SR);
+    return p;
   }
 
   // -----------------------------
@@ -977,7 +1065,9 @@
   async function doLookup() {
     clearLog();
     $("btnExportGeo").disabled = true;
+    $("btnExportParcelCSV").disabled = true;
     state.exportGeoJSON = null;
+    state.parcelFeature2243 = null;
     setSummaryCards([]);
     clearMapLayers();
 
@@ -999,13 +1089,13 @@
       log(`Address match: ${addrLL[0].toFixed(7)}, ${addrLL[1].toFixed(7)}`);
       drawAddressPoint(addrF);
 
-      // Move map early
       map.setView(addrLL, 18);
       invalidateMapSoon("after setView");
 
       const lon = addrF.geometry.x, lat = addrF.geometry.y;
+      state.lastLonLat = { lon, lat };
 
-      const parcel = await findParcelNearPoint(lon, lat);
+      const parcel = await findParcelNearPoint(lon, lat, 4326);
       if (!parcel) {
         log("Parcel not found near that address point (0/10/30/150m).", "bad");
         setSummaryCards([
@@ -1022,7 +1112,6 @@
         style: () => ({ color: "#24d18f", weight: 3, fillOpacity: 0.08 })
       }, "Parcel");
 
-      // Fit parcel bounds
       const ext = arcExtentFromPolygon(parcel.geometry);
       if (ext) {
         const bounds = L.latLngBounds([ext.ymin, ext.xmin], [ext.ymax, ext.xmax]);
@@ -1069,7 +1158,6 @@
         }
       }
 
-      // Summary
       const cards = [];
       cards.push(card(
         "Address",
@@ -1088,6 +1176,7 @@
         [
           ["Centroid", `${c.y.toFixed(7)}, ${c.x.toFixed(7)}`],
           ["Attrs", `${Object.keys(pAttrs).length} fields`],
+          ["Export", `Parcel CSV will be P,N,E,Z,D in EPSG:${EXPORT_OUT_SR} (ID West ftUS)`],
         ],
         []
       ));
@@ -1110,9 +1199,21 @@
 
       setSummaryCards(cards);
 
-      // Export
       state.exportGeoJSON = buildExportGeoJSON();
       $("btnExportGeo").disabled = false;
+
+      try {
+        log(`Fetching parcel export geometry in EPSG:${EXPORT_OUT_SR}...`);
+        state.parcelFeature2243 = await fetchParcelGeometry2243FromPoint(lon, lat);
+        if (state.parcelFeature2243?.geometry?.rings?.length) {
+          $("btnExportParcelCSV").disabled = false;
+          log("Parcel export geometry ready (IDW ft).");
+        } else {
+          log("Parcel export geometry not available (no rings).", "warn");
+        }
+      } catch (e) {
+        log(`Parcel export geometry fetch failed: ${e.message || e}`, "warn");
+      }
 
       invalidateMapSoon("lookup complete");
       log("Done.", "info");
@@ -1134,7 +1235,11 @@
     clearMapLayers();
     setSummaryCards([]);
     $("btnExportGeo").disabled = true;
+    $("btnExportParcelCSV").disabled = true;
     state.exportGeoJSON = null;
+    state.parcelFeature = null;
+    state.parcelFeature2243 = null;
+    state.lastLonLat = null;
     $("pdfFindings").style.display = "none";
     $("pdfFindings").textContent = "";
     log("Cleared.");
@@ -1144,6 +1249,21 @@
   $("btnExportGeo").addEventListener("click", () => {
     if (!state.exportGeoJSON) return;
     downloadJson(state.exportGeoJSON, "ada_lookup.geojson");
+  });
+
+  $("btnExportParcelCSV").addEventListener("click", () => {
+    try {
+      if (!state.parcelFeature2243) {
+        throw new Error("Parcel export geometry not loaded yet. Run Lookup again.");
+      }
+      // Your required order: P,N,E,Z,D and start at point 1.
+      const csv = buildParcelCsvPNEZD(state.parcelFeature2243, 1);
+      downloadText(csv, "parcel_vertices_idw_ft_pnezd.csv", "text/csv");
+      log("Exported parcel CSV (PNEZD, IDW ft).");
+    } catch (e) {
+      log(`Parcel CSV export failed: ${e.message || e}`, "bad");
+      console.error(e);
+    }
   });
 
   $("btnScanPdf").addEventListener("click", async () => {
