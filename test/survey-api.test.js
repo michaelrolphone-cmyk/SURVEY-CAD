@@ -6,7 +6,7 @@ import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, point
 function createMockServer(options = {}) {
   const { strictAddressMiss = false, addressAlwaysMiss = false } = options;
   const requests = [];
-  const headers = { geocodeUserAgent: null, geocodeEmail: null };
+  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
@@ -23,6 +23,20 @@ function createMockServer(options = {}) {
       res.statusCode = 403;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: 'forbidden' }));
+      return;
+    }
+
+
+    if (url.pathname === '/arcgis-geocode') {
+      headers.arcgisGeocodeUserAgent = req.headers['user-agent'] || null;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        candidates: [{
+          address: '5707 W Castle Dr, Boise, Idaho, 83703',
+          location: { x: -116.27, y: 43.66 },
+          attributes: { Match_addr: '5707 W Castle Dr, Boise, Idaho, 83703' },
+        }],
+      }));
       return;
     }
 
@@ -180,6 +194,28 @@ test('geocodeAddress sends configured nominatim user agent', async () => {
   }
 });
 
+
+
+
+test('geocodeAddress falls back to ArcGIS geocoder when Nominatim fails', async () => {
+  const { server, port, headers } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode-403`,
+    arcgisGeocodeUrl: `${base}/arcgis-geocode`,
+  });
+
+  try {
+    const geocode = await client.geocodeAddress('5707 W Castle Dr, Boise ID');
+    assert.equal(geocode.lon, -116.27);
+    assert.equal(geocode.lat, 43.66);
+    assert.match(geocode.display, /5707 W Castle Dr/i);
+    assert.equal(headers.arcgisGeocodeUserAgent, 'survey-cad/1.0 (contact: admin@example.com)');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
 
 test('lookupByAddress falls back to address layer when geocode is unavailable', async () => {
   const { server, port } = await createMockServer();
