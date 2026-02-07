@@ -186,7 +186,9 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-<script>
+<script type="module">
+import { loadSectionAtPoint as fetchSectionAtPoint, loadAliquotsAtPoint } from "./src/browser-survey-client.js";
+
 (() => {
   // ---------------------------
   // CONFIG
@@ -645,40 +647,22 @@
   // ---------------------------
   // BLM queries
   // ---------------------------
+  function arcFeatureToGeoJson(feature) {
+    return featureSetToGeoJson({ features: feature ? [feature] : [] }).features[0] || null;
+  }
+
   async function loadSectionAtPoint(lat, lon) {
-    const qUrl = arcgisQueryUrl(BLM_FIRST_DIV_LAYER, {
-      f:"json",
-      where:"1=1",
-      geometry: esriPoint(lon, lat),
-      geometryType:"esriGeometryPoint",
-      inSR:4326,
-      spatialRel:"esriSpatialRelIntersects",
-      outFields:"*",
-      returnGeometry:true,
-      outSR:4326
-    });
-    const fs = await fetchJson(qUrl);
-    const gj = featureSetToGeoJson(fs);
-    if (!gj.features.length) throw new Error("No PLSS section found at that point.");
-    return gj.features[0];
+    const section = await fetchSectionAtPoint(lon, lat);
+    const gjFeature = arcFeatureToGeoJson(section);
+    if (!gjFeature) throw new Error("No PLSS section found at that point.");
+    return gjFeature;
   }
 
   async function loadAliquotsInSection(sectionFeature) {
-    const esriPoly = esriGeomFromGeoJsonPolygon(sectionFeature.geometry);
-    if (!esriPoly) throw new Error("Section geometry not usable for aliquot query.");
-    const qUrl = arcgisQueryUrl(BLM_SECOND_DIV_LAYER, {
-      f:"json",
-      where:"1=1",
-      geometry: esriPoly,
-      geometryType:"esriGeometryPolygon",
-      inSR:4326,
-      spatialRel:"esriSpatialRelIntersects",
-      outFields:"*",
-      returnGeometry:true,
-      outSR:4326
-    });
-    const fs = await fetchJson(qUrl);
-    return featureSetToGeoJson(fs);
+    const center = centroidLatLng(sectionFeature);
+    if (!center) throw new Error("Section geometry not usable for aliquot query.");
+    const payload = await loadAliquotsAtPoint(center.lon, center.lat);
+    return featureSetToGeoJson({ features: payload.aliquots || [] });
   }
 
   async function loadCornersInSection(sectionFeature) {

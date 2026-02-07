@@ -124,6 +124,16 @@ export function createSurveyServer({ client = new SurveyCadClient(), staticDir =
         return;
       }
 
+
+      if (urlObj.pathname === '/api/parcel') {
+        const { lon, lat } = parseLonLat(urlObj);
+        const outSR = Number(urlObj.searchParams.get('outSR') || 4326);
+        const searchMeters = Number(urlObj.searchParams.get('searchMeters') || 40);
+        const parcel = await client.findParcelNearPoint(lon, lat, outSR, searchMeters);
+        sendJson(res, 200, { parcel });
+        return;
+      }
+
       if (urlObj.pathname === '/api/section') {
         const { lon, lat } = parseLonLat(urlObj);
         const section = await client.loadSectionAtPoint(lon, lat);

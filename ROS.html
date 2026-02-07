@@ -336,7 +336,9 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint } from "./src/browser-survey-client.js";
+
 (() => {
   // -----------------------------
   // Configuration (Ada County)
@@ -1012,8 +1014,7 @@
   }
 
   async function fetchParcelGeometry2243FromPoint(lon, lat) {
-    const p = await findParcelNearPoint(lon, lat, EXPORT_OUT_SR);
-    return p;
+    return fetchParcelNearPoint(lon, lat, EXPORT_OUT_SR, 150);
   }
 
   // -----------------------------
@@ -1078,24 +1079,26 @@
       log("Lookup started.");
       invalidateMapSoon("lookup start");
 
-      const { best: addrF, candidates } = await findBestAddressFeature(rawAddr);
+      const lookup = await lookupByAddress(rawAddr);
+      const addrF = lookup.addressFeature;
+      const candidates = addrF ? [addrF] : [];
       if (!addrF) {
         log("Address not found in Ada County Address layer (16). Try different formatting.", "bad");
         return;
       }
       state.addressFeature = addrF;
 
-      const addrLL = arcPointToLatLng(addrF.geometry);
+      const lon = lookup.location?.lon ?? addrF.geometry.x;
+      const lat = lookup.location?.lat ?? addrF.geometry.y;
+      const addrLL = [lat, lon];
       log(`Address match: ${addrLL[0].toFixed(7)}, ${addrLL[1].toFixed(7)}`);
       drawAddressPoint(addrF);
 
       map.setView(addrLL, 18);
       invalidateMapSoon("after setView");
-
-      const lon = addrF.geometry.x, lat = addrF.geometry.y;
       state.lastLonLat = { lon, lat };
 
-      const parcel = await findParcelNearPoint(lon, lat, 4326);
+      const parcel = lookup.parcel;
       if (!parcel) {
         log("Parcel not found near that address point (0/10/30/150m).", "bad");
         setSummaryCards([
@@ -1122,9 +1125,9 @@
       const c = centroidOfPolygon(parcel.geometry) || { x: lon, y: lat };
       log(`Parcel centroid: ${c.y.toFixed(7)}, ${c.x.toFixed(7)}`);
 
-      const subdiv = await findContainingPolygon(LAYERS.subdivisions, c.x, c.y, 600);
-      const section = await findContainingPolygon(LAYERS.sections, c.x, c.y, 2500);
-      const township = await findContainingPolygon(LAYERS.townships, c.x, c.y, 4000);
+      const subdiv = lookup.subdivision || null;
+      const section = lookup.section || null;
+      const township = lookup.township || null;
 
       state.subdivisionFeature = subdiv;
       state.sectionFeature = section;
@@ -1134,7 +1137,7 @@
       if (section) drawPolygonFeature(section, layers.section, { style: () => ({ color:"#ffcc66", weight:2, fillOpacity:0.03, dashArray:"6 6" }) }, "Section");
       if (township) drawPolygonFeature(township, layers.township, { style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02, dashArray:"3 8" }) }, "Township");
 
-      const ros = await findRosNearPoint(c.x, c.y, 1600);
+      const ros = lookup.ros || [];
       state.rosFeatures = ros;
       log(`ROS near parcel: ${ros.length}`);
 
