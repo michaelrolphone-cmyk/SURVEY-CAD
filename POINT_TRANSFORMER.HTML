@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Point TXT/CSV Renumber (G + G# + REF)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; line-height: 1.25; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .row > * { flex: 0 0 auto; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+    textarea { width: 100%; min-height: 360px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; padding: 10px; box-sizing: border-box; }
+    .card { border: 1px solid rgba(127,127,127,.35); border-radius: 10px; padding: 12px; }
+    .muted { opacity: .8; }
+    label { display: inline-flex; align-items: center; gap: 8px; }
+    button { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(127,127,127,.45); background: rgba(127,127,127,.12); cursor: pointer; }
+    button:active { transform: translateY(1px); }
+    a.download { display: inline-block; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(127,127,127,.45); text-decoration: none; }
+    .log { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Point TXT/CSV Renumber: move <b>G</b>/<b>G#</b>/<b>REF</b> from Name → Description, renumber, sort</h1>
+
+  <div class="row">
+    <input id="file" type="file" accept=".txt,.csv,text/plain,text/csv" />
+    <button id="processBtn">Process</button>
+    <button id="loadSampleBtn">Load sample</button>
+    <button id="clearBtn">Clear</button>
+    <a id="downloadLink" class="download" href="#" download="points_transformed.txt" style="display:none;">Download output</a>
+  </div>
+
+  <div class="row" style="margin-top:10px;">
+    <label>
+      <input id="preferAvoid100" type="checkbox" checked />
+      Prefer to avoid using the 100–199 block for renumbered G points (falls back if needed)
+    </label>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="muted" style="margin-bottom:6px;">Input (paste here or choose a file)</div>
+      <textarea id="input"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="muted" style="margin-bottom:6px;">Output (sorted numerically by point number)</div>
+      <textarea id="output" readonly></textarea>
+      <div class="muted" style="margin-top:10px;">Run log</div>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const elFile = document.getElementById('file');
+  const elInput = document.getElementById('input');
+  const elOutput = document.getElementById('output');
+  const elLog = document.getElementById('log');
+  const elDownload = document.getElementById('downloadLink');
+  const elPreferAvoid100 = document.getElementById('preferAvoid100');
+
+  const SAMPLE = [
+    "1,10000.000,10000.000,0.000,",
+    "2,9997.045,8669.003,0.000,",
+    "3,11315.586,8664.263,0.000,",
+    "4,11321.713,9995.623,0.000,",
+    "5,10535.611,8667.057,0.000,",
+    "6,10523.837,9998.265,0.000,",
+    "7,10164.999,9999.454,0.000,",
+    "8,10160.976,8668.411,0.000,",
+    "BURLEY REF,534777.803,2643218.675,3125.438,",
+    "2G,534734.784,2642969.690,3126.368,FBC",
+    "100G,534773.772,2642953.176,3125.954,SCX",
+    "101G,534694.287,2642948.037,3126.043,SCX",
+    "104G,534694.801,2642945.916,3126.056,F12 NC",
+    "123G1,534694.900,2642946.111,3126.099,CHK",
+    "123G2,534694.901,2642946.112,3126.100,CHK",
+    "777G1,534694.902,2642946.113,3126.101,SINGLE"
+  ].join("\n");
+
+  // --- CSV helpers (handles quotes and embedded commas) ---
+  function parseCSVLine(line) {
+    const out = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += ch;
+        continue;
+      }
+
+      if (ch === '"') { inQuotes = true; continue; }
+      if (ch === ',') { out.push(cur); cur = ""; continue; }
+      cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function csvStringifyField(field) {
+    const s = String(field ?? "");
+    const needsQuote =
+      s.includes('"') ||
+      s.includes(',') ||
+      s.includes('\n') ||
+      s.includes('\r') ||
+      (s.length > 0 && (s[0] === ' ' || s[s.length - 1] === ' '));
+    if (!needsQuote) return s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+
+  function toCSVLine(fields) {
+    return fields.map(csvStringifyField).join(',');
+  }
+
+  function appendTokenToDesc(existingDesc, token) {
+    const d = (existingDesc ?? "").trim();
+    const t = (token ?? "").trim();
+    if (!t) return d;
+    return d ? (d + " " + t) : t;
+  }
+
+  function isDigitsOnly(s) {
+    return /^\s*\d+\s*$/.test(s);
+  }
+
+  function parseIntStrict(s) {
+    const m = /^\s*(\d+)\s*$/.exec(s);
+    return m ? parseInt(m[1], 10) : NaN;
+  }
+
+  // Name classification:
+  // - REF: contains "REF" anywhere
+  // - G suffix: digits + G + digits  (e.g., 123G1, 123 G 2)
+  // - G plain: digits + G           (e.g., 2G, 202G)
+  // - NUM: digits
+  function classifyName(nameRaw) {
+    const name = (nameRaw ?? "").trim();
+
+    if (/ref/i.test(name)) return { kind: "REF", name };
+
+    const mgs = /^\s*(\d+)\s*G\s*(\d+)\s*$/i.exec(name);
+    if (mgs) {
+      return {
+        kind: "G_SUFFIX",
+        name,
+        pre: parseInt(mgs[1], 10),
+        suf: parseInt(mgs[2], 10)
+      };
+    }
+
+    const mg = /^\s*(\d+)\s*G\s*$/i.exec(name);
+    if (mg) {
+      return { kind: "G", name, gNum: parseInt(mg[1], 10) };
+    }
+
+    if (isDigitsOnly(name)) return { kind: "NUM", name, num: parseIntStrict(name) };
+
+    return { kind: "OTHER", name };
+  }
+
+  // Candidate 100-block ordering:
+  // - For normal G groups (2G / 202G / 100G), use 200,300,400,500,... and keep 100 last (unless user opts out).
+  // - For G_SUFFIX families and suffix-buckets, prefer 500 first so 1→501,2→502 style feels natural,
+  //   then 600..900, then 200..400, then 100.
+  function buildCandidateBlocksNormal(preferAvoid100) {
+    if (preferAvoid100) return [200,300,400,500,600,700,800,900,100];
+    return [100,200,300,400,500,600,700,800,900];
+  }
+  function buildCandidateBlocksSuffix(preferAvoid100) {
+    if (preferAvoid100) return [500,600,700,800,900,200,300,400,100];
+    return [100,500,600,700,800,900,200,300,400];
+  }
+
+  function groupSortKey(groupKey) {
+    // Lower = earlier pick.
+    // Ordering:
+    //   0: normal-G buckets (g:hN, g:lt100)
+    //   1: G_SUFFIX families (fam:123)
+    //   2: singleton suffix buckets (suf:1)
+    //   3: others
+    if (groupKey.startsWith("g:")) {
+      if (groupKey === "g:lt100") return [0, 9999];
+      const m = /^g:h(\d+)$/.exec(groupKey);
+      if (m) return [0, parseInt(m[1], 10)];
+      return [0, 9999];
+    }
+    if (groupKey.startsWith("fam:")) return [1, parseInt(groupKey.slice(4), 10) || 9999];
+    if (groupKey.startsWith("suf:")) return [2, parseInt(groupKey.slice(4), 10) || 9999];
+    return [3, 9999];
+  }
+
+  function allocateGroupBlocks(groupKeys, usedHundredsBlocks, preferAvoid100) {
+    // We allocate blocks with a bias:
+    // - normal G groups draw from normal candidates
+    // - suffix-related groups draw from suffix candidates
+    // If we run out of unused blocks, we start reusing blocks (still collision-safe per-point).
+    const normalCandidates = buildCandidateBlocksNormal(preferAvoid100);
+    const suffixCandidates = buildCandidateBlocksSuffix(preferAvoid100);
+
+    const assigned = new Map(); // groupKey -> blockStart
+
+    const sorted = [...groupKeys].sort((a,b) => {
+      const ka = groupSortKey(a), kb = groupSortKey(b);
+      return ka[0]-kb[0] || ka[1]-kb[1] || (a < b ? -1 : 1);
+    });
+
+    function candidatesFor(groupKey) {
+      return (groupKey.startsWith("fam:") || groupKey.startsWith("suf:")) ? suffixCandidates : normalCandidates;
+    }
+
+    for (const gk of sorted) {
+      const candidates = candidatesFor(gk);
+
+      // Pass 1: pick a block not already in-use and not already assigned
+      let picked = null;
+      for (const b of candidates) {
+        if (usedHundredsBlocks.has(b)) continue;
+        if ([...assigned.values()].includes(b)) continue;
+        picked = b;
+        break;
+      }
+
+      // Pass 2: allow reusing an already assigned block (still must not be "in use")
+      if (picked === null) {
+        for (const b of candidates) {
+          if (usedHundredsBlocks.has(b)) continue;
+          picked = b;
+          break;
+        }
+      }
+
+      // Pass 3: last-resort: allow blocks that are in-use (we'll collision-resolve per-point)
+      if (picked === null) {
+        picked = candidates[0] ?? 200;
+      }
+
+      assigned.set(gk, picked);
+    }
+
+    return assigned;
+  }
+
+  function findFreeInBlock(usedNumbers, blockStart, preferredOffset) {
+    const baseOffset = ((preferredOffset % 100) + 100) % 100;
+    for (let d = 0; d < 100; d++) {
+      const off = (baseOffset + d) % 100;
+      const candidate = blockStart + off;
+      if (!usedNumbers.has(candidate)) return candidate;
+    }
+    // If this 100-block is completely full, fall back to ANY free 100..999
+    for (let n = 100; n <= 999; n++) {
+      if (!usedNumbers.has(n)) return n;
+    }
+    // Absolute last resort (should be extremely rare)
+    let n = 1000;
+    while (usedNumbers.has(n)) n++;
+    return n;
+  }
+
+  function processText(text, preferAvoid100) {
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    const records = [];
+    const errors = [];
+
+    for (let idx = 0; idx < lines.length; idx++) {
+      const raw = lines[idx];
+      if (!raw.trim()) continue;
+
+      const cols = parseCSVLine(raw);
+      if (cols.length < 4) {
+        errors.push(`Line ${idx+1}: expected at least 4 columns (name,x,y,z). Kept unchanged.`);
+        records.push({
+          lineIndex: idx,
+          rawLine: raw,
+          kind: "RAW",
+          cols,
+          pointNum: NaN
+        });
+        continue;
+      }
+
+      while (cols.length < 5) cols.push("");
+
+      const nameRaw = cols[0];
+      const c = classifyName(nameRaw);
+
+      records.push({
+        lineIndex: idx,
+        rawLine: raw,
+        cols,
+        kind: c.kind,
+        name: c.name,
+        gNum: c.gNum ?? null,
+        pre: c.pre ?? null,
+        suf: c.suf ?? null,
+        pointNum: c.num ?? NaN
+      });
+    }
+
+    // Used point numbers (existing, non-G/non-REF numeric points)
+    const usedNumbers = new Set();
+    const usedHundredsBlocks = new Set();
+    for (const r of records) {
+      if (r.kind === "NUM" && Number.isFinite(r.pointNum)) {
+        usedNumbers.add(r.pointNum);
+        if (r.pointNum >= 100 && r.pointNum <= 999) {
+          usedHundredsBlocks.add(Math.floor(r.pointNum / 100) * 100);
+        }
+      }
+    }
+
+    // Determine G_SUFFIX multiplicity by prefix (pre):
+    // If a prefix appears more than once, treat it as a "family" -> derived numbering by suffix.
+    const preCounts = new Map(); // pre -> count
+    for (const r of records) {
+      if (r.kind === "G_SUFFIX") {
+        preCounts.set(r.pre, (preCounts.get(r.pre) ?? 0) + 1);
+      }
+    }
+
+    // Build group keys
+    const groupKeys = new Set();
+
+    // Normal G groups:
+    for (const r of records) {
+      if (r.kind === "G") {
+        const n = r.gNum;
+        r.gKey = (n < 100) ? "g:lt100" : ("g:h" + Math.floor(n / 100));
+        groupKeys.add(r.gKey);
+      }
+    }
+
+    // G_SUFFIX groups:
+    // - If pre repeats: groupKey = fam:<pre>  (derived from suffix; e.g., 501,502,...)
+    // - If pre does NOT repeat: groupKey = suf:<suf> (all singleton ...G1 together sequentially, etc.)
+    for (const r of records) {
+      if (r.kind === "G_SUFFIX") {
+        const count = preCounts.get(r.pre) ?? 0;
+        if (count > 1) {
+          r.gKey = "fam:" + r.pre;
+        } else {
+          r.gKey = "suf:" + r.suf;
+        }
+        groupKeys.add(r.gKey);
+      }
+    }
+
+    const groupBlockMap = allocateGroupBlocks(groupKeys, usedHundredsBlocks, preferAvoid100);
+
+    // For singleton suffix buckets (suf:<n>) we assign sequentially (not based on suffix).
+    // Start at offset 1 so the first is X01 (often feels nicer than X00).
+    const bucketCounters = new Map(); // groupKey -> nextIndex
+    function nextSequentialOffsetForBucket(groupKey) {
+      const i = bucketCounters.get(groupKey) ?? 0;
+      bucketCounters.set(groupKey, i + 1);
+      return 1 + i; // 1,2,3,...
+    }
+
+    // Apply transformations
+    let refNext = 5000;
+    let gCount = 0, gSuffixFamilyCount = 0, gSuffixBucketCount = 0, refCount = 0;
+
+    const transformed = [];
+    for (const r of records) {
+      if (r.kind === "RAW") {
+        transformed.push({
+          sortKey: Number.POSITIVE_INFINITY,
+          lineIndex: r.lineIndex,
+          cols: r.cols,
+          raw: r.rawLine,
+          isRaw: true
+        });
+        continue;
+      }
+
+      const cols = r.cols.slice();
+      const descIndex = cols.length - 1;
+
+      if (r.kind === "REF") {
+        while (usedNumbers.has(refNext)) refNext++;
+        const newNum = refNext;
+        usedNumbers.add(newNum);
+        refNext++;
+        refCount++;
+
+        cols[0] = String(newNum);
+        cols[descIndex] = appendTokenToDesc(cols[descIndex], r.name);
+
+        transformed.push({ sortKey: newNum, lineIndex: r.lineIndex, cols, isRaw: false });
+        continue;
+      }
+
+      if (r.kind === "G") {
+        const blockStart = groupBlockMap.get(r.gKey) ?? 200;
+        const offset = r.gNum % 100;
+        const newNum = findFreeInBlock(usedNumbers, blockStart, offset);
+        usedNumbers.add(newNum);
+        gCount++;
+
+        cols[0] = String(newNum);
+        cols[descIndex] = appendTokenToDesc(cols[descIndex], r.name);
+
+        transformed.push({ sortKey: newNum, lineIndex: r.lineIndex, cols, isRaw: false });
+        continue;
+      }
+
+      if (r.kind === "G_SUFFIX") {
+        const blockStart = groupBlockMap.get(r.gKey) ?? 500;
+
+        let preferredOffset;
+        if (r.gKey.startsWith("fam:")) {
+          // FAMILY: derive from number after G (suffix)
+          // Example: 123G1 → X01 (e.g., 501), 123G2 → X02 (e.g., 502)
+          preferredOffset = r.suf % 100;
+          gSuffixFamilyCount++;
+        } else {
+          // SINGLETON BUCKET: ALL ...G1 (etc.) go sequentially in a 100-block
+          // (not derived from the suffix, because they'd collide)
+          preferredOffset = nextSequentialOffsetForBucket(r.gKey);
+          gSuffixBucketCount++;
+        }
+
+        const newNum = findFreeInBlock(usedNumbers, blockStart, preferredOffset);
+        usedNumbers.add(newNum);
+
+        cols[0] = String(newNum);
+        cols[descIndex] = appendTokenToDesc(cols[descIndex], r.name);
+
+        transformed.push({ sortKey: newNum, lineIndex: r.lineIndex, cols, isRaw: false });
+        continue;
+      }
+
+      if (r.kind === "NUM") {
+        const n = r.pointNum;
+        transformed.push({
+          sortKey: Number.isFinite(n) ? n : Number.POSITIVE_INFINITY,
+          lineIndex: r.lineIndex,
+          cols,
+          isRaw: false
+        });
+        continue;
+      }
+
+      // OTHER: keep as-is; place after numeric rows.
+      transformed.push({
+        sortKey: Number.POSITIVE_INFINITY,
+        lineIndex: r.lineIndex,
+        cols,
+        isRaw: false
+      });
+    }
+
+    // Sort numerically by point number; non-numeric/RAW at the end in original order.
+    transformed.sort((a,b) => {
+      if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+      return a.lineIndex - b.lineIndex;
+    });
+
+    const outLines = transformed.map(t => toCSVLine(t.cols));
+    const outText = outLines.join("\n") + (outLines.length ? "\n" : "");
+
+    const blockPairs = [...groupBlockMap.entries()]
+      .sort((a,b) => {
+        const ka = groupSortKey(a[0]), kb = groupSortKey(b[0]);
+        return ka[0]-kb[0] || ka[1]-kb[1] || (a[0] < b[0] ? -1 : 1);
+      })
+      .map(([k,v]) => `${k} → ${v}-${v+99}`)
+      .join("\n");
+
+    const log = [
+      `Lines read: ${records.length}`,
+      `G (plain) renumbered: ${gCount}`,
+      `G (suffix) family-derived renumbered: ${gSuffixFamilyCount}`,
+      `G (suffix) singleton-bucket renumbered: ${gSuffixBucketCount}`,
+      `REF renumbered: ${refCount}`,
+      "",
+      "Assigned group blocks:",
+      blockPairs || "(none)",
+      "",
+      errors.length ? ("Warnings:\n" + errors.join("\n")) : "Warnings: (none)"
+    ].join("\n");
+
+    return { outText, log };
+  }
+
+  function setDownload(text) {
+    if (!text) {
+      elDownload.style.display = "none";
+      elDownload.removeAttribute("href");
+      return;
+    }
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    elDownload.href = url;
+    elDownload.style.display = "inline-block";
+  }
+
+  async function readSelectedFile() {
+    const f = elFile.files && elFile.files[0];
+    if (!f) return null;
+    return await f.text();
+  }
+
+  document.getElementById('loadSampleBtn').addEventListener('click', () => {
+    elInput.value = SAMPLE;
+    elOutput.value = "";
+    elLog.textContent = "";
+    setDownload("");
+    elFile.value = "";
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    elInput.value = "";
+    elOutput.value = "";
+    elLog.textContent = "";
+    setDownload("");
+    elFile.value = "";
+  });
+
+  document.getElementById('processBtn').addEventListener('click', async () => {
+    const preferAvoid100 = !!elPreferAvoid100.checked;
+
+    let text = elInput.value;
+    if ((!text || !text.trim()) && elFile.files && elFile.files[0]) {
+      text = await readSelectedFile();
+      elInput.value = text ?? "";
+    }
+
+    if (!text || !text.trim()) {
+      elLog.textContent = "No input. Paste text or choose a file.";
+      elOutput.value = "";
+      setDownload("");
+      return;
+    }
+
+    const { outText, log } = processText(text, preferAvoid100);
+    elOutput.value = outText;
+    elLog.textContent = log;
+    setDownload(outText);
+  });
+})();
+</script>
+</body>
+</html>
