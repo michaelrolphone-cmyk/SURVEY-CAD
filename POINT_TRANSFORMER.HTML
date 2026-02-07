@@ -3,553 +3,1131 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Point TXT/CSV Renumber (G + G# + REF)</title>
+  <title>PointForge // NAD83 Idaho West // G+REF Renumber + Map</title>
+
+  <!-- Leaflet (map preview). For fully-offline use, download these assets and replace CDN links. -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; line-height: 1.25; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    :root{
+      /* Sci-fi palette */
+      --bg0:#05060a;
+      --bg1:#070a12;
+      --glass: rgba(14, 18, 30, .62);
+      --glass2: rgba(10, 14, 22, .55);
+      --line: rgba(255,255,255,.10);
+      --line2: rgba(255,255,255,.06);
+
+      --text:#e7f0ff;
+      --muted:#8aa4c2;
+
+      --c1:#00e5ff; /* cyan */
+      --c2:#ff2bd6; /* magenta */
+      --c3:#a6ff6f; /* lime */
+      --warn:#ffbd2e;
+      --bad:#ff4d6d;
+
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --r: 16px;
+    }
+
+    *{ box-sizing: border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 15% 20%, rgba(0,229,255,.13), transparent 55%),
+                  radial-gradient(900px 700px at 85% 30%, rgba(255,43,214,.10), transparent 55%),
+                  radial-gradient(900px 900px at 50% 95%, rgba(166,255,111,.06), transparent 60%),
+                  linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 100%);
+      overflow-x: hidden;
+    }
+
+    /* HUD overlays */
+    body::before{
+      content:"";
+      position: fixed; inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity:.08;
+      mask-image: radial-gradient(closest-side at 50% 40%, black 35%, transparent 80%);
+    }
+    body::after{
+      content:"";
+      position: fixed; inset:-40%;
+      pointer-events:none;
+      background:
+        repeating-linear-gradient(
+          180deg,
+          rgba(255,255,255,.00) 0px,
+          rgba(255,255,255,.00) 3px,
+          rgba(255,255,255,.02) 4px
+        );
+      opacity:.12;
+      transform: rotate(-3deg);
+      animation: scan 7.5s linear infinite;
+    }
+    @keyframes scan{
+      0%{ transform: translateY(-4%) rotate(-3deg); }
+      100%{ transform: translateY(4%) rotate(-3deg); }
+    }
+
+    /* Top bar */
+    header{
+      position: sticky; top:0; z-index: 50;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(90deg, rgba(0,229,255,.10), rgba(255,43,214,.08), rgba(166,255,111,.06));
+      border-bottom: 1px solid var(--line);
+    }
+    .top{
+      padding: 14px 18px;
+      display:flex;
+      align-items:flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .brand{
+      display:flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 280px;
+    }
+    .brand .title{
+      display:flex; align-items: baseline; gap: 10px;
+      font-weight: 800;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+    .badge{
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,229,255,.35);
+      background: rgba(0,229,255,.10);
+      color: var(--c1);
+      box-shadow: 0 0 0 1px rgba(0,229,255,.10), 0 0 18px rgba(0,229,255,.15);
+    }
+    .brand .sub{
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .statusbar{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      min-width: 280px;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(10,14,22,.48);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .dot{
+      width:8px; height:8px;
+      border-radius: 99px;
+      background: var(--c3);
+      box-shadow: 0 0 0 2px rgba(166,255,111,.15), 0 0 18px rgba(166,255,111,.35);
+    }
+    .mono{ font-family: var(--mono); color: var(--text); }
+
+    /* Layout */
+    main{
+      padding: 16px 18px 24px;
+      display:grid;
+      grid-template-columns: 460px 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 1020px){
+      main{ grid-template-columns: 1fr; }
+    }
+
+    .panel{
+      border-radius: var(--r);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      border: 1px solid var(--line);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.04) inset,
+        0 12px 48px rgba(0,0,0,.40);
+      overflow:hidden;
+      position: relative;
+    }
+    .panel::before{
+      content:"";
+      position:absolute; inset:0;
+      pointer-events:none;
+      background: radial-gradient(800px 200px at 20% 0%, rgba(0,229,255,.12), transparent 60%),
+                  radial-gradient(800px 220px at 80% 0%, rgba(255,43,214,.10), transparent 60%);
+      opacity:.85;
+      mix-blend-mode: screen;
+    }
+    .panelhead{
+      position: relative;
+      padding: 12px 12px;
+      border-bottom: 1px solid var(--line2);
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+      background: rgba(7,10,18,.55);
+      backdrop-filter: blur(12px);
+    }
+    .panelhead h2{
+      margin:0;
+      font-size: 12px;
+      letter-spacing: .9px;
+      text-transform: uppercase;
+      font-weight: 850;
+      color: rgba(231,240,255,.92);
+      display:flex;
+      align-items:center;
+      gap: 10px;
+    }
+    .panelhead h2 .sig{
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      background: linear-gradient(135deg, var(--c1), var(--c2));
+      box-shadow: 0 0 14px rgba(0,229,255,.25), 0 0 18px rgba(255,43,214,.20);
+    }
+
+    .panelbody{
+      position: relative;
+      padding: 12px;
+    }
+
+    /* Controls */
+    .row{ display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
     .row > * { flex: 0 0 auto; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-    @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
-    textarea { width: 100%; min-height: 360px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; padding: 10px; box-sizing: border-box; }
-    .card { border: 1px solid rgba(127,127,127,.35); border-radius: 10px; padding: 12px; }
-    .muted { opacity: .8; }
-    label { display: inline-flex; align-items: center; gap: 8px; }
-    button { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(127,127,127,.45); background: rgba(127,127,127,.12); cursor: pointer; }
-    button:active { transform: translateY(1px); }
-    a.download { display: inline-block; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(127,127,127,.45); text-decoration: none; }
-    .log { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+    label{ font-size: 12px; color: var(--muted); }
+    input[type="file"]{ width: 100%; color: var(--muted); }
+
+    textarea{
+      width: 100%;
+      min-height: 260px;
+      resize: vertical;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,229,255,.18);
+      background: rgba(6,8,14,.78);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.05) inset,
+        0 0 24px rgba(0,229,255,.08);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.35;
+      outline: none;
+    }
+    textarea:focus{
+      border-color: rgba(255,43,214,.30);
+      box-shadow:
+        0 0 0 1px rgba(255,43,214,.18) inset,
+        0 0 26px rgba(255,43,214,.16);
+    }
+
+    select{
+      appearance:none;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      color: var(--text);
+      outline:none;
+      font-size: 12px;
+    }
+    select:focus{ border-color: rgba(0,229,255,.35); box-shadow: 0 0 22px rgba(0,229,255,.12); }
+
+    .btn{
+      position: relative;
+      border: 1px solid rgba(0,229,255,.35);
+      color: rgba(231,240,255,.95);
+      background: linear-gradient(180deg, rgba(0,229,255,.18), rgba(0,229,255,.06));
+      padding: 10px 12px;
+      border-radius: 14px;
+      font-weight: 850;
+      font-size: 12px;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow:
+        0 0 0 1px rgba(0,229,255,.10) inset,
+        0 0 22px rgba(0,229,255,.12);
+      transition: transform .08s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .btn:hover{
+      border-color: rgba(255,43,214,.35);
+      box-shadow:
+        0 0 0 1px rgba(255,43,214,.10) inset,
+        0 0 28px rgba(255,43,214,.14);
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.secondary{
+      border-color: rgba(255,255,255,.16);
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+      box-shadow: 0 0 0 1px rgba(255,255,255,.05) inset;
+    }
+    .btn.secondary:hover{
+      border-color: rgba(255,255,255,.26);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.07) inset, 0 0 22px rgba(255,255,255,.06);
+    }
+    .btn[disabled]{
+      opacity: .45;
+      cursor: not-allowed;
+      filter: grayscale(.2);
+      box-shadow: none;
+    }
+
+    .pill{
+      display:inline-flex; align-items:center; gap: 10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(10,14,22,.44);
+      color: var(--muted);
+      font-size: 12px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
+    }
+    input[type="checkbox"]{
+      width: 16px; height: 16px;
+      accent-color: var(--c1);
+    }
+    .hint{
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    @media (max-width: 540px){ .grid2{ grid-template-columns:1fr; } }
+
+    /* Stats readout */
+    .stats{
+      margin-top: 10px;
+      border-top: 1px solid var(--line2);
+      padding-top: 10px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .stat{
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(8,10,16,.55);
+      padding: 10px 12px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
+    }
+    .stat .k{
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-bottom: 6px;
+    }
+    .stat .v{
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--text);
+      display:flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .stat .v .glow{
+      color: var(--c1);
+      text-shadow: 0 0 18px rgba(0,229,255,.25);
+    }
+
+    .log{
+      margin-top: 10px;
+      border-top: 1px solid var(--line2);
+      padding-top: 10px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: rgba(138,164,194,.95);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .ok{ color: var(--c3); }
+    .warn{ color: var(--warn); }
+    .bad{ color: var(--bad); }
+
+    /* Map */
+    #map{
+      height: 380px;
+      width: 100%;
+      border-radius: var(--r);
+      border: 1px solid rgba(0,229,255,.22);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset, 0 0 30px rgba(0,229,255,.10);
+      overflow: hidden;
+    }
+    .leaflet-container{
+      background: #06101b;
+    }
+    .leaflet-control-zoom a{
+      background: rgba(8,10,16,.78) !important;
+      color: var(--text) !important;
+      border: 1px solid rgba(255,255,255,.16) !important;
+      box-shadow: 0 0 18px rgba(0,0,0,.25);
+    }
+    .leaflet-control-attribution{
+      background: rgba(8,10,16,.55) !important;
+      color: rgba(138,164,194,.85) !important;
+      border-radius: 10px !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+      margin: 0 8px 8px 0 !important;
+    }
+
+    /* Right side split */
+    .right{
+      display:grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+    }
+    .outputArea{
+      min-height: 320px;
+    }
+
+    .kbd{
+      font-family: var(--mono);
+      padding: 2px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(8,10,16,.55);
+      color: var(--text);
+      font-size: 11px;
+    }
   </style>
 </head>
+
 <body>
-  <h1>Point TXT/CSV Renumber: move <b>G</b>/<b>G#</b>/<b>REF</b> from Name → Description, renumber, sort</h1>
+  <header>
+    <div class="top">
+      <div class="brand">
+        <div class="title">
+          <span class="badge">POINTFORGE</span>
+          <span>G/REF RENUMB + MAP PREVIEW</span>
+        </div>
+        <div class="sub">
+          Defaults locked: <span class="kbd">US-ft</span> + <span class="kbd">Idaho West</span> + <span class="kbd">Swap X/Y</span>.
+          Input: <span class="kbd">NAME,X,Y,Z,DESCRIPTION</span> (description = last column). Output sorted by point number.
+        </div>
+      </div>
 
-  <div class="row">
-    <input id="file" type="file" accept=".txt,.csv,text/plain,text/csv" />
-    <button id="processBtn">Process</button>
-    <button id="loadSampleBtn">Load sample</button>
-    <button id="clearBtn">Clear</button>
-    <a id="downloadLink" class="download" href="#" download="points_transformed.txt" style="display:none;">Download output</a>
-  </div>
-
-  <div class="row" style="margin-top:10px;">
-    <label>
-      <input id="preferAvoid100" type="checkbox" checked />
-      Prefer to avoid using the 100–199 block for renumbered G points (falls back if needed)
-    </label>
-  </div>
-
-  <div class="grid">
-    <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Input (paste here or choose a file)</div>
-      <textarea id="input"></textarea>
+      <div class="statusbar">
+        <span class="chip"><span class="dot"></span> SYSTEM: ONLINE</span>
+        <span class="chip">DATUM: <span class="mono">NAD83 (NO_TRANS)</span></span>
+        <span class="chip">PIPELINE: <span class="mono">PARSE → RENUMB → SORT → PLOT</span></span>
+      </div>
     </div>
+  </header>
 
-    <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Output (sorted numerically by point number)</div>
-      <textarea id="output" readonly></textarea>
-      <div class="muted" style="margin-top:10px;">Run log</div>
-      <div id="log" class="log"></div>
-    </div>
-  </div>
+  <main>
+    <!-- Left: Input + Controls -->
+    <section class="panel">
+      <div class="panelhead">
+        <h2><span class="sig"></span> Ingest Console</h2>
+        <div class="pill">
+          <input id="autoProcess" type="checkbox" checked />
+          <label for="autoProcess" style="color:var(--text); margin:0;">Auto-process</label>
+        </div>
+      </div>
+      <div class="panelbody">
+        <div class="row" style="width:100%;">
+          <div style="flex:1 1 100%;">
+            <label for="file">Load point file (.txt / .csv)</label>
+            <input id="file" type="file" accept=".txt,.csv,text/plain,text/csv" />
+            <div class="hint">Or paste into the field below. Processing doesn’t modify coordinates; only point IDs + descriptions.</div>
+          </div>
+        </div>
 
-<script>
-(() => {
-  const elFile = document.getElementById('file');
-  const elInput = document.getElementById('input');
-  const elOutput = document.getElementById('output');
-  const elLog = document.getElementById('log');
-  const elDownload = document.getElementById('downloadLink');
-  const elPreferAvoid100 = document.getElementById('preferAvoid100');
+        <label for="inText">Raw points</label>
+        <textarea id="inText" spellcheck="false" placeholder="Paste points here... (no sample data loaded)"></textarea>
 
-  const SAMPLE = [
-    "1,10000.000,10000.000,0.000,",
-    "2,9997.045,8669.003,0.000,",
-    "3,11315.586,8664.263,0.000,",
-    "4,11321.713,9995.623,0.000,",
-    "5,10535.611,8667.057,0.000,",
-    "6,10523.837,9998.265,0.000,",
-    "7,10164.999,9999.454,0.000,",
-    "8,10160.976,8668.411,0.000,",
-    "BURLEY REF,534777.803,2643218.675,3125.438,",
-    "2G,534734.784,2642969.690,3126.368,FBC",
-    "100G,534773.772,2642953.176,3125.954,SCX",
-    "101G,534694.287,2642948.037,3126.043,SCX",
-    "104G,534694.801,2642945.916,3126.056,F12 NC",
-    "123G1,534694.900,2642946.111,3126.099,CHK",
-    "123G2,534694.901,2642946.112,3126.100,CHK",
-    "777G1,534694.902,2642946.113,3126.101,SINGLE"
-  ].join("\n");
+        <div class="row" style="margin-top:10px;">
+          <button id="btnProcess" class="btn">Process</button>
+          <button id="btnDownload" class="btn secondary" disabled>Download</button>
+          <span class="pill">Map defaults: <span class="mono">US-ft</span> · <span class="mono">West</span> · <span class="mono">SwapXY</span></span>
+        </div>
 
-  // --- CSV helpers (handles quotes and embedded commas) ---
-  function parseCSVLine(line) {
-    const out = [];
-    let cur = "";
-    let inQuotes = false;
+        <div class="grid2" style="margin-top: 10px;">
+          <div class="pill">
+            <span class="mono">Zone</span>
+            <select id="zone" title="State Plane zone" style="min-width: 160px;">
+              <option value="west" selected>Idaho West</option>
+              <option value="central">Idaho Central</option>
+              <option value="east">Idaho East</option>
+            </select>
+          </div>
 
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+          <div class="pill">
+            <input id="showLabels" type="checkbox" checked />
+            <label for="showLabels" style="color:var(--text); margin:0;">Show marker labels</label>
+          </div>
+        </div>
 
-      if (inQuotes) {
-        if (ch === '"') {
-          if (i + 1 < line.length && line[i + 1] === '"') { cur += '"'; i++; }
-          else inQuotes = false;
-        } else cur += ch;
-        continue;
+        <div class="grid2" style="margin-top: 10px;">
+          <div class="pill">
+            <input id="swapXY" type="checkbox" checked disabled />
+            <label for="swapXY" style="color:var(--text); margin:0;">Swap X/Y (locked default)</label>
+          </div>
+          <div class="pill">
+            <span class="mono">Units</span>
+            <select id="units" style="min-width: 160px;" disabled>
+              <option value="usft" selected>US-ft (locked)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stats" id="stats">
+          <div class="stat">
+            <div class="k">Input lines</div>
+            <div class="v"><span id="st_lines" class="glow">—</span><span class="mono">ln</span></div>
+          </div>
+          <div class="stat">
+            <div class="k">Parsed points</div>
+            <div class="v"><span id="st_parsed" class="glow">—</span><span class="mono">pts</span></div>
+          </div>
+          <div class="stat">
+            <div class="k">G renumbered</div>
+            <div class="v"><span id="st_g" class="glow">—</span><span class="mono">pts</span></div>
+          </div>
+          <div class="stat">
+            <div class="k">REF renumbered</div>
+            <div class="v"><span id="st_ref" class="glow">—</span><span class="mono">pts</span></div>
+          </div>
+          <div class="stat">
+            <div class="k">Map plotted</div>
+            <div class="v"><span id="st_map" class="glow">—</span><span class="mono">pts</span></div>
+          </div>
+          <div class="stat">
+            <div class="k">Active zone</div>
+            <div class="v"><span id="st_zone" class="glow">W</span><span class="mono">ID</span></div>
+          </div>
+        </div>
+
+        <div class="log" id="log"></div>
+      </div>
+    </section>
+
+    <!-- Right: Map + Output -->
+    <section class="right">
+      <section class="panel">
+        <div class="panelhead">
+          <h2><span class="sig"></span> Spatial HUD</h2>
+          <div class="chip">Projection: <span class="mono">Idaho SP (US-ft)</span></div>
+        </div>
+        <div class="panelbody">
+          <div id="map"></div>
+          <div class="hint" id="mapHint">Load a file or paste points to plot.</div>
+        </div>
+      </section>
+
+      <section class="panel outputArea">
+        <div class="panelhead">
+          <h2><span class="sig"></span> Output Stream</h2>
+          <div class="chip">Sorted: <span class="mono">numeric point id</span></div>
+        </div>
+        <div class="panelbody">
+          <label for="outText">Transformed points</label>
+          <textarea id="outText" spellcheck="false" readonly></textarea>
+          <div class="hint">Download saves exactly what you see here.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- libs -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.10.0/dist/proj4.js"></script>
+
+  <script>
+    // -----------------------------
+    // CSV helpers
+    // -----------------------------
+    function parseCSVLine(line){
+      const out = [];
+      let cur = "";
+      let inQuotes = false;
+
+      for (let i=0; i<line.length; i++){
+        const ch = line[i];
+        if (inQuotes){
+          if (ch === '"'){
+            if (i+1 < line.length && line[i+1] === '"'){ cur += '"'; i++; }
+            else inQuotes = false;
+          } else cur += ch;
+        } else {
+          if (ch === ','){ out.push(cur); cur = ""; }
+          else if (ch === '"'){ inQuotes = true; }
+          else cur += ch;
+        }
+      }
+      out.push(cur);
+      return out;
+    }
+
+    function csvEscape(v){
+      const s = (v ?? "").toString();
+      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }
+
+    function isIntString(s){ return /^\s*\d+\s*$/.test(s); }
+    function toInt(s){ return parseInt(String(s).trim(), 10); }
+    function trimOrEmpty(s){ return (s ?? "").toString().trim(); }
+
+    // -----------------------------
+    // Point classification
+    // -----------------------------
+    function classifyName(name){
+      const n = trimOrEmpty(name);
+      const isRef = /REF/i.test(n);
+      const gMatch = n.match(/^(\d+)\s*G(\d+)?\s*$/i); // 15G, 202G, 123G1
+      const isG = !!gMatch && !isRef;
+      const gPrefix = isG ? parseInt(gMatch[1], 10) : null;
+      const gSuffix = (isG && gMatch[2] != null) ? parseInt(gMatch[2], 10) : null;
+      return { isRef, isG, gPrefix, gSuffix };
+    }
+
+    function appendToDesc(fields, token){
+      const last = fields.length - 1;
+      const existing = trimOrEmpty(fields[last]);
+      fields[last] = existing ? (existing + " " + token) : token;
+    }
+
+    // -----------------------------
+    // Block allocation logic
+    // -----------------------------
+    function computeUsedBlocks(usedNums){
+      const blocks = new Set();
+      for (const n of usedNums){
+        if (!Number.isFinite(n)) continue;
+        blocks.add(Math.floor(n / 100) * 100);
+      }
+      return blocks;
+    }
+
+    function pickFreeBlock({ start, usedBlocks, allocatedBlocks, avoidBlocks = new Set(), maxBlock = 20000 }){
+      for (let b = start; b <= maxBlock; b += 100){
+        if (b === 5000) continue; // reserved for REF renumbering
+        if (avoidBlocks.has(b)) continue;
+        if (allocatedBlocks.has(b)) continue;
+        if (usedBlocks.has(b)) continue;
+        return b;
+      }
+      return null;
+    }
+
+    function allocatePreferredInBlock(preferred, blockStart, usedNums){
+      const blockEnd = blockStart + 99;
+
+      if (Number.isFinite(preferred) && !usedNums.has(preferred) && preferred >= blockStart && preferred <= blockEnd){
+        usedNums.add(preferred);
+        return preferred;
+      }
+      for (let n = blockStart; n <= blockEnd; n++){
+        if (!usedNums.has(n)){
+          usedNums.add(n);
+          return n;
+        }
+      }
+      // overflow if block completely full
+      let n = blockEnd + 1;
+      while (usedNums.has(n)) n++;
+      usedNums.add(n);
+      return n;
+    }
+
+    // -----------------------------
+    // Main transform
+    // -----------------------------
+    function transformPoints(text){
+      const rawLines = text.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
+      const records = [];
+      const log = [];
+      let parsedCount = 0;
+
+      for (let i=0; i<rawLines.length; i++){
+        const line = rawLines[i];
+        if (!line || !line.trim()) continue;
+
+        const fields = parseCSVLine(line);
+        if (fields.length < 2){
+          records.push({ idx:i, passthrough:true, fields });
+          continue;
+        }
+
+        // Ensure description column exists (at least 5 columns)
+        while (fields.length < 5) fields.push("");
+
+        const name = trimOrEmpty(fields[0]);
+        const cls = classifyName(name);
+
+        const x = Number.parseFloat(fields[1]);
+        const y = (fields.length > 2) ? Number.parseFloat(fields[2]) : NaN;
+
+        records.push({
+          idx: i,
+          passthrough:false,
+          fields,
+          origName: name,
+          cls,
+          x, y,
+          newNum: null
+        });
+        parsedCount++;
       }
 
-      if (ch === '"') { inQuotes = true; continue; }
-      if (ch === ',') { out.push(cur); cur = ""; continue; }
-      cur += ch;
-    }
-    out.push(cur);
-    return out;
-  }
+      // Used numeric point numbers from non-special points (so we don't collide).
+      const usedNums = new Set();
+      for (const r of records){
+        if (r.passthrough) continue;
+        const name = trimOrEmpty(r.fields[0]);
+        if (isIntString(name) && !r.cls.isRef && !r.cls.isG){
+          usedNums.add(toInt(name));
+        }
+      }
 
-  function csvStringifyField(field) {
-    const s = String(field ?? "");
-    const needsQuote =
-      s.includes('"') ||
-      s.includes(',') ||
-      s.includes('\n') ||
-      s.includes('\r') ||
-      (s.length > 0 && (s[0] === ' ' || s[s.length - 1] === ' '));
-    if (!needsQuote) return s;
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
+      // 1) REF points => 5000+
+      let refCount = 0;
+      let nextRef = 5000;
+      for (const r of records){
+        if (r.passthrough) continue;
+        if (!r.cls.isRef) continue;
 
-  function toCSVLine(fields) {
-    return fields.map(csvStringifyField).join(',');
-  }
+        while (usedNums.has(nextRef)) nextRef++;
+        r.newNum = nextRef;
+        usedNums.add(nextRef);
+        refCount++;
 
-  function appendTokenToDesc(existingDesc, token) {
-    const d = (existingDesc ?? "").trim();
-    const t = (token ?? "").trim();
-    if (!t) return d;
-    return d ? (d + " " + t) : t;
-  }
+        appendToDesc(r.fields, r.origName);
+        r.fields[0] = String(nextRef);
+        nextRef++;
+      }
 
-  function isDigitsOnly(s) {
-    return /^\s*\d+\s*$/.test(s);
-  }
+      // 2) G points => allocate 100-block ranges
+      const gRecords = records.filter(r => !r.passthrough && r.cls.isG);
+      const gCount = gRecords.length;
 
-  function parseIntStrict(s) {
-    const m = /^\s*(\d+)\s*$/.exec(s);
-    return m ? parseInt(m[1], 10) : NaN;
-  }
+      const usedBlocks = computeUsedBlocks(usedNums);
+      const allocatedBlocks = new Set();
 
-  // Name classification:
-  // - REF: contains "REF" anywhere
-  // - G suffix: digits + G + digits  (e.g., 123G1, 123 G 2)
-  // - G plain: digits + G           (e.g., 2G, 202G)
-  // - NUM: digits
-  function classifyName(nameRaw) {
-    const name = (nameRaw ?? "").trim();
+      const simpleGroups = new Map(); // origHundreds -> records[] for <digits>G (no suffix)
+      const suffixCandidates = [];    // <digits>G<digits>
 
-    if (/ref/i.test(name)) return { kind: "REF", name };
+      for (const r of gRecords){
+        if (r.cls.gSuffix == null){
+          const h0 = Math.floor(r.cls.gPrefix / 100) * 100; // 0, 100, 200, ...
+          const key = String(h0);
+          if (!simpleGroups.has(key)) simpleGroups.set(key, []);
+          simpleGroups.get(key).push(r);
+        } else {
+          suffixCandidates.push(r);
+        }
+      }
 
-    const mgs = /^\s*(\d+)\s*G\s*(\d+)\s*$/i.exec(name);
-    if (mgs) {
+      // Determine multiplicity by prefix for suffix candidates
+      const byPrefix = new Map();
+      for (const r of suffixCandidates){
+        const p = r.cls.gPrefix;
+        if (!byPrefix.has(p)) byPrefix.set(p, []);
+        byPrefix.get(p).push(r);
+      }
+
+      const seriesGroups = [];             // multiple per prefix => derive from suffix
+      const singletonBySuffix = new Map(); // single per prefix => group by suffix and sequentially number
+
+      for (const [p, arr] of byPrefix.entries()){
+        if (arr.length > 1){
+          seriesGroups.push({ key: "prefix:" + p, prefix: p, records: arr });
+        } else {
+          const r = arr[0];
+          const sfx = r.cls.gSuffix;
+          if (!singletonBySuffix.has(sfx)) singletonBySuffix.set(sfx, []);
+          singletonBySuffix.get(sfx).push(r);
+        }
+      }
+
+      // Allocate blocks for simple groups: start 200.., avoid 500-block (preferred for suffix logic)
+      const simpleKeys = Array.from(simpleGroups.keys()).map(k => parseInt(k,10));
+      simpleKeys.sort((a,b)=>{
+        const az = (a===0)?1:0;
+        const bz = (b===0)?1:0;
+        if (az !== bz) return az - bz;
+        return a - b;
+      });
+
+      const groupBlockAssignments = [];
+
+      for (const h0 of simpleKeys){
+        const recs = simpleGroups.get(String(h0));
+        const avoid = new Set([500]); // reserve 500s for suffix numbering feel
+        if (h0 >= 100) avoid.add(h0);
+
+        const block = pickFreeBlock({
+          start: 200,
+          usedBlocks,
+          allocatedBlocks,
+          avoidBlocks: avoid,
+          maxBlock: 20000
+        }) ?? pickFreeBlock({
+          start: 200,
+          usedBlocks,
+          allocatedBlocks,
+          avoidBlocks: new Set([500]),
+          maxBlock: 20000
+        }) ?? 200;
+
+        // If blocks are exhausted, this can re-use later via fallback in pickFreeBlock returning null.
+        allocatedBlocks.add(block);
+        usedBlocks.add(block);
+        groupBlockAssignments.push({ kind:"simple", origHundreds:h0, block, count: recs.length });
+
+        for (const r of recs){
+          const preferred = block + (r.cls.gPrefix % 100);
+          const assigned = allocatePreferredInBlock(preferred, block, usedNums);
+          r.newNum = assigned;
+          appendToDesc(r.fields, r.origName);
+          r.fields[0] = String(assigned);
+        }
+      }
+
+      // Series groups: prefer 500-block upwards so ...G1 becomes X01 (e.g., 501)
+      seriesGroups.sort((a,b)=>a.prefix - b.prefix);
+      for (const g of seriesGroups){
+        const block = pickFreeBlock({
+          start: 500,
+          usedBlocks,
+          allocatedBlocks,
+          avoidBlocks: new Set(),
+          maxBlock: 20000
+        }) ?? pickFreeBlock({
+          start: 200,
+          usedBlocks,
+          allocatedBlocks,
+          avoidBlocks: new Set([5000]),
+          maxBlock: 20000
+        }) ?? 500;
+
+        allocatedBlocks.add(block);
+        usedBlocks.add(block);
+        groupBlockAssignments.push({ kind:"series", key:g.key, block, count: g.records.length });
+
+        for (const r of g.records){
+          const sfx = r.cls.gSuffix;
+          const preferred = block + sfx;
+          const assigned = allocatePreferredInBlock(preferred, block, usedNums);
+          r.newNum = assigned;
+          appendToDesc(r.fields, r.origName);
+          r.fields[0] = String(assigned);
+        }
+      }
+
+      // Singleton-by-suffix groups: sequential numbering inside their allocated block.
+      // If "available 100s ranges are used up", pickFreeBlock returns null and fallback will re-use a block,
+      // effectively grouping multiple suffix buckets into the same 100-block.
+      const suffixKeys = Array.from(singletonBySuffix.keys()).sort((a,b)=>a-b);
+      for (const sfx of suffixKeys){
+        const recs = singletonBySuffix.get(sfx);
+
+        const block = pickFreeBlock({
+          start: 500,
+          usedBlocks,
+          allocatedBlocks,
+          avoidBlocks: new Set(),
+          maxBlock: 20000
+        }) ?? pickFreeBlock({
+          start: 200,
+          usedBlocks,
+          allocatedBlocks,
+          avoidBlocks: new Set([5000]),
+          maxBlock: 20000
+        }) ?? 500;
+
+        allocatedBlocks.add(block);
+        usedBlocks.add(block);
+        groupBlockAssignments.push({ kind:"suffixSingles", suffix:sfx, block, count: recs.length });
+
+        recs.sort((a,b)=>a.idx-b.idx);
+        for (const r of recs){
+          const assigned = allocatePreferredInBlock(block, block, usedNums);
+          r.newNum = assigned;
+          appendToDesc(r.fields, r.origName);
+          r.fields[0] = String(assigned);
+        }
+      }
+
+      // 3) Sort numerically by final point number
+      const sortable = records.filter(r => !r.passthrough);
+      sortable.sort((a,b)=>{
+        const an = isIntString(a.fields[0]) ? toInt(a.fields[0]) : Number.POSITIVE_INFINITY;
+        const bn = isIntString(b.fields[0]) ? toInt(b.fields[0]) : Number.POSITIVE_INFINITY;
+        if (an !== bn) return an - bn;
+        return a.idx - b.idx;
+      });
+
+      const passthrough = records.filter(r => r.passthrough).sort((a,b)=>a.idx-b.idx);
+
+      const outLines = [];
+      for (const r of sortable) outLines.push(r.fields.map(csvEscape).join(","));
+      for (const r of passthrough) outLines.push(r.fields.map(csvEscape).join(","));
+
+      log.push(`BLOCK ALLOCATION`);
+      for (const g of groupBlockAssignments){
+        if (g.kind === "simple") log.push(`  simple G (orig hundreds ${g.origHundreds}) -> ${g.block}-${g.block+99}  (${g.count})`);
+        else if (g.kind === "series") log.push(`  suffix series (${g.key}) -> ${g.block}-${g.block+99}  (${g.count})`);
+        else log.push(`  suffix singletons (G${g.suffix}) -> ${g.block}-${g.block+99}  (${g.count})`);
+      }
+
       return {
-        kind: "G_SUFFIX",
-        name,
-        pre: parseInt(mgs[1], 10),
-        suf: parseInt(mgs[2], 10)
+        recordsSorted: sortable,
+        outputText: outLines.join("\n"),
+        stats: { totalLines: rawLines.length, parsedCount, gCount, refCount },
+        logText: log.join("\n")
       };
     }
 
-    const mg = /^\s*(\d+)\s*G\s*$/i.exec(name);
-    if (mg) {
-      return { kind: "G", name, gNum: parseInt(mg[1], 10) };
+    // -----------------------------
+    // Idaho State Plane defs (NAD83; "NO_TRANS": no grid shift terms)
+    // Defaults locked: US-ft + Idaho West + Swap X/Y
+    // -----------------------------
+    const PROJ_DEFS_USFT = {
+      east:   "+proj=tmerc +lat_0=41.6666666666667 +lon_0=-112.166666666667 +k=0.999947368 +x_0=200000.0001016 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs",
+      central:"+proj=tmerc +lat_0=41.6666666666667 +lon_0=-114 +k=0.999947368 +x_0=500000.0001016 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs",
+      west:   "+proj=tmerc +lat_0=41.6666666666667 +lon_0=-115.75 +k=0.999933333 +x_0=800000.0001016 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs"
+    };
+
+    const ID_BBOX = { minLat: 41.8, maxLat: 49.6, minLon: -117.6, maxLon: -110.4 };
+    function inIdaho(lat, lon){
+      return lat >= ID_BBOX.minLat && lat <= ID_BBOX.maxLat && lon >= ID_BBOX.minLon && lon <= ID_BBOX.maxLon;
     }
 
-    if (isDigitsOnly(name)) return { kind: "NUM", name, num: parseIntStrict(name) };
-
-    return { kind: "OTHER", name };
-  }
-
-  // Candidate 100-block ordering:
-  // - For normal G groups (2G / 202G / 100G), use 200,300,400,500,... and keep 100 last (unless user opts out).
-  // - For G_SUFFIX families and suffix-buckets, prefer 500 first so 1→501,2→502 style feels natural,
-  //   then 600..900, then 200..400, then 100.
-  function buildCandidateBlocksNormal(preferAvoid100) {
-    if (preferAvoid100) return [200,300,400,500,600,700,800,900,100];
-    return [100,200,300,400,500,600,700,800,900];
-  }
-  function buildCandidateBlocksSuffix(preferAvoid100) {
-    if (preferAvoid100) return [500,600,700,800,900,200,300,400,100];
-    return [100,500,600,700,800,900,200,300,400];
-  }
-
-  function groupSortKey(groupKey) {
-    // Lower = earlier pick.
-    // Ordering:
-    //   0: normal-G buckets (g:hN, g:lt100)
-    //   1: G_SUFFIX families (fam:123)
-    //   2: singleton suffix buckets (suf:1)
-    //   3: others
-    if (groupKey.startsWith("g:")) {
-      if (groupKey === "g:lt100") return [0, 9999];
-      const m = /^g:h(\d+)$/.exec(groupKey);
-      if (m) return [0, parseInt(m[1], 10)];
-      return [0, 9999];
+    function escapeHtml(s){
+      return String(s)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
     }
-    if (groupKey.startsWith("fam:")) return [1, parseInt(groupKey.slice(4), 10) || 9999];
-    if (groupKey.startsWith("suf:")) return [2, parseInt(groupKey.slice(4), 10) || 9999];
-    return [3, 9999];
-  }
 
-  function allocateGroupBlocks(groupKeys, usedHundredsBlocks, preferAvoid100) {
-    // We allocate blocks with a bias:
-    // - normal G groups draw from normal candidates
-    // - suffix-related groups draw from suffix candidates
-    // If we run out of unused blocks, we start reusing blocks (still collision-safe per-point).
-    const normalCandidates = buildCandidateBlocksNormal(preferAvoid100);
-    const suffixCandidates = buildCandidateBlocksSuffix(preferAvoid100);
+    // -----------------------------
+    // UI + Map
+    // -----------------------------
+    const elFile = document.getElementById("file");
+    const elIn = document.getElementById("inText");
+    const elOut = document.getElementById("outText");
+    const elLog = document.getElementById("log");
+    const elDownload = document.getElementById("btnDownload");
+    const elProcess = document.getElementById("btnProcess");
+    const elAuto = document.getElementById("autoProcess");
+    const elZone = document.getElementById("zone");
+    const elSwap = document.getElementById("swapXY");
+    const elShowLabels = document.getElementById("showLabels");
+    const elMapHint = document.getElementById("mapHint");
 
-    const assigned = new Map(); // groupKey -> blockStart
+    const st_lines = document.getElementById("st_lines");
+    const st_parsed = document.getElementById("st_parsed");
+    const st_g = document.getElementById("st_g");
+    const st_ref = document.getElementById("st_ref");
+    const st_map = document.getElementById("st_map");
+    const st_zone = document.getElementById("st_zone");
 
-    const sorted = [...groupKeys].sort((a,b) => {
-      const ka = groupSortKey(a), kb = groupSortKey(b);
-      return ka[0]-kb[0] || ka[1]-kb[1] || (a < b ? -1 : 1);
+    let latestOutputText = "";
+    let latestTransformed = null;
+
+    // Map init
+    let map = null;
+    let layer = null;
+
+    function initMap(){
+      map = L.map("map", { preferCanvas:true }).setView([44.2, -116.7], 7);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+      layer = L.layerGroup().addTo(map);
+    }
+
+    function setStats(stats, plottedCount){
+      st_lines.textContent = String(stats.totalLines ?? 0);
+      st_parsed.textContent = String(stats.parsedCount ?? 0);
+      st_g.textContent = String(stats.gCount ?? 0);
+      st_ref.textContent = String(stats.refCount ?? 0);
+      st_map.textContent = String(plottedCount ?? 0);
+
+      const z = elZone.value;
+      st_zone.textContent = z === "west" ? "W" : (z === "central" ? "C" : "E");
+    }
+
+    function refreshMap(recordsSorted){
+      if (!map || !layer || !window.proj4) {
+        elMapHint.innerHTML = `<span class="bad">Map libs not loaded (Leaflet/proj4). Output still works.</span>`;
+        return 0;
+      }
+      layer.clearLayers();
+
+      const zone = elZone.value || "west";
+      const def = PROJ_DEFS_USFT[zone];
+
+      const swapXY = true; // LOCKED default
+      const showLabels = !!elShowLabels.checked;
+
+      let plotted = 0;
+      const bounds = [];
+
+      for (const r of recordsSorted){
+        if (!Number.isFinite(r.x) || !Number.isFinite(r.y)) continue;
+
+        const X = swapXY ? r.y : r.x;
+        const Y = swapXY ? r.x : r.y;
+
+        try{
+          const ll = proj4(def, "WGS84", [X, Y]);
+          const lon = ll[0], lat = ll[1];
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+          if (!inIdaho(lat, lon)) continue;
+
+          const ptNum = trimOrEmpty(r.fields[0]);
+          const desc = trimOrEmpty(r.fields[r.fields.length-1]);
+
+          const marker = L.circleMarker([lat, lon], {
+            radius: 5,
+            weight: 2,
+            opacity: 0.95,
+            fillOpacity: 0.32
+          });
+
+          const tip = `${ptNum}${desc ? " — " + desc : ""}\n(X=${X}, Y=${Y})\n(lat=${lat.toFixed(6)}, lon=${lon.toFixed(6)})`;
+          marker.bindPopup(
+            `<div style="font-family:${getComputedStyle(document.documentElement).getPropertyValue('--mono')}; font-size:12px; white-space:pre-wrap;">${escapeHtml(tip)}</div>`
+          );
+          if (showLabels) marker.bindTooltip(String(ptNum), { permanent: false, direction: "top", opacity: 0.9 });
+
+          marker.addTo(layer);
+          bounds.push([lat, lon]);
+          plotted++;
+        } catch(_e) {}
+      }
+
+      if (plotted > 0){
+        const b = L.latLngBounds(bounds);
+        map.fitBounds(b.pad(0.15));
+        elMapHint.innerHTML = `<span class="ok">Plotted ${plotted} pts</span> — zone <span class="mono">${zone}</span>, <span class="mono">US-ft</span>, <span class="mono">swapXY</span>.`;
+      } else {
+        elMapHint.innerHTML = `<span class="warn">No points plotted.</span> If coords are not Idaho State Plane, they’ll be skipped on the map (output still transforms IDs). Try another zone.`;
+      }
+
+      return plotted;
+    }
+
+    function processNow(){
+      const input = elIn.value || "";
+      if (!input.trim()){
+        elOut.value = "";
+        elLog.textContent = "";
+        latestOutputText = "";
+        latestTransformed = null;
+        elDownload.disabled = true;
+        if (layer) layer.clearLayers();
+        elMapHint.textContent = "Load a file or paste points to plot.";
+        setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
+        return;
+      }
+
+      const res = transformPoints(input);
+      latestTransformed = res;
+      latestOutputText = res.outputText;
+
+      elOut.value = res.outputText;
+      elLog.textContent = res.logText;
+
+      const plotted = refreshMap(res.recordsSorted);
+      setStats(res.stats, plotted);
+
+      elDownload.disabled = !latestOutputText;
+    }
+
+    // File loader
+    elFile.addEventListener("change", async (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const text = await f.text();
+      elIn.value = text;
+      processNow();
     });
 
-    function candidatesFor(groupKey) {
-      return (groupKey.startsWith("fam:") || groupKey.startsWith("suf:")) ? suffixCandidates : normalCandidates;
-    }
+    // Manual process
+    elProcess.addEventListener("click", ()=>processNow());
 
-    for (const gk of sorted) {
-      const candidates = candidatesFor(gk);
-
-      // Pass 1: pick a block not already in-use and not already assigned
-      let picked = null;
-      for (const b of candidates) {
-        if (usedHundredsBlocks.has(b)) continue;
-        if ([...assigned.values()].includes(b)) continue;
-        picked = b;
-        break;
-      }
-
-      // Pass 2: allow reusing an already assigned block (still must not be "in use")
-      if (picked === null) {
-        for (const b of candidates) {
-          if (usedHundredsBlocks.has(b)) continue;
-          picked = b;
-          break;
-        }
-      }
-
-      // Pass 3: last-resort: allow blocks that are in-use (we'll collision-resolve per-point)
-      if (picked === null) {
-        picked = candidates[0] ?? 200;
-      }
-
-      assigned.set(gk, picked);
-    }
-
-    return assigned;
-  }
-
-  function findFreeInBlock(usedNumbers, blockStart, preferredOffset) {
-    const baseOffset = ((preferredOffset % 100) + 100) % 100;
-    for (let d = 0; d < 100; d++) {
-      const off = (baseOffset + d) % 100;
-      const candidate = blockStart + off;
-      if (!usedNumbers.has(candidate)) return candidate;
-    }
-    // If this 100-block is completely full, fall back to ANY free 100..999
-    for (let n = 100; n <= 999; n++) {
-      if (!usedNumbers.has(n)) return n;
-    }
-    // Absolute last resort (should be extremely rare)
-    let n = 1000;
-    while (usedNumbers.has(n)) n++;
-    return n;
-  }
-
-  function processText(text, preferAvoid100) {
-    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-    const records = [];
-    const errors = [];
-
-    for (let idx = 0; idx < lines.length; idx++) {
-      const raw = lines[idx];
-      if (!raw.trim()) continue;
-
-      const cols = parseCSVLine(raw);
-      if (cols.length < 4) {
-        errors.push(`Line ${idx+1}: expected at least 4 columns (name,x,y,z). Kept unchanged.`);
-        records.push({
-          lineIndex: idx,
-          rawLine: raw,
-          kind: "RAW",
-          cols,
-          pointNum: NaN
-        });
-        continue;
-      }
-
-      while (cols.length < 5) cols.push("");
-
-      const nameRaw = cols[0];
-      const c = classifyName(nameRaw);
-
-      records.push({
-        lineIndex: idx,
-        rawLine: raw,
-        cols,
-        kind: c.kind,
-        name: c.name,
-        gNum: c.gNum ?? null,
-        pre: c.pre ?? null,
-        suf: c.suf ?? null,
-        pointNum: c.num ?? NaN
-      });
-    }
-
-    // Used point numbers (existing, non-G/non-REF numeric points)
-    const usedNumbers = new Set();
-    const usedHundredsBlocks = new Set();
-    for (const r of records) {
-      if (r.kind === "NUM" && Number.isFinite(r.pointNum)) {
-        usedNumbers.add(r.pointNum);
-        if (r.pointNum >= 100 && r.pointNum <= 999) {
-          usedHundredsBlocks.add(Math.floor(r.pointNum / 100) * 100);
-        }
-      }
-    }
-
-    // Determine G_SUFFIX multiplicity by prefix (pre):
-    // If a prefix appears more than once, treat it as a "family" -> derived numbering by suffix.
-    const preCounts = new Map(); // pre -> count
-    for (const r of records) {
-      if (r.kind === "G_SUFFIX") {
-        preCounts.set(r.pre, (preCounts.get(r.pre) ?? 0) + 1);
-      }
-    }
-
-    // Build group keys
-    const groupKeys = new Set();
-
-    // Normal G groups:
-    for (const r of records) {
-      if (r.kind === "G") {
-        const n = r.gNum;
-        r.gKey = (n < 100) ? "g:lt100" : ("g:h" + Math.floor(n / 100));
-        groupKeys.add(r.gKey);
-      }
-    }
-
-    // G_SUFFIX groups:
-    // - If pre repeats: groupKey = fam:<pre>  (derived from suffix; e.g., 501,502,...)
-    // - If pre does NOT repeat: groupKey = suf:<suf> (all singleton ...G1 together sequentially, etc.)
-    for (const r of records) {
-      if (r.kind === "G_SUFFIX") {
-        const count = preCounts.get(r.pre) ?? 0;
-        if (count > 1) {
-          r.gKey = "fam:" + r.pre;
-        } else {
-          r.gKey = "suf:" + r.suf;
-        }
-        groupKeys.add(r.gKey);
-      }
-    }
-
-    const groupBlockMap = allocateGroupBlocks(groupKeys, usedHundredsBlocks, preferAvoid100);
-
-    // For singleton suffix buckets (suf:<n>) we assign sequentially (not based on suffix).
-    // Start at offset 1 so the first is X01 (often feels nicer than X00).
-    const bucketCounters = new Map(); // groupKey -> nextIndex
-    function nextSequentialOffsetForBucket(groupKey) {
-      const i = bucketCounters.get(groupKey) ?? 0;
-      bucketCounters.set(groupKey, i + 1);
-      return 1 + i; // 1,2,3,...
-    }
-
-    // Apply transformations
-    let refNext = 5000;
-    let gCount = 0, gSuffixFamilyCount = 0, gSuffixBucketCount = 0, refCount = 0;
-
-    const transformed = [];
-    for (const r of records) {
-      if (r.kind === "RAW") {
-        transformed.push({
-          sortKey: Number.POSITIVE_INFINITY,
-          lineIndex: r.lineIndex,
-          cols: r.cols,
-          raw: r.rawLine,
-          isRaw: true
-        });
-        continue;
-      }
-
-      const cols = r.cols.slice();
-      const descIndex = cols.length - 1;
-
-      if (r.kind === "REF") {
-        while (usedNumbers.has(refNext)) refNext++;
-        const newNum = refNext;
-        usedNumbers.add(newNum);
-        refNext++;
-        refCount++;
-
-        cols[0] = String(newNum);
-        cols[descIndex] = appendTokenToDesc(cols[descIndex], r.name);
-
-        transformed.push({ sortKey: newNum, lineIndex: r.lineIndex, cols, isRaw: false });
-        continue;
-      }
-
-      if (r.kind === "G") {
-        const blockStart = groupBlockMap.get(r.gKey) ?? 200;
-        const offset = r.gNum % 100;
-        const newNum = findFreeInBlock(usedNumbers, blockStart, offset);
-        usedNumbers.add(newNum);
-        gCount++;
-
-        cols[0] = String(newNum);
-        cols[descIndex] = appendTokenToDesc(cols[descIndex], r.name);
-
-        transformed.push({ sortKey: newNum, lineIndex: r.lineIndex, cols, isRaw: false });
-        continue;
-      }
-
-      if (r.kind === "G_SUFFIX") {
-        const blockStart = groupBlockMap.get(r.gKey) ?? 500;
-
-        let preferredOffset;
-        if (r.gKey.startsWith("fam:")) {
-          // FAMILY: derive from number after G (suffix)
-          // Example: 123G1 → X01 (e.g., 501), 123G2 → X02 (e.g., 502)
-          preferredOffset = r.suf % 100;
-          gSuffixFamilyCount++;
-        } else {
-          // SINGLETON BUCKET: ALL ...G1 (etc.) go sequentially in a 100-block
-          // (not derived from the suffix, because they'd collide)
-          preferredOffset = nextSequentialOffsetForBucket(r.gKey);
-          gSuffixBucketCount++;
-        }
-
-        const newNum = findFreeInBlock(usedNumbers, blockStart, preferredOffset);
-        usedNumbers.add(newNum);
-
-        cols[0] = String(newNum);
-        cols[descIndex] = appendTokenToDesc(cols[descIndex], r.name);
-
-        transformed.push({ sortKey: newNum, lineIndex: r.lineIndex, cols, isRaw: false });
-        continue;
-      }
-
-      if (r.kind === "NUM") {
-        const n = r.pointNum;
-        transformed.push({
-          sortKey: Number.isFinite(n) ? n : Number.POSITIVE_INFINITY,
-          lineIndex: r.lineIndex,
-          cols,
-          isRaw: false
-        });
-        continue;
-      }
-
-      // OTHER: keep as-is; place after numeric rows.
-      transformed.push({
-        sortKey: Number.POSITIVE_INFINITY,
-        lineIndex: r.lineIndex,
-        cols,
-        isRaw: false
-      });
-    }
-
-    // Sort numerically by point number; non-numeric/RAW at the end in original order.
-    transformed.sort((a,b) => {
-      if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
-      return a.lineIndex - b.lineIndex;
+    // Auto-process (debounced)
+    let t = null;
+    elIn.addEventListener("input", ()=>{
+      if (!elAuto.checked) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(()=>processNow(), 250);
     });
 
-    const outLines = transformed.map(t => toCSVLine(t.cols));
-    const outText = outLines.join("\n") + (outLines.length ? "\n" : "");
+    // Re-render map when settings change (does not alter output)
+    elZone.addEventListener("change", ()=>{
+      if (latestTransformed?.recordsSorted){
+        const plotted = refreshMap(latestTransformed.recordsSorted);
+        setStats(latestTransformed.stats, plotted);
+      } else {
+        setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
+      }
+    });
+    elShowLabels.addEventListener("change", ()=>{
+      if (latestTransformed?.recordsSorted){
+        const plotted = refreshMap(latestTransformed.recordsSorted);
+        setStats(latestTransformed.stats, plotted);
+      }
+    });
 
-    const blockPairs = [...groupBlockMap.entries()]
-      .sort((a,b) => {
-        const ka = groupSortKey(a[0]), kb = groupSortKey(b[0]);
-        return ka[0]-kb[0] || ka[1]-kb[1] || (a[0] < b[0] ? -1 : 1);
-      })
-      .map(([k,v]) => `${k} → ${v}-${v+99}`)
-      .join("\n");
+    // Download output
+    elDownload.addEventListener("click", ()=>{
+      if (!latestOutputText) return;
+      const blob = new Blob([latestOutputText], {type:"text/plain;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "points_transformed.txt";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    });
 
-    const log = [
-      `Lines read: ${records.length}`,
-      `G (plain) renumbered: ${gCount}`,
-      `G (suffix) family-derived renumbered: ${gSuffixFamilyCount}`,
-      `G (suffix) singleton-bucket renumbered: ${gSuffixBucketCount}`,
-      `REF renumbered: ${refCount}`,
-      "",
-      "Assigned group blocks:",
-      blockPairs || "(none)",
-      "",
-      errors.length ? ("Warnings:\n" + errors.join("\n")) : "Warnings: (none)"
-    ].join("\n");
-
-    return { outText, log };
-  }
-
-  function setDownload(text) {
-    if (!text) {
-      elDownload.style.display = "none";
-      elDownload.removeAttribute("href");
-      return;
-    }
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    elDownload.href = url;
-    elDownload.style.display = "inline-block";
-  }
-
-  async function readSelectedFile() {
-    const f = elFile.files && elFile.files[0];
-    if (!f) return null;
-    return await f.text();
-  }
-
-  document.getElementById('loadSampleBtn').addEventListener('click', () => {
-    elInput.value = SAMPLE;
-    elOutput.value = "";
-    elLog.textContent = "";
-    setDownload("");
-    elFile.value = "";
-  });
-
-  document.getElementById('clearBtn').addEventListener('click', () => {
-    elInput.value = "";
-    elOutput.value = "";
-    elLog.textContent = "";
-    setDownload("");
-    elFile.value = "";
-  });
-
-  document.getElementById('processBtn').addEventListener('click', async () => {
-    const preferAvoid100 = !!elPreferAvoid100.checked;
-
-    let text = elInput.value;
-    if ((!text || !text.trim()) && elFile.files && elFile.files[0]) {
-      text = await readSelectedFile();
-      elInput.value = text ?? "";
-    }
-
-    if (!text || !text.trim()) {
-      elLog.textContent = "No input. Paste text or choose a file.";
-      elOutput.value = "";
-      setDownload("");
-      return;
-    }
-
-    const { outText, log } = processText(text, preferAvoid100);
-    elOutput.value = outText;
-    elLog.textContent = log;
-    setDownload(outText);
-  });
-})();
-</script>
+    // Init: blank textarea (no sample data), locked defaults already set in HTML
+    initMap();
+    elIn.value = "";
+    setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
+    elSwap.checked = true; // locked, but keep consistent
+    elMapHint.textContent = "Load a file or paste points to plot. Defaults: US-ft / Idaho West / Swap X-Y.";
+  </script>
 </body>
 </html>
