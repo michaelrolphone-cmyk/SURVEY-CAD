@@ -5,15 +5,23 @@ import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, point
 
 function createMockServer() {
   const requests = [];
-  const headers = { geocodeUserAgent: null };
+  const headers = { geocodeUserAgent: null, geocodeEmail: null };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
 
     if (url.pathname === '/geocode') {
       headers.geocodeUserAgent = req.headers['user-agent'] || null;
+      headers.geocodeEmail = url.searchParams.get('email');
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify([{ lat: '43.61', lon: '-116.20', display_name: 'Boise' }]));
+      return;
+    }
+
+    if (url.pathname === '/geocode-403') {
+      res.statusCode = 403;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'forbidden' }));
       return;
     }
 
@@ -144,11 +152,35 @@ test('geocodeAddress sends configured nominatim user agent', async () => {
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
     nominatimUrl: `${base}/geocode`,
     nominatimUserAgent: 'survey-cad-test/2.0',
+    nominatimEmail: 'owner@example.com',
   });
 
   try {
     await client.geocodeAddress('100 Main St, Boise');
     assert.equal(headers.geocodeUserAgent, 'survey-cad-test/2.0');
+    assert.equal(headers.geocodeEmail, 'owner@example.com');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
+test('lookupByAddress falls back to address layer when geocode is unavailable', async () => {
+  const { server, port } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode-403`,
+    blmFirstDivisionLayer: `${base}/blm1`,
+    blmSecondDivisionLayer: `${base}/blm2`,
+  });
+
+  try {
+    const lookup = await client.lookupByAddress('100 Main St, Boise');
+    assert.equal(lookup.parcel.attributes.PARCEL, 'R12345');
+    assert.equal(lookup.location.lon, -116.2);
+    assert.equal(lookup.location.lat, 43.61);
+    assert.equal(lookup.geocode, null);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

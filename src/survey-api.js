@@ -14,6 +14,7 @@ const DEFAULTS = {
     "https://gis.blm.gov/idarcgis/rest/services/realty/BLM_ID_CADNSDI_PLSS_Second_Division/MapServer/0",
   nominatimUrl: "https://nominatim.openstreetmap.org/search",
   nominatimUserAgent: "survey-cad/1.0 (contact: admin@example.com)",
+  nominatimEmail: "admin@example.com",
 };
 
 const DIRS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
@@ -147,6 +148,9 @@ export class SurveyCadClient {
     u.searchParams.set("format", "json");
     u.searchParams.set("limit", "1");
     u.searchParams.set("addressdetails", "1");
+    if (this.config.nominatimEmail) {
+      u.searchParams.set("email", this.config.nominatimEmail);
+    }
     const result = await this.fetchJson(u.toString(), {
       headers: {
         Accept: "application/json",
@@ -273,11 +277,21 @@ export class SurveyCadClient {
   }
 
   async lookupByAddress(address) {
-    const geocode = await this.geocodeAddress(address);
     const addressFeature = await this.findBestAddressFeature(address);
+    let geocode = null;
 
-    const lon = addressFeature?.geometry?.x ?? geocode.lon;
-    const lat = addressFeature?.geometry?.y ?? geocode.lat;
+    if (!addressFeature) {
+      geocode = await this.geocodeAddress(address);
+    } else {
+      try {
+        geocode = await this.geocodeAddress(address);
+      } catch {
+        geocode = null;
+      }
+    }
+
+    const lon = addressFeature?.geometry?.x ?? geocode?.lon;
+    const lat = addressFeature?.geometry?.y ?? geocode?.lat;
 
     const parcel = await this.findParcelNearPoint(lon, lat);
     if (!parcel) {

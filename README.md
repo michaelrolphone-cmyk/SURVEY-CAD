@@ -44,6 +44,7 @@ Optional endpoint overrides:
 - `blmSecondDivisionLayer`
 - `nominatimUrl`
 - `nominatimUserAgent` (default `survey-cad/1.0 (contact: admin@example.com)`)
+- `nominatimEmail` (default `admin@example.com`; sent to Nominatim as `email=` query param)
 
 ### Core methods
 
@@ -86,7 +87,7 @@ curl "http://localhost:3000/api/parcel?lon=-116.2&lat=43.61&outSR=2243&searchMet
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
 ```
 
-Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors.
+Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. `/api/lookup` will still return a successful payload when the geocoder fails but the Ada County address layer returns a match.
 
 ### Browser helper module for static HTML tools
 
