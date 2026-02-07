@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, pointInPolygon } from '../src/survey-api.js';
 
-function createMockServer() {
+function createMockServer(options = {}) {
+  const { strictAddressMiss = false, addressAlwaysMiss = false } = options;
   const requests = [];
   const headers = { geocodeUserAgent: null, geocodeEmail: null };
   const server = http.createServer((req, res) => {
@@ -26,12 +27,16 @@ function createMockServer() {
     }
 
     if (url.pathname.endsWith('/16/query')) {
+      const where = url.searchParams.get('where') || '';
+      const strictClauseRequested = /\b(PREDIR|SUFFIX|POSTDIR)\b/.test(where);
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
-        features: [{
-          attributes: { ADDRNUM: '100', STREETNAME: 'MAIN', CITY: 'BOISE' },
-          geometry: { x: -116.2, y: 43.61 }
-        }]
+        features: addressAlwaysMiss || (strictAddressMiss && strictClauseRequested)
+          ? []
+          : [{
+            attributes: { ADDRNUM: '100', STREETNAME: 'CASTLE', SUFFIX: 'DRIVE', CITY: 'BOISE' },
+            geometry: { x: -116.2, y: 43.61 }
+          }]
       }));
       return;
     }
@@ -192,6 +197,48 @@ test('lookupByAddress falls back to address layer when geocode is unavailable', 
     assert.equal(lookup.location.lon, -116.2);
     assert.equal(lookup.location.lat, 43.61);
     assert.equal(lookup.geocode, null);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
+test('findBestAddressFeature retries with fallback where clause when strict query misses', async () => {
+  const { server, port, requests } = await createMockServer({ strictAddressMiss: true });
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode`,
+  });
+
+  try {
+    const feature = await client.findBestAddressFeature('5707 W Castle Dr, Boise ID');
+    assert.ok(feature);
+    assert.equal(feature.attributes.STREETNAME, 'CASTLE');
+
+    const addressQueries = requests.filter((r) => r.includes('/16/query'));
+    assert.equal(addressQueries.length, 2);
+    assert.match(addressQueries[0], /SUFFIX/);
+    assert.doesNotMatch(addressQueries[1], /SUFFIX/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
+test('lookupByAddress throws clear error when address and geocode both fail', async () => {
+  const { server, port } = await createMockServer({ addressAlwaysMiss: true });
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode-403`,
+  });
+
+  try {
+    await assert.rejects(
+      () => client.lookupByAddress('5707 W Castle Dr, Boise ID'),
+      /Unable to locate this address from county records or geocoder/i,
+    );
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
