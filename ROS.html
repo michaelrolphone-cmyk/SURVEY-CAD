@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Ada County ROS / Parcel / PLSS Lookup (Standalone)</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- pdf.js (UMD build defining window.pdfjsLib) -->
+  <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#101834;
+      --panel2:#0e1630;
+      --text:#e7ecff;
+      --muted:#b6c0ff;
+      --line:rgba(255,255,255,.12);
+      --good:#24d18f;
+      --warn:#ffcc66;
+      --bad:#ff5a7a;
+      --btn:#2a3dff;
+      --btn2:#1a255f;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
+    a{color:#9ab0ff;text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    .app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
+    header{
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0));
+    }
+    header .title{font-weight:700;letter-spacing:.2px;}
+    header .subtitle{color:var(--muted);font-size:12px;}
+
+    .main{
+      flex:1;
+      min-height:0;
+      display:grid;
+      grid-template-columns: 430px 1fr;
+      gap:10px;
+      padding:10px;
+    }
+    @media (max-width: 980px){
+      .main{grid-template-columns:1fr; grid-template-rows: 460px 1fr;}
+    }
+
+    .panel{
+      background:rgba(255,255,255,.03);
+      border:1px solid var(--line);
+      border-radius:12px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
+    .panel .phead{
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex:0 0 auto;
+    }
+    .panel .phead .h{font-weight:700;font-size:13px;}
+
+    /* IMPORTANT: make panel bodies expand so Leaflet has real height */
+    .panel .pbody{
+      padding:12px;
+      overflow:auto;
+      min-height:0;
+      flex:1 1 auto;   /* <-- KEY FIX */
+    }
+
+    .row{display:flex;gap:10px;align-items:center}
+    .row.wrap{flex-wrap:wrap}
+    label{font-size:12px;color:var(--muted)}
+    input[type="text"]{
+      width:100%;
+      padding:10px 10px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.2);
+      color:var(--text);
+      outline:none;
+    }
+    input[type="file"]{
+      width:100%;
+      padding:10px 10px;
+      border-radius:10px;
+      border:1px dashed var(--line);
+      background:rgba(0,0,0,.18);
+      color:var(--muted);
+      outline:none;
+    }
+    button{
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(180deg, rgba(42,61,255,.9), rgba(26,37,95,.9));
+      color:white;
+      font-weight:700;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    button.secondary{
+      background:rgba(255,255,255,.06);
+      border:1px solid var(--line);
+      color:var(--text);
+      font-weight:600;
+    }
+    button:disabled{opacity:.5;cursor:not-allowed}
+
+    .small{font-size:12px;color:var(--muted)}
+    .mono{font-family:var(--mono);font-size:12px}
+    .hr{height:1px;background:var(--line);margin:10px 0}
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.2);
+      font-size:12px;
+      color:var(--muted);
+      margin:2px 6px 2px 0;
+    }
+    .pill .dot{width:8px;height:8px;border-radius:99px;background:var(--muted);opacity:.9}
+    .pill.good .dot{background:var(--good)}
+    .pill.warn .dot{background:var(--warn)}
+    .pill.bad  .dot{background:var(--bad)}
+
+    .hint{
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:rgba(255,255,255,.03);
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .log{
+      font-family:var(--mono);
+      font-size:12px;
+      line-height:1.35;
+      background:rgba(0,0,0,.25);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+      max-height:260px;
+      overflow:auto;
+    }
+
+    .list{display:flex;flex-direction:column;gap:10px;}
+    .card{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:rgba(0,0,0,.14);
+      overflow:hidden;
+    }
+    .card .chead{
+      padding:10px 10px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:flex-start;
+    }
+    .card .cbody{padding:10px;}
+    .kv{
+      display:grid;
+      grid-template-columns: 130px 1fr;
+      gap:6px 10px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .kv div:nth-child(2n){
+      color:var(--text);
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+
+    /* Right side: ensure map gets height */
+    .rightBody{
+      padding:0 !important;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+      overflow:hidden; /* prevent nested scrollbars */
+    }
+    .mapWrap{
+      flex:1 1 auto;
+      min-height:320px; /* <-- map always has real height */
+      position:relative;
+    }
+    #map{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      border-radius:12px;
+    }
+    @media (max-width: 980px){
+      .mapWrap{min-height:420px;}
+    }
+
+    .summaryPanel{
+      margin:10px;
+      border-radius:12px;
+      flex:0 0 auto;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      overflow:hidden;
+    }
+    .summaryPanel .phead{background:rgba(255,255,255,.03);}
+    .summaryPanel .pbody{max-height:280px;}
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="title">Ada County Survey Context Lookup (Standalone)</div>
+      <div class="subtitle">Address → Parcel → Subdivision / Section / Township + nearby ROS (JSONP, no CORS failures)</div>
+    </div>
+    <div class="row">
+      <span class="pill good"><span class="dot"></span>ArcGIS JSONP</span>
+      <span class="pill warn"><span class="dot"></span>PDFs require upload (CORS)</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- LEFT -->
+    <div class="panel">
+      <div class="phead">
+        <div class="h">Lookup</div>
+        <div class="row">
+          <button id="btnLookup">Lookup</button>
+          <button id="btnClear" class="secondary">Clear</button>
+        </div>
+      </div>
+      <div class="pbody">
+        <label for="addr">Address (Ada County, ID)</label>
+        <input id="addr" type="text" placeholder="e.g. 5707 W Castle Dr, Boise ID" value="5707 W Castle Dr, Boise ID"/>
+
+        <div class="row wrap" style="margin-top:10px">
+          <div class="pill" title="ExternalMap MapServer">
+            <span class="dot"></span>Service: External/ExternalMap
+          </div>
+          <div class="pill" title="Parcel query uses point+distance">
+            <span class="dot"></span>Parcel: layer 24
+          </div>
+          <div class="pill" title="Address layer is 16">
+            <span class="dot"></span>Address: layer 16
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="hint">
+          <b>Map not displaying fix:</b> This file forces the map container to have height and calls
+          <span class="mono">map.invalidateSize()</span> on load, after lookup, and on resize.
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
+          <div class="h">PDF Basis of Bearing (local upload)</div>
+        </div>
+        <div class="small" style="margin:6px 0 10px">
+          Automatic PDF download is usually blocked by CORS. Download the ROS PDF and upload it here.
+        </div>
+        <input id="pdfFile" type="file" accept="application/pdf"/>
+        <button id="btnScanPdf" class="secondary" style="width:100%;margin-top:10px">Scan Uploaded PDF</button>
+        <div id="pdfFindings" class="log" style="margin-top:10px;display:none"></div>
+
+        <div class="hr"></div>
+
+        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
+          <div class="h">Diagnostics</div>
+        </div>
+        <div id="log" class="log" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="panel">
+      <div class="phead">
+        <div class="h">Map + Results</div>
+        <div class="row">
+          <button id="btnExportGeo" class="secondary" disabled>Export GeoJSON</button>
+        </div>
+      </div>
+
+      <div class="pbody rightBody">
+        <div class="mapWrap">
+          <div id="map"></div>
+        </div>
+
+        <div class="summaryPanel">
+          <div class="phead"><div class="h">Summary</div></div>
+          <div class="pbody" style="padding:12px;overflow:auto">
+            <div id="summary" class="list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(() => {
+  // -----------------------------
+  // Configuration (Ada County)
+  // -----------------------------
+  const BASE = "https://adacountyassessor.org/arcgis/rest/services/External/ExternalMap/MapServer";
+  const LAYERS = {
+    address: 16,
+    ros: 17,
+    subdivisions: 18,
+    townships: 19,
+    sections: 20,
+    parcels: 24,
+  };
+
+  // pdf.js worker
+  if (!window.pdfjsLib) {
+    alert("pdf.js failed to load (pdfjsLib missing). Check network access.");
+  } else {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  }
+
+  // -----------------------------
+  // UI helpers
+  // -----------------------------
+  const $ = (id) => document.getElementById(id);
+  const logEl = $("log");
+  function ts() {
+    const d = new Date();
+    return d.toISOString().replace("T"," ").replace("Z","");
+  }
+  function log(line, kind="info") {
+    const prefix = kind === "bad" ? "✖" : kind === "warn" ? "⚠" : "•";
+    logEl.textContent += `[${ts()}] ${prefix} ${line}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function clearLog() { logEl.textContent = ""; }
+
+  // -----------------------------
+  // JSONP for ArcGIS (no CORS)
+  // -----------------------------
+  function toQuery(params) {
+    const parts = [];
+    for (const [k,v] of Object.entries(params)) {
+      if (v === undefined || v === null) continue;
+      parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(String(v)));
+    }
+    return parts.join("&");
+  }
+
+  function arcJsonp(url, params, timeoutMs=20000) {
+    return new Promise((resolve, reject) => {
+      const cb = "__arc_cb_" + Math.random().toString(36).slice(2);
+      const script = document.createElement("script");
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("JSONP timeout"));
+      }, timeoutMs);
+
+      function cleanup() {
+        clearTimeout(timer);
+        try { delete window[cb]; } catch {}
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+
+      window[cb] = (data) => {
+        cleanup();
+        resolve(data);
+      };
+
+      const fullParams = Object.assign({}, params, { f: "json", callback: cb });
+      script.src = url + (url.includes("?") ? "&" : "?") + toQuery(fullParams);
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("JSONP script load failed"));
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  async function arcQuery(layerId, params) {
+    const url = `${BASE}/${layerId}/query`;
+    const data = await arcJsonp(url, params);
+    if (data && data.error) {
+      const msg = data.error.message || "ArcGIS error";
+      throw new Error(`${msg}${data.error.details ? " :: " + data.error.details.join(" | ") : ""}`);
+    }
+    return data;
+  }
+
+  // -----------------------------
+  // Geometry helpers
+  // -----------------------------
+  function arcPointToLatLng(g) {
+    if (!g) return null;
+    return [g.y, g.x];
+  }
+
+  function arcPolygonToGeoJSON(geom) {
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "Polygon",
+        coordinates: (geom?.rings || []).map(ring => ring.map(([x,y]) => [x,y]))
+      }
+    };
+  }
+
+  function arcExtentFromPolygon(geom) {
+    const rings = geom?.rings || [];
+    let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;
+    for (const ring of rings) {
+      for (const [x,y] of ring) {
+        if (x < xmin) xmin = x;
+        if (y < ymin) ymin = y;
+        if (x > xmax) xmax = x;
+        if (y > ymax) ymax = y;
+      }
+    }
+    if (!isFinite(xmin)) return null;
+    return { xmin, ymin, xmax, ymax };
+  }
+
+  function centroidOfPolygon(geom) {
+    const ring = geom?.rings?.[0] || [];
+    if (!ring.length) return null;
+    let sx=0, sy=0, n=0;
+    for (const [x,y] of ring) { sx += x; sy += y; n++; }
+    return { x: sx/n, y: sy/n };
+  }
+
+  function haversineMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a =
+      Math.sin(dLat/2)**2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  function pointInRing(pointXY, ring) {
+    let inside = false;
+    const [x, y] = pointXY;
+    for (let i=0, j=ring.length-1; i<ring.length; j=i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-30) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function pointInPolygon(pointXY, geom) {
+    const rings = geom?.rings || [];
+    if (!rings.length) return false;
+    if (!pointInRing(pointXY, rings[0])) return false;
+    for (let i=1; i<rings.length; i++) {
+      if (pointInRing(pointXY, rings[i])) return false;
+    }
+    return true;
+  }
+
+  // -----------------------------
+  // Address parsing
+  // -----------------------------
+  const DIRS = new Set(["N","S","E","W","NE","NW","SE","SW"]);
+  const SUFFIXES = new Set(["ST","AVE","AV","DR","RD","LN","CT","PL","WAY","BLVD","CIR","PKWY","TRL","TER","HWY"]);
+  function normalizeSpaces(s){ return (s||"").trim().replace(/\s+/g," "); }
+
+  function parseAddress(raw) {
+    raw = normalizeSpaces(raw);
+    const parts = raw.split(",").map(s => s.trim()).filter(Boolean);
+    const streetPart = parts[0] || "";
+    const cityPart = parts[1] || "";
+
+    const toks = streetPart.toUpperCase().split(/\s+/).filter(Boolean);
+    const out = { AddNum: null, StPreDir: null, StName: null, StSuffix: null, City: null };
+
+    if (toks.length && /^\d+$/.test(toks[0])) {
+      out.AddNum = parseInt(toks[0], 10);
+      toks.shift();
+    }
+    if (toks.length && DIRS.has(toks[0])) {
+      out.StPreDir = toks.shift();
+    }
+    let suffix = null;
+    if (toks.length && SUFFIXES.has(toks[toks.length-1])) {
+      suffix = toks.pop();
+    }
+    out.StSuffix = suffix;
+    out.StName = toks.length ? toks.join(" ") : null;
+
+    if (cityPart) out.City = cityPart.toUpperCase().split(/\s+/)[0];
+    return out;
+  }
+
+  // -----------------------------
+  // Map setup
+  // -----------------------------
+  const map = L.map("map", { zoomControl: true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 20,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+  map.setView([43.615, -116.202], 12);
+
+  const layers = {
+    address: L.layerGroup().addTo(map),
+    parcel: L.layerGroup().addTo(map),
+    subdivision: L.layerGroup().addTo(map),
+    section: L.layerGroup().addTo(map),
+    township: L.layerGroup().addTo(map),
+    ros: L.layerGroup().addTo(map),
+  };
+
+  function clearMapLayers() {
+    Object.values(layers).forEach(g => g.clearLayers());
+  }
+
+  // ---- Leaflet display fix helpers ----
+  function invalidateMapSoon(reason="") {
+    // multiple invalidations covers layout shifts + font load + async panel sizing
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => map.invalidateSize(), 50);
+    setTimeout(() => map.invalidateSize(), 250);
+    if (reason) log(`map.invalidateSize() (${reason})`);
+  }
+  window.addEventListener("load", () => invalidateMapSoon("window load"));
+  window.addEventListener("resize", () => invalidateMapSoon("window resize"));
+  try {
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe($("map"));
+    ro.observe(document.querySelector(".mapWrap"));
+  } catch {}
+
+  // -----------------------------
+  // Results state
+  // -----------------------------
+  const state = {
+    addressFeature: null,
+    parcelFeature: null,
+    subdivisionFeature: null,
+    sectionFeature: null,
+    townshipFeature: null,
+    rosFeatures: [],
+    exportGeoJSON: null
+  };
+
+  function setSummaryCards(cards) {
+    const root = $("summary");
+    root.innerHTML = "";
+    if (!cards.length) {
+      root.innerHTML = `<div class="small">No results yet.</div>`;
+      return;
+    }
+    for (const c of cards) root.appendChild(c);
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;").replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
+  }
+
+  function card(title, subtitle, kvPairs, links=[]) {
+    const el = document.createElement("div");
+    el.className = "card";
+    const head = document.createElement("div");
+    head.className = "chead";
+    head.innerHTML = `
+      <div>
+        <div style="font-weight:800">${escapeHtml(title)}</div>
+        <div class="small">${escapeHtml(subtitle || "")}</div>
+      </div>
+    `;
+    const body = document.createElement("div");
+    body.className = "cbody";
+
+    const kv = document.createElement("div");
+    kv.className = "kv";
+    for (const [k,v] of kvPairs) {
+      const kdiv = document.createElement("div");
+      kdiv.textContent = k;
+      const vdiv = document.createElement("div");
+      vdiv.innerHTML = v;
+      kv.appendChild(kdiv);
+      kv.appendChild(vdiv);
+    }
+    body.appendChild(kv);
+
+    if (links.length) {
+      const hr = document.createElement("div");
+      hr.className = "hr";
+      body.appendChild(hr);
+      const ldiv = document.createElement("div");
+      ldiv.className = "small";
+      ldiv.innerHTML = links.map(h => `• ${h}`).join("<br/>");
+      body.appendChild(ldiv);
+    }
+
+    el.appendChild(head);
+    el.appendChild(body);
+    return el;
+  }
+
+  // -----------------------------
+  // Address lookup
+  // -----------------------------
+  function buildAddressWhere(p) {
+    const clauses = ["1=1"];
+    if (p.AddNum != null) clauses.push(`AddNum = ${p.AddNum}`);
+    if (p.StName) clauses.push(`UPPER(StName) LIKE '%${p.StName.replace(/'/g,"''")}%'`);
+    if (p.StPreDir) clauses.push(`UPPER(StPreDir) = '${p.StPreDir.replace(/'/g,"''")}'`);
+    if (p.StSuffix) clauses.push(`UPPER(StSuffix) = '${p.StSuffix.replace(/'/g,"''")}'`);
+    if (p.City) clauses.push(`UPPER(CommName) LIKE '%${p.City.replace(/'/g,"''")}%'`);
+    return clauses.join(" AND ");
+  }
+
+  function scoreAddressCandidate(p, attrs) {
+    let s = 0;
+    if (p.AddNum != null && attrs.AddNum == p.AddNum) s += 10;
+    if (p.StPreDir && String(attrs.StPreDir||"").toUpperCase() === p.StPreDir) s += 4;
+    if (p.StSuffix && String(attrs.StSuffix||"").toUpperCase() === p.StSuffix) s += 4;
+    if (p.City && String(attrs.CommName||"").toUpperCase().includes(p.City)) s += 2;
+    if (p.StName && String(attrs.StName||"").toUpperCase().includes(p.StName.split(" ")[0])) s += 2;
+    return s;
+  }
+
+  async function findBestAddressFeature(rawAddr) {
+    const parsed = parseAddress(rawAddr);
+    log(`Parsed address: AddNum=${parsed.AddNum ?? "-"} PreDir=${parsed.StPreDir ?? "-"} StName=${parsed.StName ?? "-"} Suffix=${parsed.StSuffix ?? "-"} City=${parsed.City ?? "-"}`);
+
+    const where = buildAddressWhere(parsed);
+    log(`Address query WHERE: ${where}`);
+
+    const resp = await arcQuery(LAYERS.address, {
+      where,
+      outFields: "*",
+      returnGeometry: true,
+      outSR: 4326
+    });
+    const feats = resp?.features || [];
+    log(`Address query returned ${feats.length} feature(s).`);
+    if (!feats.length) return { best: null, candidates: [] };
+
+    const scored = feats
+      .map(f => ({ f, score: scoreAddressCandidate(parsed, f.attributes || {}) }))
+      .sort((a,b) => b.score - a.score);
+
+    return { best: scored[0].f, candidates: scored.map(x => x.f) };
+  }
+
+  // -----------------------------
+  // Parcel query (point+distance)
+  // -----------------------------
+  async function findParcelNearPoint(lon, lat) {
+    const distances = [0, 10, 30, 150];
+    let best = null;
+
+    for (const d of distances) {
+      const params = {
+        where: "1=1",
+        outFields: "*",
+        returnGeometry: true,
+        outSR: 4326,
+        geometry: `${lon},${lat}`,
+        geometryType: "esriGeometryPoint",
+        inSR: 4326,
+        spatialRel: "esriSpatialRelIntersects",
+      };
+      if (d > 0) {
+        params.distance = d;
+        params.units = "esriSRUnit_Meter";
+      }
+
+      log(`Parcel search: point+distance ${d}m`);
+      const resp = await arcQuery(LAYERS.parcels, params);
+      const feats = resp?.features || [];
+      log(`Parcel candidates @ ${d}m: ${feats.length}`);
+
+      if (feats.length) {
+        const pointXY = [lon, lat];
+        const containing = feats.find(f => pointInPolygon(pointXY, f.geometry));
+        if (containing) { best = containing; break; }
+
+        let nearest = null;
+        let bestDist = Infinity;
+        for (const f of feats) {
+          const c = centroidOfPolygon(f.geometry);
+          if (!c) continue;
+          const meters = haversineMeters(lat, lon, c.y, c.x);
+          if (meters < bestDist) { bestDist = meters; nearest = f; }
+        }
+        best = nearest || feats[0];
+        break;
+      }
+    }
+    return best;
+  }
+
+  async function findContainingPolygon(layerId, lon, lat, searchMeters) {
+    const resp = await arcQuery(layerId, {
+      where: "1=1",
+      outFields: "*",
+      returnGeometry: true,
+      outSR: 4326,
+      geometry: `${lon},${lat}`,
+      geometryType: "esriGeometryPoint",
+      inSR: 4326,
+      spatialRel: "esriSpatialRelIntersects",
+      distance: searchMeters,
+      units: "esriSRUnit_Meter"
+    });
+    const feats = resp?.features || [];
+    if (!feats.length) return null;
+
+    const pointXY = [lon, lat];
+    const containing = feats.find(f => pointInPolygon(pointXY, f.geometry));
+    if (containing) return containing;
+
+    let nearest = null;
+    let bestDist = Infinity;
+    for (const f of feats) {
+      const c = centroidOfPolygon(f.geometry);
+      if (!c) continue;
+      const meters = haversineMeters(lat, lon, c.y, c.x);
+      if (meters < bestDist) { bestDist = meters; nearest = f; }
+    }
+    return nearest || feats[0];
+  }
+
+  async function findRosNearPoint(lon, lat, searchMeters=1600) {
+    const resp = await arcQuery(LAYERS.ros, {
+      where: "1=1",
+      outFields: "*",
+      returnGeometry: true,
+      outSR: 4326,
+      geometry: `${lon},${lat}`,
+      geometryType: "esriGeometryPoint",
+      inSR: 4326,
+      spatialRel: "esriSpatialRelIntersects",
+      distance: searchMeters,
+      units: "esriSRUnit_Meter"
+    });
+    return resp?.features || [];
+  }
+
+  // -----------------------------
+  // Draw
+  // -----------------------------
+  function formatAddressAttrs(a) {
+    const parts = [];
+    if (a.AddNum) parts.push(a.AddNum);
+    if (a.StPreDir) parts.push(a.StPreDir);
+    if (a.StName) parts.push(a.StName);
+    if (a.StSuffix) parts.push(a.StSuffix);
+    const line1 = parts.join(" ");
+    const line2 = [a.CommName, a.State, a.Zip4].filter(Boolean).join(" ");
+    return [line1, line2].filter(Boolean).join(", ");
+  }
+
+  function drawAddressPoint(f) {
+    const ll = arcPointToLatLng(f.geometry);
+    if (!ll) return null;
+    const m = L.circleMarker(ll, { radius: 7, weight: 2, color: "#ffffff", fillColor: "#2a3dff", fillOpacity: 0.9 });
+    m.bindPopup(`<b>Address</b><br/>${escapeHtml(formatAddressAttrs(f.attributes || {}))}`);
+    layers.address.addLayer(m);
+    return m;
+  }
+
+  function drawPolygonFeature(f, group, geojsonOptions, label) {
+    const gj = arcPolygonToGeoJSON(f.geometry);
+    const layer = L.geoJSON(gj, geojsonOptions);
+    layer.bindPopup(`<b>${escapeHtml(label)}</b>`);
+    group.addLayer(layer);
+    return layer;
+  }
+
+  function bestRosLabel(a) {
+    const fields = ["RS","ROS","Survey","SurveyNo","SURVEYNO","Book","BOOK","Page","PAGE","Document","DOC","Description","DESC","Name","NAME"];
+    const parts = [];
+    for (const f of fields) if (a[f]) parts.push(`${f}:${a[f]}`);
+    if (parts.length) return parts.slice(0,3).join("  ");
+    for (const [k,v] of Object.entries(a||{})) {
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "ROS feature";
+  }
+
+  function summarizeAttrs(attrs) {
+    if (!attrs) return [["(no attrs)",""]];
+    const picks = [];
+    const prefer = ["PARCEL","PIN","RP","AIN","SUB","TOWNSHIP","RANGE","SECTION","BOOK","PAGE","RS","ROS","DOC","URL","PDF","LINK","NAME","DESC"];
+    const keys = Object.keys(attrs);
+    const used = new Set();
+
+    function add(k) {
+      if (used.has(k)) return;
+      const v = attrs[k];
+      if (v === null || v === undefined || v === "") return;
+      used.add(k);
+      picks.push([k, escapeHtml(v)]);
+    }
+
+    for (const token of prefer) {
+      for (const k of keys) {
+        if (k.toUpperCase().includes(token)) add(k);
+        if (picks.length >= 10) break;
+      }
+      if (picks.length >= 10) break;
+    }
+    if (!picks.length) for (const k of keys.slice(0,8)) add(k);
+    return picks;
+  }
+
+  function findPdfLinks(attrs) {
+    const links = [];
+    for (const [k,v] of Object.entries(attrs || {})) {
+      if (!v) continue;
+      const sv = String(v);
+      if (/^https?:\/\//i.test(sv) && /\.pdf(\?|$)/i.test(sv)) links.push({ key: k, url: sv });
+      if (!/^https?:\/\//i.test(sv) && /\.pdf(\?|$)/i.test(sv) && sv.includes("/")) {
+        links.push({ key: k, url: new URL(sv, BASE).toString() });
+      }
+    }
+    const seen = new Set();
+    return links.filter(l => (seen.has(l.url) ? false : (seen.add(l.url), true)));
+  }
+
+  // -----------------------------
+  // Export
+  // -----------------------------
+  function downloadJson(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  function buildExportGeoJSON() {
+    const fc = { type:"FeatureCollection", features:[] };
+
+    if (state.addressFeature?.geometry) {
+      fc.features.push({
+        type:"Feature",
+        properties: Object.assign({ _layer: "address" }, state.addressFeature.attributes||{}),
+        geometry: { type:"Point", coordinates:[state.addressFeature.geometry.x, state.addressFeature.geometry.y] }
+      });
+    }
+    if (state.parcelFeature?.geometry?.rings) {
+      const feat = arcPolygonToGeoJSON(state.parcelFeature.geometry);
+      feat.properties = Object.assign({ _layer: "parcel" }, state.parcelFeature.attributes||{});
+      fc.features.push(feat);
+    }
+    const addPoly = (f, name) => {
+      if (!f?.geometry?.rings) return;
+      const feat = arcPolygonToGeoJSON(f.geometry);
+      feat.properties = Object.assign({ _layer: name }, f.attributes||{});
+      fc.features.push(feat);
+    };
+    addPoly(state.subdivisionFeature, "subdivision");
+    addPoly(state.sectionFeature, "section");
+    addPoly(state.townshipFeature, "township");
+
+    for (const f of (state.rosFeatures||[])) {
+      const g = f.geometry;
+      if (!g) continue;
+      let geo = null;
+      if (g.x != null && g.y != null) geo = { type:"Point", coordinates:[g.x,g.y] };
+      else if (g.paths) geo = { type:"LineString", coordinates: g.paths[0].map(([x,y])=>[x,y]) };
+      else if (g.rings) geo = { type:"Polygon", coordinates: g.rings.map(r=>r.map(([x,y])=>[x,y])) };
+      if (!geo) continue;
+
+      fc.features.push({
+        type:"Feature",
+        properties: Object.assign({ _layer:"ros" }, f.attributes||{}),
+        geometry: geo
+      });
+    }
+    return fc;
+  }
+
+  // -----------------------------
+  // PDF Basis of Bearing (upload)
+  // -----------------------------
+  function extractBasisLines(text) {
+    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const hits = [];
+    const re = /(BASIS\s+OF\s+BEARING|BASIS\s+OF\s+BEARINGS|BEARINGS?\s+ARE\s+BASED\s+ON|BEARINGS?\s+SHOWN\s+HEREON\s+ARE\s+BASED\s+ON)/i;
+
+    for (const ln of lines) if (re.test(ln)) hits.push(ln);
+
+    const context = [];
+    for (let i=0; i<lines.length; i++) {
+      if (re.test(lines[i])) {
+        const start = Math.max(0, i-2);
+        const end = Math.min(lines.length, i+5);
+        context.push(lines.slice(start, end).join(" "));
+      }
+    }
+
+    const uniq = (arr) => {
+      const s = new Set();
+      const out = [];
+      for (const x of arr) { const k=x.toUpperCase(); if (!s.has(k)) { s.add(k); out.push(x); } }
+      return out;
+    };
+    return { hits: uniq(hits), context: uniq(context) };
+  }
+
+  async function scanUploadedPdf(file) {
+    if (!file) throw new Error("No PDF selected.");
+    if (!window.pdfjsLib) throw new Error("pdfjsLib missing.");
+    const buf = await file.arrayBuffer();
+    const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+    let fullText = "";
+    for (let p=1; p<=doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      const strings = tc.items.map(it => it.str);
+      fullText += strings.join("\n") + "\n";
+    }
+    return extractBasisLines(fullText);
+  }
+
+  // -----------------------------
+  // Main flow
+  // -----------------------------
+  async function doLookup() {
+    clearLog();
+    $("btnExportGeo").disabled = true;
+    state.exportGeoJSON = null;
+    setSummaryCards([]);
+    clearMapLayers();
+
+    const rawAddr = $("addr").value.trim();
+    if (!rawAddr) { log("Enter an address.", "warn"); return; }
+
+    try {
+      log("Lookup started.");
+      invalidateMapSoon("lookup start");
+
+      const { best: addrF, candidates } = await findBestAddressFeature(rawAddr);
+      if (!addrF) {
+        log("Address not found in Ada County Address layer (16). Try different formatting.", "bad");
+        return;
+      }
+      state.addressFeature = addrF;
+
+      const addrLL = arcPointToLatLng(addrF.geometry);
+      log(`Address match: ${addrLL[0].toFixed(7)}, ${addrLL[1].toFixed(7)}`);
+      drawAddressPoint(addrF);
+
+      // Move map early
+      map.setView(addrLL, 18);
+      invalidateMapSoon("after setView");
+
+      const lon = addrF.geometry.x, lat = addrF.geometry.y;
+
+      const parcel = await findParcelNearPoint(lon, lat);
+      if (!parcel) {
+        log("Parcel not found near that address point (0/10/30/150m).", "bad");
+        setSummaryCards([
+          card("Address", formatAddressAttrs(addrF.attributes||{}),
+            [["Lat/Lon", `${lat.toFixed(7)}, ${lon.toFixed(7)}`],["Candidates", String(candidates.length)]],
+            [])
+        ]);
+        invalidateMapSoon("parcel not found");
+        return;
+      }
+      state.parcelFeature = parcel;
+
+      drawPolygonFeature(parcel, layers.parcel, {
+        style: () => ({ color: "#24d18f", weight: 3, fillOpacity: 0.08 })
+      }, "Parcel");
+
+      // Fit parcel bounds
+      const ext = arcExtentFromPolygon(parcel.geometry);
+      if (ext) {
+        const bounds = L.latLngBounds([ext.ymin, ext.xmin], [ext.ymax, ext.xmax]);
+        map.fitBounds(bounds.pad(0.15));
+        invalidateMapSoon("after fitBounds");
+      }
+
+      const c = centroidOfPolygon(parcel.geometry) || { x: lon, y: lat };
+      log(`Parcel centroid: ${c.y.toFixed(7)}, ${c.x.toFixed(7)}`);
+
+      const subdiv = await findContainingPolygon(LAYERS.subdivisions, c.x, c.y, 600);
+      const section = await findContainingPolygon(LAYERS.sections, c.x, c.y, 2500);
+      const township = await findContainingPolygon(LAYERS.townships, c.x, c.y, 4000);
+
+      state.subdivisionFeature = subdiv;
+      state.sectionFeature = section;
+      state.townshipFeature = township;
+
+      if (subdiv) drawPolygonFeature(subdiv, layers.subdivision, { style: () => ({ color:"#9ab0ff", weight:2, fillOpacity:0.04 }) }, "Subdivision");
+      if (section) drawPolygonFeature(section, layers.section, { style: () => ({ color:"#ffcc66", weight:2, fillOpacity:0.03, dashArray:"6 6" }) }, "Section");
+      if (township) drawPolygonFeature(township, layers.township, { style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02, dashArray:"3 8" }) }, "Township");
+
+      const ros = await findRosNearPoint(c.x, c.y, 1600);
+      state.rosFeatures = ros;
+      log(`ROS near parcel: ${ros.length}`);
+
+      for (const f of ros) {
+        const g = f.geometry;
+        if (!g) continue;
+        if (g.x != null && g.y != null) {
+          const m = L.circleMarker([g.y, g.x], { radius: 5, weight: 1.5, color: "#ffffff", fillColor:"#ff5a7a", fillOpacity: .7 });
+          m.bindPopup(`<b>Record of Survey</b><br/>${escapeHtml(bestRosLabel(f.attributes||{}))}`);
+          layers.ros.addLayer(m);
+        } else if (g.paths) {
+          const gj = { type:"Feature", properties:{}, geometry:{ type:"LineString", coordinates: g.paths[0].map(([x,y])=>[x,y]) } };
+          const l = L.geoJSON(gj, { style:{ color:"#ff5a7a", weight:2 }});
+          l.bindPopup(`<b>Record of Survey</b><br/>${escapeHtml(bestRosLabel(f.attributes||{}))}`);
+          layers.ros.addLayer(l);
+        } else if (g.rings) {
+          const gj = arcPolygonToGeoJSON(g);
+          const p = L.geoJSON(gj, { style:{ color:"#ff5a7a", weight:2, fillOpacity:0.02 }});
+          p.bindPopup(`<b>Record of Survey</b><br/>${escapeHtml(bestRosLabel(f.attributes||{}))}`);
+          layers.ros.addLayer(p);
+        }
+      }
+
+      // Summary
+      const cards = [];
+      cards.push(card(
+        "Address",
+        formatAddressAttrs(addrF.attributes||{}),
+        [
+          ["Location", `${lat.toFixed(7)}, ${lon.toFixed(7)}`],
+          ["Candidates", `${candidates.length}`],
+        ],
+        []
+      ));
+
+      const pAttrs = parcel.attributes || {};
+      cards.push(card(
+        "Parcel",
+        "Parcel feature",
+        [
+          ["Centroid", `${c.y.toFixed(7)}, ${c.x.toFixed(7)}`],
+          ["Attrs", `${Object.keys(pAttrs).length} fields`],
+        ],
+        []
+      ));
+
+      if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
+      if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
+      if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
+
+      if (ros.length) {
+        const rosCards = ros.slice(0, 10).map((f, idx) => {
+          const a = f.attributes || {};
+          const pdfs = findPdfLinks(a);
+          const links = pdfs.map(p => `<a target="_blank" rel="noopener" href="${escapeHtml(p.url)}">Open PDF</a> <span class="small">(${escapeHtml(p.key)})</span>`);
+          return card(`Record of Survey #${idx+1}`, bestRosLabel(a), summarizeAttrs(a), links);
+        });
+        cards.push(...rosCards);
+      } else {
+        cards.push(card("Record of Survey", "None within 1600m of parcel centroid", [["Note","Increase search distance in code if needed."]], []));
+      }
+
+      setSummaryCards(cards);
+
+      // Export
+      state.exportGeoJSON = buildExportGeoJSON();
+      $("btnExportGeo").disabled = false;
+
+      invalidateMapSoon("lookup complete");
+      log("Done.", "info");
+    } catch (e) {
+      log(`Error: ${e.message || e}`, "bad");
+      console.error(e);
+      invalidateMapSoon("after error");
+    }
+  }
+
+  // -----------------------------
+  // UI events
+  // -----------------------------
+  $("btnLookup").addEventListener("click", doLookup);
+
+  $("btnClear").addEventListener("click", () => {
+    $("addr").value = "";
+    clearLog();
+    clearMapLayers();
+    setSummaryCards([]);
+    $("btnExportGeo").disabled = true;
+    state.exportGeoJSON = null;
+    $("pdfFindings").style.display = "none";
+    $("pdfFindings").textContent = "";
+    log("Cleared.");
+    invalidateMapSoon("clear");
+  });
+
+  $("btnExportGeo").addEventListener("click", () => {
+    if (!state.exportGeoJSON) return;
+    downloadJson(state.exportGeoJSON, "ada_lookup.geojson");
+  });
+
+  $("btnScanPdf").addEventListener("click", async () => {
+    const file = $("pdfFile").files?.[0];
+    $("pdfFindings").style.display = "none";
+    $("pdfFindings").textContent = "";
+    try {
+      log(`Scanning PDF upload: ${file ? file.name : "(none)"}`);
+      const res = await scanUploadedPdf(file);
+      const out = [];
+      out.push("BASIS OF BEARING — matches:\n");
+      if (res.hits.length) out.push(...res.hits.map(x => "• " + x));
+      else out.push("(none found as single-line matches)");
+      out.push("\n\nBASIS OF BEARING — with context:\n");
+      if (res.context.length) out.push(...res.context.map(x => "• " + x));
+      else out.push("(none found)");
+      $("pdfFindings").textContent = out.join("\n");
+      $("pdfFindings").style.display = "block";
+      log("PDF scan complete.");
+    } catch (e) {
+      log(`PDF scan failed: ${e.message || e}`, "bad");
+      console.error(e);
+    }
+  });
+
+  // initial log
+  clearLog();
+  log("Ready. Enter an address and click Lookup.");
+  invalidateMapSoon("initial");
+})();
+</script>
+</body>
+</html>
