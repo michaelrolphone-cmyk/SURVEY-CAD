@@ -107,6 +107,11 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(staticRes.status, 200);
     const html = await staticRes.text();
     assert.match(html, /<html/i);
+
+    const caseInsensitiveStaticRes = await fetch(`http://127.0.0.1:${app.port}/cpnf.html`);
+    assert.equal(caseInsensitiveStaticRes.status, 200);
+    const cpnfHtml = await caseInsensitiveStaticRes.text();
+    assert.match(cpnfHtml, /<html/i);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));

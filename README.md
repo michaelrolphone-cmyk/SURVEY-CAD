@@ -86,11 +86,12 @@ curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
 
 ### Static HTML files
 
-Any repository-root file can be requested directly. Examples:
+Any repository-root static file can be requested directly. File path matching is case-insensitive, so `/CPNF.HTML` and `/cpnf.html` both resolve to the same file. Examples:
 
 ```bash
 curl "http://localhost:3000/ROS.html"
 curl "http://localhost:3000/CPNF.HTML"
+curl "http://localhost:3000/cpnf.html"
 ```
 
 `/` defaults to `VIEWPORT.HTML`.
