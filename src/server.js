@@ -27,6 +27,15 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+
+function getErrorStatusCode(err) {
+  const message = err?.message || '';
+  if (/^HTTP\s+\d{3}:/i.test(message)) {
+    return 502;
+  }
+  return 400;
+}
+
 function parseLonLat(urlObj) {
   const lon = Number(urlObj.searchParams.get('lon'));
   const lat = Number(urlObj.searchParams.get('lat'));
@@ -155,7 +164,7 @@ export function createSurveyServer({ client = new SurveyCadClient(), staticDir =
 
       await serveStaticFile(urlObj.pathname, staticDir, res);
     } catch (err) {
-      sendJson(res, 400, { error: err.message || 'Bad request.' });
+      sendJson(res, getErrorStatusCode(err), { error: err.message || 'Bad request.' });
     }
   });
 }

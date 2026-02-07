@@ -13,6 +13,7 @@ const DEFAULTS = {
   blmSecondDivisionLayer:
     "https://gis.blm.gov/idarcgis/rest/services/realty/BLM_ID_CADNSDI_PLSS_Second_Division/MapServer/0",
   nominatimUrl: "https://nominatim.openstreetmap.org/search",
+  nominatimUserAgent: "survey-cad/1.0 (contact: admin@example.com)",
 };
 
 const DIRS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
@@ -146,7 +147,12 @@ export class SurveyCadClient {
     u.searchParams.set("format", "json");
     u.searchParams.set("limit", "1");
     u.searchParams.set("addressdetails", "1");
-    const result = await this.fetchJson(u.toString(), { headers: { Accept: "application/json" } });
+    const result = await this.fetchJson(u.toString(), {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": this.config.nominatimUserAgent,
+      },
+    });
     if (!result?.length) throw new Error("No geocode results.");
     return { lat: Number(result[0].lat), lon: Number(result[0].lon), display: result[0].display_name };
   }
