@@ -14,6 +14,13 @@ function createMockServer() {
       return;
     }
 
+    if (url.pathname === '/geocode-403') {
+      res.statusCode = 403;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'forbidden' }));
+      return;
+    }
+
     if (url.pathname.endsWith('/16/query')) {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
@@ -152,5 +159,29 @@ test('server maps upstream HTTP errors to bad gateway', async () => {
     assert.match(body.error, /HTTP 403/i);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+test('server lookup succeeds when geocode provider fails but address layer resolves', async () => {
+  const upstream = await createMockServer();
+  const base = `http://127.0.0.1:${upstream.port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode-403`,
+    blmFirstDivisionLayer: `${base}/blm1`,
+    blmSecondDivisionLayer: `${base}/blm2`,
+  });
+  const app = await startApiServer(client);
+
+  try {
+    const lookupRes = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(lookupRes.status, 200);
+    const lookup = await lookupRes.json();
+    assert.equal(lookup.parcel.attributes.PARCEL, 'R12345');
+    assert.equal(lookup.geocode, null);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+    await new Promise((resolve) => upstream.server.close(resolve));
   }
 });
