@@ -45,6 +45,7 @@ Optional endpoint overrides:
 - `nominatimUrl`
 - `nominatimUserAgent` (default `survey-cad/1.0 (contact: admin@example.com)`)
 - `nominatimEmail` (default `admin@example.com`; sent to Nominatim as `email=` query param)
+- `arcgisGeocodeUrl` (default ArcGIS World Geocode `findAddressCandidates` endpoint, used as geocode fallback when Nominatim is unavailable)
 
 ### Core methods
 
@@ -89,7 +90,7 @@ curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61&outSR=2243"
 ```
 
-Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. `/api/lookup` will still return a successful payload when the geocoder fails but the Ada County address layer returns a match (including a fallback query that relaxes directional/suffix filters). If both data sources fail to locate the address, `/api/lookup` now returns a clear validation error instead of bubbling an upstream HTTP error.
+Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. Geocoding now tries Nominatim first and then automatically falls back to ArcGIS World Geocode when Nominatim fails. `/api/lookup` will still return a successful payload when geocoding fails but the Ada County address layer returns a match (including a fallback query that relaxes directional/suffix filters). If both data sources fail to locate the address, `/api/lookup` returns a clear validation error instead of bubbling an upstream HTTP error.
 
 ### Browser helper module for static HTML tools
 
