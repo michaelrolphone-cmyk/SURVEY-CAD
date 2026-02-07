@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SURVEY CAD Launcher</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-hover: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #22c55e;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(4px);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      object-fit: cover;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: #000;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .home,
+    .viewer {
+      width: 100%;
+      padding: 1.2rem;
+    }
+
+    .home.hidden,
+    .viewer.hidden {
+      display: none;
+    }
+
+    .subtitle {
+      margin: 0.1rem 0 1rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.8rem;
+    }
+
+    .app-card {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 14px;
+      padding: 0.95rem;
+      text-align: left;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    .app-card:hover,
+    .app-card:focus-visible {
+      background: var(--panel-hover);
+      transform: translateY(-1px);
+    }
+
+    .app-card strong {
+      display: block;
+      font-size: 1rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .app-card span {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .viewer {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button,
+    select {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.92rem;
+    }
+
+    button:hover,
+    select:hover {
+      background: var(--panel-hover);
+    }
+
+    .close {
+      border-color: rgba(239, 68, 68, 0.6);
+    }
+
+    .active-label {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    iframe {
+      width: 100%;
+      flex: 1;
+      min-height: 460px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 12px;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="943.png" alt="SURVEY CAD" class="logo" />
+    <h1>SURVEY CAD App Launcher</h1>
+  </header>
+
+  <main>
+    <section class="home" id="homeView" aria-label="App launcher home">
+      <p class="subtitle">Choose an app to open in the embedded viewer.</p>
+      <div class="app-grid" id="appGrid"></div>
+    </section>
+
+    <section class="viewer hidden" id="viewerView" aria-label="Embedded app viewer">
+      <div class="toolbar">
+        <button id="backButton" type="button">← Back to launcher</button>
+        <label for="appSelect" class="active-label">Switch app:</label>
+        <select id="appSelect" aria-label="Switch to another app"></select>
+        <button id="reloadButton" type="button">↻ Reload app</button>
+      </div>
+      <iframe id="appFrame" title="Standalone app"></iframe>
+      <button id="closeButton" type="button" class="close">Close app and return home</button>
+    </section>
+  </main>
+
+  <script>
+    const apps = [
+      { name: 'CPNF', file: 'CPNF.HTML' },
+      { name: 'POINT TRANSFORMER', file: 'POINT_TRANSFORMER.HTML' },
+      { name: 'ROS', file: 'ROS.html' },
+      { name: 'VIEWPORT', file: 'VIEWPORT.HTML' }
+    ];
+
+    const homeView = document.getElementById('homeView');
+    const viewerView = document.getElementById('viewerView');
+    const appGrid = document.getElementById('appGrid');
+    const appSelect = document.getElementById('appSelect');
+    const appFrame = document.getElementById('appFrame');
+    const backButton = document.getElementById('backButton');
+    const reloadButton = document.getElementById('reloadButton');
+    const closeButton = document.getElementById('closeButton');
+
+    let currentApp = null;
+
+    function showHome() {
+      homeView.classList.remove('hidden');
+      viewerView.classList.add('hidden');
+      currentApp = null;
+      appFrame.removeAttribute('src');
+    }
+
+    function openApp(file) {
+      currentApp = file;
+      appFrame.src = file;
+      appSelect.value = file;
+      homeView.classList.add('hidden');
+      viewerView.classList.remove('hidden');
+    }
+
+    function renderApps() {
+      apps.forEach((app) => {
+        const card = document.createElement('button');
+        card.className = 'app-card';
+        card.type = 'button';
+        card.innerHTML = `<strong>${app.name}</strong><span>${app.file}</span>`;
+        card.addEventListener('click', () => openApp(app.file));
+        appGrid.appendChild(card);
+
+        const option = document.createElement('option');
+        option.value = app.file;
+        option.textContent = `${app.name} (${app.file})`;
+        appSelect.appendChild(option);
+      });
+    }
+
+    backButton.addEventListener('click', showHome);
+    closeButton.addEventListener('click', showHome);
+    reloadButton.addEventListener('click', () => {
+      if (!currentApp) return;
+      appFrame.src = currentApp;
+    });
+
+    appSelect.addEventListener('change', (event) => {
+      openApp(event.target.value);
+    });
+
+    renderApps();
+  </script>
+</body>
+</html>
