@@ -10,7 +10,6 @@
 
   <style>
     :root{
-      /* Sci-fi palette */
       --bg0:#05060a;
       --bg1:#070a12;
       --glass: rgba(14, 18, 30, .62);
@@ -21,9 +20,9 @@
       --text:#e7f0ff;
       --muted:#8aa4c2;
 
-      --c1:#00e5ff; /* cyan */
-      --c2:#ff2bd6; /* magenta */
-      --c3:#a6ff6f; /* lime */
+      --c1:#00e5ff;
+      --c2:#ff2bd6;
+      --c3:#a6ff6f;
       --warn:#ffbd2e;
       --bad:#ff4d6d;
 
@@ -45,7 +44,6 @@
       overflow-x: hidden;
     }
 
-    /* HUD overlays */
     body::before{
       content:"";
       position: fixed; inset:0;
@@ -77,7 +75,6 @@
       100%{ transform: translateY(4%) rotate(-3deg); }
     }
 
-    /* Top bar */
     header{
       position: sticky; top:0; z-index: 50;
       backdrop-filter: blur(12px);
@@ -148,7 +145,6 @@
     }
     .mono{ font-family: var(--mono); color: var(--text); }
 
-    /* Layout */
     main{
       padding: 16px 18px 24px;
       display:grid;
@@ -212,9 +208,7 @@
       padding: 12px;
     }
 
-    /* Controls */
     .row{ display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
-    .row > * { flex: 0 0 auto; }
     label{ font-size: 12px; color: var(--muted); }
     input[type="file"]{ width: 100%; color: var(--muted); }
 
@@ -247,8 +241,7 @@
       padding: 10px 12px;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,.14);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
       color: var(--text);
       outline:none;
       font-size: 12px;
@@ -256,7 +249,6 @@
     select:focus{ border-color: rgba(0,229,255,.35); box-shadow: 0 0 22px rgba(0,229,255,.12); }
 
     .btn{
-      position: relative;
       border: 1px solid rgba(0,229,255,.35);
       color: rgba(231,240,255,.95);
       background: linear-gradient(180deg, rgba(0,229,255,.18), rgba(0,229,255,.06));
@@ -288,12 +280,7 @@
       border-color: rgba(255,255,255,.26);
       box-shadow: 0 0 0 1px rgba(255,255,255,.07) inset, 0 0 22px rgba(255,255,255,.06);
     }
-    .btn[disabled]{
-      opacity: .45;
-      cursor: not-allowed;
-      filter: grayscale(.2);
-      box-shadow: none;
-    }
+    .btn[disabled]{ opacity: .45; cursor: not-allowed; filter: grayscale(.2); box-shadow: none; }
 
     .pill{
       display:inline-flex; align-items:center; gap: 10px;
@@ -304,17 +291,10 @@
       color: var(--muted);
       font-size: 12px;
       box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
+      flex-wrap: wrap;
     }
-    input[type="checkbox"]{
-      width: 16px; height: 16px;
-      accent-color: var(--c1);
-    }
-    .hint{
-      margin: 8px 0 0;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.35;
-    }
+    input[type="checkbox"]{ width: 16px; height: 16px; accent-color: var(--c1); }
+    .hint{ margin: 8px 0 0; font-size: 12px; color: var(--muted); line-height: 1.35; }
 
     .grid2{
       display:grid;
@@ -324,7 +304,6 @@
     }
     @media (max-width: 540px){ .grid2{ grid-template-columns:1fr; } }
 
-    /* Stats readout */
     .stats{
       margin-top: 10px;
       border-top: 1px solid var(--line2);
@@ -356,10 +335,7 @@
       justify-content: space-between;
       gap: 10px;
     }
-    .stat .v .glow{
-      color: var(--c1);
-      text-shadow: 0 0 18px rgba(0,229,255,.25);
-    }
+    .stat .v .glow{ color: var(--c1); text-shadow: 0 0 18px rgba(0,229,255,.25); }
 
     .log{
       margin-top: 10px;
@@ -375,7 +351,6 @@
     .warn{ color: var(--warn); }
     .bad{ color: var(--bad); }
 
-    /* Map */
     #map{
       height: 380px;
       width: 100%;
@@ -384,9 +359,7 @@
       box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset, 0 0 30px rgba(0,229,255,.10);
       overflow: hidden;
     }
-    .leaflet-container{
-      background: #06101b;
-    }
+    .leaflet-container{ background: #06101b; }
     .leaflet-control-zoom a{
       background: rgba(8,10,16,.78) !important;
       color: var(--text) !important;
@@ -401,15 +374,12 @@
       margin: 0 8px 8px 0 !important;
     }
 
-    /* Right side split */
     .right{
       display:grid;
       grid-template-rows: auto 1fr;
       gap: 14px;
     }
-    .outputArea{
-      min-height: 320px;
-    }
+    .outputArea{ min-height: 320px; }
 
     .kbd{
       font-family: var(--mono);
@@ -470,10 +440,19 @@
         <div class="row" style="margin-top:10px;">
           <button id="btnProcess" class="btn">Process</button>
           <button id="btnDownload" class="btn secondary" disabled>Download</button>
+
+          <span class="pill">
+            <span class="mono">Basemap</span>
+            <select id="basemap" style="min-width: 170px;">
+              <option value="street" selected>Street</option>
+              <option value="satellite">Satellite</option>
+            </select>
+          </span>
+
           <span class="pill">Map defaults: <span class="mono">US-ft</span> · <span class="mono">West</span> · <span class="mono">SwapXY</span></span>
         </div>
 
-        <div class="grid2" style="margin-top: 10px;">
+        <div class="grid2" style="margin-top: 10px; display:none;">
           <div class="pill">
             <span class="mono">Zone</span>
             <select id="zone" title="State Plane zone" style="min-width: 160px;">
@@ -489,7 +468,7 @@
           </div>
         </div>
 
-        <div class="grid2" style="margin-top: 10px;">
+        <div class="grid2" style="margin-top: 10px; display:none;">
           <div class="pill">
             <input id="swapXY" type="checkbox" checked disabled />
             <label for="swapXY" style="color:var(--text); margin:0;">Swap X/Y (locked default)</label>
@@ -502,7 +481,7 @@
           </div>
         </div>
 
-        <div class="stats" id="stats">
+        <div class="stats">
           <div class="stat">
             <div class="k">Input lines</div>
             <div class="v"><span id="st_lines" class="glow">—</span><span class="mono">ln</span></div>
@@ -802,7 +781,6 @@
           maxBlock: 20000
         }) ?? 200;
 
-        // If blocks are exhausted, this can re-use later via fallback in pickFreeBlock returning null.
         allocatedBlocks.add(block);
         usedBlocks.add(block);
         groupBlockAssignments.push({ kind:"simple", origHundreds:h0, block, count: recs.length });
@@ -848,8 +826,6 @@
       }
 
       // Singleton-by-suffix groups: sequential numbering inside their allocated block.
-      // If "available 100s ranges are used up", pickFreeBlock returns null and fallback will re-use a block,
-      // effectively grouping multiple suffix buckets into the same 100-block.
       const suffixKeys = Array.from(singletonBySuffix.keys()).sort((a,b)=>a-b);
       for (const sfx of suffixKeys){
         const recs = singletonBySuffix.get(sfx);
@@ -913,7 +889,7 @@
 
     // -----------------------------
     // Idaho State Plane defs (NAD83; "NO_TRANS": no grid shift terms)
-    // Defaults locked: US-ft + Idaho West + Swap X/Y
+    // Defaults locked: US-ft + Swap X/Y
     // -----------------------------
     const PROJ_DEFS_USFT = {
       east:   "+proj=tmerc +lat_0=41.6666666666667 +lon_0=-112.166666666667 +k=0.999947368 +x_0=200000.0001016 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs",
@@ -936,7 +912,7 @@
     }
 
     // -----------------------------
-    // UI + Map
+    // UI + Map (basemap switcher)
     // -----------------------------
     const elFile = document.getElementById("file");
     const elIn = document.getElementById("inText");
@@ -946,8 +922,8 @@
     const elProcess = document.getElementById("btnProcess");
     const elAuto = document.getElementById("autoProcess");
     const elZone = document.getElementById("zone");
-    const elSwap = document.getElementById("swapXY");
     const elShowLabels = document.getElementById("showLabels");
+    const elBasemap = document.getElementById("basemap");
     const elMapHint = document.getElementById("mapHint");
 
     const st_lines = document.getElementById("st_lines");
@@ -960,17 +936,52 @@
     let latestOutputText = "";
     let latestTransformed = null;
 
-    // Map init
     let map = null;
     let layer = null;
 
+    // Base layers (Street + Satellite)
+    let streetLayer = null;
+    let satLayer = null;
+    let activeBase = "street";
+
     function initMap(){
       map = L.map("map", { preferCanvas:true }).setView([44.2, -116.7], 7);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+
+      // Street: OpenStreetMap
+      streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
-      }).addTo(map);
+      });
+
+      // Satellite: Esri World Imagery (no key)
+      satLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          maxZoom: 19,
+          attribution: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+        }
+      );
+
+      // Default basemap
+      streetLayer.addTo(map);
+      activeBase = "street";
+
       layer = L.layerGroup().addTo(map);
+    }
+
+    function setBasemap(mode){
+      if (!map) return;
+      if (mode === activeBase) return;
+
+      if (mode === "street"){
+        if (satLayer && map.hasLayer(satLayer)) map.removeLayer(satLayer);
+        if (streetLayer && !map.hasLayer(streetLayer)) streetLayer.addTo(map);
+        activeBase = "street";
+      } else {
+        if (streetLayer && map.hasLayer(streetLayer)) map.removeLayer(streetLayer);
+        if (satLayer && !map.hasLayer(satLayer)) satLayer.addTo(map);
+        activeBase = "satellite";
+      }
     }
 
     function setStats(stats, plottedCount){
@@ -1037,7 +1048,7 @@
       if (plotted > 0){
         const b = L.latLngBounds(bounds);
         map.fitBounds(b.pad(0.15));
-        elMapHint.innerHTML = `<span class="ok">Plotted ${plotted} pts</span> — zone <span class="mono">${zone}</span>, <span class="mono">US-ft</span>, <span class="mono">swapXY</span>.`;
+        elMapHint.innerHTML = `<span class="ok">Plotted ${plotted} pts</span> — zone <span class="mono">${zone}</span>, <span class="mono">US-ft</span>, <span class="mono">swapXY</span>, basemap <span class="mono">${activeBase}</span>.`;
       } else {
         elMapHint.innerHTML = `<span class="warn">No points plotted.</span> If coords are not Idaho State Plane, they’ll be skipped on the map (output still transforms IDs). Try another zone.`;
       }
@@ -1108,6 +1119,16 @@
       }
     });
 
+    // Basemap switch
+    elBasemap.addEventListener("change", ()=>{
+      setBasemap(elBasemap.value);
+      // no need to re-plot markers; base layer change only
+      if (latestTransformed?.recordsSorted){
+        const plotted = refreshMap(latestTransformed.recordsSorted);
+        setStats(latestTransformed.stats, plotted);
+      }
+    });
+
     // Download output
     elDownload.addEventListener("click", ()=>{
       if (!latestOutputText) return;
@@ -1125,9 +1146,9 @@
     // Init: blank textarea (no sample data), locked defaults already set in HTML
     initMap();
     elIn.value = "";
+    setBasemap("street");
     setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
-    elSwap.checked = true; // locked, but keep consistent
-    elMapHint.textContent = "Load a file or paste points to plot. Defaults: US-ft / Idaho West / Swap X-Y.";
+    elMapHint.textContent = "Load a file or paste points to plot. Basemap toggle: Street / Satellite.";
   </script>
 </body>
 </html>
