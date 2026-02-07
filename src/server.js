@@ -143,12 +143,13 @@ export function createSurveyServer({ client = new SurveyCadClient(), staticDir =
 
       if (urlObj.pathname === '/api/aliquots') {
         const { lon, lat } = parseLonLat(urlObj);
+        const outSR = Number(urlObj.searchParams.get('outSR') || 4326);
         const section = await client.loadSectionAtPoint(lon, lat);
         if (!section) {
           sendJson(res, 404, { error: 'No section found at requested coordinates.' });
           return;
         }
-        const aliquots = await client.loadAliquotsInSection(section);
+        const aliquots = await client.loadAliquotsInSection(section, outSR);
         sendJson(res, 200, { section, aliquots });
         return;
       }

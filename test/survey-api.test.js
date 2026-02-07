@@ -109,7 +109,7 @@ test('pointInPolygon handles holes', () => {
 });
 
 test('client lookup, section, and aliquot flows', async () => {
-  const { server, port } = await createMockServer();
+  const { server, port, requests } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
   const client = new SurveyCadClient({
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
@@ -126,8 +126,9 @@ test('client lookup, section, and aliquot flows', async () => {
     const section = await client.loadSectionAtPoint(-116.2, 43.61);
     assert.equal(section.attributes.SEC, 1);
 
-    const aliquots = await client.loadAliquotsInSection(section);
+    const aliquots = await client.loadAliquotsInSection(section, 2243);
     assert.equal(aliquots[0].attributes.ALIQUOT, 'NWNW');
+    assert.ok(requests.some((r) => r.includes('/blm2/query') && r.includes('outSR=2243')));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

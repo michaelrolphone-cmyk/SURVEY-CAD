@@ -83,6 +83,7 @@ curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/section?lon=-116.2&lat=43.61"
 curl "http://localhost:3000/api/parcel?lon=-116.2&lat=43.61&outSR=2243&searchMeters=150"
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
+curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61&outSR=2243"
 ```
 
 
@@ -93,7 +94,7 @@ The static HTML tools use `src/browser-survey-client.js` so network calls flow t
 - `lookupByAddress(address)` → `/api/lookup`
 - `findParcelNearPoint(lon, lat, outSR?, searchMeters?)` → `/api/parcel`
 - `loadSectionAtPoint(lon, lat)` → `/api/section`
-- `loadAliquotsAtPoint(lon, lat)` → `/api/aliquots`
+- `loadAliquotsAtPoint(lon, lat, outSR?)` → `/api/aliquots`
 
 ### Static HTML files
 
@@ -118,3 +119,9 @@ node src/cli.js aliquots --lat 43.61 --lon -116.20
 ```
 
 All CLI commands print JSON to stdout.
+
+
+### ROS.html enhancements
+
+- `ROS.html` now includes BLM aliquot lookup/mapping in the map results panel.
+- Parcel CSV export from `ROS.html` now appends aliquot centroid coordinate rows in the same P,N,E,Z,D format (EPSG:2243).
