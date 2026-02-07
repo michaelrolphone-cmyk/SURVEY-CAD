@@ -81,8 +81,19 @@ curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/geocode?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/section?lon=-116.2&lat=43.61"
+curl "http://localhost:3000/api/parcel?lon=-116.2&lat=43.61&outSR=2243&searchMeters=150"
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
 ```
+
+
+### Browser helper module for static HTML tools
+
+The static HTML tools use `src/browser-survey-client.js` so network calls flow through shared server endpoints backed by `SurveyCadClient`:
+
+- `lookupByAddress(address)` → `/api/lookup`
+- `findParcelNearPoint(lon, lat, outSR?, searchMeters?)` → `/api/parcel`
+- `loadSectionAtPoint(lon, lat)` → `/api/section`
+- `loadAliquotsAtPoint(lon, lat)` → `/api/aliquots`
 
 ### Static HTML files
 

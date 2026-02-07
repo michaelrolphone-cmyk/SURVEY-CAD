@@ -98,6 +98,11 @@ test('server exposes survey APIs and static html', async () => {
     const lookup = await lookupRes.json();
     assert.equal(lookup.parcel.attributes.PARCEL, 'R12345');
 
+    const parcelRes = await fetch(`http://127.0.0.1:${app.port}/api/parcel?lon=-116.2&lat=43.61&outSR=2243`);
+    assert.equal(parcelRes.status, 200);
+    const parcelPayload = await parcelRes.json();
+    assert.equal(parcelPayload.parcel.attributes.PARCEL, 'R12345');
+
     const aliquotsRes = await fetch(`http://127.0.0.1:${app.port}/api/aliquots?lon=-116.2&lat=43.61`);
     assert.equal(aliquotsRes.status, 200);
     const aliquots = await aliquotsRes.json();
@@ -112,6 +117,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(caseInsensitiveStaticRes.status, 200);
     const cpnfHtml = await caseInsensitiveStaticRes.text();
     assert.match(cpnfHtml, /<html/i);
+    assert.match(cpnfHtml, /browser-survey-client\.js/);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));
