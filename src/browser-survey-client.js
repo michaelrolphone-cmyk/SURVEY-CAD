@@ -37,3 +37,12 @@ export async function loadSectionAtPoint(lon, lat) {
 export async function loadAliquotsAtPoint(lon, lat, outSR = 4326) {
   return requestJson('/api/aliquots', { lon, lat, outSR });
 }
+
+export async function loadSubdivisionAtPoint(lon, lat, outSR = 4326) {
+  const payload = await requestJson('/api/subdivision', { lon, lat, outSR });
+  return payload.subdivision || null;
+}
+
+export function buildRosPdfProxyUrl(url) {
+  return buildUrl('/api/ros-pdf', { url });
+}

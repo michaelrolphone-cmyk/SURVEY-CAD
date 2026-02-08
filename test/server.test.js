@@ -70,6 +70,12 @@ function createMockServer() {
       return;
     }
 
+    if (url.pathname === '/sample.pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.end(Buffer.from('%PDF-1.4\n%mock\n', 'utf8'));
+      return;
+    }
+
     res.statusCode = 404;
     res.end('not found');
   });
@@ -114,6 +120,15 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(aliquotsRes.status, 200);
     const aliquots = await aliquotsRes.json();
     assert.equal(aliquots.aliquots[0].attributes.ALIQUOT, 'NWNW');
+
+    const subdivisionRes = await fetch(`http://127.0.0.1:${app.port}/api/subdivision?lon=-116.2&lat=43.61&outSR=2243`);
+    assert.equal(subdivisionRes.status, 200);
+    const subdivisionPayload = await subdivisionRes.json();
+    assert.equal(subdivisionPayload.subdivision.attributes.NAME, 'polygon');
+
+    const rosPdfRes = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=${encodeURIComponent(`${base}/sample.pdf`)}`);
+    assert.equal(rosPdfRes.status, 200);
+    assert.match(rosPdfRes.headers.get('content-type') || '', /application\/pdf/i);
 
     const staticRes = await fetch(`http://127.0.0.1:${app.port}/ROS.html`);
     assert.equal(staticRes.status, 200);
@@ -200,6 +215,19 @@ test('server returns validation error when lookup cannot resolve coordinates', a
     assert.equal(res.status, 400);
     const body = await res.json();
     assert.match(body.error, /Unable to locate this address/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+test('server validates ros pdf URL input', async () => {
+  const app = await startApiServer(new SurveyCadClient());
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=notaurl`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /valid absolute URL/i);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }

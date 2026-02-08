@@ -88,6 +88,8 @@ curl "http://localhost:3000/api/section?lon=-116.2&lat=43.61"
 curl "http://localhost:3000/api/parcel?lon=-116.2&lat=43.61&outSR=2243&searchMeters=150"
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61&outSR=2243"
+curl "http://localhost:3000/api/subdivision?lon=-116.2&lat=43.61&outSR=2243"
+curl "http://localhost:3000/api/ros-pdf?url=https%3A%2F%2Fexample.com%2Fros.pdf"
 ```
 
 Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. Geocoding now tries Nominatim first and then automatically falls back to ArcGIS World Geocode when Nominatim fails. `/api/lookup` will still return a successful payload when geocoding fails but the Ada County address layer returns a match (including a fallback query that relaxes directional/suffix filters). If both data sources fail to locate the address, `/api/lookup` returns a clear validation error instead of bubbling an upstream HTTP error.
@@ -100,6 +102,8 @@ The static HTML tools use `src/browser-survey-client.js` so network calls flow t
 - `findParcelNearPoint(lon, lat, outSR?, searchMeters?)` → `/api/parcel`
 - `loadSectionAtPoint(lon, lat)` → `/api/section`
 - `loadAliquotsAtPoint(lon, lat, outSR?)` → `/api/aliquots`
+- `loadSubdivisionAtPoint(lon, lat, outSR?)` → `/api/subdivision`
+- `buildRosPdfProxyUrl(url)` → `/api/ros-pdf?url=...` (stream ROS PDFs through the API server)
 
 ### Static HTML files
 
@@ -141,4 +145,6 @@ All CLI commands print JSON to stdout.
 ### ROS.html enhancements
 
 - `ROS.html` now includes BLM aliquot lookup/mapping in the map results panel.
-- Parcel CSV export from `ROS.html` now appends aliquot centroid coordinate rows in the same P,N,E,Z,D format (EPSG:2243).
+- ROS cards now link PDFs through `/api/ros-pdf` so PDFs are loaded via this app server.
+- Subdivision boundary and parcel/subdivision/aliquot corner markers are drawn on the map.
+- Parcel CSV export from `ROS.html` now includes subdivision corners, aliquot corners, and marker rows (address + ROS points + corner markers) in P,N,E,Z,D format (EPSG:2243).

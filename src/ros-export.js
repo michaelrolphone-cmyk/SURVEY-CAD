@@ -52,42 +52,64 @@ export function buildParcelCsvPNEZD(parcel2243, startPoint = 1) {
   return { csv: `${lines.join('\n')}\n`, nextPoint: pointNumber };
 }
 
-function centroidFromRings(rings) {
-  const ring = stripClosingDup((rings || [])[0] || []);
-  if (!ring.length) return null;
-  let sx = 0;
-  let sy = 0;
-  for (const [x, y] of ring) {
-    sx += x;
-    sy += y;
-  }
-  return { x: sx / ring.length, y: sy / ring.length };
-}
-
-function aliquotLabel(feature, index) {
+function polygonFeatureLabel(feature, fallbackPrefix, index) {
   const attrs = feature?.attributes || {};
   return (
-    attrs.ALIQUOT || attrs.ALIQUOT_LABEL || attrs.LegalDescription || attrs.LEGAL || attrs.DESCRIPTION ||
-    `ALIQUOT_${index + 1}`
+    attrs.ALIQUOT || attrs.ALIQUOT_LABEL || attrs.SUB_NAME || attrs.SUBDIVISION || attrs.NAME ||
+    attrs.PARCEL || attrs.PIN || attrs.PARCELID || attrs.LEGAL || attrs.DESCRIPTION ||
+    `${fallbackPrefix}_${index + 1}`
   );
 }
 
-export function buildAliquotCsvRowsPNEZD(aliquotFeatures2243, startPoint = 1) {
-  const features = aliquotFeatures2243 || [];
+export function buildPolygonCornerCsvRowsPNEZD(features2243, startPoint = 1, labelPrefix = 'POLYGON_CORNER') {
+  const features = features2243 || [];
   const lines = [];
   let pointNumber = startPoint;
 
   for (let i = 0; i < features.length; i++) {
     const feature = features[i];
-    const centroid = centroidFromRings(feature?.geometry?.rings || []);
-    if (!centroid) continue;
+    const rings = feature?.geometry?.rings || [];
+    const label = polygonFeatureLabel(feature, labelPrefix, i);
+
+    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+      const ring = stripClosingDup(rings[ringIndex]);
+      for (let vertexIndex = 0; vertexIndex < ring.length; vertexIndex++) {
+        const east = Number(ring[vertexIndex][0]);
+        const north = Number(ring[vertexIndex][1]);
+        if (!Number.isFinite(east) || !Number.isFinite(north)) continue;
+
+        lines.push([
+          pointNumber,
+          north.toFixed(3),
+          east.toFixed(3),
+          '0.000',
+          csvEscape(`${labelPrefix} ${label} R${ringIndex + 1} V${vertexIndex + 1}`),
+        ].join(','));
+        pointNumber += 1;
+      }
+    }
+  }
+
+  return { csv: lines.length ? `${lines.join('\n')}\n` : '', nextPoint: pointNumber, count: lines.length };
+}
+
+export function buildPointMarkerCsvRowsPNEZD(markers2243, startPoint = 1, labelPrefix = 'MARKER') {
+  const markers = markers2243 || [];
+  const lines = [];
+  let pointNumber = startPoint;
+
+  for (let i = 0; i < markers.length; i++) {
+    const marker = markers[i] || {};
+    const east = Number(marker.east);
+    const north = Number(marker.north);
+    if (!Number.isFinite(east) || !Number.isFinite(north)) continue;
 
     lines.push([
       pointNumber,
-      centroid.y.toFixed(3),
-      centroid.x.toFixed(3),
+      north.toFixed(3),
+      east.toFixed(3),
       '0.000',
-      csvEscape(`ALIQUOT_CENTROID ${aliquotLabel(feature, i)}`),
+      csvEscape(`${labelPrefix} ${marker.label || `POINT_${i + 1}`}`),
     ].join(','));
     pointNumber += 1;
   }

@@ -36,6 +36,27 @@ function getErrorStatusCode(err) {
   return 400;
 }
 
+
+function parseRemotePdfUrl(urlObj) {
+  const rawUrl = urlObj.searchParams.get('url');
+  if (!rawUrl) {
+    throw new Error('url query parameter is required.');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('url query parameter must be a valid absolute URL.');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http/https URLs are supported for ROS PDF loading.');
+  }
+
+  return parsed.toString();
+}
+
 function parseLonLat(urlObj) {
   const lon = Number(urlObj.searchParams.get('lon'));
   const lat = Number(urlObj.searchParams.get('lat'));
@@ -160,6 +181,41 @@ export function createSurveyServer({ client = new SurveyCadClient(), staticDir =
         }
         const aliquots = await client.loadAliquotsInSection(section, outSR);
         sendJson(res, 200, { section, aliquots });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/subdivision') {
+        const { lon, lat } = parseLonLat(urlObj);
+        const outSR = Number(urlObj.searchParams.get('outSR') || 4326);
+        const subdivision = await client.loadSubdivisionAtPoint(lon, lat, outSR);
+        sendJson(res, 200, { subdivision });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/ros-pdf') {
+        const remoteUrl = parseRemotePdfUrl(urlObj);
+        const pdfResponse = await fetch(remoteUrl, {
+          headers: {
+            Accept: 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.8',
+            'User-Agent': 'survey-cad/1.0',
+          },
+        });
+
+        if (!pdfResponse.ok) {
+          throw new Error(`HTTP ${pdfResponse.status}: ${remoteUrl}`);
+        }
+
+        const contentType = pdfResponse.headers.get('content-type') || 'application/pdf';
+        const contentDisposition = pdfResponse.headers.get('content-disposition');
+        const body = Buffer.from(await pdfResponse.arrayBuffer());
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', contentType);
+        if (contentDisposition) {
+          res.setHeader('Content-Disposition', contentDisposition);
+        }
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.end(body);
         return;
       }
 

@@ -279,3 +279,19 @@ test('lookupByAddress throws clear error when address and geocode both fail', as
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('loadSubdivisionAtPoint supports outSR override', async () => {
+  const { server, port, requests } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+  });
+
+  try {
+    const subdivision = await client.loadSubdivisionAtPoint(-116.2, 43.61, 2243);
+    assert.equal(subdivision.attributes.NAME, 'polygon');
+    assert.ok(requests.some((r) => r.includes('/18/query') && r.includes('outSR=2243')));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

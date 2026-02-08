@@ -293,6 +293,28 @@ export class SurveyCadClient {
       .sort((a, b) => a.meters - b.meters);
   }
 
+  async findContainingPolygonWithOutSr(layerId, lon, lat, outSR = 4326, searchMeters = 2000) {
+    const response = await this.arcQuery(layerId, {
+      where: "1=1",
+      geometry: { x: lon, y: lat, spatialReference: { wkid: 4326 } },
+      geometryType: "esriGeometryPoint",
+      spatialRel: "esriSpatialRelIntersects",
+      distance: searchMeters,
+      units: "esriSRUnit_Meter",
+      outFields: "*",
+      returnGeometry: true,
+      outSR,
+    });
+
+    const features = response.features || [];
+    const containing = features.find((f) => pointInPolygon([lon, lat], f.geometry));
+    return containing || features[0] || null;
+  }
+
+  async loadSubdivisionAtPoint(lon, lat, outSR = 4326, searchMeters = 2500) {
+    return this.findContainingPolygonWithOutSr(this.config.layers.subdivisions, lon, lat, outSR, searchMeters);
+  }
+
   async loadSectionAtPoint(lon, lat) {
     const url = arcgisQueryUrl(this.config.blmFirstDivisionLayer, {
       where: "1=1",

@@ -315,7 +315,7 @@
         <div class="h">Map + Results</div>
         <div class="row">
           <button id="btnExportGeo" class="secondary" disabled>Export GeoJSON</button>
-          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports parcel vertices plus aliquot centroids as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Parcel + Aliquots CSV (IDW ft)</button>
+          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports parcel vertices plus aliquot centroids as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Parcel/Subdivision/Aliquot Markers CSV (IDW ft)</button>
         </div>
       </div>
 
@@ -337,8 +337,8 @@
 </div>
 
 <script type="module">
-import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint } from "./src/browser-survey-client.js";
-import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.js";
+import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
+import { buildParcelCsvPNEZD, buildPolygonCornerCsvRowsPNEZD, buildPointMarkerCsvRowsPNEZD } from "./src/ros-export.js";
 
 (() => {
   // -----------------------------
@@ -555,6 +555,54 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
     }
   }
 
+
+
+  function getPolygonCornerMarkers(feature, role, options = {}) {
+    const rings = feature?.geometry?.rings || [];
+    const points = [];
+    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+      const ring = rings[ringIndex] || [];
+      const trimmed = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+        ? ring.slice(0, -1)
+        : ring;
+      for (let vertexIndex = 0; vertexIndex < trimmed.length; vertexIndex++) {
+        const vertex = trimmed[vertexIndex];
+        const x = Number(vertex[0]);
+        const y = Number(vertex[1]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        points.push({
+          east: x,
+          north: y,
+          label: `${role.toUpperCase()}_CORNER R${ringIndex + 1} V${vertexIndex + 1}`,
+          color: options.color || '#ffffff',
+        });
+      }
+    }
+    return points;
+  }
+
+  function drawCornerMarkers(featuresByRole = []) {
+    layers.cornerMarkers.clearLayers();
+    for (const entry of featuresByRole) {
+      const role = entry.role;
+      const featureList = entry.features || [];
+      for (const feature of featureList) {
+        const corners = getPolygonCornerMarkers(feature, role, entry);
+        for (const corner of corners) {
+          const marker = L.circleMarker([corner.north, corner.east], {
+            radius: 3,
+            weight: 1,
+            color: '#101834',
+            fillColor: corner.color,
+            fillOpacity: 0.95,
+          });
+          marker.bindPopup(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}`);
+          layers.cornerMarkers.addLayer(marker);
+        }
+      }
+    }
+  }
+
   // -----------------------------
   // Address parsing
   // -----------------------------
@@ -607,6 +655,7 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
     township: L.layerGroup().addTo(map),
     ros: L.layerGroup().addTo(map),
     aliquots: L.layerGroup().addTo(map),
+    cornerMarkers: L.layerGroup().addTo(map),
   };
 
   function clearMapLayers() {
@@ -635,12 +684,14 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
     addressFeature: null,
     parcelFeature: null,        // displayed (outSR 4326)
     parcelFeature2243: null,    // export geometry (outSR 2243)
+    subdivisionFeature2243: null,
     subdivisionFeature: null,
     sectionFeature: null,
     townshipFeature: null,
     rosFeatures: [],
     aliquotFeatures: [],
     aliquotFeatures2243: [],
+    markerPoints2243: [],
     selectedAliquot: null,
     exportGeoJSON: null,
     lastLonLat: null
@@ -1064,8 +1115,10 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
     $("btnExportParcelCSV").disabled = true;
     state.exportGeoJSON = null;
     state.parcelFeature2243 = null;
+    state.subdivisionFeature2243 = null;
     state.aliquotFeatures = [];
     state.aliquotFeatures2243 = [];
+    state.markerPoints2243 = [];
     state.selectedAliquot = null;
     setSummaryCards([]);
     clearMapLayers();
@@ -1150,6 +1203,12 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
       if (section) drawPolygonFeature(section, layers.section, { style: () => ({ color:"#ffcc66", weight:2, fillOpacity:0.03, dashArray:"6 6" }) }, "Section");
       if (township) drawPolygonFeature(township, layers.township, { style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02, dashArray:"3 8" }) }, "Township");
 
+      drawCornerMarkers([
+        { role: "parcel", features: parcel ? [parcel] : [], color: "#24d18f" },
+        { role: "subdivision", features: subdiv ? [subdiv] : [], color: "#9ab0ff" },
+        { role: "aliquot", features: state.aliquotFeatures || [], color: "#6aa9ff" },
+      ]);
+
       const ros = lookup.ros || [];
       state.rosFeatures = ros;
       log(`ROS near parcel: ${ros.length}`);
@@ -1212,7 +1271,7 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
         const rosCards = ros.slice(0, 10).map((f, idx) => {
           const a = f.attributes || {};
           const pdfs = findPdfLinks(a);
-          const links = pdfs.map(p => `<a target="_blank" rel="noopener" href="${escapeHtml(p.url)}">Open PDF</a> <span class="small">(${escapeHtml(p.key)})</span>`);
+          const links = pdfs.map(p => `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(p.url))}">Open PDF (API)</a> <span class="small">(${escapeHtml(p.key)})</span>`);
           return card(`Record of Survey #${idx+1}`, bestRosLabel(a), summarizeAttrs(a), links);
         });
         cards.push(...rosCards);
@@ -1226,17 +1285,27 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
       $("btnExportGeo").disabled = false;
 
       try {
-        log(`Fetching parcel export geometry in EPSG:${EXPORT_OUT_SR}...`);
+        log(`Fetching parcel/subdivision/aliquot export geometry in EPSG:${EXPORT_OUT_SR}...`);
         state.parcelFeature2243 = await fetchParcelGeometry2243FromPoint(lon, lat);
+        state.subdivisionFeature2243 = await loadSubdivisionAtPoint(lon, lat, EXPORT_OUT_SR);
         state.aliquotFeatures2243 = await fetchAliquotsAtPoint(lon, lat, EXPORT_OUT_SR);
+        const parcelMarkers = state.parcelFeature2243 ? getPolygonCornerMarkers(state.parcelFeature2243, 'parcel') : [];
+        const subdivisionMarkers = state.subdivisionFeature2243 ? getPolygonCornerMarkers(state.subdivisionFeature2243, 'subdivision') : [];
+        const aliquotMarkers = (state.aliquotFeatures2243 || []).flatMap((f) => getPolygonCornerMarkers(f, 'aliquot'));
+        const rosPointMarkers = (state.rosFeatures || [])
+          .map((f, idx) => ({ east: Number(f?.geometry?.x), north: Number(f?.geometry?.y), label: `ROS_POINT ${idx + 1}` }))
+          .filter((m) => Number.isFinite(m.east) && Number.isFinite(m.north));
+        const addrMarker = { east: lon, north: lat, label: 'ADDRESS_POINT' };
+        state.markerPoints2243 = [addrMarker, ...parcelMarkers, ...subdivisionMarkers, ...aliquotMarkers, ...rosPointMarkers];
+
         if (state.parcelFeature2243?.geometry?.rings?.length) {
           $("btnExportParcelCSV").disabled = false;
-          log(`Parcel export geometry ready (IDW ft). Aliquot points ready: ${state.aliquotFeatures2243.length}.`);
+          log(`Export points ready (IDW ft): ${state.markerPoints2243.length} marker point(s).`);
         } else {
           log("Parcel export geometry not available (no rings).", "warn");
         }
       } catch (e) {
-        log(`Parcel/aliquot export geometry fetch failed: ${e.message || e}`, "warn");
+        log(`Parcel/subdivision/aliquot export geometry fetch failed: ${e.message || e}`, "warn");
       }
 
       invalidateMapSoon("lookup complete");
@@ -1263,8 +1332,10 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
     state.exportGeoJSON = null;
     state.parcelFeature = null;
     state.parcelFeature2243 = null;
+    state.subdivisionFeature2243 = null;
     state.aliquotFeatures = [];
     state.aliquotFeatures2243 = [];
+    state.markerPoints2243 = [];
     state.selectedAliquot = null;
     state.lastLonLat = null;
     $("pdfFindings").style.display = "none";
@@ -1285,10 +1356,20 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
       }
       // Export order: P,N,E,Z,D and start at point 1.
       const parcelPart = buildParcelCsvPNEZD(state.parcelFeature2243, 1);
-      const aliquotPart = buildAliquotCsvRowsPNEZD(state.aliquotFeatures2243, parcelPart.nextPoint);
-      const csv = `${parcelPart.csv}${aliquotPart.csv}`;
-      downloadText(csv, "parcel_vertices_and_aliquots_idw_ft_pnezd.csv", "text/csv");
-      log(`Exported parcel CSV (PNEZD, IDW ft) with ${aliquotPart.count} aliquot coordinate row(s).`);
+      const subdivisionPart = buildPolygonCornerCsvRowsPNEZD(
+        state.subdivisionFeature2243 ? [state.subdivisionFeature2243] : [],
+        parcelPart.nextPoint,
+        'SUBDIVISION_CORNER'
+      );
+      const aliquotCornerPart = buildPolygonCornerCsvRowsPNEZD(
+        state.aliquotFeatures2243,
+        subdivisionPart.nextPoint,
+        'ALIQUOT_CORNER'
+      );
+      const markerPart = buildPointMarkerCsvRowsPNEZD(state.markerPoints2243, aliquotCornerPart.nextPoint, 'MARKER');
+      const csv = `${parcelPart.csv}${subdivisionPart.csv}${aliquotCornerPart.csv}${markerPart.csv}`;
+      downloadText(csv, "parcel_subdivision_aliquot_markers_idw_ft_pnezd.csv", "text/csv");
+      log(`Exported marker CSV (PNEZD, IDW ft): subdivision corners=${subdivisionPart.count}, aliquot corners=${aliquotCornerPart.count}, markers=${markerPart.count}.`);
     } catch (e) {
       log(`Parcel CSV export failed: ${e.message || e}`, "bad");
       console.error(e);
