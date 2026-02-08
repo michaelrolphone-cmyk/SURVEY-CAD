@@ -5,6 +5,7 @@ import {
   buildPolygonCornerCsvRowsPNEZD,
   buildPointMarkerCsvRowsPNEZD,
   buildUniquePolygonCsvRowsPNEZD,
+  buildRosBoundaryCsvRowsPNEZD,
 } from '../src/ros-export.js';
 
 test('buildParcelCsvPNEZD emits P,N,E,Z,D rows and strips duplicate closing vertex', () => {
@@ -83,4 +84,44 @@ test('buildUniquePolygonCsvRowsPNEZD emits each coordinate once across parcel/su
   assert.equal(lines[0], '1,0.000,0.000,0.000,BOUNDARY_CORNER P1 R1 V1');
   assert.equal(lines[5], '6,20.000,20.000,0.000,BOUNDARY_CORNER SEC 1 R1 V3');
   assert.equal(nextPoint, 7);
+});
+
+test('buildRosBoundaryCsvRowsPNEZD applies simplified codes and optional CP&F notes', () => {
+  const parcel = {
+    geometry: { rings: [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]] },
+  };
+  const subdivision = {
+    geometry: { rings: [[[120, 0], [200, 0], [200, 100], [120, 100], [120, 0]]] },
+  };
+  const section = {
+    geometry: { rings: [[[0, 0], [400, 0], [400, 400], [0, 400], [0, 0]]] },
+  };
+  const aliquots = [
+    {
+      geometry: {
+        rings: [[
+          [100, 100], [200, 100], [200, 200], [100, 200], [100, 100],
+        ]],
+      },
+    },
+  ];
+
+  const notesByCoordinate = new Map([
+    ['200.000000000,200.000000000', 'CPNFS: 1234567...321111...65456'],
+  ]);
+
+  const { csv, count } = buildRosBoundaryCsvRowsPNEZD({
+    parcelFeature2243: parcel,
+    subdivisionFeature2243: subdivision,
+    sectionFeature2243: section,
+    aliquotFeatures2243: aliquots,
+    notesByCoordinate,
+  });
+
+  const lines = csv.trim().split('\n');
+  assert.equal(count, lines.length);
+  assert.match(lines[0], /,COR,$/);
+  assert.ok(lines.some((line) => /,SUB,$/.test(line)), 'should include subdivision code');
+  assert.ok(lines.some((line) => /,16COR,$/.test(line)), 'should classify aliquot corners as 16th corners');
+  assert.ok(lines.some((line) => /,CSECOR,CPNFS: 1234567\.\.\.321111\.\.\.65456$/.test(line)), 'should include CP&F notes for PLSS points');
 });

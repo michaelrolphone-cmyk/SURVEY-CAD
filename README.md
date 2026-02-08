@@ -163,6 +163,8 @@ In PointForge, click **Open in Survey Sketch** after processing points; this ope
 
 `ROS.html` also supports one-click **Export to PointForge** for unique parcel/subdivision/aliquot boundary vertices. The button stores a temporary payload in browser local storage and opens `POINT_TRANSFORMER.HTML?source=ros`, where PointForge auto-loads the incoming CSV points.
 
+`ROS.html` **Export Unique Parcel/Subdivision/Aliquots CSV (IDW ft)** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
+
 `ROS.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
 `ROS.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
 
