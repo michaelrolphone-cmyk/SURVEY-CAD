@@ -2,6 +2,7 @@
 
 This repository includes:
 - A reusable Node.js surveying client in `src/survey-api.js`.
+- A project-file manifest builder in `src/project-file.js` for symbolic archive compilation plans.
 - A CLI in `src/cli.js`.
 - A standalone ROS basis-of-bearing OCR API in `src/ros-ocr-api.js`.
 - A standalone ROS basis-of-bearing CLI in `src/ros-basis-cli.js`.
@@ -105,6 +106,10 @@ curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61&outSR=2243"
 curl "http://localhost:3000/api/subdivision?lon=-116.2&lat=43.61&outSR=2243"
 curl "http://localhost:3000/api/ros-pdf?url=https%3A%2F%2Fexample.com%2Fros.pdf"
+curl "http://localhost:3000/api/project-file/template?projectName=Demo&client=Ada%20County&address=100%20Main%20St%2C%20Boise"
+curl -X POST "http://localhost:3000/api/project-file/compile" \
+  -H "Content-Type: application/json" \
+  -d "{"project":{"projectName":"Demo","client":"Ada County","address":"100 Main St, Boise"}}"
 ```
 
 Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. Geocoding now tries Nominatim first and then automatically falls back to ArcGIS World Geocode when Nominatim fails. `/api/lookup` will still return a successful payload when geocoding fails but the Ada County address layer returns a match (including a fallback query that relaxes directional/suffix filters). If both data sources fail to locate the address, `/api/lookup` returns a clear validation error instead of bubbling an upstream HTTP error.
@@ -206,6 +211,15 @@ Launcher icon mappings now use the shipped PNG assets for core apps:
 - `PointForge` → `/assets/icons/PointForge.png`
 - `LineSmith` → `/assets/icons/LineSmith.png`
 
+### SurveyFoundry project file concept
+
+SurveyFoundry now supports a **project file** manifest that symbolically represents the final downloadable project archive (`.zip`).
+
+- The manifest defines fixed folders: `RoS`, `CP&Fs`, `Point Files`, `Drawings`, `Deeds`, `Plats`, `Invoices`, and `Other`.
+- Each folder stores an indexed list of resource references rather than embedded binaries.
+- At compile time, each reference can be resolved into export files (for example, CP&Fs by instrument number to PDF, or PointForge point sets to CSV) and mapped into an archive plan.
+- The API returns both the generated project file and an archive-entry plan, including unresolved references for later resolver wiring.
+
 ### SurveyFoundry project workflow
 
 `index.html` (SurveyFoundry launcher) now includes a lightweight project manager for RecordQuarry/PointForge/LineSmith workflows:
@@ -246,6 +260,12 @@ node src/cli.js aliquots --lat 43.61 --lon -116.20
 ```
 
 All CLI commands print JSON to stdout.
+
+Generate a symbolic project-file + zip archive plan:
+
+```bash
+node src/cli.js project-file --projectName "Demo" --client "Ada County" --address "100 Main St, Boise" --resource "cpfs|instrument-number|2019-12345|CP&F 2019-12345" --resource "point-files|pointforge-set|set-77|Boundary points"
+```
 
 ## ROS Basis Extractor Standalone App
 

@@ -334,3 +334,51 @@ test('server validates ros pdf URL input', async () => {
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+
+test('server exposes project-file template and compile endpoints', async () => {
+  const app = await startApiServer(new SurveyCadClient());
+
+  try {
+    const resources = encodeURIComponent(JSON.stringify([
+      {
+        folder: 'cpfs',
+        title: 'CP&F Instrument',
+        reference: { type: 'instrument-number', value: 'INST-123' },
+      },
+    ]));
+
+    const templateRes = await fetch(`http://127.0.0.1:${app.port}/api/project-file/template?projectName=Demo&client=Ada&address=100%20Main&resources=${resources}`);
+    assert.equal(templateRes.status, 200);
+    const templatePayload = await templateRes.json();
+    assert.equal(templatePayload.projectFile.project.name, 'Demo');
+    assert.equal(templatePayload.projectFile.folders.find((folder) => folder.key === 'cpfs').index.length, 1);
+
+    const compileRes = await fetch(`http://127.0.0.1:${app.port}/api/project-file/compile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        project: {
+          projectName: 'Compile Test',
+          address: '200 Main St, Boise',
+          resources: [
+            {
+              folder: 'point-files',
+              title: 'Boundary points',
+              reference: { type: 'pointforge-set', value: 'set-100' },
+            },
+          ],
+        },
+      }),
+    });
+    assert.equal(compileRes.status, 200);
+    const compilePayload = await compileRes.json();
+    assert.equal(compilePayload.projectFile.project.name, 'Compile Test');
+    assert.ok(compilePayload.archivePlan.entries.some((entry) => /project-file\.json$/.test(entry.path)));
+    assert.equal(compilePayload.archivePlan.unresolved.length, 1);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});

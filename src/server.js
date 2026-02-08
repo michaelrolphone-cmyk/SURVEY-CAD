@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import SurveyCadClient from './survey-api.js';
 import { createRosOcrApp } from './ros-ocr-api.js';
 import { listApps } from './app-catalog.js';
+import { buildProjectArchivePlan, createProjectFile } from './project-file.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,6 +67,20 @@ function parseLonLat(urlObj) {
     throw new Error('Valid numeric lon and lat query parameters are required.');
   }
   return { lon, lat };
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  const raw = Buffer.concat(chunks).toString('utf8').trim();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error('Request body must be valid JSON.');
+  }
 }
 
 async function serveStaticFile(urlPath, staticDir, res) {
@@ -149,6 +164,18 @@ export function createSurveyServer({
         return;
       }
 
+      if (urlObj.pathname === '/api/project-file/compile') {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
+        const body = await readJsonBody(req);
+        const projectFile = body.projectFile || createProjectFile(body.project || {});
+        const archivePlan = await buildProjectArchivePlan(projectFile);
+        sendJson(res, 200, { projectFile, archivePlan });
+        return;
+      }
+
       if (req.method !== 'GET') {
         sendJson(res, 405, { error: 'Only GET is supported.' });
         return;
@@ -161,6 +188,29 @@ export function createSurveyServer({
 
       if (urlObj.pathname === '/api/apps') {
         sendJson(res, 200, { apps: listApps() });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-file/template') {
+        const resourcesRaw = urlObj.searchParams.get('resources');
+        let resources = [];
+        if (resourcesRaw) {
+          try {
+            const parsed = JSON.parse(resourcesRaw);
+            resources = Array.isArray(parsed) ? parsed : [];
+          } catch {
+            throw new Error('resources must be a JSON array when provided.');
+          }
+        }
+
+        const projectFile = createProjectFile({
+          projectId: urlObj.searchParams.get('projectId') || undefined,
+          projectName: urlObj.searchParams.get('projectName') || undefined,
+          client: urlObj.searchParams.get('client') || undefined,
+          address: urlObj.searchParams.get('address') || undefined,
+          resources,
+        });
+        sendJson(res, 200, { projectFile });
         return;
       }
 
