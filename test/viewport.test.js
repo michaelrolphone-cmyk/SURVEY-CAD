@@ -91,6 +91,14 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
 });
 
 
+test('VIEWPORT.HTML starts desktop marquee selection on primary-button blank-canvas drag', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const additive = e\.shiftKey;/, 'desktop additive window selection should be controlled only by Shift state');
+  assert.match(html, /if \(e\.button === 0\) \{\s*beginDrag\(\{type:"marquee", x0: mouse\.x, y0: mouse\.y, x1: mouse\.x, y1: mouse\.y, additive\}\);/, 'left-clicking blank canvas should always start marquee drag, with additive selection honored when Shift is held');
+});
+
+
 test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected point notes', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
