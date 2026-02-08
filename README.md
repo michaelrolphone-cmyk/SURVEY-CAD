@@ -199,12 +199,12 @@ curl "http://localhost:3000/api/apps"
 
 Current apps in the catalog:
 
-- **SurveyFoundry Launcher** (`index.html`): central launch page for all tools.
-- **LineSmith** (`VIEWPORT.HTML`): point-and-bearing drafting workspace.
-- **RecordQuarry** (`RecordQuarry.html`): address lookup for parcels, sections, ROS, and PDF links.
+- **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
+- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure.
+- **RecordQuarry** (`RecordQuarry.html`): Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.
 - **ROS Basis Extractor** (`ROS_OCR.html`): OCR-based basis-of-bearing extraction from uploaded PDFs.
 - **PLSS + CP&F Explorer** (`CPNF.HTML`): aliquot/corner viewer with Ada County CP&F lookups.
-- **PointForge Transformer** (`POINT_TRANSFORMER.HTML`): NAD83 Idaho West coordinate transform and renumbering helper with one-click handoff to LineSmith imports.
+- **PointForge Transformer** (`POINT_TRANSFORMER.HTML`): Builds the canonical point set (coords + provenance + weights).
 
 ## CLI Commands
 
