@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { extractBasisFromPdf } from './extractor.js';
 
@@ -19,6 +20,10 @@ function parsePositiveInt(input, fallback) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function parseBoolFlag(input) {
+  return String(input || '0') === '1';
 }
 
 export async function createRosOcrApp({ extractor = extractBasisFromPdf, htmlPath = DEFAULT_HTML_PATH } = {}) {
@@ -44,6 +49,43 @@ export async function createRosOcrApp({ extractor = extractBasisFromPdf, htmlPat
     }
   });
 
+  const jobs = new Map();
+
+  app.get('/extract/jobs/:jobId', (req, res) => {
+    const job = jobs.get(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: 'Job not found.' });
+      return;
+    }
+
+    if (job.status === 'completed') {
+      res.status(200).json({
+        jobId: req.params.jobId,
+        status: job.status,
+        request: job.request,
+        ...job.result,
+      });
+      return;
+    }
+
+    if (job.status === 'failed') {
+      res.status(500).json({
+        jobId: req.params.jobId,
+        status: job.status,
+        request: job.request,
+        error: job.error,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      jobId: req.params.jobId,
+      status: job.status,
+      request: job.request,
+      pollAfterMs: 1000,
+    });
+  });
+
   app.post('/extract', upload.single('pdf'), async (req, res) => {
     if (!req.file) {
       res.status(400).json({ error: 'Missing file field "pdf".' });
@@ -51,35 +93,94 @@ export async function createRosOcrApp({ extractor = extractBasisFromPdf, htmlPat
     }
 
     const pdfPath = req.file.path;
+    let runAsync = false;
     try {
-      const allowSlow = String(req.query.allowSlow || '0') === '1';
+      const allowSlow = parseBoolFlag(req.query.allowSlow);
+      runAsync = parseBoolFlag(req.query.async) || allowSlow;
       const requestedMaxPages = parsePositiveInt(req.query.maxPages, DEFAULT_MAX_PAGES);
       const requestedDpi = parsePositiveInt(req.query.dpi, DEFAULT_DPI);
 
       const maxPages = allowSlow ? requestedMaxPages : clamp(requestedMaxPages, 1, DEFAULT_MAX_PAGES);
       const dpi = allowSlow ? requestedDpi : clamp(requestedDpi, 120, DEFAULT_DPI);
 
+      const requestOptions = {
+        allowSlow,
+        requestedMaxPages,
+        requestedDpi,
+        maxPages,
+        dpi,
+      };
+
+      if (runAsync) {
+        const jobId = crypto.randomUUID();
+        jobs.set(jobId, {
+          status: 'queued',
+          request: requestOptions,
+        });
+
+        const statusUrl = `/extract/jobs/${jobId}`;
+        Promise.resolve()
+          .then(() => {
+            const job = jobs.get(jobId);
+            if (job) {
+              jobs.set(jobId, { ...job, status: 'running' });
+            }
+          })
+          .then(async () => {
+            const result = await extractor(pdfPath, {
+              maxPages,
+              dpi,
+              debug: parseBoolFlag(req.query.debug),
+            });
+            jobs.set(jobId, {
+              status: 'completed',
+              request: requestOptions,
+              result: {
+                ...result,
+                request: requestOptions,
+              },
+            });
+          })
+          .catch((e) => {
+            jobs.set(jobId, {
+              status: 'failed',
+              request: requestOptions,
+              error: String(e?.message || e),
+            });
+          })
+          .finally(async () => {
+            try {
+              await fs.unlink(pdfPath);
+            } catch {}
+          });
+
+        res.status(202).json({
+          jobId,
+          status: 'queued',
+          statusUrl,
+          pollAfterMs: 1000,
+          request: requestOptions,
+        });
+        return;
+      }
+
       const result = await extractor(pdfPath, {
         maxPages,
         dpi,
-        debug: String(req.query.debug || '0') === '1',
+        debug: parseBoolFlag(req.query.debug),
       });
       res.status(200).json({
         ...result,
-        request: {
-          allowSlow,
-          requestedMaxPages,
-          requestedDpi,
-          maxPages,
-          dpi,
-        },
+        request: requestOptions,
       });
     } catch (e) {
       res.status(500).json({ error: String(e?.message || e) });
     } finally {
-      try {
-        await fs.unlink(pdfPath);
-      } catch {}
+      if (!runAsync) {
+        try {
+          await fs.unlink(pdfPath);
+        } catch {}
+      }
     }
   });
 
