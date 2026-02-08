@@ -76,3 +76,17 @@ test('launcher includes SurveyFoundry project manager and RecordQuarry start wor
   assert.match(launcherHtml, /autostart:\s*'1'/, 'project start should request RecordQuarry autostart lookup');
   assert.match(launcherHtml, /start\.textContent\s*=\s*'Start in RecordQuarry'/, 'project list rows should offer RecordQuarry start action');
 });
+
+
+test('launcher project manager is opened from a button and closes after activation/create', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /id="openProjectManagerButton"[^>]*>Choose project<\/button>/, 'launcher home should expose a project picker button');
+  assert.match(launcherHtml, /id="projectModalBackdrop" class="project-modal-backdrop hidden"/, 'project manager should render as hidden modal backdrop initially');
+  assert.match(launcherHtml, /function\s+openProjectManager\(\)\s*\{[\s\S]*projectModalBackdrop\.classList\.remove\('hidden'\);/, 'project picker button should open the manager modal');
+  assert.match(launcherHtml, /function\s+closeProjectManager\(\)\s*\{[\s\S]*projectModalBackdrop\.classList\.add\('hidden'\);/, 'project manager should provide a close helper');
+  assert.match(launcherHtml, /makeActive\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*setActiveProject\(project\.id\);[\s\S]*closeProjectManager\(\);/, 'activating an existing project should return focus to launcher home by closing modal');
+  assert.match(launcherHtml, /createProjectButton\.addEventListener\('click',\s*createProject\);/, 'create action should still be wired from modal');
+  assert.match(launcherHtml, /setActiveProject\(project\.id\);[\s\S]*saveProjects\(\);[\s\S]*renderProjects\(\);[\s\S]*closeProjectManager\(\);/, 'creating a project should auto-activate and close modal');
+  assert.match(launcherHtml, /activeProjectSummary\.textContent\s*=\s*activeProject[\s\S]*'No active project selected\.'/, 'launcher home should show active project summary text');
+});
