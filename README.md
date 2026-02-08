@@ -190,5 +190,6 @@ CLI prints the same JSON payload returned by `/extract`.
 - `ROS.html` now includes BLM aliquot lookup/mapping in the map results panel.
 - ROS cards now link PDFs through `/api/ros-pdf` so PDFs are loaded via this app server.
 - Aliquot cards now also surface any PDF attribute links and route them through `/api/ros-pdf`.
+- Clicking a parcel/subdivision/aliquot corner marker in `ROS.html` now queries nearby Ada County CP&F records and shows CP&F PDF download links (proxied through `/api/ros-pdf`).
 - Subdivision boundary and parcel/subdivision/aliquot corner markers are drawn on the map.
-- Parcel CSV export from `ROS.html` now includes subdivision corners, aliquot corners, and marker rows (address + ROS points + corner markers) in P,N,E,Z,D format (EPSG:2243).
+- Parcel CSV export from `ROS.html` now emits unique boundary points only (parcel + subdivision + containing section), deduplicated to one row per coordinate in P,N,E,Z,D format (EPSG:2243).
