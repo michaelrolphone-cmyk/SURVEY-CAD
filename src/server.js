@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import SurveyCadClient from './survey-api.js';
+import { createRosOcrApp } from './ros-ocr-api.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -118,7 +119,13 @@ async function resolveStaticPath(staticDir, safePath) {
   return currentDir;
 }
 
-export function createSurveyServer({ client = new SurveyCadClient(), staticDir = DEFAULT_STATIC_DIR } = {}) {
+export function createSurveyServer({
+  client = new SurveyCadClient(),
+  staticDir = DEFAULT_STATIC_DIR,
+  rosOcrHandler,
+} = {}) {
+  let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
+
   return createServer(async (req, res) => {
     if (!req.url) {
       sendJson(res, 400, { error: 'Missing request URL.' });
@@ -128,6 +135,19 @@ export function createSurveyServer({ client = new SurveyCadClient(), staticDir =
     const urlObj = new URL(req.url, 'http://localhost');
 
     try {
+      if (urlObj.pathname === '/extract') {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
+        if (!rosOcrHandlerPromise) {
+          rosOcrHandlerPromise = createRosOcrApp();
+        }
+        const app = await rosOcrHandlerPromise;
+        app(req, res);
+        return;
+      }
+
       if (req.method !== 'GET') {
         sendJson(res, 405, { error: 'Only GET is supported.' });
         return;
