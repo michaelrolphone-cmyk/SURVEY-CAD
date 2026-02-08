@@ -22,3 +22,11 @@ test('launcher supports in-iframe app handoff navigation messages', async () => 
   assert.match(launcherHtml, /message\.type\s*!==\s*'survey-cad:navigate-app'/, 'launcher should only process survey-cad handoff events');
   assert.match(launcherHtml, /openApp\(`\$\{file\}\$\{url\.search\}`\)/, 'launcher should navigate iframe app source with query params when handoff is requested');
 });
+
+
+test('launcher includes SurveyFoundry branding in title and header', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /<title>SurveyFoundry Launcher<\/title>/);
+  assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
+});

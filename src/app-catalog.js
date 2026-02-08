@@ -1,8 +1,8 @@
 export const APP_CATALOG = [
   {
     id: 'launcher',
-    name: '943 Surveying Tools',
-    description: 'Central launchpad that links all SURVEY-CAD tools from one start page.',
+    name: 'SurveyFoundry',
+    description: 'Central launchpad that links all SurveyFoundry tools from one start page.',
     entryHtml: 'index.html',
     iconPath: '/assets/icons/launcher.svg',
     color: '#355C7D',
@@ -11,9 +11,9 @@ export const APP_CATALOG = [
   },
   {
     id: 'ros-lookup',
-    name: 'ROS / Parcel Lookup',
+    name: 'RecordQuarry',
     description: 'Address-first lookup app for parcels, sections, ROS records, aliquots, and proxied PDF links.',
-    entryHtml: 'ROS.html',
+    entryHtml: 'RecordQuarry.html',
     iconPath: '/assets/icons/ros-lookup.svg',
     color: '#2A9D8F',
     accent: '#E9F5DB',
@@ -51,7 +51,7 @@ export const APP_CATALOG = [
   },
   {
     id: 'viewport-sketch',
-    name: 'Survey Sketch',
+    name: 'LineSmith',
     description: 'Interactive drafting workspace for points, bearings, and geometry construction workflows.',
     entryHtml: 'VIEWPORT.HTML',
     iconPath: '/assets/icons/viewport-sketch.svg',

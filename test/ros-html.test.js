@@ -2,16 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('ROS.html defines buildExportGeoJSON used by lookup/export flow', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html includes RecordQuarry branding in the document title and header', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /<title>RecordQuarry — Ada County Survey Context Lookup \(Standalone\)<\/title>/, 'RecordQuarry should set branded document title');
+  assert.match(html, /<div class="title">RecordQuarry — Ada County Survey Context Lookup \(Standalone\)<\/div>/, 'RecordQuarry should show branded app header title');
+});
+
+test('RecordQuarry.html defines buildExportGeoJSON used by lookup/export flow', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+buildExportGeoJSON\s*\(/, 'buildExportGeoJSON should be defined');
   assert.match(html, /state\.exportGeoJSON\s*=\s*buildExportGeoJSON\(\)/, 'lookup should assign export data');
   assert.match(html, /downloadJson\(state\.exportGeoJSON,\s*"ada_lookup\.geojson"\)/, 'export button should download generated GeoJSON');
 });
 
-test('ROS.html routes ROS PDF links through API server and exports unique parcel/subdivision/aliquot CSV points', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html routes ROS PDF links through API server and exports unique parcel/subdivision/aliquot CSV points', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /buildRosPdfProxyUrl\(p\.url\)/, 'ROS PDF links should use API proxy URL');
   assert.match(html, /function\s+buildPdfProxyLinks\s*\(/, 'helper should build shared API PDF links for ROS and aliquots');
@@ -24,8 +31,8 @@ test('ROS.html routes ROS PDF links through API server and exports unique parcel
   assert.match(html, /state\.sectionFeature2243\s*=\s*await\s*fetchSectionGeometry2243FromPoint\(lon, lat\)/, 'export lookup should fetch containing section geometry in export SR');
 });
 
-test('ROS.html keeps ROS scoped to containing section and includes popup PDF links', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html keeps ROS scoped to containing section and includes popup PDF links', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+normalizeRosFeatures\s*\(/, 'lookup ROS payloads should normalize feature wrappers');
   assert.match(html, /function\s+filterRosFeaturesForSection\s*\(/, 'ROS should be filtered to containing section geometry');
@@ -37,8 +44,8 @@ test('ROS.html keeps ROS scoped to containing section and includes popup PDF lin
 });
 
 
-test('ROS.html summary cards can center/zoom map for ROS and aliquots and aliquot popups include CP&F links', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html summary cards can center/zoom map for ROS and aliquots and aliquot popups include CP&F links', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+centerMapOnFeature\s*\(/, 'summary card selection should use a shared map centering helper');
   assert.match(html, /onSelect:\s*\(\)\s*=>\s*centerMapOnFeature\(f,\s*layers\.aliquots/, 'aliquot summary cards should center/zoom to selected aliquot');
@@ -55,8 +62,8 @@ test('ROS.html summary cards can center/zoom map for ROS and aliquots and aliquo
 });
 
 
-test('ROS.html loads CP&F PDF links when a corner marker is selected', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html loads CP&F PDF links when a corner marker is selected', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /ADA_CPF_WEBMAP_ITEM_ID/, 'CP&F web map id should be configured');
   assert.match(html, /discoverAdaCpfLayerViaJsonp\(/, 'should discover CP&F layer from Ada web map');
@@ -72,8 +79,8 @@ test('ROS.html loads CP&F PDF links when a corner marker is selected', async () 
 });
 
 
-test('ROS.html can export unique boundary points directly to PointForge', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html can export unique boundary points directly to PointForge', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /id="btnExportPointForge"/, 'ROS should render an Export to PointForge button');
   assert.match(html, /const\s+POINTFORGE_ROS_IMPORT_STORAGE_KEY\s*=\s*"pointforgeRosImport"/, 'ROS should use a stable localStorage key for PointForge handoff');
@@ -84,8 +91,8 @@ test('ROS.html can export unique boundary points directly to PointForge', async 
   assert.match(html, /openLinkedApp\('\/POINT_TRANSFORMER\.HTML\?source=ros'\)/, 'ROS should navigate PointForge using launcher-aware helper');
 });
 
-test('ROS.html shows a busy processing modal while CPNF instrument numbers are gathered for exports', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html shows a busy processing modal while CPNF instrument numbers are gathered for exports', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /id="busyModal"\s+class="busyModal"/, 'ROS should render an export processing modal container');
   assert.match(html, /Gathering CPNF instrument numbers for exported points\./, 'modal copy should explain CPNF instrument gathering progress');
@@ -98,8 +105,8 @@ test('ROS.html shows a busy processing modal while CPNF instrument numbers are g
 
 
 
-test('ROS.html renders Summary in the left control panel between PDF upload and Diagnostics', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html renders Summary in the left control panel between PDF upload and Diagnostics', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   const leftPanelMatch = html.match(/<!-- LEFT -->[\s\S]*?<\/div>\s*<\/div>\s*\n\n\s*<!-- RIGHT -->/);
   assert.ok(leftPanelMatch, 'left panel markup should be present');
@@ -114,8 +121,8 @@ test('ROS.html renders Summary in the left control panel between PDF upload and 
   assert.doesNotMatch(html, /class="summaryPanel"/, 'right map panel should no longer include a separate summary panel block');
 });
 
-test('ROS.html does not render internal CORS/map-fix commentary text', async () => {
-  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+test('RecordQuarry.html does not render internal CORS/map-fix commentary text', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.doesNotMatch(html, /Map not displaying fix:/, 'ROS should not show internal map debug commentary');
   assert.doesNotMatch(html, /Automatic PDF download is usually blocked by CORS\./, 'ROS should not show internal CORS commentary in upload section');

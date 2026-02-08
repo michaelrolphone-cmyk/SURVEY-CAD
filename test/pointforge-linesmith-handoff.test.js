@@ -2,20 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('POINT_TRANSFORMER.HTML exposes Open in Survey Sketch handoff controls', async () => {
+test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /id="btnOpenSurveySketch"/, 'PointForge should render the Survey Sketch handoff button');
-  assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"surveySketchPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
+  assert.match(html, /id="btnOpenLineSmith"/, 'PointForge should render the LineSmith handoff button');
+  assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app"[\s\S]*path,/, 'PointForge should notify launcher iframe host to navigate embedded app');
-  assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate Survey Sketch using launcher-aware helper');
-  assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into Survey Sketch code field');
-  assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into Survey Sketch notes field');
-  assert.match(html, /const\s+handoffX\s*=\s*swapXY\s*\?\s*y\s*:\s*x\s*;/, 'PointForge should map handoff X to the state-plane easting used by Survey Sketch');
-  assert.match(html, /const\s+handoffY\s*=\s*swapXY\s*\?\s*x\s*:\s*y\s*;/, 'PointForge should map handoff Y to the state-plane northing used by Survey Sketch');
+  assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate LineSmith using launcher-aware helper');
+  assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into LineSmith code field');
+  assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into LineSmith notes field');
+  assert.match(html, /const\s+handoffX\s*=\s*swapXY\s*\?\s*y\s*:\s*x\s*;/, 'PointForge should map handoff X to the state-plane easting used by LineSmith');
+  assert.match(html, /const\s+handoffY\s*=\s*swapXY\s*\?\s*x\s*:\s*y\s*;/, 'PointForge should map handoff Y to the state-plane northing used by LineSmith');
   assert.match(html, /rows\.push\(\[number, handoffX, handoffY, z, code, notes\]\)/, 'PointForge should preserve handoff coordinates and metadata without additional normalization');
-  assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for Survey Sketch map alignment');
+  assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for LineSmith map alignment');
   assert.match(html, /georeference:\s*\{[\s\S]*type:\s*"idaho-state-plane-usft"[\s\S]*zone,[\s\S]*swapXY,[\s\S]*points:\s*georeferencePoints/, 'PointForge handoff payload should include georeference metadata and sample points');
   assert.match(html, /georeferencePoints\.push\(\{\s*x:\s*handoffX,\s*y:\s*handoffY,\s*lat,\s*lng:\s*lon\s*\}\)/, 'PointForge georeference samples should be keyed to the exact handoff coordinates');
 });
@@ -23,12 +23,12 @@ test('POINT_TRANSFORMER.HTML exposes Open in Survey Sketch handoff controls', as
 test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /const\s+POINTFORGE_IMPORT_STORAGE_KEY\s*=\s*"surveySketchPointforgeImport"/, 'Survey Sketch should read the same handoff localStorage key');
-  assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'Survey Sketch should define PointForge import bootstrap logic');
-  assert.match(html, /params\.get\("source"\)\s*!==\s*"pointforge"/, 'Survey Sketch import bootstrap should be gated by query param');
-  assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'Survey Sketch should reuse CSV import pipeline for PointForge payloads');
-  assert.match(html, /const\s+aligned\s*=\s*syncViewToGeoreference\(payload\)/, 'Survey Sketch should apply georeference alignment when PointForge provides it');
-  assert.match(html, /if \(aligned && mapLayerState\.enabled\) \{[\s\S]*syncMapToView\(true\);/, 'Survey Sketch should refresh map view after georeference alignment when map layer is enabled');
+  assert.match(html, /const\s+POINTFORGE_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'LineSmith should read the same handoff localStorage key');
+  assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'LineSmith should define PointForge import bootstrap logic');
+  assert.match(html, /params\.get\("source"\)\s*!==\s*"pointforge"/, 'LineSmith import bootstrap should be gated by query param');
+  assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'LineSmith should reuse CSV import pipeline for PointForge payloads');
+  assert.match(html, /const\s+aligned\s*=\s*syncViewToGeoreference\(payload\)/, 'LineSmith should apply georeference alignment when PointForge provides it');
+  assert.match(html, /if \(aligned && mapLayerState\.enabled\) \{[\s\S]*syncMapToView\(true\);/, 'LineSmith should refresh map view after georeference alignment when map layer is enabled');
 });
 
 

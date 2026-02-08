@@ -118,7 +118,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();
     assert.equal(appsPayload.apps.length, 6);
-    assert.equal(appsPayload.apps[0].name, '943 Surveying Tools');
+    assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/launcher\.svg$/i);
 
     const lookupRes = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('100 Main St, Boise')}`);
@@ -146,7 +146,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(rosPdfRes.status, 200);
     assert.match(rosPdfRes.headers.get('content-type') || '', /application\/pdf/i);
 
-    const staticRes = await fetch(`http://127.0.0.1:${app.port}/ROS.html`);
+    const staticRes = await fetch(`http://127.0.0.1:${app.port}/RecordQuarry.html`);
     assert.equal(staticRes.status, 200);
     const html = await staticRes.text();
     assert.match(html, /<html/i);
@@ -160,7 +160,7 @@ test('server exposes survey APIs and static html', async () => {
     const launcherRes = await fetch(`http://127.0.0.1:${app.port}/`);
     assert.equal(launcherRes.status, 200);
     const launcherHtml = await launcherRes.text();
-    assert.match(launcherHtml, /SURVEY CAD Launcher/i);
+    assert.match(launcherHtml, /SurveyFoundry Launcher/i);
     assert.match(launcherHtml, /api\/apps/);
     assert.match(launcherHtml, /app-icon/);
 
