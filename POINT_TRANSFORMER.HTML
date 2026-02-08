@@ -390,6 +390,30 @@
       color: var(--text);
       font-size: 11px;
     }
+    .toggleRow{ margin-top: 10px; display:flex; justify-content:flex-end; }
+    .pointsTableWrap{
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:12px;
+      overflow:hidden;
+      background: rgba(5,7,11,.75);
+      max-height: 300px;
+      display:none;
+      flex-direction:column;
+    }
+    .pointsTableWrap.active{ display:flex; }
+    .pointsTableScroll{ overflow:auto; }
+    .pointsTable{ width:100%; border-collapse:collapse; font-size:12px; }
+    .pointsTable th, .pointsTable td{ padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.09); text-align:left; white-space:nowrap; }
+    .pointsTable thead th{ position:sticky; top:0; background: rgba(9,12,18,.95); color: var(--muted); }
+    .pointsTable input{
+      width:100%;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(8,10,16,.75);
+      color: var(--text);
+      border-radius:8px;
+      padding:6px;
+      font-size:12px;
+    }
   </style>
 </head>
 
@@ -435,6 +459,19 @@
 
         <label for="inText">Raw points</label>
         <textarea id="inText" spellcheck="false" placeholder="Paste points here... (no sample data loaded)"></textarea>
+        <div class="toggleRow">
+          <button id="btnToggleInputView" class="btn secondary" type="button">Switch to Point Editor View</button>
+        </div>
+        <div id="inputTableWrap" class="pointsTableWrap" aria-hidden="true">
+          <div class="pointsTableScroll">
+            <table class="pointsTable">
+              <thead>
+                <tr><th>#</th><th>X</th><th>Y</th><th>Z</th><th>Code</th><th>Notes</th></tr>
+              </thead>
+              <tbody id="inputPointsBody"></tbody>
+            </table>
+          </div>
+        </div>
 
         <div class="row" style="margin-top:10px;">
           <button id="btnProcess" class="btn">Process</button>
@@ -533,6 +570,16 @@
         <div class="panelbody">
           <label for="outText">Transformed points</label>
           <textarea id="outText" spellcheck="false" readonly></textarea>
+          <div id="outputTableWrap" class="pointsTableWrap" aria-hidden="true">
+            <div class="pointsTableScroll">
+              <table class="pointsTable">
+                <thead>
+                  <tr><th>#</th><th>X</th><th>Y</th><th>Z</th><th>Code</th><th>Notes</th></tr>
+                </thead>
+                <tbody id="outputPointsBody"></tbody>
+              </table>
+            </div>
+          </div>
           <div class="hint">Download saves exactly what you see here.</div>
         </div>
       </section>
@@ -936,12 +983,99 @@
 
     const SURVEY_SKETCH_IMPORT_STORAGE_KEY = "lineSmithPointforgeImport";
     const ROS_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeRosImport";
+    const PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeProjectBrowserImport";
     const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
     const POINTFORGE_POINT_SET_STORAGE_PREFIX = "pointforgePointSet";
 
     let latestOutputText = "";
     let latestTransformed = null;
     let currentImportContext = null;
+    let usePointEditorView = false;
+
+    const elInputTableWrap = document.getElementById("inputTableWrap");
+    const elOutputTableWrap = document.getElementById("outputTableWrap");
+    const elInputPointsBody = document.getElementById("inputPointsBody");
+    const elOutputPointsBody = document.getElementById("outputPointsBody");
+    const elToggleInputView = document.getElementById("btnToggleInputView");
+
+    function parsePointRows(text){
+      const lines = String(text || "").split(/\r?\n/);
+      const rows = [];
+      for (const line of lines){
+        if (!line.trim()) continue;
+        const fields = parseCSVLine(line);
+        if (fields.length < 4) continue;
+        rows.push({
+          number: trimOrEmpty(fields[0]),
+          x: trimOrEmpty(fields[1]),
+          y: trimOrEmpty(fields[2]),
+          z: trimOrEmpty(fields[3]),
+          code: trimOrEmpty(fields[4]),
+          notes: trimOrEmpty(fields[5]),
+        });
+      }
+      return rows;
+    }
+
+    function rowsToCsv(rows){
+      return rows
+        .map((row)=>[
+          csvEscape(row.number), csvEscape(row.x), csvEscape(row.y), csvEscape(row.z), csvEscape(row.code), csvEscape(row.notes)
+        ].join(","))
+        .join("\n");
+    }
+
+    function renderPointRows(rows, tbody, editable){
+      tbody.innerHTML = "";
+      if (!rows.length){
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="6" class="muted">No points to display.</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+      rows.forEach((row, idx)=>{
+        const tr = document.createElement("tr");
+        const cells = ["number", "x", "y", "z", "code", "notes"];
+        for (const key of cells){
+          const td = document.createElement("td");
+          if (editable){
+            const input = document.createElement("input");
+            input.value = row[key] || "";
+            input.dataset.index = String(idx);
+            input.dataset.field = key;
+            input.addEventListener("input", (event)=>{
+              const target = event.target;
+              rows[Number(target.dataset.index)][target.dataset.field] = target.value;
+              elIn.value = rowsToCsv(rows);
+              if (elAuto.checked) processNow();
+            });
+            td.appendChild(input);
+          } else {
+            td.textContent = row[key] || "";
+          }
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      });
+    }
+
+    function refreshPointEditorTables(){
+      if (!usePointEditorView) return;
+      renderPointRows(parsePointRows(elIn.value), elInputPointsBody, true);
+      renderPointRows(parsePointRows(elOut.value), elOutputPointsBody, false);
+    }
+
+    function setPointEditorView(enabled){
+      usePointEditorView = !!enabled;
+      elIn.style.display = usePointEditorView ? "none" : "block";
+      elOut.style.display = usePointEditorView ? "none" : "block";
+      elInputTableWrap.classList.toggle("active", usePointEditorView);
+      elOutputTableWrap.classList.toggle("active", usePointEditorView);
+      elInputTableWrap.setAttribute("aria-hidden", usePointEditorView ? "false" : "true");
+      elOutputTableWrap.setAttribute("aria-hidden", usePointEditorView ? "false" : "true");
+      elToggleInputView.textContent = usePointEditorView ? "Switch to Textarea View" : "Switch to Point Editor View";
+      if (usePointEditorView) refreshPointEditorTables();
+    }
 
     let map = null;
     let layer = null;
@@ -1309,6 +1443,7 @@
 
       elOut.value = res.outputText;
       elLog.textContent = res.logText;
+      refreshPointEditorTables();
 
       const plotted = refreshMap(res.recordsSorted);
       setStats(res.stats, plotted);
@@ -1326,6 +1461,7 @@
       elIn.value = text;
       persistPointSetToProjectFile({ kind: "import", text, context, timestamp: new Date() });
       processNow();
+      refreshPointEditorTables();
     });
 
     // Manual process
@@ -1334,10 +1470,13 @@
     // Auto-process (debounced)
     let t = null;
     elIn.addEventListener("input", ()=>{
+      refreshPointEditorTables();
       if (!elAuto.checked) return;
       if (t) clearTimeout(t);
       t = setTimeout(()=>processNow(), 250);
     });
+
+    elToggleInputView.addEventListener("click", ()=>setPointEditorView(!usePointEditorView));
 
     // Re-render map when settings change (does not alter output)
     elZone.addEventListener("change", ()=>{
@@ -1441,9 +1580,42 @@
       }
     }
 
+    function tryImportProjectBrowserPayload(){
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("source") !== "project-browser") return false;
+
+      const raw = localStorage.getItem(PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY);
+      if (!raw) return false;
+
+      try {
+        const payload = JSON.parse(raw);
+        if (!payload?.csv || !String(payload.csv).trim()){
+          localStorage.removeItem(PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY);
+          return false;
+        }
+        const title = normalizeBaseName(payload.title, "Project Browser Point File");
+        currentImportContext = {
+          sourceType: "project-browser",
+          sourceLabel: title,
+          baseName: title,
+          extension: ".csv",
+        };
+        elIn.value = String(payload.csv);
+        persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context: currentImportContext, timestamp: new Date() });
+        processNow();
+        refreshPointEditorTables();
+        localStorage.removeItem(PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY);
+        return true;
+      } catch {
+        localStorage.removeItem(PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY);
+        return false;
+      }
+    }
+
     // Init: blank textarea (no sample data), locked defaults already set in HTML
     initMap();
     elIn.value = "";
+    setPointEditorView(false);
     setBasemap("street");
     setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
     elMapHint.textContent = "Load a file or paste points to plot. Basemap toggle: Street / Satellite.";
@@ -1455,6 +1627,7 @@
       }
     });
     tryImportRosPayload();
+    tryImportProjectBrowserPayload();
   </script>
 </body>
 </html>

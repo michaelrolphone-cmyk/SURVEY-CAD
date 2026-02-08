@@ -178,6 +178,15 @@ PointForge export now performs CP&F lookups for aliquot/section (PLSS) corners b
 When launched with an active project, RecordQuarry also updates a project-file snapshot in browser local storage (`surveyfoundryProjectFile:<projectId>`), adding all discovered CP&F instrument references into the `CP&Fs` folder and recording the outgoing PointForge CSV handoff in `Point Files`.
 When launched with an active project, PointForge now also writes imported and exported point sets into the project file `Point Files` folder as local-storage-backed resources. Uploaded imports keep the source filename, pasted imports prompt for a name, ROS imports are labeled as exported from RecordQuarry, edited exports append `Edited` to the import-derived filename, and imports/exports append a date token (`M D YY`) when the base name does not already include one.
 `PROJECT_BROWSER.html` now prefers the persisted in-browser project-file snapshot (`surveyfoundryProjectFile:<projectId>`) so CP&Fs and Point Files added during Quarry → Forge → Smith workflows appear immediately; it falls back to `/api/project-file/template` only when no stored snapshot exists.
+Point-file rows in `PROJECT_BROWSER.html` now include **Open in PointForge**, which stores the selected local-storage-backed point file and navigates to `POINT_TRANSFORMER.HTML?source=project-browser` so PointForge auto-loads that point set into input.
+PointForge also now includes a **Switch to Point Editor View** toggle that swaps input/output textareas for a LineSmith-style tabular point editor/read-only output table (`#`, `X`, `Y`, `Z`, `Code`, `Notes`) while keeping transform processing behavior unchanged.
+
+Project Browser → PointForge deep-link command:
+
+```bash
+npm start
+open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&activeProjectName=Demo%20Project"
+```
 
 `RecordQuarry.html` **Export CSV** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
 
