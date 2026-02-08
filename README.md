@@ -259,10 +259,13 @@ Current apps in the catalog:
 - **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
 - **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure.
 - **RecordQuarry** (`RecordQuarry.html`): Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.
-- **ROS Basis Extractor** (`ROS_OCR.html`): OCR-based basis-of-bearing extraction from uploaded PDFs.
-- **PLSS + CP&F Explorer** (`CPNF.HTML`): aliquot/corner viewer with Ada County CP&F lookups.
 - **Project Browser** (`PROJECT_BROWSER.html`): Browse a symbolic SurveyFoundry project-file folder tree as a standalone app.
 - **PointForge Transformer** (`POINT_TRANSFORMER.HTML`): Builds the canonical point set (coords + provenance + weights).
+
+Experimental apps:
+
+- **ROS Basis Extractor** (`ROS_OCR.html`): OCR-based basis-of-bearing extraction from uploaded PDFs.
+- **PLSS + CP&F Explorer** (`CPNF.HTML`): aliquot/corner viewer with Ada County CP&F lookups.
 
 ## CLI Commands
 

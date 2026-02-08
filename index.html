@@ -224,6 +224,20 @@
       color: var(--muted);
     }
 
+    .app-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .app-section-title {
+      margin: 0 0 0.5rem;
+      font-size: 0.9rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
     .app-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -381,7 +395,7 @@
           </div>
         </div>
       </div>
-      <div class="app-grid" id="appGrid"></div>
+      <div class="app-sections" id="appSections"></div>
     </section>
 
     <section class="viewer hidden" id="viewerView" aria-label="Embedded app viewer">
@@ -404,7 +418,7 @@
 
     const homeView = document.getElementById('homeView');
     const viewerView = document.getElementById('viewerView');
-    const appGrid = document.getElementById('appGrid');
+    const appSections = document.getElementById('appSections');
     const appSelect = document.getElementById('appSelect');
     const appFrame = document.getElementById('appFrame');
     const backButton = document.getElementById('backButton');
@@ -578,24 +592,50 @@
       footerLogoWrap?.classList.add('hidden');
     }
 
+    function createAppCard(app) {
+      const card = document.createElement('button');
+      card.className = 'app-card';
+      card.type = 'button';
+      card.innerHTML = `
+        <img class="app-icon" src="${app.iconPath}" alt="${app.name} icon" loading="lazy" />
+        <div class="app-meta">
+          <strong>${app.name}</strong>
+          <p class="app-description">${app.description || ''}</p>
+        </div>
+      `;
+      card.addEventListener('click', () => openApp(app.entryHtml));
+      return card;
+    }
+
+    function renderAppSection(title, sectionApps) {
+      if (!sectionApps.length) return;
+
+      const section = document.createElement('section');
+      if (title) {
+        const heading = document.createElement('h2');
+        heading.className = 'app-section-title';
+        heading.textContent = title;
+        section.appendChild(heading);
+      }
+
+      const grid = document.createElement('div');
+      grid.className = 'app-grid';
+      sectionApps.forEach((app) => grid.appendChild(createAppCard(app)));
+      section.appendChild(grid);
+      appSections.appendChild(section);
+    }
+
     function renderApps() {
-      appGrid.innerHTML = '';
+      appSections.innerHTML = '';
       appSelect.innerHTML = '';
 
-      apps.forEach((app) => {
-        const card = document.createElement('button');
-        card.className = 'app-card';
-        card.type = 'button';
-        card.innerHTML = `
-          <img class="app-icon" src="${app.iconPath}" alt="${app.name} icon" loading="lazy" />
-          <div class="app-meta">
-            <strong>${app.name}</strong>
-            <p class="app-description">${app.description || ''}</p>
-          </div>
-        `;
-        card.addEventListener('click', () => openApp(app.entryHtml));
-        appGrid.appendChild(card);
+      const stableApps = apps.filter((app) => !app.experimental);
+      const experimentalApps = apps.filter((app) => app.experimental);
 
+      renderAppSection('', stableApps);
+      renderAppSection('Experimental', experimentalApps);
+
+      stableApps.concat(experimentalApps).forEach((app) => {
         const option = document.createElement('option');
         option.value = app.entryHtml;
         option.textContent = app.name;
@@ -656,7 +696,7 @@
     renderProjects();
 
     loadApps().catch((err) => {
-      appGrid.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
+      appSections.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
       console.error(err);
     });
   </script>

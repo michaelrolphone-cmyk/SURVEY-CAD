@@ -45,6 +45,16 @@ test('app catalog publishes updated core app descriptions', () => {
   assert.equal(byName.get('Project Browser'), 'Browse the symbolic project-file folder structure as a standalone app.');
 });
 
+
+test('experimental apps are flagged and sorted after stable apps', () => {
+  const experimentalApps = APP_CATALOG.filter((app) => app.experimental);
+  assert.deepEqual(experimentalApps.map((app) => app.id), ['cpnf-corners', 'ros-ocr']);
+
+  const firstExperimentalIndex = APP_CATALOG.findIndex((app) => app.experimental);
+  assert.ok(firstExperimentalIndex > 0);
+  assert.equal(APP_CATALOG.slice(firstExperimentalIndex).every((app) => app.experimental), true);
+});
+
 test('generated icon files exist for every app', async () => {
   for (const app of APP_CATALOG) {
     const iconFsPath = path.join(rootDir, app.iconPath.replace(/^\//, ''));
