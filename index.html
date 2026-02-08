@@ -278,6 +278,23 @@
       openApp(event.target.value);
     });
 
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin) return;
+
+      const message = event.data;
+      if (!message || message.type !== 'survey-cad:navigate-app' || typeof message.path !== 'string') return;
+
+      const nextPath = message.path.trim();
+      if (!nextPath.startsWith('/')) return;
+
+      const url = new URL(nextPath, window.location.origin);
+      const file = url.pathname.replace(/^\//, '');
+      const hasApp = apps.some((app) => app.entryHtml === file);
+      if (!hasApp) return;
+
+      openApp(`${file}${url.search}`);
+    });
+
     loadApps().catch((err) => {
       appGrid.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
       console.error(err);

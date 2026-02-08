@@ -7,7 +7,9 @@ test('POINT_TRANSFORMER.HTML exposes Open in Survey Sketch handoff controls', as
 
   assert.match(html, /id="btnOpenSurveySketch"/, 'PointForge should render the Survey Sketch handoff button');
   assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"surveySketchPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
-  assert.match(html, /window\.open\("\/VIEWPORT\.HTML\?source=pointforge",\s*"_blank",\s*"noopener,noreferrer"\)/, 'PointForge should open Survey Sketch in a new tab with source flag');
+  assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
+  assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app"[\s\S]*path,/, 'PointForge should notify launcher iframe host to navigate embedded app');
+  assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate Survey Sketch using launcher-aware helper');
 });
 
 test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
