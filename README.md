@@ -113,6 +113,18 @@ curl "http://localhost:3000/cpnf.html"
 
 `/` defaults to `VIEWPORT.HTML`.
 
+
+### ROS standalone tool command
+
+Run the web app and open the ROS helper directly:
+
+```bash
+npm start
+open http://localhost:3000/ROS.html
+```
+
+`ROS.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
+
 ## CLI Commands
 
 Entry: `src/cli.js`

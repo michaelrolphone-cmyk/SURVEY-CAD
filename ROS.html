@@ -936,6 +936,49 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
   // -----------------------------
   // Export helpers
   // -----------------------------
+  function buildExportGeoJSON() {
+    const features = [];
+
+    function pushPolygonFeature(feature, role) {
+      if (!feature?.geometry) return;
+      const geometry = arcPolygonToGeoJSON(feature.geometry);
+      if (!geometry) return;
+      features.push({
+        type: "Feature",
+        properties: {
+          role,
+          ...(feature.attributes || {})
+        },
+        geometry
+      });
+    }
+
+    pushPolygonFeature(state.parcelFeature, "parcel");
+    pushPolygonFeature(state.subdivisionFeature, "subdivision");
+    pushPolygonFeature(state.sectionFeature, "section");
+    pushPolygonFeature(state.townshipFeature, "township");
+
+    for (const feature of state.aliquotFeatures || []) pushPolygonFeature(feature, "aliquot");
+    for (const feature of state.rosFeatures || []) pushPolygonFeature(feature, "ros");
+
+    if (state.lastLonLat) {
+      features.push({
+        type: "Feature",
+        properties: { role: "address_point" },
+        geometry: { type: "Point", coordinates: [state.lastLonLat.lon, state.lastLonLat.lat] }
+      });
+    }
+
+    return {
+      type: "FeatureCollection",
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        count: features.length
+      },
+      features
+    };
+  }
+
   function downloadJson(obj, filename) {
     const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
