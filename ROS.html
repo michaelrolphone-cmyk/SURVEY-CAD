@@ -229,17 +229,6 @@
       .mapWrap{min-height:420px;}
     }
 
-    .summaryPanel{
-      margin:10px;
-      border-radius:12px;
-      flex:0 0 auto;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.03);
-      overflow:hidden;
-    }
-    .summaryPanel .phead{background:rgba(255,255,255,.03);}
-    .summaryPanel .pbody{max-height:280px;}
-
     .busyModal{
       position:fixed;
       inset:0;
@@ -328,6 +317,13 @@
         <div class="hr"></div>
 
         <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
+          <div class="h">Summary</div>
+        </div>
+        <div id="summary" class="list" style="margin-top:10px"></div>
+
+        <div class="hr"></div>
+
+        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
           <div class="h">Diagnostics</div>
         </div>
         <div id="log" class="log" style="margin-top:10px"></div>
@@ -348,13 +344,6 @@
       <div class="pbody rightBody">
         <div class="mapWrap">
           <div id="map"></div>
-        </div>
-
-        <div class="summaryPanel">
-          <div class="phead"><div class="h">Summary</div></div>
-          <div class="pbody" style="padding:12px;overflow:auto">
-            <div id="summary" class="list"></div>
-          </div>
         </div>
       </div>
     </div>

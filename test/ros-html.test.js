@@ -77,6 +77,24 @@ test('ROS.html shows a busy processing modal while CPNF instrument numbers are g
 });
 
 
+
+
+test('ROS.html renders Summary in the left control panel between PDF upload and Diagnostics', async () => {
+  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+
+  const leftPanelMatch = html.match(/<!-- LEFT -->[\s\S]*?<\/div>\s*<\/div>\s*\n\n\s*<!-- RIGHT -->/);
+  assert.ok(leftPanelMatch, 'left panel markup should be present');
+  const leftPanel = leftPanelMatch[0];
+
+  assert.match(leftPanel, /PDF Basis of Bearing \(local upload\)/, 'left panel should include PDF upload section');
+  assert.match(leftPanel, /<div class="h">Summary<\/div>/, 'left panel should include Summary section');
+  assert.match(leftPanel, /<div class="h">Diagnostics<\/div>/, 'left panel should include Diagnostics section');
+  assert.ok(leftPanel.indexOf('PDF Basis of Bearing (local upload)') < leftPanel.indexOf('<div class="h">Summary</div>'), 'Summary should appear below PDF upload section');
+  assert.ok(leftPanel.indexOf('<div class="h">Summary</div>') < leftPanel.indexOf('<div class="h">Diagnostics</div>'), 'Summary should appear above Diagnostics section');
+
+  assert.doesNotMatch(html, /class="summaryPanel"/, 'right map panel should no longer include a separate summary panel block');
+});
+
 test('ROS.html does not render internal CORS/map-fix commentary text', async () => {
   const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
 
