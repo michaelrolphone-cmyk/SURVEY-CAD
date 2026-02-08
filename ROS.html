@@ -315,7 +315,7 @@
         <div class="h">Map + Results</div>
         <div class="row">
           <button id="btnExportGeo" class="secondary" disabled>Export GeoJSON</button>
-          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports unique parcel, subdivision, and section vertices as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Unique Parcel/Subdivision/Section CSV (IDW ft)</button>
+          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports unique parcel, subdivision, and aliquot vertices as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Unique Parcel/Subdivision/Aliquots CSV (IDW ft)</button>
         </div>
       </div>
 
@@ -889,6 +889,7 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     subdivisionFeature: null,
     sectionFeature: null,
     sectionFeature2243: null,
+    aliquotFeatures2243: [],
     townshipFeature: null,
     rosFeatures: [],
     aliquotFeatures: [],
@@ -1070,6 +1071,8 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     });
     const feats = resp?.features || [];
     if (!feats.length) return null;
+
+    if (outSR !== 4326) return feats[0];
 
     const pointXY = [lon, lat];
     const containing = feats.find(f => pointInPolygon(pointXY, f.geometry));
@@ -1304,6 +1307,22 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     return payload?.aliquots || [];
   }
 
+  async function fetchSectionGeometry2243FromPoint(lon, lat) {
+    const section4326 = await findContainingPolygon(LAYERS.sections, lon, lat, 2500, 4326);
+    const objectId = Number(section4326?.attributes?.OBJECTID);
+    if (!Number.isFinite(objectId)) return null;
+
+    const resp = await arcQuery(LAYERS.sections, {
+      where: `OBJECTID=${objectId}`,
+      outFields: '*',
+      returnGeometry: true,
+      outSR: EXPORT_OUT_SR,
+      resultRecordCount: 1,
+    });
+
+    return resp?.features?.[0] || null;
+  }
+
   // -----------------------------
   // PDF Basis of Bearing (upload)
   // -----------------------------
@@ -1359,6 +1378,7 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     state.subdivisionFeature2243 = null;
     state.aliquotFeatures = [];
     state.sectionFeature2243 = null;
+    state.aliquotFeatures2243 = [];
     state.selectedAliquot = null;
     setSummaryCards([]);
     clearMapLayers();
@@ -1432,10 +1452,12 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
 
       try {
         state.aliquotFeatures = await fetchAliquotsAtPoint(lon, lat, 4326);
+        state.aliquotFeatures2243 = await fetchAliquotsAtPoint(lon, lat, EXPORT_OUT_SR);
         drawAliquots(state.aliquotFeatures, section);
         log(`Aliquots loaded: ${state.aliquotFeatures.length}`);
       } catch (e) {
         state.aliquotFeatures = [];
+        state.aliquotFeatures2243 = [];
         log(`Aliquot lookup failed: ${e.message || e}`, "warn");
       }
 
@@ -1492,7 +1514,7 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
         [
           ["Centroid", `${c.y.toFixed(7)}, ${c.x.toFixed(7)}`],
           ["Attrs", `${Object.keys(pAttrs).length} fields`],
-          ["Export", `Unique parcel/subdivision/section CSV in P,N,E,Z,D (EPSG:${EXPORT_OUT_SR}, ID West ftUS)`],
+          ["Export", `Unique parcel/subdivision/aliquots CSV in P,N,E,Z,D (EPSG:${EXPORT_OUT_SR}, ID West ftUS)`],
         ],
         []
       ));
@@ -1533,19 +1555,19 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
       $("btnExportGeo").disabled = false;
 
       try {
-        log(`Fetching parcel/subdivision/section export geometry in EPSG:${EXPORT_OUT_SR}...`);
+        log(`Fetching parcel/subdivision/aliquot export geometry in EPSG:${EXPORT_OUT_SR}...`);
         state.parcelFeature2243 = await fetchParcelGeometry2243FromPoint(lon, lat);
         state.subdivisionFeature2243 = await loadSubdivisionAtPoint(lon, lat, EXPORT_OUT_SR);
-        state.sectionFeature2243 = await findContainingPolygon(LAYERS.sections, lon, lat, 2500, EXPORT_OUT_SR);
+        state.sectionFeature2243 = await fetchSectionGeometry2243FromPoint(lon, lat);
 
         if (state.parcelFeature2243?.geometry?.rings?.length) {
           $("btnExportParcelCSV").disabled = false;
-          log("Export geometry ready (IDW ft): parcel, subdivision, and section vertices.");
+        log("Export geometry ready (IDW ft): parcel, subdivision, and aliquot vertices.");
         } else {
           log("Parcel export geometry not available (no rings).", "warn");
         }
       } catch (e) {
-        log(`Parcel/subdivision/section export geometry fetch failed: ${e.message || e}`, "warn");
+        log(`Parcel/subdivision/aliquot export geometry fetch failed: ${e.message || e}`, "warn");
       }
 
       invalidateMapSoon("lookup complete");
@@ -1575,6 +1597,7 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     state.subdivisionFeature2243 = null;
     state.aliquotFeatures = [];
     state.sectionFeature2243 = null;
+    state.aliquotFeatures2243 = [];
     state.selectedAliquot = null;
     state.lastLonLat = null;
     $("pdfFindings").style.display = "none";
@@ -1597,11 +1620,11 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
       const exportFeatures = [
         state.parcelFeature2243,
         state.subdivisionFeature2243,
-        state.sectionFeature2243,
+        ...(state.aliquotFeatures2243 || []),
       ].filter(Boolean);
       const uniquePart = buildUniquePolygonCsvRowsPNEZD(exportFeatures, 1, 'BOUNDARY_CORNER');
       if (!uniquePart.count) throw new Error('No boundary vertices available to export.');
-      downloadText(uniquePart.csv, "parcel_subdivision_section_unique_points_idw_ft_pnezd.csv", "text/csv");
+      downloadText(uniquePart.csv, "parcel_subdivision_aliquots_unique_points_idw_ft_pnezd.csv", "text/csv");
       log(`Exported unique boundary CSV (PNEZD, IDW ft): points=${uniquePart.count}.`);
     } catch (e) {
       log(`Parcel CSV export failed: ${e.message || e}`, "bad");

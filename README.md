@@ -235,4 +235,4 @@ CLI prints the same JSON payload returned by `/extract`.
 - Clicking a parcel/subdivision/aliquot corner marker in `ROS.html` now queries nearby Ada County CP&F records and shows CP&F PDF download links (proxied through `/api/ros-pdf`).
 - CP&F lookups in `ROS.html` now JSON-encode ArcGIS geometry query parameters and filter returned records to the selected corner radius, preventing section-wide CP&F lists from appearing on each corner popup.
 - Subdivision boundary and parcel/subdivision/aliquot corner markers are drawn on the map.
-- Parcel CSV export from `ROS.html` now emits unique boundary points only (parcel + subdivision + containing section), deduplicated to one row per coordinate in P,N,E,Z,D format (EPSG:2243).
+- Parcel CSV export from `ROS.html` now emits unique boundary points only (parcel + subdivision + section aliquots), deduplicated to one row per coordinate in P,N,E,Z,D format (EPSG:2243).

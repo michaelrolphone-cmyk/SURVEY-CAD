@@ -10,7 +10,7 @@ test('ROS.html defines buildExportGeoJSON used by lookup/export flow', async () 
   assert.match(html, /downloadJson\(state\.exportGeoJSON,\s*"ada_lookup\.geojson"\)/, 'export button should download generated GeoJSON');
 });
 
-test('ROS.html routes ROS PDF links through API server and exports unique parcel/subdivision/section CSV points', async () => {
+test('ROS.html routes ROS PDF links through API server and exports unique parcel/subdivision/aliquot CSV points', async () => {
   const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
 
   assert.match(html, /buildRosPdfProxyUrl\(p\.url\)/, 'ROS PDF links should use API proxy URL');
@@ -19,8 +19,8 @@ test('ROS.html routes ROS PDF links through API server and exports unique parcel
   assert.doesNotMatch(html, /sv\.includes\("\/"\)/, 'relative PDF fields without slash should still be proxied');
   assert.match(html, /drawCornerMarkers\(/, 'corner markers should be drawn on the map');
   assert.match(html, /buildUniquePolygonCsvRowsPNEZD\(/, 'CSV export should use unique polygon vertices');
-  assert.match(html, /parcel_subdivision_section_unique_points_idw_ft_pnezd\.csv/, 'CSV filename should reflect unique parcel/subdivision/section points');
-  assert.match(html, /state\.sectionFeature2243\s*=\s*await\s*findContainingPolygon\(LAYERS\.sections, lon, lat, 2500, EXPORT_OUT_SR\)/, 'export lookup should fetch containing section geometry in export SR');
+  assert.match(html, /parcel_subdivision_aliquots_unique_points_idw_ft_pnezd\.csv/, 'CSV filename should reflect unique parcel/subdivision/aliquot points');
+  assert.match(html, /state\.sectionFeature2243\s*=\s*await\s*fetchSectionGeometry2243FromPoint\(lon, lat\)/, 'export lookup should fetch containing section geometry in export SR');
 });
 
 test('ROS.html keeps ROS scoped to containing section and includes popup PDF links', async () => {
