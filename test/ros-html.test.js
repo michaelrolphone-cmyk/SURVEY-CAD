@@ -128,3 +128,16 @@ test('RecordQuarry.html does not render internal CORS/map-fix commentary text', 
   assert.doesNotMatch(html, /Automatic PDF download is usually blocked by CORS\./, 'ROS should not show internal CORS commentary in upload section');
   assert.doesNotMatch(html, /PDFs require upload \(CORS\)/, 'ROS should not show old CORS warning pill copy');
 });
+
+
+test('RecordQuarry.html restores and saves project lookup snapshots when launched from SurveyFoundry projects', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+PROJECT_LOOKUP_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectLookup"/, 'RecordQuarry should use a stable localStorage prefix for project lookup snapshots');
+  assert.match(html, /function\s+getProjectContext\(\)/, 'RecordQuarry should parse launcher-provided project context from URL params');
+  assert.match(html, /function\s+loadProjectLookupSnapshot\(projectId\)/, 'RecordQuarry should load saved project lookup snapshots');
+  assert.match(html, /function\s+saveProjectLookupSnapshot\(projectId, snapshot\)/, 'RecordQuarry should persist lookup snapshots back to project storage');
+  assert.match(html, /const\s+lookup\s*=\s*options\.lookupPayload\s*\|\|\s*await\s*lookupByAddress\(rawAddr\)/, 'lookup flow should support restoring cached project lookup payloads');
+  assert.match(html, /saveProjectLookupSnapshot\(state\.projectContext\.projectId,\s*\{[\s\S]*lookup,/, 'lookup flow should save the latest lookup payload per project id');
+  assert.match(html, /doLookup\(\{ lookupPayload:\s*snapshot\.lookup \}\)/, 'autostart flow should restore cached lookup payload when project snapshot exists');
+});
