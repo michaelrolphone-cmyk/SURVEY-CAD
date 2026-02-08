@@ -148,6 +148,17 @@
     }
     .status.warn{ border-left-color:var(--warn); }
     .status.ok{ border-left-color:var(--ok); }
+    .inspectorCard{
+      margin-top:8px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:8px;
+      background:#0c0c0c;
+      font-size:11px;
+    }
+    .inspectorRow{ display:flex; justify-content:space-between; gap:8px; margin-bottom:4px; }
+    .inspectorRow:last-child{ margin-bottom:0; }
+    .inspectorRow b{ color:var(--text); }
 
     .canvasWrap{
       position:relative;
@@ -586,6 +597,7 @@
         <button id="deleteSelected" class="danger">Delete Selected</button>
         <button id="clearSelection">Clear Selection</button>
       </div>
+      <div id="lineInspector" class="inspectorCard">Select one line or two points to inspect bearing + distance.</div>
       <div id="status" class="status">Ready.</div>
     </div>
 
@@ -778,6 +790,44 @@
     return `${q1}${d}-${String(m).padStart(2,"0")}-${String(sRound.toFixed(3)).padStart(6,"0")}${q2}`;
   }
 
+  function lineMeasurement(a, b) {
+    if (!a || !b) return null;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const distance = Math.hypot(dx, dy);
+    if (!(distance > EPS)) return null;
+    const az = Math.atan2(dx, dy);
+    return {
+      distance,
+      bearing: azimuthRadToQuadrantString(az),
+      angle: Math.atan2(-(b.y - a.y), b.x - a.x)
+    };
+  }
+
+  function rectsOverlap(a, b, padding = 4) {
+    return !(a.x + a.w + padding <= b.x || b.x + b.w + padding <= a.x || a.y + a.h + padding <= b.y || b.y + b.h + padding <= a.y);
+  }
+
+  function rotatedRectAabb(cx, cy, width, height, angle) {
+    const hw = width / 2;
+    const hh = height / 2;
+    const c = Math.cos(angle);
+    const ss = Math.sin(angle);
+    const pts = [
+      { x: -hw, y: -hh },
+      { x: hw, y: -hh },
+      { x: hw, y: hh },
+      { x: -hw, y: hh }
+    ].map((p) => ({ x: cx + (p.x * c - p.y * ss), y: cy + (p.x * ss + p.y * c) }));
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+
   // -------------------------
   // Geometry helpers
   // -------------------------
@@ -891,6 +941,7 @@
   const hudUndo = $("#hudUndo");
   const hudRedo = $("#hudRedo");
   const selSummary = $("#selSummary");
+  const lineInspector = $("#lineInspector");
   const toolHint = $("#toolHint");
 
   const pointsCount = $("#pointsCount");
@@ -1307,9 +1358,12 @@
 
     drawGrid(W,H);
 
+    const blockedTextRects = [];
+
     // lines
     ctx.lineWidth = 1;
     ctx.strokeStyle = "#fff";
+    const lineLabelCandidates = [];
     for (const ln of lines.values()) {
       const a = points.get(ln.a);
       const b = points.get(ln.b);
@@ -1332,6 +1386,8 @@
         ctx.stroke();
         ctx.restore();
       }
+
+      lineLabelCandidates.push({ a, b, sa, sb });
     }
 
     // highlight selected lines
@@ -1394,17 +1450,60 @@
       ctx.textBaseline = "middle";
 
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(String(p.num), sp.x + 8, sp.y - 10);
+      const numText = String(p.num);
+      ctx.fillText(numText, sp.x + 8, sp.y - 10);
+      blockedTextRects.push({ x: sp.x + 8, y: sp.y - 16, w: ctx.measureText(numText).width, h: 12 });
 
       if (labelVisibility.codes && p.code) {
         ctx.fillStyle = "#39ff79";
-        ctx.fillText(String(p.code), sp.x + 8, sp.y + 2);
+        const codeText = String(p.code);
+        ctx.fillText(codeText, sp.x + 8, sp.y + 2);
+        blockedTextRects.push({ x: sp.x + 8, y: sp.y - 4, w: ctx.measureText(codeText).width, h: 12 });
       }
       if (labelVisibility.notes && p.notes) {
         ctx.fillStyle = "#3aa3ff";
-        ctx.fillText(String(p.notes), sp.x + 8, sp.y + 14);
+        const notesText = String(p.notes);
+        ctx.fillText(notesText, sp.x + 8, sp.y + 14);
+        blockedTextRects.push({ x: sp.x + 8, y: sp.y + 8, w: ctx.measureText(notesText).width, h: 12 });
       }
     }
+
+    ctx.save();
+    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillStyle = "#ffd54a";
+    for (const c of lineLabelCandidates) {
+      const measure = lineMeasurement(c.a, c.b);
+      if (!measure) continue;
+      const label = `${measure.bearing} • ${measure.distance.toFixed(3)}`;
+      const labelW = ctx.measureText(label).width;
+      const dx = c.sb.x - c.sa.x;
+      const dy = c.sb.y - c.sa.y;
+      const pixelLength = Math.hypot(dx, dy);
+      if (pixelLength < labelW + 24) continue;
+
+      let angle = measure.angle;
+      if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
+      const mx = (c.sa.x + c.sb.x) * 0.5;
+      const my = (c.sa.y + c.sb.y) * 0.5;
+      const offset = 11;
+      const nx = -dy / Math.max(pixelLength, EPS);
+      const ny = dx / Math.max(pixelLength, EPS);
+      const cx = mx + nx * offset;
+      const cy = my + ny * offset;
+      const candidateAabb = rotatedRectAabb(cx, cy, labelW + 6, 16, angle);
+      if (blockedTextRects.some((r) => rectsOverlap(r, candidateAabb))) continue;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+
+      blockedTextRects.push(candidateAabb);
+    }
+    ctx.restore();
 
     // highlight selected points
     if (selectedPointIds.length) {
@@ -2830,12 +2929,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   function updateDerivedSelectionInfo() {
     if (lastSelectedLineId && lines.has(lastSelectedLineId)) {
       const ln = lines.get(lastSelectedLineId);
-      const a = points.get(ln.a), b = points.get(ln.b);
-      if (a && b) {
-        const dx = b.x-a.x, dy=b.y-a.y;
-        const L = Math.hypot(dx,dy);
-        const az = Math.atan2(dx, dy);
-        const brg = azimuthRadToQuadrantString(az);
+      const measure = lineMeasurement(points.get(ln.a), points.get(ln.b));
+      if (measure) {
         const baseName = ({
           select:"Select/Move",
           addPoint:"Add Point",
@@ -2844,7 +2939,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
           pointOnLine:"Point on Line",
           pan:"Pan"
         })[tool] ?? tool;
-        toolHint.textContent = `${baseName} — L=${L.toFixed(3)}  ${brg}`;
+        toolHint.textContent = `${baseName} — L=${measure.distance.toFixed(3)}  ${measure.bearing}`;
         return;
       }
     }
@@ -2858,7 +2953,32 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     };
     toolHint.textContent = names[tool] ?? tool;
   }
+
+  function updateLineInspector() {
+    let source = "";
+    let measure = null;
+    if (lastSelectedLineId && lines.has(lastSelectedLineId)) {
+      const ln = lines.get(lastSelectedLineId);
+      measure = lineMeasurement(points.get(ln.a), points.get(ln.b));
+      source = "Selected line";
+    } else if (selectedPointIds.length === 2) {
+      const a = points.get(selectedPointIds[0]);
+      const b = points.get(selectedPointIds[1]);
+      measure = lineMeasurement(a, b);
+      source = "Selected points";
+    }
+
+    if (!measure) {
+      lineInspector.textContent = "Select one line or two points to inspect bearing + distance.";
+      return;
+    }
+    lineInspector.innerHTML =
+      `<div class="inspectorRow"><span>Source</span><b>${source}</b></div>` +
+      `<div class="inspectorRow"><span>Distance</span><b>${measure.distance.toFixed(3)}</b></div>` +
+      `<div class="inspectorRow"><span>Bearing</span><b>${measure.bearing}</b></div>`;
+  }
   setInterval(updateDerivedSelectionInfo, 250);
+  setInterval(updateLineInspector, 250);
 
   // -------------------------
   // Boot

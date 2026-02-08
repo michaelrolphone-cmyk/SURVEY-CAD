@@ -28,3 +28,20 @@ test('VIEWPORT.HTML provides toggles to hide/show point code and notes labels', 
   assert.match(html, /#showPointCodes"\)\.addEventListener\("change"/, 'code visibility toggle should be wired to change events');
   assert.match(html, /#showPointNotes"\)\.addEventListener\("change"/, 'notes visibility toggle should be wired to change events');
 });
+
+
+test('VIEWPORT.HTML renders conditional line labels and avoids text collisions', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+lineLabelCandidates\s*=\s*\[\]/, 'draw loop should gather line label candidates');
+  assert.match(html, /if \(pixelLength < labelW \+ 24\) continue;/, 'line labels should only draw when the label can fit beside the line');
+  assert.match(html, /blockedTextRects\.some\(\(r\) => rectsOverlap\(r, candidateAabb\)\)/, 'line labels should skip drawing when they overlap existing text bounds');
+});
+
+test('VIEWPORT.HTML includes line inspector card for selected line or two points', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="lineInspector"\s+class="inspectorCard"/, 'selection panel should include the line inspector card');
+  assert.match(html, /else if \(selectedPointIds\.length === 2\)/, 'inspector should support computing measurements from two selected points');
+  assert.match(html, /lineInspector\.innerHTML\s*=\s*[\s\S]*Distance[\s\S]*Bearing/, 'inspector should render distance and bearing rows');
+});
