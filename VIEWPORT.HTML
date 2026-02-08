@@ -3193,6 +3193,26 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       mobileInteraction.longPressTimer = window.setTimeout(() => {
         if (!mobileInteraction.pointerDown || mobileInteraction.moved) return;
         updateMouseFromEvent(e);
+        if (tool === "addPoint") {
+          history.push("add point");
+          const num = resolveDesiredPointNumber($("#ptNum").value);
+          const z = parseNum($("#ptZ").value, 0);
+          const code = String($("#ptCode").value || "");
+          const notes = String($("#ptNotes").value || "");
+          const pidNew = addPoint({ num, x: mouse.wx, y: mouse.wy, z, code, notes, movable:false });
+
+          selectedPointIds = [pidNew];
+          selectedPointId = pidNew;
+          selectedLines = [];
+          lastSelectedLineId = null;
+          updatePointEditorFromSelection();
+          clearPointNumberField();
+
+          setStatus(`Added point ${points.get(pidNew).num} at (${fmt(mouse.wx)}, ${fmt(mouse.wy)}).`, "ok");
+          schedulePointsTableRender();
+          touchGesture.mode = "long-press-add";
+          return;
+        }
         const pid = pickPoint(mouse.x, mouse.y, 14);
         const lpick = pid ? null : pickLine(mouse.x, mouse.y, 12);
         if (pid) {

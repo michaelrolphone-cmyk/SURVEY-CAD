@@ -266,7 +266,7 @@ open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&act
 Current apps in the catalog:
 
 - **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
-- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select) with a slide-out tools drawer.
+- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select), plus long-press add-point placement when the Add Point tool is active, with a slide-out tools drawer.
 
 Mobile launch command:
 
