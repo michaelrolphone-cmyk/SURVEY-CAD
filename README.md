@@ -180,6 +180,7 @@ When launched with an active project, PointForge now also writes imported and ex
 `PROJECT_BROWSER.html` now prefers the persisted in-browser project-file snapshot (`surveyfoundryProjectFile:<projectId>`) so CP&Fs and Point Files added during Quarry → Forge → Smith workflows appear immediately; it falls back to `/api/project-file/template` only when no stored snapshot exists.
 Point-file rows in `PROJECT_BROWSER.html` now include **Open in PointForge**, which stores the selected local-storage-backed point file and navigates to `POINT_TRANSFORMER.HTML?source=project-browser` so PointForge auto-loads that point set into input.
 PointForge also now includes a **Switch to Point Editor View** toggle that swaps input/output textareas for a LineSmith-style tabular point editor/read-only output table (`#`, `X`, `Y`, `Z`, `Code`, `Notes`) while keeping transform processing behavior unchanged.
+PointForge now also includes a **Renumber start** control (default `1`) that repacks processed points sequentially in output order from any specified starting number (for example, starting at `1000` to move the set into a new range).
 
 Project Browser → PointForge deep-link command:
 

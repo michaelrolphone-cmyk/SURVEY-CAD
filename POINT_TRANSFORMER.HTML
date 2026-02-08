@@ -211,6 +211,20 @@
     .row{ display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
     label{ font-size: 12px; color: var(--muted); }
     input[type="file"]{ width: 100%; color: var(--muted); }
+    input[type="number"]{
+      width: 110px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(8,10,16,.75);
+      color: var(--text);
+      font-size: 12px;
+    }
+    input[type="number"]:focus{
+      outline: none;
+      border-color: rgba(0,229,255,.35);
+      box-shadow: 0 0 22px rgba(0,229,255,.12);
+    }
 
     textarea{
       width: 100%;
@@ -479,6 +493,11 @@
           <button id="btnOpenLineSmith" class="btn secondary" disabled>Open in LineSmith</button>
 
           <span class="pill">
+            <label for="renumberStart" style="color:var(--text); margin:0;">Renumber start</label>
+            <input id="renumberStart" type="number" min="1" step="1" value="1" />
+          </span>
+
+          <span class="pill">
             <span class="mono">Basemap</span>
             <select id="basemap" style="min-width: 170px;">
               <option value="street" selected>Street</option>
@@ -691,11 +710,14 @@
     // -----------------------------
     // Main transform
     // -----------------------------
-    function transformPoints(text){
+    function transformPoints(text, options = {}){
       const rawLines = text.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
       const records = [];
       const log = [];
       let parsedCount = 0;
+      const renumberStart = Number.isInteger(options.renumberStart) && options.renumberStart > 0
+        ? options.renumberStart
+        : 1;
 
       for (let i=0; i<rawLines.length; i++){
         const line = rawLines[i];
@@ -915,6 +937,12 @@
 
       const passthrough = records.filter(r => r.passthrough).sort((a,b)=>a.idx-b.idx);
 
+      sortable.forEach((r, index)=>{
+        const nextNumber = renumberStart + index;
+        r.newNum = nextNumber;
+        r.fields[0] = String(nextNumber);
+      });
+
       const outLines = [];
       for (const r of sortable) outLines.push(r.fields.map(csvEscape).join(","));
       for (const r of passthrough) outLines.push(r.fields.map(csvEscape).join(","));
@@ -925,6 +953,9 @@
         else if (g.kind === "series") log.push(`  suffix series (${g.key}) -> ${g.block}-${g.block+99}  (${g.count})`);
         else log.push(`  suffix singletons (G${g.suffix}) -> ${g.block}-${g.block+99}  (${g.count})`);
       }
+      log.push(`SEQUENTIAL RENUMBER`);
+      log.push(`  start: ${renumberStart}`);
+      log.push(`  assigned: ${sortable.length}`);
 
       return {
         recordsSorted: sortable,
@@ -972,6 +1003,7 @@
     const elZone = document.getElementById("zone");
     const elShowLabels = document.getElementById("showLabels");
     const elBasemap = document.getElementById("basemap");
+    const elRenumberStart = document.getElementById("renumberStart");
     const elMapHint = document.getElementById("mapHint");
 
     const st_lines = document.getElementById("st_lines");
@@ -1437,7 +1469,10 @@
 
       ensureImportContextForPaste(false);
 
-      const res = transformPoints(input);
+      const parsedStart = Number.parseInt(elRenumberStart.value, 10);
+      const renumberStart = Number.isInteger(parsedStart) && parsedStart > 0 ? parsedStart : 1;
+      elRenumberStart.value = String(renumberStart);
+      const res = transformPoints(input, { renumberStart });
       latestTransformed = res;
       latestOutputText = res.outputText;
 
@@ -1471,6 +1506,12 @@
     let t = null;
     elIn.addEventListener("input", ()=>{
       refreshPointEditorTables();
+      if (!elAuto.checked) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(()=>processNow(), 250);
+    });
+
+    elRenumberStart.addEventListener("input", ()=>{
       if (!elAuto.checked) return;
       if (t) clearTimeout(t);
       t = setTimeout(()=>processNow(), 250);

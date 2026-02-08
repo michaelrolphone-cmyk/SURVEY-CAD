@@ -5,6 +5,12 @@ import { readFile } from 'node:fs/promises';
 test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
 
+
+  assert.match(html, /id="renumberStart"\s+type="number"\s+min="1"\s+step="1"\s+value="1"/, 'PointForge should render a configurable renumber start input defaulting to 1');
+  assert.match(html, /function\s+transformPoints\(text,\s*options\s*=\s*\{\}\)/, 'PointForge transform pipeline should accept renumber options');
+  assert.match(html, /const\s+renumberStart\s*=\s*Number\.isInteger\(options\.renumberStart\)\s*&&\s*options\.renumberStart\s*>\s*0[\s\S]*:\s*1;/, 'PointForge should default renumber start to 1 when no valid value is supplied');
+  assert.match(html, /sortable\.forEach\(\(r,\s*index\)=>\{[\s\S]*const\s+nextNumber\s*=\s*renumberStart\s*\+\s*index;[\s\S]*r\.fields\[0\]\s*=\s*String\(nextNumber\);/, 'PointForge should renumber points sequentially in sorted order from the selected start value');
+  assert.match(html, /const\s+parsedStart\s*=\s*Number\.parseInt\(elRenumberStart\.value,\s*10\);[\s\S]*const\s+renumberStart\s*=\s*Number\.isInteger\(parsedStart\)\s*&&\s*parsedStart\s*>\s*0\s*\?\s*parsedStart\s*:\s*1;/, 'PointForge should sanitize invalid renumber start input back to 1 before processing');
   assert.match(html, /id="btnOpenLineSmith"/, 'PointForge should render the LineSmith handoff button');
   assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
