@@ -206,6 +206,7 @@
     import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource } from './src/project-browser-state.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
+    const ADA_CPF_PDF_BASE = 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/';
 
     const projectLabel = document.getElementById('projectLabel');
     const treeContainer = document.getElementById('treeContainer');
@@ -252,6 +253,35 @@
       if (projectContext.projectId) destination.searchParams.set('projectId', projectContext.projectId);
       if (projectContext.projectName) destination.searchParams.set('projectName', projectContext.projectName);
       openLinkedApp(`${destination.pathname}${destination.search}`);
+    }
+
+    function getCpfPdfUrl(resource) {
+      const reference = resource?.reference || {};
+      const metadata = reference.metadata || {};
+      const metadataPdf = typeof metadata.pdfUrl === 'string' ? metadata.pdfUrl.trim() : '';
+      const instrument = String(reference.value || metadata.instrument || '').trim();
+
+      let remoteUrl = '';
+      if (/^https?:\/\//i.test(metadataPdf)) {
+        remoteUrl = metadataPdf;
+      } else if (instrument) {
+        remoteUrl = `${ADA_CPF_PDF_BASE}${encodeURIComponent(instrument)}.pdf`;
+      }
+
+      if (!remoteUrl) return '';
+
+      const proxyUrl = new URL('/api/ros-pdf', window.location.origin);
+      proxyUrl.searchParams.set('url', remoteUrl);
+      return proxyUrl.toString();
+    }
+
+    function openCpfPdfFromResource(resource) {
+      const pdfUrl = getCpfPdfUrl(resource);
+      if (!pdfUrl) {
+        renderError(`Selected CP&F file could not be opened. Missing instrument number for ${resource?.title || 'resource'}.`);
+        return;
+      }
+      window.open(pdfUrl, '_blank', 'noopener,noreferrer');
     }
 
     function loadActiveProjectContext(activeProjectId) {
@@ -388,6 +418,7 @@
           resource.className = 'file-row';
 
           const canLaunchPointForge = folder.key === 'point-files' && entry?.reference?.type === 'local-storage';
+          const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
 
           if (canLaunchPointForge) {
@@ -410,6 +441,30 @@
             openButton.addEventListener('click', (event) => {
               event.stopPropagation();
               launchPointForgeFromResource(entry, projectContext);
+            });
+            resource.appendChild(openButton);
+          }
+
+          if (canOpenCpfPdf) {
+            resource.classList.add('pointforge-openable');
+            resource.setAttribute('role', 'button');
+            resource.setAttribute('tabindex', '0');
+            resource.title = 'Tap to open this CP&F PDF in a new tab';
+            resource.addEventListener('click', () => openCpfPdfFromResource(entry));
+            resource.addEventListener('keydown', (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              openCpfPdfFromResource(entry);
+            });
+
+            const openButton = document.createElement('button');
+            openButton.type = 'button';
+            openButton.className = 'launch-btn';
+            openButton.textContent = 'Open PDF';
+            openButton.title = 'Opens this CP&F PDF in a new tab';
+            openButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              openCpfPdfFromResource(entry);
             });
             resource.appendChild(openButton);
           }
