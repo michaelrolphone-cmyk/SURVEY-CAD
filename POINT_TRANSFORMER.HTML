@@ -1083,16 +1083,19 @@
 
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
-        rows.push([number, x, y, z, code, notes]);
+        const handoffX = swapXY ? y : x;
+        const handoffY = swapXY ? x : y;
+
+        rows.push([number, handoffX, handoffY, z, code, notes]);
 
         try {
-          const projectedX = swapXY ? y : x;
-          const projectedY = swapXY ? x : y;
+          const projectedX = handoffX;
+          const projectedY = handoffY;
           const ll = proj4(def, "WGS84", [projectedX, projectedY]);
           const lon = ll[0];
           const lat = ll[1];
           if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            georeferencePoints.push({ x, y, lat, lng: lon });
+            georeferencePoints.push({ x: handoffX, y: handoffY, lat, lng: lon });
           }
         } catch (_err) {
           // Ignore malformed coordinates and continue exporting CSV rows.

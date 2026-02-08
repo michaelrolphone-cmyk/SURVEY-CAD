@@ -164,7 +164,7 @@ open http://localhost:3000/POINT_TRANSFORMER.HTML
 ```
 
 In PointForge, click **Open in Survey Sketch** after processing points; this navigates to `VIEWPORT.HTML?source=pointforge` (inside the launcher iframe when embedded, or current tab when standalone) and auto-imports the transformed points via browser local storage.
-PointForge handoff uses `number,x,y,z,code,notes` ordering (code immediately after z, notes immediately after code), preserving both values when importing into Survey Sketch.
+PointForge handoff uses `number,x,y,z,code,notes` ordering (code immediately after z, notes immediately after code), and now writes the exact state-plane drawing coordinates expected by Survey Sketch with no additional normalization at import handoff.
 PointForge handoff payloads now also include georeference metadata (`zone`, `swapXY`, and sampled WGS84 lat/lon pairs) so Survey Sketch can align map zoom/centering to imported state-plane coordinates instead of treating feet values as degrees.
 Survey Sketch now solves a best-fit affine transform from Idaho State Plane West (US-ft) `x/y` to WGS84 `lat/lon` using the sampled PointForge georeference points, then syncs map center + zoom from the drawing extents so panning/zooming tracks imported state-plane geometry correctly on the basemap.
 
