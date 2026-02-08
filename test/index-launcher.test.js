@@ -84,7 +84,10 @@ test('launcher includes SurveyFoundry project manager and RecordQuarry start wor
   assert.match(launcherHtml, /aria-label="RecordQuarry project manager"/, 'launcher should render project manager panel');
   assert.match(launcherHtml, /id="projectName"/, 'launcher should include project name input');
   assert.match(launcherHtml, /id="projectClient"/, 'launcher should include project client input');
+  assert.match(launcherHtml, /id="projectClientContact"/, 'launcher should include project client contact input');
+  assert.match(launcherHtml, /id="projectBillingRate"/, 'launcher should include project billing rate input');
   assert.match(launcherHtml, /id="projectAddress"/, 'launcher should include project address input');
+  assert.match(launcherHtml, /id="projectDescription"/, 'launcher should include project description input');
   assert.match(launcherHtml, /const\s+PROJECT_STORAGE_KEY\s*=\s*'surveyfoundryProjects'/, 'launcher should persist project metadata in localStorage');
   assert.match(launcherHtml, /function\s+openProject\(project\)/, 'launcher should define project start helper');
   assert.match(launcherHtml, /openApp\(`RecordQuarry\.html\?\$\{params\.toString\(\)\}`\)/, 'project start should open RecordQuarry with encoded project query params');
@@ -92,6 +95,23 @@ test('launcher includes SurveyFoundry project manager and RecordQuarry start wor
   assert.match(launcherHtml, /start\.textContent\s*=\s*'Start in RecordQuarry'/, 'project list rows should offer RecordQuarry start action');
 });
 
+
+
+test('launcher project manager supports rename, edit details, and delete actions', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /function\s+renameProject\(projectId\)/, 'launcher should define a rename project helper');
+  assert.match(launcherHtml, /window\.prompt\('Rename project',\s*project\.name\s*\|\|\s*''\)/, 'rename flow should prompt for a new name');
+  assert.match(launcherHtml, /function\s+editProject\(projectId\)/, 'launcher should define an edit details helper');
+  assert.match(launcherHtml, /window\.prompt\('Client contact information',\s*project\.clientContact\s*\|\|\s*''\)/, 'edit flow should include client contact prompt');
+  assert.match(launcherHtml, /window\.prompt\('Billing rate \(USD\/hour\)',\s*project\.billingRate\s*\|\|\s*''\)/, 'edit flow should include billing rate prompt');
+  assert.match(launcherHtml, /window\.prompt\('Project description',\s*project\.description\s*\|\|\s*''\)/, 'edit flow should include description prompt');
+  assert.match(launcherHtml, /function\s+deleteProject\(projectId\)/, 'launcher should define a delete project helper');
+  assert.match(launcherHtml, /function\s+deleteProject\(projectId\)[\s\S]*window\.confirm\(/, 'delete flow should require confirmation');
+  assert.match(launcherHtml, /remove\.textContent\s*=\s*'Delete'/, 'project rows should include delete action');
+  assert.match(launcherHtml, /rename\.textContent\s*=\s*'Rename'/, 'project rows should include rename action');
+  assert.match(launcherHtml, /edit\.textContent\s*=\s*'Edit details'/, 'project rows should include edit-details action');
+});
 
 test('launcher project manager is opened from a button and closes after activation/create', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
@@ -102,6 +122,10 @@ test('launcher project manager is opened from a button and closes after activati
   assert.match(launcherHtml, /function\s+closeProjectManager\(\)\s*\{[\s\S]*projectModalBackdrop\.classList\.add\('hidden'\);/, 'project manager should provide a close helper');
   assert.match(launcherHtml, /makeActive\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*setActiveProject\(project\.id\);[\s\S]*closeProjectManager\(\);/, 'activating an existing project should return focus to launcher home by closing modal');
   assert.match(launcherHtml, /createProjectButton\.addEventListener\('click',\s*createProject\);/, 'create action should still be wired from modal');
+  assert.match(launcherHtml, /const\s+clientContact\s*=\s*projectClientContactInput\.value\.trim\(\);/, 'create flow should read client contact metadata');
+  assert.match(launcherHtml, /const\s+billingRate\s*=\s*projectBillingRateInput\.value\.trim\(\);/, 'create flow should read billing rate metadata');
+  assert.match(launcherHtml, /const\s+description\s*=\s*projectDescriptionInput\.value\.trim\(\);/, 'create flow should read project description metadata');
+  assert.match(launcherHtml, /clientContact,\s*[\s\S]*billingRate,\s*[\s\S]*description,/, 'create flow should persist new metadata fields on saved project');
   assert.match(launcherHtml, /setActiveProject\(project\.id\);[\s\S]*saveProjects\(\);[\s\S]*renderProjects\(\);[\s\S]*closeProjectManager\(\);/, 'creating a project should auto-activate and close modal');
   assert.match(launcherHtml, /activeProjectSummary\.textContent\s*=\s*activeProject[\s\S]*'No active project selected\.'/, 'launcher home should show active project summary text');
   assert.match(launcherHtml, /activeProjectHeader\.textContent\s*=\s*activeProject\s*\?\s*`Active project: \$\{activeProject\.name\}`\s*:\s*'';/, 'launcher header should show active project when selected and clear when none active');

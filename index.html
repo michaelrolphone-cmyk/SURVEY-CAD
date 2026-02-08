@@ -192,13 +192,39 @@
       margin-bottom: 0.7rem;
     }
 
-    .project-grid input {
+    .project-grid input,
+    .project-grid textarea {
       width: 100%;
       background: var(--panel);
       color: var(--text);
       border: 1px solid rgba(148, 163, 184, 0.35);
       border-radius: 8px;
       padding: 0.5rem 0.6rem;
+    }
+
+    .project-grid textarea {
+      resize: vertical;
+      min-height: 84px;
+      grid-column: 1 / -1;
+      font-family: inherit;
+    }
+
+    .project-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.4rem;
+    }
+
+    .danger-button {
+      border-color: rgba(248, 113, 113, 0.5);
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.22);
+    }
+
+    .danger-button:hover {
+      border-color: rgba(248, 113, 113, 0.7);
+      background: rgba(127, 29, 29, 0.3);
     }
 
     .project-list {
@@ -387,8 +413,11 @@
             <p class="subtitle" style="margin-top:0.1rem">Create SurveyFoundry projects for RecordQuarry, PointForge, and LineSmith.</p>
             <div class="project-grid">
               <input id="projectName" type="text" placeholder="Project name" />
-              <input id="projectClient" type="text" placeholder="Client" />
+              <input id="projectClient" type="text" placeholder="Client name" />
+              <input id="projectClientContact" type="text" placeholder="Client contact info" />
+              <input id="projectBillingRate" type="number" min="0" step="0.01" placeholder="Billing rate (USD/hr)" />
               <input id="projectAddress" type="text" placeholder="Address" />
+              <textarea id="projectDescription" placeholder="Project description"></textarea>
             </div>
             <button id="createProjectButton" type="button">Create and activate project</button>
             <div id="projectList" class="project-list"></div>
@@ -425,7 +454,10 @@
     const reloadButton = document.getElementById('reloadButton');
     const projectNameInput = document.getElementById('projectName');
     const projectClientInput = document.getElementById('projectClient');
+    const projectClientContactInput = document.getElementById('projectClientContact');
+    const projectBillingRateInput = document.getElementById('projectBillingRate');
     const projectAddressInput = document.getElementById('projectAddress');
+    const projectDescriptionInput = document.getElementById('projectDescription');
     const createProjectButton = document.getElementById('createProjectButton');
     const projectList = document.getElementById('projectList');
     const openProjectManagerButton = document.getElementById('openProjectManagerButton');
@@ -508,6 +540,55 @@
       openApp(`RecordQuarry.html?${params.toString()}`);
     }
 
+    function renameProject(projectId) {
+      const project = projects.find((entry) => entry.id === projectId);
+      if (!project) return;
+
+      const nextName = window.prompt('Rename project', project.name || '');
+      if (!nextName) return;
+      const trimmedName = nextName.trim();
+      if (!trimmedName) return;
+
+      project.name = trimmedName;
+      project.updatedAt = new Date().toISOString();
+      saveProjects();
+      renderProjects();
+    }
+
+    function editProject(projectId) {
+      const project = projects.find((entry) => entry.id === projectId);
+      if (!project) return;
+
+      const clientContact = window.prompt('Client contact information', project.clientContact || '');
+      if (clientContact === null) return;
+      const billingRate = window.prompt('Billing rate (USD/hour)', project.billingRate || '');
+      if (billingRate === null) return;
+      const description = window.prompt('Project description', project.description || '');
+      if (description === null) return;
+
+      project.clientContact = clientContact.trim();
+      project.billingRate = billingRate.trim();
+      project.description = description.trim();
+      project.updatedAt = new Date().toISOString();
+      saveProjects();
+      renderProjects();
+    }
+
+    function deleteProject(projectId) {
+      const project = projects.find((entry) => entry.id === projectId);
+      if (!project) return;
+      if (!window.confirm(`Delete project \"${project.name}\"? This cannot be undone.`)) return;
+
+      projects = projects.filter((entry) => entry.id !== projectId);
+      if (activeProjectId === projectId) {
+        activeProjectId = null;
+        localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+      }
+
+      saveProjects();
+      renderProjects();
+    }
+
     function renderProjects() {
       const activeProject = getActiveProject();
       activeProjectSummary.textContent = activeProject
@@ -527,7 +608,10 @@
 
         const info = document.createElement('div');
         const activeBadge = project.id === activeProjectId ? ' (active)' : '';
-        info.innerHTML = `<strong>${project.name}${activeBadge}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small>`;
+        const billingRateText = project.billingRate ? `$${project.billingRate}/hr` : 'Rate not set';
+        const clientContactText = project.clientContact || 'No client contact';
+        const descriptionText = project.description || 'No project description';
+        info.innerHTML = `<strong>${project.name}${activeBadge}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small><br/><small>${clientContactText} • ${billingRateText}</small><br/><small>${descriptionText}</small>`;
 
         const start = document.createElement('button');
         start.type = 'button';
@@ -543,9 +627,32 @@
           closeProjectManager();
         });
 
+        const rename = document.createElement('button');
+        rename.type = 'button';
+        rename.textContent = 'Rename';
+        rename.addEventListener('click', () => renameProject(project.id));
+
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.textContent = 'Edit details';
+        edit.addEventListener('click', () => editProject(project.id));
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = 'Delete';
+        remove.className = 'danger-button';
+        remove.addEventListener('click', () => deleteProject(project.id));
+
+        const actions = document.createElement('div');
+        actions.className = 'project-actions';
+        actions.appendChild(start);
+        actions.appendChild(makeActive);
+        actions.appendChild(rename);
+        actions.appendChild(edit);
+        actions.appendChild(remove);
+
         row.appendChild(info);
-        row.appendChild(start);
-        row.appendChild(makeActive);
+        row.appendChild(actions);
         projectList.appendChild(row);
       });
     }
@@ -553,14 +660,20 @@
     function createProject() {
       const name = projectNameInput.value.trim();
       const client = projectClientInput.value.trim();
+      const clientContact = projectClientContactInput.value.trim();
+      const billingRate = projectBillingRateInput.value.trim();
       const address = projectAddressInput.value.trim();
+      const description = projectDescriptionInput.value.trim();
       if (!name || !address) return;
 
       const project = {
         id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name,
         client,
+        clientContact,
+        billingRate,
         address,
+        description,
         createdAt: new Date().toISOString(),
       };
       projects.unshift(project);
@@ -571,7 +684,10 @@
 
       projectNameInput.value = '';
       projectClientInput.value = '';
+      projectClientContactInput.value = '';
+      projectBillingRateInput.value = '';
       projectAddressInput.value = '';
+      projectDescriptionInput.value = '';
     }
 
     function showHome() {
