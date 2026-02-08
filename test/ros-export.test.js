@@ -6,6 +6,8 @@ import {
   buildPointMarkerCsvRowsPNEZD,
   buildUniquePolygonCsvRowsPNEZD,
   buildRosBoundaryCsvRowsPNEZD,
+  buildAliquotSelectionKey,
+  filterAliquotFeaturesForExport,
 } from '../src/ros-export.js';
 
 test('buildParcelCsvPNEZD emits P,N,E,Z,D rows and strips duplicate closing vertex', () => {
@@ -182,4 +184,26 @@ test('buildRosBoundaryCsvRowsPNEZD can omit PLSS-only points without CP&F notes'
   assert.ok(lines.some((line) => /,COR,$/.test(line)), 'should still include parcel points');
   assert.ok(lines.some((line) => /,CSECOR,CPNFS: 1234567$/.test(line)), 'should include CP&F-backed PLSS point');
   assert.ok(lines.every((line) => !/,16COR,$/.test(line)), 'should exclude unbacked PLSS points');
+});
+
+
+test('buildAliquotSelectionKey prefers object identifiers and falls back to labels/index', () => {
+  assert.equal(buildAliquotSelectionKey({ attributes: { OBJECTID: 42 } }, 3), 'oid:42');
+  assert.equal(buildAliquotSelectionKey({ attributes: { ALIQUOT: 'sw' } }, 2), 'label:SW:2');
+  assert.equal(buildAliquotSelectionKey({ attributes: {} }, 5), 'index:5');
+});
+
+test('filterAliquotFeaturesForExport returns only selected aliquots', () => {
+  const features = [
+    { attributes: { OBJECTID: 1 }, geometry: { rings: [[[0,0],[1,0],[1,1],[0,1],[0,0]]] } },
+    { attributes: { OBJECTID: 2 }, geometry: { rings: [[[2,0],[3,0],[3,1],[2,1],[2,0]]] } },
+    { attributes: { ALIQUOT: 'nw' }, geometry: { rings: [[[4,0],[5,0],[5,1],[4,1],[4,0]]] } },
+  ];
+
+  const selected = new Set(['oid:1', 'label:NW:2']);
+  const filtered = filterAliquotFeaturesForExport(features, selected);
+
+  assert.equal(filtered.length, 2);
+  assert.equal(filtered[0].attributes.OBJECTID, 1);
+  assert.equal(filtered[1].attributes.ALIQUOT, 'nw');
 });
