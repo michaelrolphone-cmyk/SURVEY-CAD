@@ -56,10 +56,24 @@ function createMockServer(options = {}) {
     }
 
     if (url.pathname.endsWith('/24/query')) {
+      const where = url.searchParams.get('where') || '';
+      const outSR = url.searchParams.get('outSR');
       res.setHeader('Content-Type', 'application/json');
+      if (/OBJECTID\s*=\s*2\b/.test(where) && outSR === '2243') {
+        res.end(JSON.stringify({
+          features: [{
+            attributes: { OBJECTID: 2, PARCEL: 'R_SECOND' },
+            geometry: { rings: [[[5000,6000],[5100,6000],[5100,6100],[5000,6100],[5000,6000]]] }
+          }]
+        }));
+        return;
+      }
       res.end(JSON.stringify({
         features: [{
-          attributes: { PARCEL: 'R12345' },
+          attributes: { OBJECTID: 1, PARCEL: 'R12345' },
+          geometry: { rings: [[[-116.30,43.50],[-116.28,43.50],[-116.28,43.52],[-116.30,43.52],[-116.30,43.50]]] }
+        }, {
+          attributes: { OBJECTID: 2, PARCEL: 'R_SECOND' },
           geometry: { rings: [[[-116.21,43.60],[-116.19,43.60],[-116.19,43.62],[-116.21,43.62],[-116.21,43.60]]] }
         }]
       }));
@@ -67,9 +81,20 @@ function createMockServer(options = {}) {
     }
 
     if (url.pathname.endsWith('/20/query') || url.pathname.endsWith('/19/query') || url.pathname.endsWith('/18/query')) {
+      const where = url.searchParams.get('where') || '';
+      const outSR = url.searchParams.get('outSR');
       res.setHeader('Content-Type', 'application/json');
+      if (/OBJECTID\s*=\s*22\b/.test(where) && outSR === '2243') {
+        res.end(JSON.stringify({
+          features: [{ attributes: { OBJECTID: 22, NAME: 'polygon' }, geometry: { rings: [[[7000,8000],[7100,8000],[7100,8100],[7000,8100],[7000,8000]]] } }]
+        }));
+        return;
+      }
       res.end(JSON.stringify({
-        features: [{ attributes: { NAME: 'polygon' }, geometry: { rings: [[[-116.3,43.5],[-116.1,43.5],[-116.1,43.7],[-116.3,43.7],[-116.3,43.5]]] } }]
+        features: [
+          { attributes: { OBJECTID: 21, NAME: 'off-target' }, geometry: { rings: [[[-116.40,43.40],[-116.31,43.40],[-116.31,43.49],[-116.40,43.49],[-116.40,43.40]]] } },
+          { attributes: { OBJECTID: 22, NAME: 'polygon' }, geometry: { rings: [[[-116.3,43.5],[-116.1,43.5],[-116.1,43.7],[-116.3,43.7],[-116.3,43.5]]] } }
+        ]
       }));
       return;
     }
@@ -147,6 +172,47 @@ test('pointInPolygon handles holes', () => {
   assert.equal(pointInPolygon([5, 5], geom), false);
 });
 
+
+
+test('findParcelNearPoint selects containing parcel and refetches projected geometry by OBJECTID', async () => {
+  const { server, port, requests } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode`,
+  });
+
+  try {
+    const parcel = await client.findParcelNearPoint(-116.2, 43.61, 2243, 150);
+    assert.equal(parcel.attributes.PARCEL, 'R_SECOND');
+    assert.deepEqual(parcel.geometry.rings[0][0], [5000, 6000]);
+
+    assert.ok(requests.some((r) => r.includes('/24/query') && r.includes('outSR=4326')));
+    assert.ok(requests.some((r) => r.includes('/24/query') && r.includes('where=OBJECTID+%3D+2') && r.includes('outSR=2243')));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('findContainingPolygonWithOutSr selects containing polygon and refetches outSR geometry by OBJECTID', async () => {
+  const { server, port, requests } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode`,
+  });
+
+  try {
+    const section = await client.findContainingPolygonWithOutSr(20, -116.2, 43.61, 2243, 2500);
+    assert.equal(section.attributes.OBJECTID, 22);
+    assert.deepEqual(section.geometry.rings[0][0], [7000, 8000]);
+
+    assert.ok(requests.some((r) => r.includes('/20/query') && r.includes('outSR=4326')));
+    assert.ok(requests.some((r) => r.includes('/20/query') && r.includes('where=OBJECTID+%3D+22') && r.includes('outSR=2243')));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
 test('client lookup, section, and aliquot flows', async () => {
   const { server, port, requests, headers } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
@@ -159,7 +225,7 @@ test('client lookup, section, and aliquot flows', async () => {
 
   try {
     const lookup = await client.lookupByAddress('100 Main St, Boise');
-    assert.equal(lookup.parcel.attributes.PARCEL, 'R12345');
+    assert.equal(lookup.parcel.attributes.PARCEL, 'R_SECOND');
     assert.equal(lookup.ros.length, 1);
     assert.match(headers.geocodeUserAgent || '', /survey-cad\/1\.0/);
 
@@ -229,7 +295,7 @@ test('lookupByAddress falls back to address layer when geocode is unavailable', 
 
   try {
     const lookup = await client.lookupByAddress('100 Main St, Boise');
-    assert.equal(lookup.parcel.attributes.PARCEL, 'R12345');
+    assert.equal(lookup.parcel.attributes.PARCEL, 'R_SECOND');
     assert.equal(lookup.location.lon, -116.2);
     assert.equal(lookup.location.lat, 43.61);
     assert.equal(lookup.geocode, null);
