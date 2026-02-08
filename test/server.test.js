@@ -232,6 +232,34 @@ test('server validates required parameters', async () => {
 });
 
 
+test('server subdivision endpoint falls back to WGS84 when projected outSR lookup fails', async () => {
+  const calls = [];
+  const client = {
+    async loadSubdivisionAtPoint(lon, lat, outSR) {
+      calls.push({ lon, lat, outSR });
+      if (outSR === 2243) {
+        throw new Error('Invalid outSR');
+      }
+      return { attributes: { NAME: 'fallback' }, geometry: { spatialReference: { wkid: 4326 } } };
+    },
+  };
+
+  const app = await startApiServer(client);
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/subdivision?lon=-116.2&lat=43.61&outSR=2243`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.subdivision.attributes.NAME, 'fallback');
+    assert.deepEqual(calls, [
+      { lon: -116.2, lat: 43.61, outSR: 2243 },
+      { lon: -116.2, lat: 43.61, outSR: 4326 },
+    ]);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
 test('server maps upstream HTTP errors to bad gateway', async () => {
   const client = {
     async lookupByAddress() {
