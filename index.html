@@ -32,7 +32,7 @@
 
     header {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0.8rem;
       padding: 1rem 1.2rem;
       border-bottom: 1px solid rgba(148, 163, 184, 0.2);
@@ -43,20 +43,37 @@
       z-index: 2;
     }
 
-    .logo {
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
-      object-fit: cover;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-      background: #000;
-    }
-
     h1 {
       margin: 0;
       font-size: 1.1rem;
       font-weight: 650;
       letter-spacing: 0.01em;
+    }
+
+    .launcher-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      object-fit: contain;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.5);
+      padding: 0.25rem;
+    }
+
+    .footer-logo-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 1.1rem 1rem 1.35rem;
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.72);
+    }
+
+    .footer-logo {
+      width: min(320px, 58vw);
+      max-height: 96px;
+      object-fit: contain;
+      opacity: 0.95;
+      filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
     }
 
     main {
@@ -146,7 +163,7 @@
       transition: background 0.15s ease, transform 0.15s ease;
       display: flex;
       gap: 0.8rem;
-      align-items: center;
+      align-items: flex-start;
     }
 
     .app-card:hover,
@@ -231,7 +248,7 @@
 </head>
 <body>
   <header>
-    <img src="943.png" alt="SurveyFoundry" class="logo" />
+    <img src="/assets/icons/SurveyFoundry.png" alt="SurveyFoundry app icon" class="launcher-icon" />
     <h1>SurveyFoundry App Launcher</h1>
   </header>
 
@@ -262,6 +279,10 @@
       <iframe id="appFrame" title="Standalone app"></iframe>
     </section>
   </main>
+
+  <footer class="footer-logo-wrap" aria-label="SurveyFoundry footer">
+    <img src="943.png" alt="SurveyFoundry logo" class="footer-logo" loading="lazy" />
+  </footer>
 
   <script>
     const apps = [];
