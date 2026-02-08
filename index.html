@@ -97,6 +97,9 @@
       color: var(--text);
       cursor: pointer;
       transition: background 0.15s ease, transform 0.15s ease;
+      display: flex;
+      gap: 0.8rem;
+      align-items: center;
     }
 
     .app-card:hover,
@@ -105,16 +108,27 @@
       transform: translateY(-1px);
     }
 
+    .app-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 10px;
+      object-fit: contain;
+      flex: none;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.5);
+      padding: 0.35rem;
+    }
+
+    .app-meta {
+      min-width: 0;
+    }
+
     .app-card strong {
       display: block;
       font-size: 1rem;
       margin-bottom: 0.2rem;
     }
 
-    .app-card span {
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
 
     .viewer {
       display: flex;
@@ -188,13 +202,7 @@
   </main>
 
   <script>
-    const apps = [
-      { name: 'CPNF', file: 'CPNF.HTML' },
-      { name: 'POINT TRANSFORMER', file: 'POINT_TRANSFORMER.HTML' },
-      { name: 'ROS', file: 'ROS.html' },
-      { name: 'ROS OCR', file: 'ROS_OCR.html' },
-      { name: 'VIEWPORT', file: 'VIEWPORT.HTML' }
-    ];
+    const apps = [];
 
     const homeView = document.getElementById('homeView');
     const viewerView = document.getElementById('viewerView');
@@ -223,19 +231,40 @@
     }
 
     function renderApps() {
+      appGrid.innerHTML = '';
+      appSelect.innerHTML = '';
+
       apps.forEach((app) => {
         const card = document.createElement('button');
         card.className = 'app-card';
         card.type = 'button';
-        card.innerHTML = `<strong>${app.name}</strong><span>${app.file}</span>`;
-        card.addEventListener('click', () => openApp(app.file));
+        card.innerHTML = `
+          <img class="app-icon" src="${app.iconPath}" alt="${app.name} icon" loading="lazy" />
+          <div class="app-meta">
+            <strong>${app.name}</strong>
+          </div>
+        `;
+        card.addEventListener('click', () => openApp(app.entryHtml));
         appGrid.appendChild(card);
 
         const option = document.createElement('option');
-        option.value = app.file;
-        option.textContent = `${app.name} (${app.file})`;
+        option.value = app.entryHtml;
+        option.textContent = app.name;
         appSelect.appendChild(option);
       });
+    }
+
+    async function loadApps() {
+      const response = await fetch('/api/apps');
+      if (!response.ok) {
+        throw new Error(`Failed to load app catalog (${response.status})`);
+      }
+
+      const payload = await response.json();
+      const listedApps = Array.isArray(payload?.apps) ? payload.apps : [];
+
+      apps.splice(0, apps.length, ...listedApps.filter((app) => app?.entryHtml && app.entryHtml.toLowerCase() !== 'index.html'));
+      renderApps();
     }
 
     backButton.addEventListener('click', showHome);
@@ -249,7 +278,10 @@
       openApp(event.target.value);
     });
 
-    renderApps();
+    loadApps().catch((err) => {
+      appGrid.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
+      console.error(err);
+    });
   </script>
 </body>
 </html>
