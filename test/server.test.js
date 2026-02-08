@@ -114,6 +114,13 @@ test('server exposes survey APIs and static html', async () => {
     const healthRes = await fetch(`http://127.0.0.1:${app.port}/health`);
     assert.equal(healthRes.status, 200);
 
+    const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
+    assert.equal(appsRes.status, 200);
+    const appsPayload = await appsRes.json();
+    assert.equal(appsPayload.apps.length, 6);
+    assert.equal(appsPayload.apps[0].name, 'Survey CAD Launcher');
+    assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/launcher\.svg$/i);
+
     const lookupRes = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('100 Main St, Boise')}`);
     assert.equal(lookupRes.status, 200);
     const lookup = await lookupRes.json();

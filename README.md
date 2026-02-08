@@ -14,6 +14,7 @@ npm install
 npm test
 npm run cli -- --help
 npm run ros:cli -- --help
+npm run icons:generate
 npm start
 npm run ros:ocr
 ```
@@ -90,6 +91,7 @@ Base entrypoint: `npm start` (or `node src/server.js`)
 
 ```bash
 curl "http://localhost:3000/health"
+curl "http://localhost:3000/api/apps"
 ```
 
 ### API endpoints
@@ -148,6 +150,30 @@ open http://localhost:3000/ROS.html
 
 `ROS.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
 `ROS.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
+
+
+## App Icons Catalog
+
+Generated app icon SVG files are stored under `assets/icons/` and can be regenerated with:
+
+```bash
+npm run icons:generate
+```
+
+Catalog endpoint:
+
+```bash
+curl "http://localhost:3000/api/apps"
+```
+
+Current apps in the catalog:
+
+- **Survey CAD Launcher** (`index.html`): central launch page for all tools.
+- **Survey Sketch** (`VIEWPORT.HTML`): point-and-bearing drafting workspace.
+- **ROS / Parcel Lookup** (`ROS.html`): address lookup for parcels, sections, ROS, and PDF links.
+- **ROS Basis Extractor** (`ROS_OCR.html`): OCR-based basis-of-bearing extraction from uploaded PDFs.
+- **PLSS + CP&F Explorer** (`CPNF.HTML`): aliquot/corner viewer with Ada County CP&F lookups.
+- **PointForge Transformer** (`POINT_TRANSFORMER.HTML`): NAD83 Idaho West coordinate transform and renumbering helper.
 
 ## CLI Commands
 
