@@ -8,6 +8,18 @@ import { extractBasisFromPdf } from './extractor.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_HTML_PATH = path.resolve(__dirname, '..', 'ROS_OCR.html');
+const DEFAULT_MAX_PAGES = Number(process.env.ROS_OCR_MAX_PAGES || 1);
+const DEFAULT_DPI = Number(process.env.ROS_OCR_DPI || 220);
+
+function parsePositiveInt(input, fallback) {
+  const parsed = Number(input);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
 export async function createRosOcrApp({ extractor = extractBasisFromPdf, htmlPath = DEFAULT_HTML_PATH } = {}) {
   const [{ default: express }, { default: multer }] = await Promise.all([import('express'), import('multer')]);
@@ -40,12 +52,28 @@ export async function createRosOcrApp({ extractor = extractBasisFromPdf, htmlPat
 
     const pdfPath = req.file.path;
     try {
+      const allowSlow = String(req.query.allowSlow || '0') === '1';
+      const requestedMaxPages = parsePositiveInt(req.query.maxPages, DEFAULT_MAX_PAGES);
+      const requestedDpi = parsePositiveInt(req.query.dpi, DEFAULT_DPI);
+
+      const maxPages = allowSlow ? requestedMaxPages : clamp(requestedMaxPages, 1, DEFAULT_MAX_PAGES);
+      const dpi = allowSlow ? requestedDpi : clamp(requestedDpi, 120, DEFAULT_DPI);
+
       const result = await extractor(pdfPath, {
-        maxPages: Number(req.query.maxPages || 2),
-        dpi: Number(req.query.dpi || 300),
+        maxPages,
+        dpi,
         debug: String(req.query.debug || '0') === '1',
       });
-      res.status(200).json(result);
+      res.status(200).json({
+        ...result,
+        request: {
+          allowSlow,
+          requestedMaxPages,
+          requestedDpi,
+          maxPages,
+          dpi,
+        },
+      });
     } catch (e) {
       res.status(500).json({ error: String(e?.message || e) });
     } finally {

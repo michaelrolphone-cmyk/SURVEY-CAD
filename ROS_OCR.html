@@ -30,13 +30,16 @@
       <legend>Options</legend>
       <div class="row">
         <label>Max Pages
-          <input id="maxPages" type="number" min="1" max="10" value="2" />
+          <input id="maxPages" type="number" min="1" max="10" value="1" />
         </label>
         <label>DPI
-          <input id="dpi" type="number" min="100" max="1200" value="300" />
+          <input id="dpi" type="number" min="100" max="1200" value="220" />
         </label>
         <label>
           <input id="debug" type="checkbox" /> Include debug diagnostics
+        </label>
+        <label>
+          <input id="allowSlow" type="checkbox" /> Allow slow OCR (higher timeout risk)
         </label>
       </div>
     </fieldset>
@@ -60,14 +63,15 @@
         return;
       }
 
-      const maxPages = document.getElementById('maxPages').value || '2';
-      const dpi = document.getElementById('dpi').value || '300';
+      const maxPages = document.getElementById('maxPages').value || '1';
+      const dpi = document.getElementById('dpi').value || '220';
       const debug = document.getElementById('debug').checked;
+      const allowSlow = document.getElementById('allowSlow').checked;
 
       const formData = new FormData();
       formData.append('pdf', pdfInput.files[0]);
 
-      const url = `/extract?maxPages=${encodeURIComponent(maxPages)}&dpi=${encodeURIComponent(dpi)}&debug=${debug ? '1' : '0'}`;
+      const url = `/extract?maxPages=${encodeURIComponent(maxPages)}&dpi=${encodeURIComponent(dpi)}&debug=${debug ? '1' : '0'}&allowSlow=${allowSlow ? '1' : '0'}`;
       output.textContent = 'Running OCR extraction...';
 
       try {
