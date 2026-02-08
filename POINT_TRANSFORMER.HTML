@@ -211,6 +211,20 @@
     .row{ display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
     label{ font-size: 12px; color: var(--muted); }
     input[type="file"]{ width: 100%; color: var(--muted); }
+    input[type="number"]{
+      width: 110px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(8,10,16,.75);
+      color: var(--text);
+      font-size: 12px;
+    }
+    input[type="number"]:focus{
+      outline: none;
+      border-color: rgba(0,229,255,.35);
+      box-shadow: 0 0 22px rgba(0,229,255,.12);
+    }
 
     textarea{
       width: 100%;
@@ -475,8 +489,14 @@
 
         <div class="row" style="margin-top:10px;">
           <button id="btnProcess" class="btn">Process</button>
+          <button id="btnRenumber" class="btn secondary" disabled>Renumber Output</button>
           <button id="btnDownload" class="btn secondary" disabled>Download</button>
           <button id="btnOpenLineSmith" class="btn secondary" disabled>Open in LineSmith</button>
+
+          <span class="pill">
+            <label for="renumberStart" style="color:var(--text); margin:0;">Renumber start</label>
+            <input id="renumberStart" type="number" min="1" step="1" value="1" />
+          </span>
 
           <span class="pill">
             <span class="mono">Basemap</span>
@@ -967,11 +987,13 @@
     const elLog = document.getElementById("log");
     const elDownload = document.getElementById("btnDownload");
     const elProcess = document.getElementById("btnProcess");
+    const elRenumber = document.getElementById("btnRenumber");
     const elOpenLineSmith = document.getElementById("btnOpenLineSmith");
     const elAuto = document.getElementById("autoProcess");
     const elZone = document.getElementById("zone");
     const elShowLabels = document.getElementById("showLabels");
     const elBasemap = document.getElementById("basemap");
+    const elRenumberStart = document.getElementById("renumberStart");
     const elMapHint = document.getElementById("mapHint");
 
     const st_lines = document.getElementById("st_lines");
@@ -1427,6 +1449,7 @@
         elLog.textContent = "";
         latestOutputText = "";
         latestTransformed = null;
+        elRenumber.disabled = true;
         elDownload.disabled = true;
         elOpenLineSmith.disabled = true;
         if (layer) layer.clearLayers();
@@ -1448,6 +1471,7 @@
       const plotted = refreshMap(res.recordsSorted);
       setStats(res.stats, plotted);
 
+      elRenumber.disabled = !latestOutputText;
       elDownload.disabled = !latestOutputText;
       elOpenLineSmith.disabled = !latestTransformed?.recordsSorted?.length;
     }
@@ -1464,6 +1488,41 @@
       refreshPointEditorTables();
     });
 
+
+    function renumberOutputFromStart(startValue){
+      if (!latestOutputText) return;
+      const parsedStart = Number.parseInt(startValue, 10);
+      const renumberStart = Number.isInteger(parsedStart) && parsedStart > 0 ? parsedStart : 1;
+      elRenumberStart.value = String(renumberStart);
+
+      const lines = String(latestOutputText || "").split(/\r?\n/);
+      let nextNumber = renumberStart;
+      const renumberedLines = lines.map((line)=>{
+        if (!line.trim()) return line;
+        const fields = parseCSVLine(line);
+        if (fields.length < 2) return line;
+        fields[0] = String(nextNumber++);
+        return fields.map(csvEscape).join(",");
+      });
+
+      latestOutputText = renumberedLines.join("\n");
+      elOut.value = latestOutputText;
+
+      const rows = parsePointRows(latestOutputText);
+      if (latestTransformed?.recordsSorted?.length){
+        const count = Math.min(rows.length, latestTransformed.recordsSorted.length);
+        for (let i = 0; i < count; i++){
+          latestTransformed.recordsSorted[i].fields[0] = rows[i].number;
+        }
+      }
+
+      elLog.textContent = `${elLog.textContent}\nSEQUENTIAL RENUMBER\n  start: ${renumberStart}`.trim();
+      refreshPointEditorTables();
+      elOpenLineSmith.disabled = !latestTransformed?.recordsSorted?.length;
+    }
+
+    elRenumber.addEventListener("click", ()=>renumberOutputFromStart(elRenumberStart.value));
+
     // Manual process
     elProcess.addEventListener("click", ()=>processNow());
 
@@ -1475,6 +1534,7 @@
       if (t) clearTimeout(t);
       t = setTimeout(()=>processNow(), 250);
     });
+
 
     elToggleInputView.addEventListener("click", ()=>setPointEditorView(!usePointEditorView));
 

@@ -5,6 +5,14 @@ import { readFile } from 'node:fs/promises';
 test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
 
+
+  assert.match(html, /id="renumberStart"\s+type="number"\s+min="1"\s+step="1"\s+value="1"/, 'PointForge should render a configurable renumber start input defaulting to 1');
+  assert.match(html, /id="btnRenumber"/, 'PointForge should render an explicit renumber action button');
+  assert.match(html, /function\s+transformPoints\(text\)/, 'PointForge processing pipeline should keep its original transform signature');
+  assert.match(html, /function\s+renumberOutputFromStart\(startValue\)/, 'PointForge should define explicit output renumber helper');
+  assert.match(html, /elRenumber\.addEventListener\("click",\s*\(\)=>renumberOutputFromStart\(elRenumberStart\.value\)\);/, 'PointForge should only renumber when the renumber button is clicked');
+  assert.doesNotMatch(html, /transformPoints\(input,\s*\{\s*renumberStart\s*\}\)/, 'PointForge should not apply sequential renumbering during normal processing');
+  assert.doesNotMatch(html, /sortable\.forEach\(\(r,\s*index\)=>\{[\s\S]*renumberStart/, 'PointForge transform should not force sequential renumbering by default');
   assert.match(html, /id="btnOpenLineSmith"/, 'PointForge should render the LineSmith handoff button');
   assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');

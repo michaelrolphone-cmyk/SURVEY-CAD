@@ -182,6 +182,7 @@ Point-file rows in `PROJECT_BROWSER.html` now include **Open in PointForge**, wh
 Point-file rows are also directly tappable/clickable (with keyboard Enter/Space support), so mobile users can open a point file in PointForge without needing the small action button.
 Project Browser point-file folders now support desktop drag-and-drop uploads and a mobile-friendly **Choose Point Files** picker (`.csv` and `.txt`/`text/csv`), which attaches files to the active project's persisted project-file snapshot for immediate PointForge launch.
 PointForge also now includes a **Switch to Point Editor View** toggle that swaps input/output textareas for a LineSmith-style tabular point editor/read-only output table (`#`, `X`, `Y`, `Z`, `Code`, `Notes`) while keeping transform processing behavior unchanged.
+PointForge now also includes a **Renumber start** control (default `1`) with a **Renumber Output** action button; standard Process behavior remains unchanged, and sequential repacking is only applied when the renumber button is pressed (for example, start at `1000` to move the set into a new range).
 
 Project Browser → PointForge deep-link command:
 
