@@ -3086,7 +3086,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     mouse.down = true;
     mouse.button = e.button;
 
-    const additive = e.shiftKey || (mouse.button === 0 && touchGesture.boxSelectActive);
+    const additive = e.shiftKey;
 
     if (toolIsPan()) {
       beginDrag({type:"pan"});
@@ -3137,7 +3137,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         return;
       }
 
-      if (e.button === 0 && (e.shiftKey || touchGesture.boxSelectActive)) {
+      if (e.button === 0) {
         beginDrag({type:"marquee", x0: mouse.x, y0: mouse.y, x1: mouse.x, y1: mouse.y, additive});
         return;
       }
