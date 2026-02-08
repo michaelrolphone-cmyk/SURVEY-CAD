@@ -128,6 +128,7 @@ open http://localhost:3000/ROS.html
 ```
 
 `ROS.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
+`ROS.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
 
 ## CLI Commands
 

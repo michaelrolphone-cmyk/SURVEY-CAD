@@ -944,6 +944,33 @@ import { buildParcelCsvPNEZD, buildPolygonCornerCsvRowsPNEZD, buildPointMarkerCs
     return "ROS feature";
   }
 
+  function normalizeRosFeatures(rosItems = []) {
+    return rosItems
+      .map((item) => (item?.feature?.geometry ? item.feature : item))
+      .filter((f) => f?.geometry);
+  }
+
+  function rosIntersectsSection(rosFeature, sectionFeature) {
+    if (!sectionFeature?.geometry) return true;
+    const g = rosFeature?.geometry;
+    if (!g) return false;
+    if (g.x != null && g.y != null) {
+      return pointInPolygon([g.x, g.y], sectionFeature.geometry);
+    }
+    if (g.rings?.length) {
+      const c = centroidOfPolygon(g);
+      return c ? pointInPolygon([c.x, c.y], sectionFeature.geometry) : false;
+    }
+    if (g.paths?.[0]?.length) {
+      return g.paths[0].some(([x, y]) => pointInPolygon([x, y], sectionFeature.geometry));
+    }
+    return false;
+  }
+
+  function filterRosFeaturesForSection(rosFeatures, sectionFeature) {
+    return (rosFeatures || []).filter((feature) => rosIntersectsSection(feature, sectionFeature));
+  }
+
   function summarizeAttrs(attrs) {
     if (!attrs) return [["(no attrs)",""]];
     const picks = [];
@@ -989,6 +1016,13 @@ import { buildParcelCsvPNEZD, buildPolygonCornerCsvRowsPNEZD, buildPointMarkerCs
     return pdfs.map((p) => (
       `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(p.url))}">${escapeHtml(linkText)}</a> <span class="small">(${escapeHtml(p.key)})</span>`
     ));
+  }
+
+  function buildRosPopupHtml(attrs = {}) {
+    const desc = bestRosLabel(attrs);
+    const links = buildPdfProxyLinks(attrs, "Open PDF (API)");
+    const linkHtml = links.length ? links.map((l, i) => `${i + 1}. ${l}`).join("<br/>") : "No PDF links found";
+    return `<b>Record of Survey</b><br/>${escapeHtml(desc)}<div class="hr"></div><div class="small"><b>PDFs</b><br/>${linkHtml}</div>`;
   }
 
   // -----------------------------
@@ -1216,26 +1250,27 @@ import { buildParcelCsvPNEZD, buildPolygonCornerCsvRowsPNEZD, buildPointMarkerCs
         { role: "aliquot", features: state.aliquotFeatures || [], color: "#6aa9ff" },
       ]);
 
-      const ros = lookup.ros || [];
+      const rosFromLookup = normalizeRosFeatures(lookup.ros || []);
+      const ros = filterRosFeaturesForSection(rosFromLookup, section);
       state.rosFeatures = ros;
-      log(`ROS near parcel: ${ros.length}`);
+      log(`ROS in containing section: ${ros.length} (from ${rosFromLookup.length} nearby ROS)`);
 
       for (const f of ros) {
         const g = f.geometry;
         if (!g) continue;
         if (g.x != null && g.y != null) {
           const m = L.circleMarker([g.y, g.x], { radius: 5, weight: 1.5, color: "#ffffff", fillColor:"#ff5a7a", fillOpacity: .7 });
-          m.bindPopup(`<b>Record of Survey</b><br/>${escapeHtml(bestRosLabel(f.attributes||{}))}`);
+          m.bindPopup(buildRosPopupHtml(f.attributes || {}));
           layers.ros.addLayer(m);
         } else if (g.paths) {
           const gj = { type:"Feature", properties:{}, geometry:{ type:"LineString", coordinates: g.paths[0].map(([x,y])=>[x,y]) } };
           const l = L.geoJSON(gj, { style:{ color:"#ff5a7a", weight:2 }});
-          l.bindPopup(`<b>Record of Survey</b><br/>${escapeHtml(bestRosLabel(f.attributes||{}))}`);
+          l.bindPopup(buildRosPopupHtml(f.attributes || {}));
           layers.ros.addLayer(l);
         } else if (g.rings) {
           const gj = arcPolygonToGeoJSON(g);
           const p = L.geoJSON(gj, { style:{ color:"#ff5a7a", weight:2, fillOpacity:0.02 }});
-          p.bindPopup(`<b>Record of Survey</b><br/>${escapeHtml(bestRosLabel(f.attributes||{}))}`);
+          p.bindPopup(buildRosPopupHtml(f.attributes || {}));
           layers.ros.addLayer(p);
         }
       }
