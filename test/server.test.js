@@ -85,8 +85,8 @@ function createMockServer() {
   });
 }
 
-async function startApiServer(client) {
-  const server = createSurveyServer({ client });
+async function startApiServer(client, opts = {}) {
+  const server = createSurveyServer({ client, ...opts });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   return { server, port: server.address().port };
 }
@@ -151,6 +151,52 @@ test('server exposes survey APIs and static html', async () => {
   }
 });
 
+
+
+test('server forwards /extract POST requests to ROS OCR handler', async () => {
+  const rosPayload = { best: { basisType: 'grid' }, candidates: [] };
+  const app = await startApiServer(new SurveyCadClient(), {
+    rosOcrHandler(req, res) {
+      assert.equal(req.method, 'POST');
+      assert.equal(new URL(req.url, 'http://localhost').pathname, '/extract');
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify(rosPayload));
+    },
+  });
+
+  try {
+    const formData = new FormData();
+    formData.append('pdf', new Blob(['%PDF-1.4\n'], { type: 'application/pdf' }), 'sample.pdf');
+    const res = await fetch(`http://127.0.0.1:${app.port}/extract?maxPages=2&dpi=300&debug=1`, {
+      method: 'POST',
+      body: formData,
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.deepEqual(body, rosPayload);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+test('server rejects non-POST methods for /extract', async () => {
+  const app = await startApiServer(new SurveyCadClient(), {
+    rosOcrHandler() {
+      throw new Error('ros ocr handler should not be called for GET /extract');
+    },
+  });
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/extract`);
+    assert.equal(res.status, 405);
+    const body = await res.json();
+    assert.match(body.error, /Only POST is supported/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
 test('server validates required parameters', async () => {
   const app = await startApiServer(new SurveyCadClient());
   try {

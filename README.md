@@ -118,9 +118,11 @@ curl "http://localhost:3000/ROS.html"
 curl "http://localhost:3000/CPNF.HTML"
 curl "http://localhost:3000/cpnf.html"
 curl "http://localhost:3000/ROS_OCR.html"
+curl -X POST "http://localhost:3000/extract?maxPages=2&dpi=300&debug=1" \
+  -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
 ```
 
-`/` defaults to `VIEWPORT.HTML`.
+`/` defaults to `VIEWPORT.HTML`. `ROS_OCR.html` posts to `/extract`, which is now served by the main `npm start` web server (same behavior as the standalone ROS OCR app).
 
 
 ### ROS standalone tool command
