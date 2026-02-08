@@ -4,6 +4,7 @@ import {
   buildParcelCsvPNEZD,
   buildPolygonCornerCsvRowsPNEZD,
   buildPointMarkerCsvRowsPNEZD,
+  buildUniquePolygonCsvRowsPNEZD,
 } from '../src/ros-export.js';
 
 test('buildParcelCsvPNEZD emits P,N,E,Z,D rows and strips duplicate closing vertex', () => {
@@ -55,4 +56,31 @@ test('buildPointMarkerCsvRowsPNEZD emits arbitrary marker points', () => {
   assert.equal(lines[0], '20,200.000,100.000,0.000,MARKER ADDRESS_POINT');
   assert.equal(lines[1], '21,210.000,110.000,0.000,MARKER ROS_POINT 1');
   assert.equal(nextPoint, 22);
+});
+
+
+test('buildUniquePolygonCsvRowsPNEZD emits each coordinate once across parcel/subdivision/section features', () => {
+  const features = [
+    {
+      attributes: { PARCEL: 'P1' },
+      geometry: { rings: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] },
+    },
+    {
+      attributes: { SUB_NAME: 'SUB A' },
+      geometry: { rings: [[[0, 0], [10, 0], [12, 8], [0, 0]]] },
+    },
+    {
+      attributes: { NAME: 'SEC 1' },
+      geometry: { rings: [[[10, 10], [12, 8], [20, 20], [10, 10]]] },
+    },
+  ];
+
+  const { csv, nextPoint, count } = buildUniquePolygonCsvRowsPNEZD(features, 1, 'BOUNDARY_CORNER');
+  const lines = csv.trim().split('\n');
+
+  assert.equal(count, 6);
+  assert.equal(lines.length, 6);
+  assert.equal(lines[0], '1,0.000,0.000,0.000,BOUNDARY_CORNER P1 R1 V1');
+  assert.equal(lines[5], '6,20.000,20.000,0.000,BOUNDARY_CORNER SEC 1 R1 V3');
+  assert.equal(nextPoint, 7);
 });
