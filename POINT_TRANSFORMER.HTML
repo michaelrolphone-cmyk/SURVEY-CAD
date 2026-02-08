@@ -440,6 +440,7 @@
         <div class="row" style="margin-top:10px;">
           <button id="btnProcess" class="btn">Process</button>
           <button id="btnDownload" class="btn secondary" disabled>Download</button>
+          <button id="btnOpenSurveySketch" class="btn secondary" disabled>Open in Survey Sketch</button>
 
           <span class="pill">
             <span class="mono">Basemap</span>
@@ -920,6 +921,7 @@
     const elLog = document.getElementById("log");
     const elDownload = document.getElementById("btnDownload");
     const elProcess = document.getElementById("btnProcess");
+    const elOpenSurveySketch = document.getElementById("btnOpenSurveySketch");
     const elAuto = document.getElementById("autoProcess");
     const elZone = document.getElementById("zone");
     const elShowLabels = document.getElementById("showLabels");
@@ -932,6 +934,8 @@
     const st_ref = document.getElementById("st_ref");
     const st_map = document.getElementById("st_map");
     const st_zone = document.getElementById("st_zone");
+
+    const SURVEY_SKETCH_IMPORT_STORAGE_KEY = "surveySketchPointforgeImport";
 
     let latestOutputText = "";
     let latestTransformed = null;
@@ -1056,6 +1060,34 @@
       return plotted;
     }
 
+
+    function buildSurveySketchImportPayload(recordsSorted){
+      const rows = [["number","x","y","z","code","notes"]];
+
+      for (const record of recordsSorted || []){
+        if (!Array.isArray(record?.fields) || record.fields.length < 4) continue;
+
+        const number = trimOrEmpty(record.fields[0]);
+        if (!number) continue;
+
+        const x = Number(record.fields[1]);
+        const y = Number(record.fields[2]);
+        const zRaw = trimOrEmpty(record.fields[3]);
+        const z = Number.isFinite(Number(zRaw)) ? Number(zRaw) : 0;
+        const notes = trimOrEmpty(record.fields[record.fields.length - 1]);
+
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+        rows.push([number, x, y, z, "", notes]);
+      }
+
+      return {
+        source: "pointforge-transformer",
+        exportedAt: new Date().toISOString(),
+        csv: rows.map((row)=>row.map(csvEscape).join(",")).join("\n")
+      };
+    }
+
     function processNow(){
       const input = elIn.value || "";
       if (!input.trim()){
@@ -1064,6 +1096,7 @@
         latestOutputText = "";
         latestTransformed = null;
         elDownload.disabled = true;
+        elOpenSurveySketch.disabled = true;
         if (layer) layer.clearLayers();
         elMapHint.textContent = "Load a file or paste points to plot.";
         setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
@@ -1081,6 +1114,7 @@
       setStats(res.stats, plotted);
 
       elDownload.disabled = !latestOutputText;
+      elOpenSurveySketch.disabled = !latestTransformed?.recordsSorted?.length;
     }
 
     // File loader
@@ -1141,6 +1175,16 @@
       a.click();
       a.remove();
       setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    });
+
+
+    elOpenSurveySketch.addEventListener("click", ()=>{
+      const recordsSorted = latestTransformed?.recordsSorted;
+      if (!recordsSorted?.length) return;
+
+      const payload = buildSurveySketchImportPayload(recordsSorted);
+      localStorage.setItem(SURVEY_SKETCH_IMPORT_STORAGE_KEY, JSON.stringify(payload));
+      window.open("/VIEWPORT.HTML?source=pointforge", "_blank", "noopener,noreferrer");
     });
 
     // Init: blank textarea (no sample data), locked defaults already set in HTML

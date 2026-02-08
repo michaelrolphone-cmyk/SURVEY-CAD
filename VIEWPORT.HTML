@@ -661,6 +661,8 @@
   const dist2 = (ax,ay,bx,by)=>{ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; };
   const dist = (ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
   const fmt = (n)=> (Number.isFinite(n) ? (Math.abs(n) < 1e6 ? n.toFixed(3) : n.toExponential(6)) : "NaN");
+  const POINTFORGE_IMPORT_STORAGE_KEY = "surveySketchPointforgeImport";
+
   const parseNum = (s, def=0) => {
     const n = Number(String(s).trim());
     return Number.isFinite(n) ? n : def;
@@ -1742,12 +1744,9 @@
     setStatus("Swapped X↔Y for ALL points. (Undo available)", "ok");
   });
 
-  $("#csvIn").addEventListener("change", async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const text = await f.text();
+  function importCsvText(text, sourceLabel = "CSV import") {
     const rows = parseCSV(text);
-    if (!rows.length) { setStatus("CSV appears empty.", "warn"); return; }
+    if (!rows.length) { setStatus("CSV appears empty.", "warn"); return false; }
 
     history.push("csv import");
 
@@ -1825,16 +1824,49 @@
       added++;
     }
 
-    setStatus(`CSV import done.
+    setStatus(`${sourceLabel} done.
 Added: ${added}
 Updated: ${updated}
 Renamed: ${renamed}
 Skipped: ${skipped}
 Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
-    $("#csvIn").value = "";
     schedulePointsTableRender();
     if ($("#autoZoomAfterImport").checked) zoomExtents();
+    return true;
+  }
+
+  function tryImportPointforgePayload() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("source") !== "pointforge") return false;
+
+    const raw = localStorage.getItem(POINTFORGE_IMPORT_STORAGE_KEY);
+    if (!raw) {
+      setStatus("PointForge launch detected, but no import payload was found in local storage.", "warn");
+      return false;
+    }
+
+    try {
+      const payload = JSON.parse(raw);
+      if (!payload?.csv) {
+        setStatus("PointForge payload was invalid (missing CSV content).", "warn");
+        return false;
+      }
+      importCsvText(payload.csv, "PointForge import");
+      localStorage.removeItem(POINTFORGE_IMPORT_STORAGE_KEY);
+      return true;
+    } catch (_err) {
+      setStatus("PointForge payload could not be parsed.", "warn");
+      return false;
+    }
+  }
+
+  $("#csvIn").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const text = await f.text();
+    importCsvText(text);
+    $("#csvIn").value = "";
   });
 
   $("#exportCsv").addEventListener("click", () => {
@@ -2805,6 +2837,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     updateUndoRedoHUD();
     updateCounts();
     requestAnimationFrame(draw);
+    const importedFromPointforge = tryImportPointforgePayload();
+    if (importedFromPointforge) return;
 
     setStatus(
       "Ready.\n" +
