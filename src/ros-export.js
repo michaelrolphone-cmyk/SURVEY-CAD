@@ -61,6 +61,27 @@ function polygonFeatureLabel(feature, fallbackPrefix, index) {
   );
 }
 
+export function buildAliquotSelectionKey(feature, index = 0) {
+  const attrs = feature?.attributes || {};
+  const identity =
+    attrs.OBJECTID ?? attrs.ObjectID ?? attrs.OBJECTID_1 ?? attrs.FID ?? attrs.GLOBALID ?? attrs.GlobalID ?? null;
+  if (identity != null && String(identity).trim()) {
+    return `oid:${String(identity).trim()}`;
+  }
+
+  const label = attrs.ALIQUOT || attrs.ALIQUOT_LABEL || attrs.NAME || '';
+  if (String(label).trim()) {
+    return `label:${String(label).trim().toUpperCase()}:${index}`;
+  }
+  return `index:${index}`;
+}
+
+export function filterAliquotFeaturesForExport(aliquotFeatures2243 = [], selectedAliquotKeys = null) {
+  const features = aliquotFeatures2243 || [];
+  if (!(selectedAliquotKeys instanceof Set) || !selectedAliquotKeys.size) return features;
+  return features.filter((feature, index) => selectedAliquotKeys.has(buildAliquotSelectionKey(feature, index)));
+}
+
 export function buildPolygonCornerCsvRowsPNEZD(features2243, startPoint = 1, labelPrefix = 'POLYGON_CORNER') {
   const features = features2243 || [];
   const lines = [];
