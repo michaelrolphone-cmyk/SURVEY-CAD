@@ -6,7 +6,9 @@
   "scripts": {
     "test": "node --test",
     "cli": "node src/cli.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "ros:ocr": "node src/ros-ocr-api.js",
+    "ros:cli": "node src/ros-basis-cli.js"
   },
   "engines": {
     "node": ">=20"

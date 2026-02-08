@@ -3,6 +3,8 @@
 This repository includes:
 - A reusable Node.js surveying client in `src/survey-api.js`.
 - A CLI in `src/cli.js`.
+- A standalone ROS basis-of-bearing OCR API in `src/ros-ocr-api.js`.
+- A standalone ROS basis-of-bearing CLI in `src/ros-basis-cli.js`.
 - A Heroku-compatible web server in `src/server.js` that serves the repository HTML files statically and exposes the surveying library as JSON API endpoints.
 
 ## Install / Run
@@ -11,7 +13,9 @@ This repository includes:
 npm install
 npm test
 npm run cli -- --help
+npm run ros:cli -- --help
 npm start
+npm run ros:ocr
 ```
 
 The server binds to `PORT` (Heroku-compatible) and defaults to `3000` locally.
@@ -113,6 +117,7 @@ Any repository-root static file can be requested directly. File path matching is
 curl "http://localhost:3000/ROS.html"
 curl "http://localhost:3000/CPNF.HTML"
 curl "http://localhost:3000/cpnf.html"
+curl "http://localhost:3000/ROS_OCR.html"
 ```
 
 `/` defaults to `VIEWPORT.HTML`.
@@ -141,6 +146,43 @@ node src/cli.js aliquots --lat 43.61 --lon -116.20
 ```
 
 All CLI commands print JSON to stdout.
+
+## ROS Basis Extractor Standalone App
+
+The ROS OCR extractor is a dedicated app that accepts a Record of Survey PDF and returns detected basis-of-bearing candidates.
+
+### Start standalone ROS OCR API
+
+```bash
+npm run ros:ocr
+open http://localhost:3001/
+```
+
+Defaults: host `0.0.0.0`, port `3001` (`PORT` env var overrides). The standalone HTML app page is served at `/` (file: `ROS_OCR.html`).
+
+### ROS OCR API endpoints
+
+```bash
+curl "http://localhost:3001/health"
+curl "http://localhost:3001/"   # standalone HTML page
+curl -X POST "http://localhost:3001/extract?maxPages=2&dpi=300&debug=1" \
+  -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
+```
+
+`/extract` response shape:
+- `pdf`: uploaded filename basename
+- `best`: top-ranked basis candidate (or `null`)
+- `candidates`: all candidate detections
+- `diagnostics`: included when `debug=1`
+
+### ROS OCR CLI
+
+```bash
+npm run ros:cli -- --pdf /absolute/path/to/ros.pdf
+npm run ros:cli -- --pdf /absolute/path/to/ros.pdf --maxPages 3 --dpi 400 --debug
+```
+
+CLI prints the same JSON payload returned by `/extract`.
 
 
 ### ROS.html enhancements
