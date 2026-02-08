@@ -34,3 +34,12 @@ test('POINT_TRANSFORMER.HTML auto-imports ROS export payloads when launched from
   assert.match(html, /localStorage\.getItem\(ROS_POINTFORGE_IMPORT_STORAGE_KEY\)/, 'PointForge should read ROS payload from localStorage');
   assert.match(html, /elIn\.value\s*=\s*String\(payload\.csv\);[\s\S]*processNow\(\);/, 'PointForge should load ROS CSV payload and process it immediately');
 });
+
+
+test('POINT_TRANSFORMER.HTML omits internal default-lock and passthrough commentary copy', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(html, /Defaults locked:/, 'PointForge should not render internal defaults-locked commentary text');
+  assert.doesNotMatch(html, /Input:\s*<span class="kbd">NAME,X,Y,Z\[,CODE\[,NOTES\]\]<\/span>\. Output sorted by point number\./, 'PointForge should not render verbose input/output commentary text');
+  assert.doesNotMatch(html, /plus code\/notes passthrough/, 'PointForge should not render code\/notes passthrough commentary text');
+});

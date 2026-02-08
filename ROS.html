@@ -286,7 +286,7 @@
     </div>
     <div class="row">
       <span class="pill good"><span class="dot"></span>ArcGIS JSONP</span>
-      <span class="pill warn"><span class="dot"></span>PDFs require upload (CORS)</span>
+      <span class="pill warn"><span class="dot"></span>PDF scan uses local uploads</span>
     </div>
   </header>
 
@@ -318,18 +318,8 @@
 
         <div class="hr"></div>
 
-        <div class="hint">
-          <b>Map not displaying fix:</b> This file forces the map container to have height and calls
-          <span class="mono">map.invalidateSize()</span> on load, after lookup, and on resize.
-        </div>
-
-        <div class="hr"></div>
-
         <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
           <div class="h">PDF Basis of Bearing (local upload)</div>
-        </div>
-        <div class="small" style="margin:6px 0 10px">
-          Automatic PDF download is usually blocked by CORS. Download the ROS PDF and upload it here.
         </div>
         <input id="pdfFile" type="file" accept="application/pdf"/>
         <button id="btnScanPdf" class="secondary" style="width:100%;margin-top:10px">Scan Uploaded PDF</button>

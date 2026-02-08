@@ -402,8 +402,7 @@
           <span>G/REF RENUMB + MAP PREVIEW</span>
         </div>
         <div class="sub">
-          Defaults locked: <span class="kbd">US-ft</span> + <span class="kbd">Idaho West</span> + <span class="kbd">Swap X/Y</span>.
-          Input: <span class="kbd">NAME,X,Y,Z[,CODE[,NOTES]]</span>. Output sorted by point number.
+          NAD83 Idaho West map preview and point renumbering.
         </div>
       </div>
 
@@ -430,7 +429,7 @@
           <div style="flex:1 1 100%;">
             <label for="file">Load point file (.txt / .csv)</label>
             <input id="file" type="file" accept=".txt,.csv,text/plain,text/csv" />
-            <div class="hint">Or paste into the field below. Processing doesn’t modify coordinates; only point IDs (plus code/notes passthrough).</div>
+            <div class="hint">Or paste into the field below. Processing keeps coordinates unchanged while renumbering point IDs.</div>
           </div>
         </div>
 
@@ -890,7 +889,7 @@
 
     // -----------------------------
     // Idaho State Plane defs (NAD83; "NO_TRANS": no grid shift terms)
-    // Defaults locked: US-ft + Swap X/Y
+    // Fixed defaults: US-ft + Swap X/Y
     // -----------------------------
     const PROJ_DEFS_USFT = {
       east:   "+proj=tmerc +lat_0=41.6666666666667 +lon_0=-112.166666666667 +k=0.999947368 +x_0=200000.0001016 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs",

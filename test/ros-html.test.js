@@ -75,3 +75,12 @@ test('ROS.html shows a busy processing modal while CPNF instrument numbers are g
   assert.match(html, /setBusyModalOpen\(true, 'Exporting to PointForge… gathering CPNF instrument numbers'\)/, 'PointForge export should open modal before CPNF lookup');
   assert.match(html, /setBusyModalOpen\(false\);[\s\S]*\}\s*\);/, 'exports should close the modal in completion paths');
 });
+
+
+test('ROS.html does not render internal CORS/map-fix commentary text', async () => {
+  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(html, /Map not displaying fix:/, 'ROS should not show internal map debug commentary');
+  assert.doesNotMatch(html, /Automatic PDF download is usually blocked by CORS\./, 'ROS should not show internal CORS commentary in upload section');
+  assert.doesNotMatch(html, /PDFs require upload \(CORS\)/, 'ROS should not show old CORS warning pill copy');
+});
