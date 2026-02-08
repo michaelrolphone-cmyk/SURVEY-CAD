@@ -84,8 +84,14 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
 
   assert.match(html, /id="btnExportPointForge"/, 'ROS should render an Export to PointForge button');
   assert.match(html, /const\s+POINTFORGE_ROS_IMPORT_STORAGE_KEY\s*=\s*"pointforgeRosImport"/, 'ROS should use a stable localStorage key for PointForge handoff');
+  assert.match(html, /const\s+PROJECT_FILE_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectFile"/, 'ROS should use a stable localStorage prefix for project file snapshots');
+  assert.match(html, /function\s+persistPointForgeExportProjectFile\s*\(/, 'ROS should persist PointForge export references into the active project file');
+  assert.match(html, /parseCpfInstrumentsFromNotesMap\(notesByCoordinate\)/, 'PointForge export project file should parse CP&F instruments from gathered notes');
+  assert.match(html, /folder:\s*'cpfs'[\s\S]*reference:\s*\{[\s\S]*type:\s*'instrument-number'/, 'PointForge export project file should add CP&F instrument references');
+  assert.match(html, /folder:\s*'point-files'[\s\S]*type:\s*'local-storage'[\s\S]*POINTFORGE_ROS_IMPORT_STORAGE_KEY/, 'PointForge export project file should add the PointForge CSV handoff reference');
   assert.match(html, /\$\("btnExportPointForge"\)\.disabled\s*=\s*false/, 'ROS should enable PointForge export after loading export geometry');
   assert.match(html, /const\s+notesByCoordinate\s*=\s*await\s*buildCpfNotesByCoordinate\(plssPoints\);[\s\S]*includePlssWithoutNotes:\s*false[\s\S]*localStorage\.setItem\(POINTFORGE_ROS_IMPORT_STORAGE_KEY,\s*JSON\.stringify\(\{[\s\S]*csv:\s*uniquePart\.csv/, 'ROS should prefetch CP&F notes and persist only CP&F-backed PLSS points for PointForge payload');
+  assert.match(html, /const\s+projectFileUpdate\s*=\s*persistPointForgeExportProjectFile\(\{[\s\S]*notesByCoordinate,[\s\S]*pointCount:\s*uniquePart\.count/, 'PointForge export should save CP&F and point-file references to the project file when a project is active');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'ROS should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*'survey-cad:navigate-app'[\s\S]*path,/, 'ROS should notify launcher iframe host to navigate embedded app');
   assert.match(html, /openLinkedApp\('\/POINT_TRANSFORMER\.HTML\?source=ros'\)/, 'ROS should navigate PointForge using launcher-aware helper');
