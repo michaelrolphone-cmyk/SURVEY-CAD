@@ -120,7 +120,9 @@
     <section class="content" id="treeContainer"></section>
   </div>
 
-  <script>
+  <script type="module">
+    import { loadStoredProjectFile } from './src/project-browser-state.js';
+
     const projectLabel = document.getElementById('projectLabel');
     const treeContainer = document.getElementById('treeContainer');
 
@@ -192,6 +194,12 @@
       projectLabel.textContent = activeProjectId
         ? `Active project: ${projectName} (${activeProjectId})`
         : 'No active project selected. Showing a template project structure.';
+
+      const storedProjectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
+      if (storedProjectFile) {
+        renderTree(storedProjectFile);
+        return;
+      }
 
       const templateUrl = new URL('/api/project-file/template', window.location.origin);
       templateUrl.searchParams.set('projectId', activeProjectId || 'project-browser-preview');
