@@ -194,6 +194,8 @@ npm start
 open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&activeProjectName=Demo%20Project"
 ```
 
+`PROJECT_BROWSER.html` CP&F folder rows now include a **Print all** action that opens a single HTML print-preview window and embeds every CP&F PDF (in listed order) for one-shot browser printing.
+
 `RecordQuarry.html` **Export CSV** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
 
 `RecordQuarry.html` now shows a processing modal while export flows are busy gathering CPNF instrument numbers for aliquot/section corner notes, so long-running CP&F lookups have visible progress feedback before CSV download or PointForge handoff completes.
