@@ -2,7 +2,7 @@ export const APP_CATALOG = [
   {
     id: 'launcher',
     name: 'SurveyFoundry',
-    description: 'Central launchpad that links all SurveyFoundry tools from one start page.',
+    description: 'Projects, evidence, and outputs—end to end.',
     entryHtml: 'index.html',
     iconPath: '/assets/icons/launcher.svg',
     color: '#355C7D',
@@ -12,7 +12,7 @@ export const APP_CATALOG = [
   {
     id: 'ros-lookup',
     name: 'RecordQuarry',
-    description: 'Address-first lookup app for parcels, sections, ROS records, aliquots, and proxied PDF links.',
+    description: 'Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.',
     entryHtml: 'RecordQuarry.html',
     iconPath: '/assets/icons/ros-lookup.svg',
     color: '#2A9D8F',
@@ -22,7 +22,7 @@ export const APP_CATALOG = [
   {
     id: 'pointforge-transformer',
     name: 'PointForge',
-    description: 'Coordinate transformer and renumbering helper for NAD83 Idaho West point data workflows.',
+    description: 'Builds the canonical point set (coords + provenance + weights).',
     entryHtml: 'POINT_TRANSFORMER.HTML',
     iconPath: '/assets/icons/pointforge-transformer.svg',
     color: '#3A5A40',
@@ -32,7 +32,7 @@ export const APP_CATALOG = [
   {
     id: 'viewport-sketch',
     name: 'LineSmith',
-    description: 'Interactive drafting workspace for points, bearings, and geometry construction workflows.',
+    description: 'Turns points into boundaries, alignments, and structure.',
     entryHtml: 'VIEWPORT.HTML',
     iconPath: '/assets/icons/viewport-sketch.svg',
     color: '#0D3B66',

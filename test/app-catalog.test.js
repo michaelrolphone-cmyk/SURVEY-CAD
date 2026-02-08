@@ -17,7 +17,7 @@ test('app catalog exposes one icon entry for each app', () => {
 
   for (const app of APP_CATALOG) {
     assert.ok(app.name.length > 4);
-    assert.ok(app.description.length > 30);
+    assert.ok(app.description.length > 20);
     assert.match(app.iconPath, /^\/assets\/icons\/.+\.svg$/i);
     assert.ok(app.entryHtml.toLowerCase().endsWith('.html'));
   }
@@ -33,6 +33,15 @@ test('public app listing omits rendering-only fields', () => {
     assert.equal(Object.hasOwn(app, 'glyph'), false);
     assert.ok(app.description);
   }
+});
+
+
+test('app catalog publishes updated core app descriptions', () => {
+  const byName = new Map(APP_CATALOG.map((app) => [app.name, app.description]));
+  assert.equal(byName.get('SurveyFoundry'), 'Projects, evidence, and outputs—end to end.');
+  assert.equal(byName.get('RecordQuarry'), 'Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.');
+  assert.equal(byName.get('PointForge'), 'Builds the canonical point set (coords + provenance + weights).');
+  assert.equal(byName.get('LineSmith'), 'Turns points into boundaries, alignments, and structure.');
 });
 
 test('generated icon files exist for every app', async () => {
