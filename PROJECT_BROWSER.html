@@ -82,6 +82,42 @@
       margin-left: 1.65rem;
       color: var(--muted);
       font-size: 0.86rem;
+      justify-content: space-between;
+      gap: 0.8rem;
+    }
+
+    .file-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-width: 0;
+    }
+
+    .file-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .launch-btn {
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      flex: none;
+    }
+
+    .launch-btn:hover {
+      border-color: rgba(56, 189, 248, 0.5);
+      color: #bae6fd;
+    }
+
+    .launch-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .icon {
@@ -123,8 +159,54 @@
   <script type="module">
     import { loadStoredProjectFile } from './src/project-browser-state.js';
 
+    const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
+
     const projectLabel = document.getElementById('projectLabel');
     const treeContainer = document.getElementById('treeContainer');
+
+    function openLinkedApp(path) {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'survey-cad:navigate-app',
+            path,
+          }, window.location.origin);
+          return;
+        }
+      } catch {
+        // If parent access is blocked, fallback to same-tab navigation.
+      }
+      window.location.assign(path);
+    }
+
+    function getPointFileText(resource) {
+      const storageKey = resource?.reference?.value;
+      if (!storageKey) return null;
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const text = parsed?.text;
+      return typeof text === 'string' ? text : null;
+    }
+
+    function launchPointForgeFromResource(resource, projectContext = {}) {
+      const text = getPointFileText(resource);
+      if (!text || !text.trim()) {
+        renderError(`Selected point file could not be opened. Missing local text for ${resource?.title || 'resource'}.`);
+        return;
+      }
+
+      localStorage.setItem(POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY, JSON.stringify({
+        csv: text,
+        title: resource.title || resource.id || 'Point File',
+      }));
+
+      const destination = new URL('/POINT_TRANSFORMER.HTML', window.location.origin);
+      destination.searchParams.set('source', 'project-browser');
+      if (projectContext.projectId) destination.searchParams.set('projectId', projectContext.projectId);
+      if (projectContext.projectName) destination.searchParams.set('projectName', projectContext.projectName);
+      openLinkedApp(`${destination.pathname}${destination.search}`);
+    }
 
     function loadActiveProjectContext(activeProjectId) {
       try {
@@ -136,7 +218,7 @@
       }
     }
 
-    function renderTree(projectFile) {
+    function renderTree(projectFile, projectContext = {}) {
       treeContainer.innerHTML = '';
 
       const root = document.createElement('div');
@@ -166,7 +248,20 @@
         for (const entry of folder.index) {
           const resource = document.createElement('div');
           resource.className = 'file-row';
-          resource.innerHTML = `<span class="icon">📄</span>${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span>`;
+
+          const canLaunchPointForge = folder.key === 'point-files' && entry?.reference?.type === 'local-storage';
+          resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
+
+          if (canLaunchPointForge) {
+            const openButton = document.createElement('button');
+            openButton.type = 'button';
+            openButton.className = 'launch-btn';
+            openButton.textContent = 'Open in PointForge';
+            openButton.title = 'Loads this point file into PointForge input';
+            openButton.addEventListener('click', () => launchPointForgeFromResource(entry, projectContext));
+            resource.appendChild(openButton);
+          }
+
           treeContainer.appendChild(resource);
         }
       }
@@ -197,7 +292,7 @@
 
       const storedProjectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
       if (storedProjectFile) {
-        renderTree(storedProjectFile);
+        renderTree(storedProjectFile, { projectId: activeProjectId, projectName });
         return;
       }
 
@@ -217,7 +312,7 @@
           throw new Error('Malformed response from project template endpoint.');
         }
 
-        renderTree(payload.projectFile);
+        renderTree(payload.projectFile, { projectId: activeProjectId, projectName });
       } catch (err) {
         renderError(`Project browser failed to load: ${err.message}`);
       }

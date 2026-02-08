@@ -56,6 +56,19 @@ test('POINT_TRANSFORMER.HTML persists project point-file imports and exports wit
   assert.match(html, /persistPointSetToProjectFile\(\{\s*kind:\s*"export"/, 'PointForge should persist exported point sets to project file');
 });
 
+test('POINT_TRANSFORMER.HTML supports Project Browser point-file imports and point editor table view', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY\s*=\s*"pointforgeProjectBrowserImport"/, 'PointForge should use a stable localStorage key for Project Browser handoff payloads');
+  assert.match(html, /function\s+tryImportProjectBrowserPayload\(\)/, 'PointForge should define Project Browser import bootstrap logic');
+  assert.match(html, /params\.get\("source"\)\s*!==\s*"project-browser"/, 'PointForge Project Browser import bootstrap should be gated by query param');
+  assert.match(html, /localStorage\.getItem\(PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY\)/, 'PointForge should read project browser payload from localStorage');
+  assert.match(html, /id="btnToggleInputView"/, 'PointForge should render a button to toggle textarea and point editor views');
+  assert.match(html, /id="inputTableWrap"/, 'PointForge should render a tabular input point editor container');
+  assert.match(html, /id="outputTableWrap"/, 'PointForge should render a tabular output points container');
+  assert.match(html, /function\s+setPointEditorView\(enabled\)/, 'PointForge should define a helper to switch between textarea and point editor modes');
+});
+
 
 test('POINT_TRANSFORMER.HTML omits internal default-lock and passthrough commentary copy', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
