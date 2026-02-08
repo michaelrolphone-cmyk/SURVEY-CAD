@@ -86,6 +86,20 @@
       gap: 0.8rem;
     }
 
+    .file-row.pointforge-openable {
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: border-color 100ms ease, background-color 100ms ease;
+    }
+
+    .file-row.pointforge-openable:hover,
+    .file-row.pointforge-openable:focus-visible {
+      border-color: rgba(56, 189, 248, 0.45);
+      background: rgba(30, 41, 59, 0.72);
+      color: var(--text);
+      outline: none;
+    }
+
     .file-meta {
       display: flex;
       align-items: center;
@@ -253,12 +267,26 @@
           resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
 
           if (canLaunchPointForge) {
+            resource.classList.add('pointforge-openable');
+            resource.setAttribute('role', 'button');
+            resource.setAttribute('tabindex', '0');
+            resource.title = 'Tap to open this point file in PointForge';
+            resource.addEventListener('click', () => launchPointForgeFromResource(entry, projectContext));
+            resource.addEventListener('keydown', (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              launchPointForgeFromResource(entry, projectContext);
+            });
+
             const openButton = document.createElement('button');
             openButton.type = 'button';
             openButton.className = 'launch-btn';
             openButton.textContent = 'Open in PointForge';
             openButton.title = 'Loads this point file into PointForge input';
-            openButton.addEventListener('click', () => launchPointForgeFromResource(entry, projectContext));
+            openButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              launchPointForgeFromResource(entry, projectContext);
+            });
             resource.appendChild(openButton);
           }
 
