@@ -117,7 +117,7 @@ test('server exposes survey APIs and static html', async () => {
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();
-    assert.equal(appsPayload.apps.length, 6);
+    assert.equal(appsPayload.apps.length, 7);
     assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/SurveyFoundry\.png$/i);
 
@@ -168,6 +168,11 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(rosOcrStaticRes.status, 200);
     const rosOcrHtml = await rosOcrStaticRes.text();
     assert.match(rosOcrHtml, /Basis of Bearing Extractor/i);
+
+    const projectBrowserStaticRes = await fetch(`http://127.0.0.1:${app.port}/PROJECT_BROWSER.html`);
+    assert.equal(projectBrowserStaticRes.status, 200);
+    const projectBrowserHtml = await projectBrowserStaticRes.text();
+    assert.match(projectBrowserHtml, /SurveyFoundry Project Browser/i);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));

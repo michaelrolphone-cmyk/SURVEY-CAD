@@ -210,6 +210,7 @@ Launcher icon mappings now use the shipped PNG assets for core apps:
 - `RecordQuarry` → `/assets/icons/RecordQuarry.png`
 - `PointForge` → `/assets/icons/PointForge.png`
 - `LineSmith` → `/assets/icons/LineSmith.png`
+- `Project Browser` → `/assets/icons/project-browser.svg` (folder emoji icon)
 
 ### SurveyFoundry project file concept
 
@@ -241,6 +242,12 @@ Example launcher deep-link with active project context:
 open "http://localhost:3000/RecordQuarry.html?activeProjectId=project-123&activeProjectName=Demo%20Project"
 ```
 
+Project Browser deep-link command:
+
+```bash
+open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&activeProjectName=Demo%20Project"
+```
+
 Current apps in the catalog:
 
 - **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
@@ -248,6 +255,7 @@ Current apps in the catalog:
 - **RecordQuarry** (`RecordQuarry.html`): Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.
 - **ROS Basis Extractor** (`ROS_OCR.html`): OCR-based basis-of-bearing extraction from uploaded PDFs.
 - **PLSS + CP&F Explorer** (`CPNF.HTML`): aliquot/corner viewer with Ada County CP&F lookups.
+- **Project Browser** (`PROJECT_BROWSER.html`): Browse a symbolic SurveyFoundry project-file folder tree as a standalone app.
 - **PointForge Transformer** (`POINT_TRANSFORMER.HTML`): Builds the canonical point set (coords + provenance + weights).
 
 ## CLI Commands

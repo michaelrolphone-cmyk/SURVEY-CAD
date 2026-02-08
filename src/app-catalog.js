@@ -39,7 +39,7 @@ export const APP_CATALOG = [
     accent: '#FAF0CA',
     glyph: 'PB',
   },
-    {
+  {
     id: 'cpnf-corners',
     name: 'PLSS + CP&F Explorer',
     description: 'Map tool for PLSS aliquots, corner geometry labels, and nearby Ada County CP&F records.',
@@ -48,6 +48,16 @@ export const APP_CATALOG = [
     color: '#BC4749',
     accent: '#FFE8D6',
     glyph: 'CP',
+  },
+  {
+    id: 'project-browser',
+    name: 'Project Browser',
+    description: 'Browse the symbolic project-file folder structure as a standalone app.',
+    entryHtml: 'PROJECT_BROWSER.html',
+    iconPath: '/assets/icons/project-browser.svg',
+    color: '#64748B',
+    accent: '#E2E8F0',
+    glyph: 'PB',
   },
   {
     id: 'ros-ocr',
