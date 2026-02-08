@@ -12,9 +12,12 @@ test('POINT_TRANSFORMER.HTML exposes Open in Survey Sketch handoff controls', as
   assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate Survey Sketch using launcher-aware helper');
   assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into Survey Sketch code field');
   assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into Survey Sketch notes field');
-  assert.match(html, /rows\.push\(\[number, x, y, z, code, notes\]\)/, 'PointForge should preserve both code and notes when handing off to Survey Sketch');
+  assert.match(html, /const\s+handoffX\s*=\s*swapXY\s*\?\s*y\s*:\s*x\s*;/, 'PointForge should map handoff X to the state-plane easting used by Survey Sketch');
+  assert.match(html, /const\s+handoffY\s*=\s*swapXY\s*\?\s*x\s*:\s*y\s*;/, 'PointForge should map handoff Y to the state-plane northing used by Survey Sketch');
+  assert.match(html, /rows\.push\(\[number, handoffX, handoffY, z, code, notes\]\)/, 'PointForge should preserve handoff coordinates and metadata without additional normalization');
   assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for Survey Sketch map alignment');
   assert.match(html, /georeference:\s*\{[\s\S]*type:\s*"idaho-state-plane-usft"[\s\S]*zone,[\s\S]*swapXY,[\s\S]*points:\s*georeferencePoints/, 'PointForge handoff payload should include georeference metadata and sample points');
+  assert.match(html, /georeferencePoints\.push\(\{\s*x:\s*handoffX,\s*y:\s*handoffY,\s*lat,\s*lng:\s*lon\s*\}\)/, 'PointForge georeference samples should be keyed to the exact handoff coordinates');
 });
 
 test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
