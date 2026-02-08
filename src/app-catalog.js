@@ -1,23 +1,13 @@
 export const APP_CATALOG = [
   {
     id: 'launcher',
-    name: 'Survey CAD Launcher',
+    name: '943 Surveying Tools',
     description: 'Central launchpad that links all SURVEY-CAD tools from one start page.',
     entryHtml: 'index.html',
     iconPath: '/assets/icons/launcher.svg',
     color: '#355C7D',
     accent: '#F8B195',
     glyph: 'SC',
-  },
-  {
-    id: 'viewport-sketch',
-    name: 'Survey Sketch',
-    description: 'Interactive drafting workspace for points, bearings, and geometry construction workflows.',
-    entryHtml: 'VIEWPORT.HTML',
-    iconPath: '/assets/icons/viewport-sketch.svg',
-    color: '#0D3B66',
-    accent: '#FAF0CA',
-    glyph: 'PB',
   },
   {
     id: 'ros-lookup',
@@ -30,16 +20,6 @@ export const APP_CATALOG = [
     glyph: 'ROS',
   },
   {
-    id: 'ros-ocr',
-    name: 'ROS Basis Extractor',
-    description: 'Upload a Record of Survey PDF and extract ranked basis-of-bearing candidates using OCR.',
-    entryHtml: 'ROS_OCR.html',
-    iconPath: '/assets/icons/ros-ocr.svg',
-    color: '#6A4C93',
-    accent: '#F2E9FF',
-    glyph: 'OCR',
-  },
-  {
     id: 'cpnf-corners',
     name: 'PLSS + CP&F Explorer',
     description: 'Map tool for PLSS aliquots, corner geometry labels, and nearby Ada County CP&F records.',
@@ -50,6 +30,16 @@ export const APP_CATALOG = [
     glyph: 'CP',
   },
   {
+    id: 'ros-ocr',
+    name: 'ROS Basis Extractor',
+    description: 'Upload a Record of Survey PDF and extract ranked basis-of-bearing candidates using OCR.',
+    entryHtml: 'ROS_OCR.html',
+    iconPath: '/assets/icons/ros-ocr.svg',
+    color: '#6A4C93',
+    accent: '#F2E9FF',
+    glyph: 'OCR',
+  },
+  {
     id: 'pointforge-transformer',
     name: 'PointForge Transformer',
     description: 'Coordinate transformer and renumbering helper for NAD83 Idaho West point data workflows.',
@@ -58,6 +48,16 @@ export const APP_CATALOG = [
     color: '#3A5A40',
     accent: '#D8F3DC',
     glyph: 'PT',
+  },
+  {
+    id: 'viewport-sketch',
+    name: 'Survey Sketch',
+    description: 'Interactive drafting workspace for points, bearings, and geometry construction workflows.',
+    entryHtml: 'VIEWPORT.HTML',
+    iconPath: '/assets/icons/viewport-sketch.svg',
+    color: '#0D3B66',
+    accent: '#FAF0CA',
+    glyph: 'PB',
   },
 ];
 
