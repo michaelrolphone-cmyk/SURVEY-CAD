@@ -130,7 +130,9 @@ curl "http://localhost:3000/ROS.html"
 curl "http://localhost:3000/CPNF.HTML"
 curl "http://localhost:3000/cpnf.html"
 curl "http://localhost:3000/ROS_OCR.html"
-curl -X POST "http://localhost:3000/extract?maxPages=2&dpi=300&debug=1" \
+curl -X POST "http://localhost:3000/extract?maxPages=1&dpi=220&debug=1" \
+  -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
+curl -X POST "http://localhost:3000/extract?maxPages=3&dpi=400&allowSlow=1" \
   -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
 ```
 
@@ -205,7 +207,9 @@ Defaults: host `0.0.0.0`, port `3001` (`PORT` env var overrides). The standalone
 ```bash
 curl "http://localhost:3001/health"
 curl "http://localhost:3001/"   # standalone HTML page
-curl -X POST "http://localhost:3001/extract?maxPages=2&dpi=300&debug=1" \
+curl -X POST "http://localhost:3001/extract?maxPages=1&dpi=220&debug=1" \
+  -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
+curl -X POST "http://localhost:3001/extract?maxPages=3&dpi=400&allowSlow=1" \
   -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
 ```
 
@@ -214,8 +218,17 @@ curl -X POST "http://localhost:3001/extract?maxPages=2&dpi=300&debug=1" \
 - `best`: top-ranked basis candidate (or `null`)
 - `candidates`: all candidate detections
 - `diagnostics`: included when `debug=1` (includes detected `tessdata_prefix`)
+- `request`: normalized request settings (`requestedMaxPages`, `requestedDpi`, applied `maxPages`, applied `dpi`, and `allowSlow`)
 
 If Tesseract has no installed OCR languages (for example missing `eng.traineddata`), the extractor returns `best: null` / empty `candidates` and, when `debug=1`, includes a clear diagnostics error describing how to install tessdata or configure `TESSDATA_PREFIX`.
+
+`/extract` query parameters:
+- `maxPages` (default request value `1`)
+- `dpi` (default request value `220`)
+- `debug` (`1` to include diagnostics)
+- `allowSlow` (`1` to bypass safety clamping; use only if your dyno/runtime budget can tolerate longer OCR jobs)
+
+When `allowSlow` is not enabled, the API clamps expensive runs to reduce timeout/503 risk on Heroku-style 30s request limits (defaults can be tuned with `ROS_OCR_MAX_PAGES` and `ROS_OCR_DPI`).
 
 ### ROS OCR CLI
 

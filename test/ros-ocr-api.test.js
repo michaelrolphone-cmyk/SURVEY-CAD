@@ -48,11 +48,11 @@ maybeTest('ros ocr api rejects missing pdf uploads', async () => {
   }
 });
 
-maybeTest('ros ocr api returns extraction payload for uploaded pdf', async () => {
+maybeTest('ros ocr api clamps expensive defaults to reduce timeout risk', async () => {
   const mockResult = { pdf: 'tmp.pdf', best: { bearing: 'N 01°00\'00" E' }, candidates: [{ bearing: 'N 01°00\'00" E' }] };
   const app = await startApp(async (_pdfPath, opts) => {
-    assert.equal(opts.maxPages, 3);
-    assert.equal(opts.dpi, 400);
+    assert.equal(opts.maxPages, 1);
+    assert.equal(opts.dpi, 220);
     assert.equal(opts.debug, true);
     return mockResult;
   });
@@ -67,7 +67,42 @@ maybeTest('ros ocr api returns extraction payload for uploaded pdf', async () =>
     });
 
     assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), mockResult);
+    const payload = await res.json();
+    assert.equal(payload.request.allowSlow, false);
+    assert.equal(payload.request.requestedMaxPages, 3);
+    assert.equal(payload.request.requestedDpi, 400);
+    assert.equal(payload.request.maxPages, 1);
+    assert.equal(payload.request.dpi, 220);
+    assert.deepEqual(payload.best, mockResult.best);
+    assert.deepEqual(payload.candidates, mockResult.candidates);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+maybeTest('ros ocr api allows full settings when allowSlow=1', async () => {
+  const app = await startApp(async (_pdfPath, opts) => {
+    assert.equal(opts.maxPages, 3);
+    assert.equal(opts.dpi, 400);
+    assert.equal(opts.debug, false);
+    return { pdf: 'tmp.pdf', best: null, candidates: [] };
+  });
+
+  try {
+    const form = new FormData();
+    form.append('pdf', new Blob(['%PDF-1.4\n%test\n'], { type: 'application/pdf' }), 'sample.pdf');
+
+    const res = await fetch(`http://127.0.0.1:${app.port}/extract?maxPages=3&dpi=400&allowSlow=1`, {
+      method: 'POST',
+      body: form,
+    });
+
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.request.allowSlow, true);
+    assert.equal(payload.request.maxPages, 3);
+    assert.equal(payload.request.dpi, 400);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }
