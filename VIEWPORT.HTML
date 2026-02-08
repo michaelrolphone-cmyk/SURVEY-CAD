@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Survey Sketch — Points & Bearings</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
   <style>
     :root{
       --bg:#0b0b0b;
@@ -165,7 +171,23 @@
       overflow:hidden;
       background:#000;
     }
+    .mapBackdrop{
+      position:absolute;
+      inset:0;
+      z-index:0;
+      pointer-events:none;
+      opacity:0;
+      transition:opacity .15s ease;
+    }
+    .mapBackdrop.on{ opacity:1; }
+    .mapBackdrop .leaflet-container{
+      width:100%;
+      height:100%;
+      background:#000;
+    }
     canvas{
+      position:relative;
+      z-index:1;
       width:100%;
       height:100%;
       display:block;
@@ -175,6 +197,7 @@
       position:absolute;
       left:10px;
       bottom:10px;
+      z-index:2;
       display:flex;
       gap:8px;
       flex-wrap:wrap;
@@ -508,7 +531,25 @@
         <label><input id="showPointCodes" type="checkbox" checked /> Draw point codes</label>
         <label><input id="showPointNotes" type="checkbox" checked /> Draw point notes</label>
       </div>
-      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching.</div>
+      <div class="sep"></div>
+      <div class="inline">
+        <label><input id="mapLayerEnabled" type="checkbox" /> Show map layer behind canvas</label>
+      </div>
+      <div class="grid2" style="margin-top:8px;">
+        <label>Map tiles
+          <select id="mapTileType">
+            <option value="satellite" selected>Satellite</option>
+            <option value="osmStandard">OpenStreetMap Standard</option>
+            <option value="osmHumanitarian">OpenStreetMap Humanitarian</option>
+            <option value="osmCycle">OpenStreetMap Cycle</option>
+          </select>
+        </label>
+        <label>Map opacity
+          <input id="mapOpacity" type="range" min="0" max="100" step="1" value="10" />
+          <span class="mini" id="mapOpacityValue">10%</span>
+        </label>
+      </div>
+      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching. Map layer starts off and defaults to 10% opacity when enabled.</div>
     </div>
 
     <div class="section">
@@ -618,6 +659,7 @@
   </div>
 
   <div class="canvasWrap">
+    <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>
     <div class="hud">
       <span class="pill"><b>Tool</b> <span id="hudTool">Select/Move</span></span>
@@ -675,6 +717,11 @@
   </div>
 </div>
 
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
 <script>
 (() => {
   // -------------------------
@@ -933,6 +980,11 @@
   // -------------------------
   const canvas = $("#c");
   const ctx = canvas.getContext("2d");
+  const mapBackdrop = $("#mapBackdrop");
+  const mapEnabledInput = $("#mapLayerEnabled");
+  const mapTileTypeInput = $("#mapTileType");
+  const mapOpacityInput = $("#mapOpacity");
+  const mapOpacityValue = $("#mapOpacityValue");
 
   const hudTool = $("#hudTool");
   const hudMouse = $("#hudMouse");
@@ -994,8 +1046,119 @@
     notes: true
   };
 
+  const mapLayerState = {
+    enabled: false,
+    tileType: "satellite",
+    opacity: 0.1
+  };
+
+  const MAP_TILESETS = {
+    satellite: {
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      options: {
+        maxZoom: 20,
+        attribution: "Tiles &copy; Esri"
+      }
+    },
+    osmStandard: {
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      options: {
+        maxZoom: 20,
+        attribution: "&copy; OpenStreetMap contributors"
+      }
+    },
+    osmHumanitarian: {
+      url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+      options: {
+        maxZoom: 20,
+        attribution: "&copy; OpenStreetMap contributors, Tiles style by HOT"
+      }
+    },
+    osmCycle: {
+      url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+      options: {
+        maxZoom: 20,
+        attribution: "&copy; OpenStreetMap contributors, Map style: OpenTopoMap"
+      }
+    }
+  };
+
+  let mapInstance = null;
+  let mapTileLayer = null;
+
   function isMovable(value) {
     return value === true;
+  }
+
+  function scaleToLeafletZoom(scale) {
+    if (!Number.isFinite(scale) || scale <= 0) return 2;
+    const zoom = Math.log2((scale * 360) / 256);
+    return clamp(zoom, 1, 22);
+  }
+
+  function clampLatLng(lat, lng) {
+    return {
+      lat: clamp(lat, -85, 85),
+      lng: clamp(lng, -180, 180)
+    };
+  }
+
+  function ensureMapLayer() {
+    if (mapInstance || !window.L) return;
+    mapInstance = L.map("mapLayer", {
+      zoomControl: false,
+      attributionControl: true,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false,
+      tap: false,
+      touchZoom: false,
+      zoomSnap: 0,
+      zoomDelta: 0.25
+    });
+    applyMapTileType();
+    applyMapOpacity();
+    syncMapToView(true);
+  }
+
+  function applyMapTileType() {
+    if (!mapInstance) return;
+    const tile = MAP_TILESETS[mapLayerState.tileType] || MAP_TILESETS.satellite;
+    if (mapTileLayer) mapInstance.removeLayer(mapTileLayer);
+    mapTileLayer = L.tileLayer(tile.url, tile.options).addTo(mapInstance);
+  }
+
+  function applyMapOpacity() {
+    if (mapBackdrop) {
+      mapBackdrop.style.opacity = String(mapLayerState.opacity);
+    }
+    if (mapOpacityValue) {
+      mapOpacityValue.textContent = `${Math.round(mapLayerState.opacity * 100)}%`;
+    }
+  }
+
+  function syncMapToView(force=false) {
+    if (!mapLayerState.enabled || !mapInstance) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const center = screenToWorld(rect.width * 0.5, rect.height * 0.5);
+    const ll = clampLatLng(center.y, center.x);
+    const zoom = scaleToLeafletZoom(view.scale);
+    mapInstance.setView([ll.lat, ll.lng], zoom, { animate: false });
+    if (force) mapInstance.invalidateSize(false);
+  }
+
+  function setMapLayerEnabled(enabled) {
+    mapLayerState.enabled = enabled === true;
+    if (mapLayerState.enabled) {
+      ensureMapLayer();
+    }
+    mapBackdrop.classList.toggle("on", mapLayerState.enabled);
+    if (mapLayerState.enabled) {
+      syncMapToView(true);
+    }
   }
 
   // -------------------------
@@ -1256,6 +1419,7 @@
       view.panX = rect.width * 0.5;
       view.panY = rect.height * 0.5;
     }
+    if (mapLayerState.enabled) syncMapToView(true);
   }
 
   function pickGridStep() {
@@ -1353,10 +1517,13 @@
     const W = rect.width, H = rect.height;
 
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0,0,W,H);
+    if (!mapLayerState.enabled) {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0,0,W,H);
+    }
 
     drawGrid(W,H);
+    if (mapLayerState.enabled) syncMapToView();
 
     const blockedTextRects = [];
 
@@ -1588,6 +1755,20 @@
   $("#showPointNotes").addEventListener("change", () => {
     syncPointLabelVisibility();
     setStatus(`Point notes labels ${labelVisibility.notes ? "shown" : "hidden"}.`, "ok");
+  });
+
+  mapEnabledInput.addEventListener("change", () => {
+    setMapLayerEnabled(mapEnabledInput.checked);
+    setStatus(`Map layer ${mapLayerState.enabled ? "enabled" : "disabled"}.`, "ok");
+  });
+  mapTileTypeInput.addEventListener("change", () => {
+    mapLayerState.tileType = String(mapTileTypeInput.value || "satellite");
+    applyMapTileType();
+    syncMapToView(true);
+  });
+  mapOpacityInput.addEventListener("input", () => {
+    mapLayerState.opacity = clamp(parseNum(mapOpacityInput.value, 10) / 100, 0, 1);
+    applyMapOpacity();
   });
 
   syncPointLabelVisibility();
@@ -2986,6 +3167,12 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   function boot() {
     resize();
     window.addEventListener("resize", resize);
+    mapEnabledInput.checked = false;
+    mapTileTypeInput.value = "satellite";
+    mapOpacityInput.value = "10";
+    mapLayerState.opacity = 0.1;
+    applyMapOpacity();
+    setMapLayerEnabled(false);
     setTool("select");
     updatePointEditorFromSelection();
     updateUndoRedoHUD();
