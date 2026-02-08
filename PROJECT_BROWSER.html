@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Browser</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #172033;
+      --panel-alt: #1e293b;
+      --border: rgba(148, 163, 184, 0.25);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #1e293b 0%, var(--bg) 60%);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .app-shell {
+      margin: 0 auto;
+      max-width: 920px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 0.95rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .subtitle {
+      margin: 0.3rem 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .content {
+      padding: 1rem;
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .tree-root,
+    .folder-row,
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      border-radius: 8px;
+      padding: 0.42rem 0.55rem;
+    }
+
+    .tree-root,
+    .folder-row {
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .folder-row {
+      margin-top: 0.45rem;
+      background: var(--panel-alt);
+    }
+
+    .file-row {
+      margin-left: 1.65rem;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .icon {
+      width: 1.2rem;
+      text-align: center;
+      flex: none;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .empty {
+      margin-left: 1.65rem;
+      color: var(--muted);
+      font-style: italic;
+      font-size: 0.86rem;
+    }
+
+    .error {
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 10px;
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.24);
+      padding: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <h1>📁 SurveyFoundry Project Browser</h1>
+      <p class="subtitle" id="projectLabel">Loading active project…</p>
+    </header>
+    <section class="content" id="treeContainer"></section>
+  </div>
+
+  <script>
+    const projectLabel = document.getElementById('projectLabel');
+    const treeContainer = document.getElementById('treeContainer');
+
+    function loadActiveProjectContext(activeProjectId) {
+      try {
+        const projects = JSON.parse(localStorage.getItem('surveyfoundryProjects') || '[]');
+        if (!Array.isArray(projects)) return null;
+        return projects.find((project) => project.id === activeProjectId) || null;
+      } catch {
+        return null;
+      }
+    }
+
+    function renderTree(projectFile) {
+      treeContainer.innerHTML = '';
+
+      const root = document.createElement('div');
+      root.className = 'tree-root';
+      root.innerHTML = `<span class="icon">🗂️</span><strong>${projectFile.archive.rootFolderName}</strong><span class="muted">(symbolic root folder)</span>`;
+      treeContainer.appendChild(root);
+
+      for (const folder of projectFile.folders || []) {
+        const folderRow = document.createElement('div');
+        folderRow.className = 'folder-row';
+        folderRow.innerHTML = `<span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span>`;
+        treeContainer.appendChild(folderRow);
+
+        const indexFile = document.createElement('div');
+        indexFile.className = 'file-row';
+        indexFile.innerHTML = '<span class="icon">📄</span>index.json';
+        treeContainer.appendChild(indexFile);
+
+        if (!folder.index.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'No linked resources yet.';
+          treeContainer.appendChild(empty);
+          continue;
+        }
+
+        for (const entry of folder.index) {
+          const resource = document.createElement('div');
+          resource.className = 'file-row';
+          resource.innerHTML = `<span class="icon">📄</span>${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span>`;
+          treeContainer.appendChild(resource);
+        }
+      }
+
+      const manifest = document.createElement('div');
+      manifest.className = 'file-row';
+      manifest.style.marginLeft = '0';
+      manifest.innerHTML = '<span class="icon">📄</span>project-file.json';
+      treeContainer.appendChild(manifest);
+    }
+
+    function renderError(message) {
+      treeContainer.innerHTML = `<div class="error">${message}</div>`;
+    }
+
+    async function initialize() {
+      const params = new URLSearchParams(window.location.search);
+      const activeProjectId = params.get('activeProjectId') || '';
+      const activeProjectName = params.get('activeProjectName') || '';
+      const activeProject = activeProjectId ? loadActiveProjectContext(activeProjectId) : null;
+      const projectName = activeProject?.name || activeProjectName || 'Untitled Project';
+      const client = activeProject?.client || '';
+      const address = activeProject?.address || '';
+
+      projectLabel.textContent = activeProjectId
+        ? `Active project: ${projectName} (${activeProjectId})`
+        : 'No active project selected. Showing a template project structure.';
+
+      const templateUrl = new URL('/api/project-file/template', window.location.origin);
+      templateUrl.searchParams.set('projectId', activeProjectId || 'project-browser-preview');
+      templateUrl.searchParams.set('projectName', projectName);
+      if (client) templateUrl.searchParams.set('client', client);
+      if (address) templateUrl.searchParams.set('address', address);
+
+      try {
+        const response = await fetch(templateUrl.toString());
+        if (!response.ok) {
+          throw new Error(`Unable to load project file (${response.status})`);
+        }
+        const payload = await response.json();
+        if (!payload?.projectFile) {
+          throw new Error('Malformed response from project template endpoint.');
+        }
+
+        renderTree(payload.projectFile);
+      } catch (err) {
+        renderError(`Project browser failed to load: ${err.message}`);
+      }
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
