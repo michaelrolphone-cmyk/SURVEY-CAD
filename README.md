@@ -96,7 +96,7 @@ Upstream HTTP failures from third-party services (for example, geocoding provide
 
 The static HTML tools use `src/browser-survey-client.js` so network calls flow through shared server endpoints backed by `SurveyCadClient`:
 
-- `lookupByAddress(address)` → `/api/lookup`
+- `lookupByAddress(address)` → `/api/lookup` (if Ada County address layer misses but geocoding succeeds, `ROS.html` continues lookup using geocoded coordinates)
 - `findParcelNearPoint(lon, lat, outSR?, searchMeters?)` → `/api/parcel`
 - `loadSectionAtPoint(lon, lat)` → `/api/section`
 - `loadAliquotsAtPoint(lon, lat, outSR?)` → `/api/aliquots`
