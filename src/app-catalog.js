@@ -40,16 +40,6 @@ export const APP_CATALOG = [
     glyph: 'PB',
   },
   {
-    id: 'cpnf-corners',
-    name: 'PLSS + CP&F Explorer',
-    description: 'Map tool for PLSS aliquots, corner geometry labels, and nearby Ada County CP&F records.',
-    entryHtml: 'CPNF.HTML',
-    iconPath: '/assets/icons/cpnf-corners.svg',
-    color: '#BC4749',
-    accent: '#FFE8D6',
-    glyph: 'CP',
-  },
-  {
     id: 'project-browser',
     name: 'Project Browser',
     description: 'Browse the symbolic project-file folder structure as a standalone app.',
@@ -60,6 +50,17 @@ export const APP_CATALOG = [
     glyph: 'PB',
   },
   {
+    id: 'cpnf-corners',
+    name: 'PLSS + CP&F Explorer',
+    description: 'Map tool for PLSS aliquots, corner geometry labels, and nearby Ada County CP&F records.',
+    entryHtml: 'CPNF.HTML',
+    iconPath: '/assets/icons/cpnf-corners.svg',
+    color: '#BC4749',
+    accent: '#FFE8D6',
+    glyph: 'CP',
+    experimental: true,
+  },
+  {
     id: 'ros-ocr',
     name: 'ROS Basis Extractor',
     description: 'Upload a Record of Survey PDF and extract ranked basis-of-bearing candidates using OCR.',
@@ -68,6 +69,7 @@ export const APP_CATALOG = [
     color: '#6A4C93',
     accent: '#F2E9FF',
     glyph: 'OCR',
+    experimental: true,
   },
 ];
 

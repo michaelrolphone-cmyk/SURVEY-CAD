@@ -16,6 +16,19 @@ test('launcher cards show app name, description, and larger icons', async () => 
 });
 
 
+
+test('launcher renders experimental apps in a dedicated section after stable apps', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /id="appSections"/, 'launcher should mount app sections wrapper');
+  assert.match(launcherHtml, /function\s+renderAppSection\(title, sectionApps\)/, 'launcher should render app sections with optional heading');
+  assert.match(launcherHtml, /const\s+stableApps\s*=\s*apps\.filter\(\(app\)\s*=>\s*!app\.experimental\);/, 'launcher should compute stable app list first');
+  assert.match(launcherHtml, /const\s+experimentalApps\s*=\s*apps\.filter\(\(app\)\s*=>\s*app\.experimental\);/, 'launcher should compute experimental app list');
+  assert.match(launcherHtml, /renderAppSection\('',\s*stableApps\);/, 'launcher should render stable apps before experimental apps');
+  assert.match(launcherHtml, /renderAppSection\('Experimental',\s*experimentalApps\);/, 'launcher should render explicit experimental section heading');
+  assert.match(launcherHtml, /\.app-section-title\s*\{[\s\S]*text-transform:\s*uppercase;/i, 'launcher should style section heading');
+});
+
 test('launcher supports in-iframe app handoff navigation messages', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
