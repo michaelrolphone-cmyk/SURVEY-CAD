@@ -129,6 +129,8 @@ Any repository-root static file can be requested directly. File path matching is
 curl "http://localhost:3000/ROS.html"
 curl "http://localhost:3000/CPNF.HTML"
 curl "http://localhost:3000/cpnf.html"
+curl "http://localhost:3000/POINT_TRANSFORMER.HTML"
+curl "http://localhost:3000/VIEWPORT.HTML?source=pointforge"
 curl "http://localhost:3000/ROS_OCR.html"
 curl -X POST "http://localhost:3000/extract?maxPages=1&dpi=220&debug=1" \
   -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
@@ -149,6 +151,15 @@ Run the web app and open the ROS helper directly:
 npm start
 open http://localhost:3000/ROS.html
 ```
+
+PointForge → Survey Sketch handoff (imports transformed output points into Survey Sketch):
+
+```bash
+npm start
+open http://localhost:3000/POINT_TRANSFORMER.HTML
+```
+
+In PointForge, click **Open in Survey Sketch** after processing points; this opens `VIEWPORT.HTML?source=pointforge` and auto-imports the transformed points via browser local storage.
 
 `ROS.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
 `ROS.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
@@ -175,7 +186,7 @@ Current apps in the catalog:
 - **ROS / Parcel Lookup** (`ROS.html`): address lookup for parcels, sections, ROS, and PDF links.
 - **ROS Basis Extractor** (`ROS_OCR.html`): OCR-based basis-of-bearing extraction from uploaded PDFs.
 - **PLSS + CP&F Explorer** (`CPNF.HTML`): aliquot/corner viewer with Ada County CP&F lookups.
-- **PointForge Transformer** (`POINT_TRANSFORMER.HTML`): NAD83 Idaho West coordinate transform and renumbering helper.
+- **PointForge Transformer** (`POINT_TRANSFORMER.HTML`): NAD83 Idaho West coordinate transform and renumbering helper with one-click handoff to Survey Sketch imports.
 
 ## CLI Commands
 

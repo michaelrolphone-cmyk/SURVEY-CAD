@@ -118,7 +118,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();
     assert.equal(appsPayload.apps.length, 6);
-    assert.equal(appsPayload.apps[0].name, 'Survey CAD Launcher');
+    assert.equal(appsPayload.apps[0].name, '943 Surveying Tools');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/launcher\.svg$/i);
 
     const lookupRes = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('100 Main St, Boise')}`);
