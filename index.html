@@ -176,6 +176,12 @@
       margin-bottom: 0.2rem;
     }
 
+    .app-description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.35;
+    }
 
     .viewer {
       display: flex;
@@ -375,6 +381,7 @@
           <img class="app-icon" src="${app.iconPath}" alt="${app.name} icon" loading="lazy" />
           <div class="app-meta">
             <strong>${app.name}</strong>
+            <p class="app-description">${app.description || ''}</p>
           </div>
         `;
         card.addEventListener('click', () => openApp(app.entryHtml));

@@ -203,6 +203,7 @@ curl "http://localhost:3000/api/apps"
 
 - Create a project with **project name**, **client**, and **address**.
 - Start that project directly in RecordQuarry via **Start in RecordQuarry**.
+- Launcher app cards now display each app's catalog description under the app name for quicker selection context.
 - Launcher opens `RecordQuarry.html` with query parameters (`projectId`, `projectName`, `client`, `address`, `autostart=1`).
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.
 - Re-opening the same project restores saved RecordQuarry results from local storage before falling back to a live lookup.
