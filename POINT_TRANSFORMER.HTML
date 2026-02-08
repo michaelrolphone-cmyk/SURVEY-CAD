@@ -403,7 +403,7 @@
         </div>
         <div class="sub">
           Defaults locked: <span class="kbd">US-ft</span> + <span class="kbd">Idaho West</span> + <span class="kbd">Swap X/Y</span>.
-          Input: <span class="kbd">NAME,X,Y,Z,DESCRIPTION</span> (description = last column). Output sorted by point number.
+          Input: <span class="kbd">NAME,X,Y,Z[,CODE[,NOTES]]</span>. Output sorted by point number.
         </div>
       </div>
 
@@ -430,7 +430,7 @@
           <div style="flex:1 1 100%;">
             <label for="file">Load point file (.txt / .csv)</label>
             <input id="file" type="file" accept=".txt,.csv,text/plain,text/csv" />
-            <div class="hint">Or paste into the field below. Processing doesn’t modify coordinates; only point IDs + descriptions.</div>
+            <div class="hint">Or paste into the field below. Processing doesn’t modify coordinates; only point IDs (plus code/notes passthrough).</div>
           </div>
         </div>
 
@@ -1075,11 +1075,12 @@
         const y = Number(record.fields[2]);
         const zRaw = trimOrEmpty(record.fields[3]);
         const z = Number.isFinite(Number(zRaw)) ? Number(zRaw) : 0;
-        const notes = trimOrEmpty(record.fields[record.fields.length - 1]);
+        const code = trimOrEmpty(record.fields[4]);
+        const notes = trimOrEmpty(record.fields[5]);
 
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
-        rows.push([number, x, y, z, "", notes]);
+        rows.push([number, x, y, z, code, notes]);
       }
 
       return {
