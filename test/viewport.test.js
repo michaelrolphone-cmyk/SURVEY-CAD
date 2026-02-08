@@ -58,4 +58,6 @@ test('VIEWPORT.HTML exposes map backdrop controls with expected defaults and wir
   assert.match(html, /mapEnabledInput\.addEventListener\("change",\s*\(\)\s*=>\s*\{[\s\S]*setMapLayerEnabled\(mapEnabledInput\.checked\)/, 'map toggle should be wired to set enabled state');
   assert.match(html, /mapTileTypeInput\.addEventListener\("change"[\s\S]*mapLayerState\.tileType\s*=\s*String\(mapTileTypeInput\.value\s*\|\|\s*"satellite"\)/, 'map tile selector should update current tileset');
   assert.match(html, /mapOpacityInput\.addEventListener\("input"[\s\S]*mapLayerState\.opacity\s*=\s*clamp\(parseNum\(mapOpacityInput\.value,\s*10\)\s*\/\s*100,\s*0,\s*1\)/, 'opacity slider should update map backdrop opacity');
+  assert.match(html, /function\s+zoomExtents\(options\s*=\s*\{\}\)/, 'zoom extents helper should accept options for silent and history-safe recentering');
+  assert.match(html, /if \(mapLayerState\.enabled\) \{[\s\S]*if \(points\.size > 0\) \{[\s\S]*zoomExtents\(\{ skipHistory: true, silent: true \}\);/, 'enabling map layer should reframe to drawing extents without mutating undo history');
 });

@@ -1154,6 +1154,9 @@
     mapLayerState.enabled = enabled === true;
     if (mapLayerState.enabled) {
       ensureMapLayer();
+      if (points.size > 0) {
+        zoomExtents({ skipHistory: true, silent: true });
+      }
     }
     mapBackdrop.classList.toggle("on", mapLayerState.enabled);
     if (mapLayerState.enabled) {
@@ -1965,12 +1968,13 @@
   // -------------------------
   // Zoom extents
   // -------------------------
-  function zoomExtents() {
+  function zoomExtents(options = {}) {
+    const { skipHistory = false, silent = false } = options;
     if (points.size === 0) {
-      setStatus("No points to zoom to.", "warn");
-      return;
+      if (!silent) setStatus("No points to zoom to.", "warn");
+      return false;
     }
-    history.push("zoom extents");
+    if (!skipHistory) history.push("zoom extents");
     let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
     for (const p of points.values()) {
       minX = Math.min(minX, p.x);
@@ -2000,7 +2004,10 @@
     view.panX = rect.width * 0.5 - cx * view.scale;
     view.panY = rect.height * 0.5 + cy * view.scale;
 
-    setStatus(`Zoomed to extents.\nX: [${fmt(minX)}, ${fmt(maxX)}]\nY: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
+    if (!silent) {
+      setStatus(`Zoomed to extents.\nX: [${fmt(minX)}, ${fmt(maxX)}]\nY: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
+    }
+    return true;
   }
 
   // -------------------------
