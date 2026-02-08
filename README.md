@@ -132,7 +132,7 @@ curl -X POST "http://localhost:3000/extract?maxPages=2&dpi=300&debug=1" \
   -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
 ```
 
-`/` defaults to `VIEWPORT.HTML`. `ROS_OCR.html` posts to `/extract`, which is now served by the main `npm start` web server (same behavior as the standalone ROS OCR app).
+`/` defaults to `index.html` (the SURVEY CAD app launcher), which includes `ROS_OCR.html` as an app entry. `ROS_OCR.html` posts to `/extract`, which is now served by the main `npm start` web server (same behavior as the standalone ROS OCR app).
 
 `VIEWPORT.HTML` drag locking behavior: points and lines are locked by default and can only be drag-moved after you double-click to toggle them to movable. Persisted/imported movable flags now only unlock dragging when the value is strict boolean `true`.
 

@@ -141,6 +141,12 @@ test('server exposes survey APIs and static html', async () => {
     assert.match(cpnfHtml, /<html/i);
     assert.match(cpnfHtml, /browser-survey-client\.js/);
 
+    const launcherRes = await fetch(`http://127.0.0.1:${app.port}/`);
+    assert.equal(launcherRes.status, 200);
+    const launcherHtml = await launcherRes.text();
+    assert.match(launcherHtml, /SURVEY CAD App Launcher/i);
+    assert.match(launcherHtml, /ROS_OCR\.html/);
+
     const rosOcrStaticRes = await fetch(`http://127.0.0.1:${app.port}/ROS_OCR.html`);
     assert.equal(rosOcrStaticRes.status, 200);
     const rosOcrHtml = await rosOcrStaticRes.text();
