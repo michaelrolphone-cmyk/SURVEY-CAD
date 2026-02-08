@@ -1700,13 +1700,28 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         exportedAt: new Date().toISOString(),
         csv: uniquePart.csv,
       }));
-      window.open('/POINT_TRANSFORMER.HTML?source=ros', '_blank', 'noopener,noreferrer');
+      openLinkedApp('/POINT_TRANSFORMER.HTML?source=ros');
       log(`Sent ${uniquePart.count} unique boundary points to PointForge.`);
     } catch (e) {
       log(`PointForge export failed: ${e.message || e}`, "bad");
       console.error(e);
     }
   });
+
+  function openLinkedApp(path) {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'survey-cad:navigate-app',
+          path,
+        }, window.location.origin);
+        return;
+      }
+    } catch (_error) {
+      // If parent access is blocked, fallback to same-tab navigation.
+    }
+    window.location.assign(path);
+  }
 
   $("btnScanPdf").addEventListener("click", async () => {
     const file = $("pdfFile").files?.[0];

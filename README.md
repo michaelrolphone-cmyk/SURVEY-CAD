@@ -159,9 +159,9 @@ npm start
 open http://localhost:3000/POINT_TRANSFORMER.HTML
 ```
 
-In PointForge, click **Open in Survey Sketch** after processing points; this opens `VIEWPORT.HTML?source=pointforge` and auto-imports the transformed points via browser local storage.
+In PointForge, click **Open in Survey Sketch** after processing points; this navigates to `VIEWPORT.HTML?source=pointforge` (inside the launcher iframe when embedded, or current tab when standalone) and auto-imports the transformed points via browser local storage.
 
-`ROS.html` also supports one-click **Export to PointForge** for unique parcel/subdivision/aliquot boundary vertices. The button stores a temporary payload in browser local storage and opens `POINT_TRANSFORMER.HTML?source=ros`, where PointForge auto-loads the incoming CSV points.
+`ROS.html` also supports one-click **Export to PointForge** for unique parcel/subdivision/aliquot boundary vertices. The button stores a temporary payload in browser local storage and navigates to `POINT_TRANSFORMER.HTML?source=ros` (inside the launcher iframe when embedded, or current tab when standalone), where PointForge auto-loads the incoming CSV points.
 
 `ROS.html` **Export Unique Parcel/Subdivision/Aliquots CSV (IDW ft)** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
 

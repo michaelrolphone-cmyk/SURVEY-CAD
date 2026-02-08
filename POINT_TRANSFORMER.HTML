@@ -1185,9 +1185,26 @@
 
       const payload = buildSurveySketchImportPayload(recordsSorted);
       localStorage.setItem(SURVEY_SKETCH_IMPORT_STORAGE_KEY, JSON.stringify(payload));
-      window.open("/VIEWPORT.HTML?source=pointforge", "_blank", "noopener,noreferrer");
+      openLinkedApp("/VIEWPORT.HTML?source=pointforge");
     });
 
+
+
+
+    function openLinkedApp(path){
+      try {
+        if (window.parent && window.parent !== window){
+          window.parent.postMessage({
+            type: "survey-cad:navigate-app",
+            path,
+          }, window.location.origin);
+          return;
+        }
+      } catch (_error){
+        // If parent access is blocked, fallback to same-tab navigation.
+      }
+      window.location.assign(path);
+    }
 
     function tryImportRosPayload(){
       const params = new URLSearchParams(window.location.search);
