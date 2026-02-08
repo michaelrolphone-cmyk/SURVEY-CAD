@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ROS Basis of Bearing Extractor</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; max-width: 860px; }
+    fieldset { margin-bottom: 1rem; }
+    label { display: block; margin: 0.5rem 0; }
+    button { padding: 0.5rem 0.9rem; }
+    pre { background: #111; color: #eaeaea; padding: 1rem; border-radius: 8px; overflow: auto; min-height: 180px; }
+    .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .row > label { min-width: 140px; }
+  </style>
+</head>
+<body>
+  <h1>ROS Basis of Bearing Extractor</h1>
+  <p>Upload a Record of Survey PDF to extract basis-of-bearing candidates.</p>
+
+  <form id="extractForm">
+    <fieldset>
+      <legend>Input</legend>
+      <label>ROS PDF
+        <input id="pdf" type="file" accept="application/pdf" required />
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Options</legend>
+      <div class="row">
+        <label>Max Pages
+          <input id="maxPages" type="number" min="1" max="10" value="2" />
+        </label>
+        <label>DPI
+          <input id="dpi" type="number" min="100" max="1200" value="300" />
+        </label>
+        <label>
+          <input id="debug" type="checkbox" /> Include debug diagnostics
+        </label>
+      </div>
+    </fieldset>
+
+    <button type="submit">Extract Basis of Bearing</button>
+  </form>
+
+  <h2>Output</h2>
+  <pre id="output">No extraction run yet.</pre>
+
+  <script>
+    const form = document.getElementById('extractForm');
+    const output = document.getElementById('output');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const pdfInput = document.getElementById('pdf');
+      if (!pdfInput.files || !pdfInput.files.length) {
+        output.textContent = 'Please choose a PDF file.';
+        return;
+      }
+
+      const maxPages = document.getElementById('maxPages').value || '2';
+      const dpi = document.getElementById('dpi').value || '300';
+      const debug = document.getElementById('debug').checked;
+
+      const formData = new FormData();
+      formData.append('pdf', pdfInput.files[0]);
+
+      const url = `/extract?maxPages=${encodeURIComponent(maxPages)}&dpi=${encodeURIComponent(dpi)}&debug=${debug ? '1' : '0'}`;
+      output.textContent = 'Running OCR extraction...';
+
+      try {
+        const res = await fetch(url, { method: 'POST', body: formData });
+        const payload = await res.json().catch(() => ({}));
+        output.textContent = JSON.stringify(payload, null, 2);
+        if (!res.ok) {
+          output.textContent = `HTTP ${res.status}\n\n${output.textContent}`;
+        }
+      } catch (err) {
+        output.textContent = `Request failed: ${err.message || String(err)}`;
+      }
+    });
+  </script>
+</body>
+</html>

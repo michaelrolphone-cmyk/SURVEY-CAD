@@ -140,6 +140,11 @@ test('server exposes survey APIs and static html', async () => {
     const cpnfHtml = await caseInsensitiveStaticRes.text();
     assert.match(cpnfHtml, /<html/i);
     assert.match(cpnfHtml, /browser-survey-client\.js/);
+
+    const rosOcrStaticRes = await fetch(`http://127.0.0.1:${app.port}/ROS_OCR.html`);
+    assert.equal(rosOcrStaticRes.status, 200);
+    const rosOcrHtml = await rosOcrStaticRes.text();
+    assert.match(rosOcrHtml, /Basis of Bearing Extractor/i);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));
