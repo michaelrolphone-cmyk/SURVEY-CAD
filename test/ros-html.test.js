@@ -19,6 +19,7 @@ test('ROS.html routes ROS PDF links through API server and exports unique parcel
   assert.doesNotMatch(html, /sv\.includes\("\/"\)/, 'relative PDF fields without slash should still be proxied');
   assert.match(html, /drawCornerMarkers\(/, 'corner markers should be drawn on the map');
   assert.match(html, /buildRosBoundaryCsvRowsPNEZD\(/, 'CSV export should use ROS-specific simplified point-code export builder');
+  assert.match(html, /id="btnExportParcelCSV"[^>]*>Export CSV<\/button>/, 'CSV export button label should be simplified to Export CSV');
   assert.match(html, /parcel_subdivision_aliquots_unique_points_idw_ft_pnezd\.csv/, 'CSV filename should reflect unique parcel/subdivision/aliquot points');
   assert.match(html, /state\.sectionFeature2243\s*=\s*await\s*fetchSectionGeometry2243FromPoint\(lon, lat\)/, 'export lookup should fetch containing section geometry in export SR');
 });
