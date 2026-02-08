@@ -394,7 +394,8 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     const parts = [];
     for (const [k,v] of Object.entries(params)) {
       if (v === undefined || v === null) continue;
-      parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(String(v)));
+      const value = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(value));
     }
     return parts.join("&");
   }
@@ -587,15 +588,21 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
       const pdfNameKey = pickField(features[0]?.attributes || {}, layerMeta, [/file/i, /filename/i, /pdfname/i]);
 
       const records = features.map((feature) => {
+        const x = Number(feature?.geometry?.x);
+        const y = Number(feature?.geometry?.y);
+        const distanceMeters = Number.isFinite(x) && Number.isFinite(y)
+          ? haversineMeters(lat, lon, y, x)
+          : null;
         const attrs = feature.attributes || {};
         const instrument = instrumentKey ? attrs[instrumentKey] : null;
         const pdfUrl = pdfUrlKey ? attrs[pdfUrlKey] : null;
         const pdfName = pdfNameKey ? attrs[pdfNameKey] : null;
         return {
+          distanceMeters,
           instrument,
           links: buildCpfPdfLinks(instrument, pdfUrl, pdfName),
         };
-      }).filter((record) => record.links.length);
+      }).filter((record) => record.links.length && (record.distanceMeters == null || record.distanceMeters <= (radius + 0.5)));
 
       if (records.length) return records;
     }
