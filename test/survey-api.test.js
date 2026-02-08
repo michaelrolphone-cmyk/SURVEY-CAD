@@ -4,7 +4,7 @@ import http from 'node:http';
 import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, pointInPolygon } from '../src/survey-api.js';
 
 function createMockServer(options = {}) {
-  const { strictAddressMiss = false, addressAlwaysMiss = false } = options;
+  const { strictAddressMiss = false, addressAlwaysMiss = false, failProjectedRefetch = false } = options;
   const requests = [];
   const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null };
   const server = http.createServer((req, res) => {
@@ -83,6 +83,12 @@ function createMockServer(options = {}) {
     if (url.pathname.endsWith('/20/query') || url.pathname.endsWith('/19/query') || url.pathname.endsWith('/18/query')) {
       const where = url.searchParams.get('where') || '';
       const outSR = url.searchParams.get('outSR');
+      if (failProjectedRefetch && /OBJECTID\s*=\s*22\b/.test(where) && outSR === '2243') {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: { message: 'Invalid outSR' } }));
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       if (/OBJECTID\s*=\s*22\b/.test(where) && outSR === '2243') {
         res.end(JSON.stringify({
@@ -356,6 +362,24 @@ test('loadSubdivisionAtPoint supports outSR override', async () => {
   try {
     const subdivision = await client.loadSubdivisionAtPoint(-116.2, 43.61, 2243);
     assert.equal(subdivision.attributes.NAME, 'polygon');
+    assert.ok(requests.some((r) => r.includes('/18/query') && r.includes('outSR=2243')));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
+test('loadSubdivisionAtPoint falls back to WGS84 geometry when projected refetch fails', async () => {
+  const { server, port, requests } = await createMockServer({ failProjectedRefetch: true });
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+  });
+
+  try {
+    const subdivision = await client.loadSubdivisionAtPoint(-116.2, 43.61, 2243);
+    assert.equal(subdivision.attributes.NAME, 'polygon');
+    assert.deepEqual(subdivision.geometry.rings[0][0], [-116.3, 43.5]);
     assert.ok(requests.some((r) => r.includes('/18/query') && r.includes('outSR=2243')));
   } finally {
     await new Promise((resolve) => server.close(resolve));

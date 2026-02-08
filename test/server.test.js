@@ -41,9 +41,17 @@ function createMockServer() {
     }
 
     if (url.pathname.endsWith('/20/query') || url.pathname.endsWith('/19/query') || url.pathname.endsWith('/18/query')) {
+      const where = url.searchParams.get('where') || '';
+      const outSR = url.searchParams.get('outSR');
+      if (url.pathname.endsWith('/18/query') && /OBJECTID\s*=\s*22\b/.test(where) && outSR === '2243') {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: { message: 'Invalid outSR' } }));
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
-        features: [{ attributes: { NAME: 'polygon' }, geometry: { rings: [[[-116.3, 43.5], [-116.1, 43.5], [-116.1, 43.7], [-116.3, 43.7], [-116.3, 43.5]]] } }],
+        features: [{ attributes: { OBJECTID: 22, NAME: 'polygon' }, geometry: { rings: [[[-116.3, 43.5], [-116.1, 43.5], [-116.1, 43.7], [-116.3, 43.7], [-116.3, 43.5]]] } }],
       }));
       return;
     }
@@ -125,6 +133,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(subdivisionRes.status, 200);
     const subdivisionPayload = await subdivisionRes.json();
     assert.equal(subdivisionPayload.subdivision.attributes.NAME, 'polygon');
+    assert.deepEqual(subdivisionPayload.subdivision.geometry.rings[0][0], [-116.3, 43.5]);
 
     const rosPdfRes = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=${encodeURIComponent(`${base}/sample.pdf`)}`);
     assert.equal(rosPdfRes.status, 200);

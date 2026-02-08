@@ -285,7 +285,11 @@ export class SurveyCadClient {
     const best = pickContainingOrNearest(response.features || [], lon, lat);
     if (!best || outSR === 4326) return best;
 
-    return (await this.refetchFeatureInOutSR(this.config.layers.parcels, best, outSR)) || best;
+    try {
+      return (await this.refetchFeatureInOutSR(this.config.layers.parcels, best, outSR)) || best;
+    } catch {
+      return best;
+    }
   }
 
   async findContainingPolygon(layerId, lon, lat, searchMeters = 2000) {
@@ -345,7 +349,11 @@ export class SurveyCadClient {
     const best = pickContainingOrNearest(features, lon, lat);
     if (!best || outSR === 4326) return best;
 
-    return (await this.refetchFeatureInOutSR(layerId, best, outSR)) || best;
+    try {
+      return (await this.refetchFeatureInOutSR(layerId, best, outSR)) || best;
+    } catch {
+      return best;
+    }
   }
 
   async refetchFeatureInOutSR(layerId, feature, outSR) {
