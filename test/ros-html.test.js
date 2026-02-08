@@ -129,6 +129,16 @@ test('RecordQuarry.html does not render internal CORS/map-fix commentary text', 
   assert.doesNotMatch(html, /PDFs require upload \(CORS\)/, 'ROS should not show old CORS warning pill copy');
 });
 
+test('RecordQuarry.html includes mobile layout rules so map and export controls stay visible', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /html,body\{height:100%;min-height:100dvh;/, 'mobile viewport should use dynamic viewport height to keep map panel visible');
+  assert.match(html, /\.app\{[\s\S]*min-height:100dvh;/, 'app shell should fill dynamic viewport height on mobile browsers');
+  assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.panel \.phead \.row\{[\s\S]*flex-wrap:wrap;/, 'mobile panel header controls should wrap to avoid clipping export controls');
+  assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.panel \.phead \.row button\{[\s\S]*flex:1 1 140px;/, 'mobile export buttons should expand and remain tappable');
+  assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.main\{[\s\S]*grid-template-rows:minmax\(460px, auto\) minmax\(420px, 1fr\);/, 'mobile grid rows should reserve explicit space for map/results panel');
+});
+
 
 test('RecordQuarry.html restores and saves project lookup snapshots when launched from SurveyFoundry projects', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');

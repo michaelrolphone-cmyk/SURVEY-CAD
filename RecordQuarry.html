@@ -29,12 +29,13 @@
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
     }
     *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
+    html,body{height:100%;min-height:100dvh;margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
     a{color:#9ab0ff;text-decoration:none}
     a:hover{text-decoration:underline}
 
     .app{
       height:100%;
+      min-height:100dvh;
       display:flex;
       flex-direction:column;
       min-height:0;
@@ -238,6 +239,31 @@
     }
     @media (max-width: 980px){
       .mapWrap{min-height:420px;}
+    }
+
+    @media (max-width: 760px){
+      header{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      header .row,
+      .panel .phead .row{
+        width:100%;
+        flex-wrap:wrap;
+      }
+      .panel .phead{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      .panel .phead .row button{
+        flex:1 1 140px;
+      }
+      .main{
+        grid-template-rows:minmax(460px, auto) minmax(420px, 1fr);
+      }
+      .mapWrap{
+        min-height:360px;
+      }
     }
 
     .busyModal{
