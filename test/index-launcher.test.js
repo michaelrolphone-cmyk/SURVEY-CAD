@@ -33,8 +33,19 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
   assert.match(launcherHtml, /<img src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon"\s*\/>/);
   assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
+  assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
   assert.match(launcherHtml, /\.footer-logo-wrap\s*\{[\s\S]*justify-content:\s*center;/i);
+  assert.match(launcherHtml, /\.footer-logo-wrap\.hidden\s*\{[\s\S]*display:\s*none;/i);
   assert.match(launcherHtml, /\.footer-logo\s*\{[\s\S]*width:\s*min\(320px, 58vw\);/i);
+  assert.match(launcherHtml, /footerLogoWrap\?\.classList\.remove\('hidden'\);/, 'showHome should display footer logo only on launcher home screen');
+  assert.match(launcherHtml, /footerLogoWrap\?\.classList\.add\('hidden'\);/, 'openApp should hide footer logo when an app is opened');
+});
+
+test('launcher mobile viewer uses full-width iframe layout', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*\.viewer\s*\{[\s\S]*padding:\s*0;/i);
+  assert.match(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*iframe\s*\{[\s\S]*border-left:\s*0;[\s\S]*border-right:\s*0;[\s\S]*border-radius:\s*0;/i);
 });
 
 
