@@ -125,3 +125,23 @@ test('buildRosBoundaryCsvRowsPNEZD applies simplified codes and optional CP&F no
   assert.ok(lines.some((line) => /,16COR,$/.test(line)), 'should classify aliquot corners as 16th corners');
   assert.ok(lines.some((line) => /,CSECOR,CPNFS: 1234567\.\.\.321111\.\.\.65456$/.test(line)), 'should include CP&F notes for PLSS points');
 });
+
+test('buildRosBoundaryCsvRowsPNEZD does not emit section-only corners when no aliquots are present', () => {
+  const parcel = {
+    geometry: { rings: [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]] },
+  };
+  const section = {
+    geometry: { rings: [[[0, 0], [400, 0], [400, 400], [0, 400], [0, 0]]] },
+  };
+
+  const { csv, count } = buildRosBoundaryCsvRowsPNEZD({
+    parcelFeature2243: parcel,
+    sectionFeature2243: section,
+    aliquotFeatures2243: [],
+  });
+
+  const lines = csv.trim().split('\n');
+  assert.equal(count, 4);
+  assert.equal(lines.length, 4);
+  assert.ok(lines.every((line) => /,COR,$/.test(line)), 'should only include parcel corners');
+});

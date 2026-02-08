@@ -222,7 +222,6 @@ export function buildRosBoundaryCsvRowsPNEZD({
   const sources = [
     ...normalizeRingPoints(parcelFeature2243, 'parcel'),
     ...normalizeRingPoints(subdivisionFeature2243, 'subdivision'),
-    ...normalizeRingPoints(sectionFeature2243, 'section'),
     ...aliquotFeatures2243.flatMap((feature) => normalizeRingPoints(feature, 'aliquot')),
   ];
 
