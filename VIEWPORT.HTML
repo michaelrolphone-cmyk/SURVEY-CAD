@@ -490,6 +490,18 @@
 
     <div class="section">
       <div class="title">
+        <b>Display</b>
+        <span>point label visibility</span>
+      </div>
+      <div class="inline">
+        <label><input id="showPointCodes" type="checkbox" checked /> Draw point codes</label>
+        <label><input id="showPointNotes" type="checkbox" checked /> Draw point notes</label>
+      </div>
+      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching.</div>
+    </div>
+
+    <div class="section">
+      <div class="title">
         <b>Line: Distance / Bearing</b>
         <span>select start point</span>
       </div>
@@ -924,6 +936,11 @@
     dragStartPanX: 0, dragStartPanY: 0,
     dragStartWorldX: 0, dragStartWorldY: 0,
     dragObj: null
+  };
+
+  const labelVisibility = {
+    codes: true,
+    notes: true
   };
 
   function isMovable(value) {
@@ -1379,11 +1396,11 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillText(String(p.num), sp.x + 8, sp.y - 10);
 
-      if (p.code) {
+      if (labelVisibility.codes && p.code) {
         ctx.fillStyle = "#39ff79";
         ctx.fillText(String(p.code), sp.x + 8, sp.y + 2);
       }
-      if (p.notes) {
+      if (labelVisibility.notes && p.notes) {
         ctx.fillStyle = "#3aa3ff";
         ctx.fillText(String(p.notes), sp.x + 8, sp.y + 14);
       }
@@ -1458,6 +1475,23 @@
   $("#toolAddPoint").addEventListener("click", ()=>setTool("addPoint"));
   $("#toolLine2pt").addEventListener("click", ()=>{ construction.startPointId = null; setTool("line2pt"); });
   $("#toolLineDB").addEventListener("click", ()=>setTool("lineDB"));
+
+  function syncPointLabelVisibility() {
+    labelVisibility.codes = $("#showPointCodes").checked;
+    labelVisibility.notes = $("#showPointNotes").checked;
+  }
+
+  $("#showPointCodes").addEventListener("change", () => {
+    syncPointLabelVisibility();
+    setStatus(`Point code labels ${labelVisibility.codes ? "shown" : "hidden"}.`, "ok");
+  });
+
+  $("#showPointNotes").addEventListener("change", () => {
+    syncPointLabelVisibility();
+    setStatus(`Point notes labels ${labelVisibility.notes ? "shown" : "hidden"}.`, "ok");
+  });
+
+  syncPointLabelVisibility();
   $("#toolPointOnLine").addEventListener("click", ()=>setTool("pointOnLine"));
   $("#toolPan").addEventListener("click", ()=>setTool("pan"));
 
