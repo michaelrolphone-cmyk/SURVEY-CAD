@@ -15,6 +15,8 @@ const DEFAULTS = {
   nominatimUrl: "https://nominatim.openstreetmap.org/search",
   nominatimUserAgent: "survey-cad/1.0 (contact: admin@example.com)",
   nominatimEmail: "admin@example.com",
+  arcgisGeocodeUrl:
+    "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
 };
 
 const DIRS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
@@ -152,6 +154,14 @@ export class SurveyCadClient {
   }
 
   async geocodeAddress(address) {
+    try {
+      return await this.geocodeAddressNominatim(address);
+    } catch {
+      return this.geocodeAddressArcGis(address);
+    }
+  }
+
+  async geocodeAddressNominatim(address) {
     const u = new URL(this.config.nominatimUrl);
     u.searchParams.set("q", address);
     u.searchParams.set("format", "json");
@@ -168,6 +178,29 @@ export class SurveyCadClient {
     });
     if (!result?.length) throw new Error("No geocode results.");
     return { lat: Number(result[0].lat), lon: Number(result[0].lon), display: result[0].display_name };
+  }
+
+  async geocodeAddressArcGis(address) {
+    const u = new URL(this.config.arcgisGeocodeUrl);
+    u.searchParams.set("SingleLine", address);
+    u.searchParams.set("maxLocations", "1");
+    u.searchParams.set("outFields", "Match_addr,LongLabel");
+    u.searchParams.set("f", "json");
+
+    const result = await this.fetchJson(u.toString(), {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": this.config.nominatimUserAgent,
+      },
+    });
+
+    const candidate = result?.candidates?.[0];
+    if (!candidate?.location) throw new Error("No geocode results.");
+    return {
+      lat: Number(candidate.location.y),
+      lon: Number(candidate.location.x),
+      display: candidate.address || candidate.attributes?.LongLabel || candidate.attributes?.Match_addr || "",
+    };
   }
 
   async arcQuery(layerId, params) {

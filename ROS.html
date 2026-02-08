@@ -1035,19 +1035,25 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
       invalidateMapSoon("lookup start");
 
       const lookup = await lookupByAddress(rawAddr);
-      const addrF = lookup.addressFeature;
+      const addrF = lookup.addressFeature || null;
       const candidates = addrF ? [addrF] : [];
       if (!addrF) {
-        log("Address not found in Ada County Address layer (16). Try different formatting.", "bad");
-        return;
+        log("Address not found in Ada County Address layer (16). Continuing with geocoder coordinates.", "warn");
       }
       state.addressFeature = addrF;
 
-      const lon = lookup.location?.lon ?? addrF.geometry.x;
-      const lat = lookup.location?.lat ?? addrF.geometry.y;
+      const lon = lookup.location?.lon ?? addrF?.geometry?.x;
+      const lat = lookup.location?.lat ?? addrF?.geometry?.y;
       const addrLL = [lat, lon];
+      const addressDisplay = addrF ? formatAddressAttrs(addrF.attributes || {}) : (lookup.geocode?.display || rawAddr);
       log(`Address match: ${addrLL[0].toFixed(7)}, ${addrLL[1].toFixed(7)}`);
-      drawAddressPoint(addrF);
+      if (addrF) {
+        drawAddressPoint(addrF);
+      } else {
+        const geocodeMarker = L.circleMarker(addrLL, { radius: 7, weight: 2, color: "#ffffff", fillColor: "#2a3dff", fillOpacity: 0.9 });
+        geocodeMarker.bindPopup(`<b>Geocoded Address</b><br/>${escapeHtml(addressDisplay)}`);
+        layers.address.addLayer(geocodeMarker);
+      }
 
       map.setView(addrLL, 18);
       invalidateMapSoon("after setView");
@@ -1057,7 +1063,7 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
       if (!parcel) {
         log("Parcel not found near that address point (0/10/30/150m).", "bad");
         setSummaryCards([
-          card("Address", formatAddressAttrs(addrF.attributes||{}),
+          card("Address", addressDisplay,
             [["Lat/Lon", `${lat.toFixed(7)}, ${lon.toFixed(7)}`],["Candidates", String(candidates.length)]],
             [])
         ]);
@@ -1128,7 +1134,7 @@ import { buildParcelCsvPNEZD, buildAliquotCsvRowsPNEZD } from "./src/ros-export.
       const cards = [];
       cards.push(card(
         "Address",
-        formatAddressAttrs(addrF.attributes||{}),
+        addressDisplay,
         [
           ["Location", `${lat.toFixed(7)}, ${lon.toFixed(7)}`],
           ["Candidates", `${candidates.length}`],
