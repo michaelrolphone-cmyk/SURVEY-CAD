@@ -15,7 +15,7 @@ test('ROS.html routes ROS PDF links through API server and exports unique parcel
 
   assert.match(html, /buildRosPdfProxyUrl\(p\.url\)/, 'ROS PDF links should use API proxy URL');
   assert.match(html, /function\s+buildPdfProxyLinks\s*\(/, 'helper should build shared API PDF links for ROS and aliquots');
-  assert.match(html, /Open\s+Aliquot\s+PDF\s*\(API\)/, 'aliquot cards should include API PDF links when available');
+  assert.match(html, /Open\s+CP&F\s+PDF\s*\(API\)/, 'aliquot cards should include CP&F API PDF links when available');
   assert.doesNotMatch(html, /sv\.includes\("\/"\)/, 'relative PDF fields without slash should still be proxied');
   assert.match(html, /drawCornerMarkers\(/, 'corner markers should be drawn on the map');
   assert.match(html, /buildRosBoundaryCsvRowsPNEZD\(/, 'CSV export should use ROS-specific simplified point-code export builder');
@@ -34,6 +34,18 @@ test('ROS.html keeps ROS scoped to containing section and includes popup PDF lin
   assert.match(html, /l\.bindPopup\(buildRosPopupHtml\(/, 'ROS line popups should use shared popup HTML with PDF links');
   assert.match(html, /p\.bindPopup\(buildRosPopupHtml\(/, 'ROS polygon popups should use shared popup HTML with PDF links');
   assert.match(html, /function\s+buildRosPopupHtml\s*\(/, 'ROS popup helper should include description and PDF links');
+});
+
+
+test('ROS.html summary cards can center/zoom map for ROS and aliquots and aliquot popups include CP&F links', async () => {
+  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+centerMapOnFeature\s*\(/, 'summary card selection should use a shared map centering helper');
+  assert.match(html, /onSelect:\s*\(\)\s*=>\s*centerMapOnFeature\(f,\s*layers\.aliquots/, 'aliquot summary cards should center/zoom to selected aliquot');
+  assert.match(html, /onSelect:\s*\(\)\s*=>\s*centerMapOnFeature\(f,\s*layers\.ros/, 'ROS summary cards should center/zoom to selected ROS feature');
+  assert.match(html, /function\s+buildAliquotPopupHtml\s*\(/, 'aliquot marker popups should use shared popup builder');
+  assert.match(html, /Open CP&F PDF \(API\)/, 'aliquot popup/summary should label CP&F PDF links');
+  assert.match(html, /l\.bindPopup\(popupHtml\)/, 'aliquot map markers should bind popup HTML with CP&F links');
 });
 
 
