@@ -1052,6 +1052,9 @@
     opacity: 0.1
   };
 
+  const FEET_TO_METERS = 0.3048006096012192;
+  let mapGeoreference = null;
+
   const MAP_TILESETS = {
     satellite: {
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -1107,6 +1110,95 @@
     return clampLatLng(y, x);
   }
 
+  function solveLinear3x3(matrix, vector) {
+    const m = matrix.map((row, rowIdx) => [...row, vector[rowIdx]]);
+    const n = 3;
+    for (let col = 0; col < n; col++) {
+      let pivot = col;
+      for (let row = col + 1; row < n; row++) {
+        if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
+      }
+      if (Math.abs(m[pivot][col]) < 1e-12) return null;
+      if (pivot !== col) {
+        const tmp = m[col];
+        m[col] = m[pivot];
+        m[pivot] = tmp;
+      }
+      const div = m[col][col];
+      for (let k = col; k <= n; k++) m[col][k] /= div;
+      for (let row = 0; row < n; row++) {
+        if (row === col) continue;
+        const factor = m[row][col];
+        for (let k = col; k <= n; k++) m[row][k] -= factor * m[col][k];
+      }
+    }
+    return [m[0][n], m[1][n], m[2][n]];
+  }
+
+  function buildGeoreferenceTransform(pointsList) {
+    if (!Array.isArray(pointsList) || pointsList.length < 3) return null;
+    let sumX = 0, sumY = 0, sumXX = 0, sumXY = 0, sumYY = 0;
+    let sumLat = 0, sumLng = 0, sumXLat = 0, sumYLat = 0, sumXLng = 0, sumYLng = 0;
+
+    for (const pt of pointsList) {
+      const x = Number(pt.x);
+      const y = Number(pt.y);
+      const lat = Number(pt.lat);
+      const lng = Number(pt.lng);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        continue;
+      }
+      sumX += x;
+      sumY += y;
+      sumXX += x * x;
+      sumXY += x * y;
+      sumYY += y * y;
+      sumLat += lat;
+      sumLng += lng;
+      sumXLat += x * lat;
+      sumYLat += y * lat;
+      sumXLng += x * lng;
+      sumYLng += y * lng;
+    }
+
+    const n = pointsList.length;
+    const normal = [
+      [sumXX, sumXY, sumX],
+      [sumXY, sumYY, sumY],
+      [sumX,  sumY,  n]
+    ];
+
+    const latCoeffs = solveLinear3x3(normal, [sumXLat, sumYLat, sumLat]);
+    const lngCoeffs = solveLinear3x3(normal, [sumXLng, sumYLng, sumLng]);
+    if (!latCoeffs || !lngCoeffs) return null;
+
+    return {
+      lat: { ax: latCoeffs[0], by: latCoeffs[1], c: latCoeffs[2] },
+      lng: { ax: lngCoeffs[0], by: lngCoeffs[1], c: lngCoeffs[2] }
+    };
+  }
+
+  function worldToLatLng(x, y) {
+    if (mapGeoreference) {
+      const lat = mapGeoreference.lat.ax * x + mapGeoreference.lat.by * y + mapGeoreference.lat.c;
+      const lng = mapGeoreference.lng.ax * x + mapGeoreference.lng.by * y + mapGeoreference.lng.c;
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return clampLatLng(lat, lng);
+      }
+    }
+    return worldToApproxLatLng(x, y);
+  }
+
+  function scaleToLeafletZoomForLat(scale, lat) {
+    if (!Number.isFinite(scale) || scale <= 0) return 2;
+    if (!mapGeoreference) return scaleToLeafletZoom(scale);
+    const feetPerPixel = 1 / scale;
+    const metersPerPixel = feetPerPixel * FEET_TO_METERS;
+    const cosLat = Math.max(0.01, Math.cos((lat * Math.PI) / 180));
+    const zoom = Math.log2((156543.03392 * cosLat) / Math.max(1e-9, metersPerPixel));
+    return clamp(zoom, 1, 22);
+  }
+
   function syncViewToGeoreference(payload) {
     const geo = payload?.georeference;
     const pointsList = Array.isArray(geo?.points) ? geo.points.filter((pt)=>
@@ -1116,73 +1208,8 @@
       Number.isFinite(Number(pt?.lng))
     ) : [];
     if (!pointsList.length) return false;
-
-    const avg = pointsList.reduce((acc, pt)=>({
-      x: acc.x + Number(pt.x),
-      y: acc.y + Number(pt.y),
-      lat: acc.lat + Number(pt.lat),
-      lng: acc.lng + Number(pt.lng)
-    }), { x:0, y:0, lat:0, lng:0 });
-
-    const n = pointsList.length;
-    const cx = avg.x / n;
-    const cy = avg.y / n;
-    const centerLL = clampLatLng(avg.lat / n, avg.lng / n);
-
-    const spans = pointsList.reduce((acc, pt)=>{
-      const ll = clampLatLng(Number(pt.lat), Number(pt.lng));
-      acc.worldMinX = Math.min(acc.worldMinX, Number(pt.x));
-      acc.worldMaxX = Math.max(acc.worldMaxX, Number(pt.x));
-      acc.worldMinY = Math.min(acc.worldMinY, Number(pt.y));
-      acc.worldMaxY = Math.max(acc.worldMaxY, Number(pt.y));
-      acc.latMin = Math.min(acc.latMin, ll.lat);
-      acc.latMax = Math.max(acc.latMax, ll.lat);
-      acc.lngMin = Math.min(acc.lngMin, ll.lng);
-      acc.lngMax = Math.max(acc.lngMax, ll.lng);
-      return acc;
-    }, {
-      worldMinX: Infinity,
-      worldMaxX: -Infinity,
-      worldMinY: Infinity,
-      worldMaxY: -Infinity,
-      latMin: Infinity,
-      latMax: -Infinity,
-      lngMin: Infinity,
-      lngMax: -Infinity
-    });
-
-    const worldWidth = Math.max(1e-9, spans.worldMaxX - spans.worldMinX);
-    const worldHeight = Math.max(1e-9, spans.worldMaxY - spans.worldMinY);
-    const latSpan = Math.max(1e-9, spans.latMax - spans.latMin);
-    const lngSpan = Math.max(1e-9, spans.lngMax - spans.lngMin);
-
-    const feetPerDegreeX = worldWidth / lngSpan;
-    const feetPerDegreeY = worldHeight / latSpan;
-    if (!Number.isFinite(feetPerDegreeX) || !Number.isFinite(feetPerDegreeY)) return false;
-
-    const rect = canvas.getBoundingClientRect();
-    const centerScreenX = rect.width * 0.5;
-    const centerScreenY = rect.height * 0.5;
-
-    const targetScaleX = 256 / (360 * feetPerDegreeX);
-    const targetScaleY = 256 / (360 * feetPerDegreeY);
-    const targetScale = clamp((targetScaleX + targetScaleY) * 0.5, 1e-6, 1e6);
-
-    const worldCenterApprox = worldToApproxLatLng(cx, cy);
-    const projectedCenterX = centerLL.lng * feetPerDegreeX;
-    const projectedCenterY = centerLL.lat * feetPerDegreeY;
-    const offsetX = cx - projectedCenterX;
-    const offsetY = cy - projectedCenterY;
-
-    const nextPanX = centerScreenX - (worldCenterApprox.lng * feetPerDegreeX + offsetX) * targetScale;
-    const nextPanY = centerScreenY + (worldCenterApprox.lat * feetPerDegreeY + offsetY) * targetScale;
-
-    if (!Number.isFinite(nextPanX) || !Number.isFinite(nextPanY) || !Number.isFinite(targetScale)) return false;
-
-    view.scale = targetScale;
-    view.panX = nextPanX;
-    view.panY = nextPanY;
-    return true;
+    mapGeoreference = buildGeoreferenceTransform(pointsList);
+    return mapGeoreference != null;
   }
 
   function ensureMapLayer() {
@@ -1226,8 +1253,8 @@
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const center = screenToWorld(rect.width * 0.5, rect.height * 0.5);
-    const ll = clampLatLng(center.y, center.x);
-    const zoom = scaleToLeafletZoom(view.scale);
+    const ll = worldToLatLng(center.x, center.y);
+    const zoom = scaleToLeafletZoomForLat(view.scale, ll.lat);
     mapInstance.setView([ll.lat, ll.lng], zoom, { animate: false });
     if (force) mapInstance.invalidateSize(false);
   }
