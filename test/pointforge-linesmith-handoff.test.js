@@ -40,6 +40,20 @@ test('POINT_TRANSFORMER.HTML auto-imports ROS export payloads when launched from
   assert.match(html, /params\.get\("source"\)\s*!==\s*"ros"/, 'PointForge ROS import bootstrap should be gated by query param');
   assert.match(html, /localStorage\.getItem\(ROS_POINTFORGE_IMPORT_STORAGE_KEY\)/, 'PointForge should read ROS payload from localStorage');
   assert.match(html, /elIn\.value\s*=\s*String\(payload\.csv\);[\s\S]*processNow\(\);/, 'PointForge should load ROS CSV payload and process it immediately');
+  assert.match(html, /setImportContextFromRos\(\)/, 'PointForge ROS bootstrap should label imports as sourced from RecordQuarry');
+});
+
+test('POINT_TRANSFORMER.HTML persists project point-file imports and exports with source-aware names', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+PROJECT_FILE_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectFile"/, 'PointForge should use SurveyFoundry project-file storage namespace');
+  assert.match(html, /function\s+persistPointSetToProjectFile\s*\(/, 'PointForge should persist imported and exported point sets into project-file point folders');
+  assert.match(html, /window\.prompt\("Name this pasted point set:",\s*"Pasted Point Set"\)/, 'PointForge should prompt for names when point sets are pasted');
+  assert.match(html, /function\s+formatPointFileDate\s*\([\s\S]*return\s+`\$\{month\}\s+\$\{day\}\s+\$\{year\}`;/, 'PointForge should format appended dates as M D YY');
+  assert.match(html, /function\s+buildEditedExportFileName\s*\([\s\S]*Edited/, 'PointForge exported edited files should append Edited to import-derived names');
+  assert.match(html, /a\.download\s*=\s*buildEditedExportFileName\(/, 'PointForge downloads should use edited filename derivation');
+  assert.match(html, /persistPointSetToProjectFile\(\{\s*kind:\s*"import"/, 'PointForge should persist imported point sets to project file');
+  assert.match(html, /persistPointSetToProjectFile\(\{\s*kind:\s*"export"/, 'PointForge should persist exported point sets to project file');
 });
 
 

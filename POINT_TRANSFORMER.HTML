@@ -936,9 +936,12 @@
 
     const SURVEY_SKETCH_IMPORT_STORAGE_KEY = "lineSmithPointforgeImport";
     const ROS_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeRosImport";
+    const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
+    const POINTFORGE_POINT_SET_STORAGE_PREFIX = "pointforgePointSet";
 
     let latestOutputText = "";
     let latestTransformed = null;
+    let currentImportContext = null;
 
     let map = null;
     let layer = null;
@@ -947,6 +950,174 @@
     let streetLayer = null;
     let satLayer = null;
     let activeBase = "street";
+
+    function projectFileStorageKey(projectId){
+      return `${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`;
+    }
+
+    function pointSetStorageKey(setId){
+      return `${POINTFORGE_POINT_SET_STORAGE_PREFIX}:${setId}`;
+    }
+
+    function getProjectContext(){
+      const params = new URLSearchParams(window.location.search || "");
+      const projectId = params.get("projectId") || params.get("activeProjectId") || "";
+      const projectName = params.get("projectName") || params.get("activeProjectName") || "";
+      return { projectId, projectName };
+    }
+
+    function loadProjectFileSnapshot(projectId){
+      if (!projectId) return null;
+      try {
+        const raw = localStorage.getItem(projectFileStorageKey(projectId));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.folders)) return null;
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveProjectFileSnapshot(projectId, projectFile){
+      if (!projectId || !projectFile) return;
+      localStorage.setItem(projectFileStorageKey(projectId), JSON.stringify(projectFile));
+    }
+
+    function ensureProjectFileFolder(projectFile, folderKey){
+      if (!projectFile || !Array.isArray(projectFile.folders)) return null;
+      const existing = projectFile.folders.find((folder) => folder.key === folderKey);
+      if (existing){
+        if (!Array.isArray(existing.index)) existing.index = [];
+        return existing;
+      }
+      const created = { key: folderKey, label: folderKey, description: "", index: [] };
+      projectFile.folders.push(created);
+      return created;
+    }
+
+    function addProjectFileResource(projectFile, resource){
+      const folder = ensureProjectFileFolder(projectFile, resource.folder);
+      if (!folder) return;
+      folder.index.push(resource);
+    }
+
+    function normalizeBaseName(name, fallback = "Point Set"){
+      const normalized = trimOrEmpty(name).replace(/\.[^.]+$/u, "").trim();
+      return normalized || fallback;
+    }
+
+    function normalizeExtension(name, fallback = ".txt"){
+      const match = String(name || "").trim().match(/\.[a-z0-9]+$/i);
+      return match ? match[0] : fallback;
+    }
+
+    function formatPointFileDate(date = new Date()){
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const year = String(date.getFullYear()).slice(-2);
+      return `${month} ${day} ${year}`;
+    }
+
+    function hasDateInName(name){
+      return /\b\d{1,2}[\s/_-]\d{1,2}[\s/_-]\d{2}\b/.test(String(name || ""));
+    }
+
+    function ensureDateInName(name, dateLabel){
+      const base = trimOrEmpty(name);
+      if (!base) return trimOrEmpty(dateLabel);
+      if (hasDateInName(base)) return base;
+      return `${base} ${dateLabel}`;
+    }
+
+    function ensureImportContextForPaste(promptIfMissing = false){
+      if (currentImportContext) return currentImportContext;
+      if (!promptIfMissing) return null;
+
+      const entered = window.prompt("Name this pasted point set:", "Pasted Point Set");
+      const baseName = normalizeBaseName(entered, "Pasted Point Set");
+      currentImportContext = {
+        sourceType: "paste",
+        sourceLabel: baseName,
+        baseName,
+        extension: ".txt",
+      };
+      return currentImportContext;
+    }
+
+    function setImportContextFromFile(file){
+      currentImportContext = {
+        sourceType: "upload",
+        sourceLabel: file?.name || "Uploaded File",
+        baseName: normalizeBaseName(file?.name, "Uploaded Point Set"),
+        extension: normalizeExtension(file?.name, ".txt"),
+      };
+      return currentImportContext;
+    }
+
+    function setImportContextFromRos(){
+      currentImportContext = {
+        sourceType: "recordquarry",
+        sourceLabel: "Exported from RecordQuarry",
+        baseName: "Exported from RecordQuarry",
+        extension: ".csv",
+      };
+      return currentImportContext;
+    }
+
+    function buildImportFileName(context, importedAt = new Date()){
+      const dated = ensureDateInName(context?.baseName || "Point Set", formatPointFileDate(importedAt));
+      return `${dated}${context?.extension || ".txt"}`;
+    }
+
+    function buildEditedExportFileName(context, exportedAt = new Date()){
+      const editedBase = `${context?.baseName || "Point Set"} Edited`;
+      const dated = ensureDateInName(editedBase, formatPointFileDate(exportedAt));
+      return `${dated}${context?.extension || ".txt"}`;
+    }
+
+    function persistPointSetToProjectFile({ kind, text, context, timestamp = new Date() }){
+      const projectContext = getProjectContext();
+      if (!projectContext.projectId || !text) return null;
+
+      const projectFile = loadProjectFileSnapshot(projectContext.projectId);
+      if (!projectFile) return null;
+
+      const setId = `point-set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const storageKey = pointSetStorageKey(setId);
+      const isoTimestamp = timestamp.toISOString();
+      localStorage.setItem(storageKey, JSON.stringify({
+        id: setId,
+        kind,
+        source: context?.sourceType || "unknown",
+        fileName: kind === "import" ? buildImportFileName(context, timestamp) : buildEditedExportFileName(context, timestamp),
+        savedAt: isoTimestamp,
+        text,
+      }));
+
+      addProjectFileResource(projectFile, {
+        id: setId,
+        folder: "point-files",
+        title: kind === "import" ? buildImportFileName(context, timestamp) : buildEditedExportFileName(context, timestamp),
+        exportFormat: "csv",
+        reference: {
+          type: "local-storage",
+          value: storageKey,
+          resolverHint: "pointforge-point-set",
+          metadata: {
+            flow: kind,
+            source: context?.sourceType || "unknown",
+            sourceLabel: context?.sourceLabel || "",
+            timestamp: isoTimestamp,
+            charLength: String(text).length,
+          },
+        },
+      });
+
+      projectFile.generatedAt = isoTimestamp;
+      saveProjectFileSnapshot(projectContext.projectId, projectFile);
+      return storageKey;
+    }
 
     function initMap(){
       map = L.map("map", { preferCanvas:true }).setView([44.2, -116.7], 7);
@@ -1130,6 +1301,8 @@
         return;
       }
 
+      ensureImportContextForPaste(false);
+
       const res = transformPoints(input);
       latestTransformed = res;
       latestOutputText = res.outputText;
@@ -1149,7 +1322,9 @@
       const f = e.target.files && e.target.files[0];
       if (!f) return;
       const text = await f.text();
+      const context = setImportContextFromFile(f);
       elIn.value = text;
+      persistPointSetToProjectFile({ kind: "import", text, context, timestamp: new Date() });
       processNow();
     });
 
@@ -1193,11 +1368,14 @@
     // Download output
     elDownload.addEventListener("click", ()=>{
       if (!latestOutputText) return;
+      const context = ensureImportContextForPaste(true);
+      persistPointSetToProjectFile({ kind: "export", text: latestOutputText, context, timestamp: new Date() });
+
       const blob = new Blob([latestOutputText], {type:"text/plain;charset=utf-8"});
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "points_transformed.txt";
+      a.download = buildEditedExportFileName(context, new Date());
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1251,6 +1429,8 @@
         }
 
         elIn.value = String(payload.csv);
+        const context = setImportContextFromRos();
+        persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context, timestamp: new Date() });
         processNow();
         localStorage.removeItem(ROS_POINTFORGE_IMPORT_STORAGE_KEY);
         return true;
@@ -1267,6 +1447,13 @@
     setBasemap("street");
     setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
     elMapHint.textContent = "Load a file or paste points to plot. Basemap toggle: Street / Satellite.";
+    elIn.addEventListener("blur", ()=>{
+      if (!elIn.value.trim() || currentImportContext) return;
+      ensureImportContextForPaste(true);
+      if (currentImportContext){
+        persistPointSetToProjectFile({ kind: "import", text: elIn.value, context: currentImportContext, timestamp: new Date() });
+      }
+    });
     tryImportRosPayload();
   </script>
 </body>
