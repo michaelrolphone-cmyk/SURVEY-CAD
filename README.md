@@ -26,6 +26,15 @@ The repo is configured with:
 - `Procfile` (`web: npm start`)
 - `npm start` script (`node src/server.js`)
 - Node engine requirement in `package.json`
+- `Aptfile` packages for OCR/PDF binaries (`poppler-utils`, `tesseract-ocr`, `tesseract-ocr-eng`)
+
+Heroku settings required for OCR features:
+
+```bash
+heroku buildpacks:add --index 1 heroku-community/apt
+heroku buildpacks:add --index 2 heroku/nodejs
+heroku config:set TESSDATA_PREFIX=/app/.apt/usr/share/tesseract-ocr/5/tessdata
+```
 
 Example deploy commands:
 
@@ -175,7 +184,9 @@ curl -X POST "http://localhost:3001/extract?maxPages=2&dpi=300&debug=1" \
 - `pdf`: uploaded filename basename
 - `best`: top-ranked basis candidate (or `null`)
 - `candidates`: all candidate detections
-- `diagnostics`: included when `debug=1`
+- `diagnostics`: included when `debug=1` (includes detected `tessdata_prefix`)
+
+If Tesseract has no installed OCR languages (for example missing `eng.traineddata`), the extractor returns `best: null` / empty `candidates` and, when `debug=1`, includes a clear diagnostics error describing how to install tessdata or configure `TESSDATA_PREFIX`.
 
 ### ROS OCR CLI
 
