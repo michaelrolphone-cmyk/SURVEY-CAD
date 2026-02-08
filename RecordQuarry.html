@@ -397,6 +397,7 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
   const ADA_CPF_WEBMAP_ITEM_ID = "019521c7932442f0b4b581f641cbf236";
   const ADA_CPF_PDF_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/";
   const POINTFORGE_ROS_IMPORT_STORAGE_KEY = "pointforgeRosImport";
+  const PROJECT_LOOKUP_STORAGE_PREFIX = "surveyfoundryProjectLookup";
 
   // pdf.js worker
   if (!window.pdfjsLib) {
@@ -428,6 +429,38 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     msg.textContent = message;
     modal.classList.toggle('is-open', !!isOpen);
     modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+  }
+
+  function getProjectContext() {
+    const params = new URLSearchParams(window.location.search || "");
+    const projectId = params.get("projectId") || "";
+    const address = params.get("address") || "";
+    const projectName = params.get("projectName") || "";
+    const client = params.get("client") || "";
+    const autostart = params.get("autostart") === "1";
+    return { projectId, address, projectName, client, autostart };
+  }
+
+  function projectLookupStorageKey(projectId) {
+    return `${PROJECT_LOOKUP_STORAGE_PREFIX}:${projectId}`;
+  }
+
+  function loadProjectLookupSnapshot(projectId) {
+    if (!projectId) return null;
+    try {
+      const raw = localStorage.getItem(projectLookupStorageKey(projectId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || !parsed.lookup) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveProjectLookupSnapshot(projectId, snapshot) {
+    if (!projectId || !snapshot) return;
+    localStorage.setItem(projectLookupStorageKey(projectId), JSON.stringify(snapshot));
   }
 
   // -----------------------------
@@ -1015,7 +1048,8 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     aliquotFeatures: [],
     selectedAliquot: null,
     exportGeoJSON: null,
-    lastLonLat: null
+    lastLonLat: null,
+    projectContext: getProjectContext()
   };
 
   function setSummaryCards(cards) {
@@ -1570,7 +1604,7 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
   // -----------------------------
   // Main flow
   // -----------------------------
-  async function doLookup() {
+  async function doLookup(options = {}) {
     clearLog();
     $("btnExportGeo").disabled = true;
     $("btnExportParcelCSV").disabled = true;
@@ -1592,7 +1626,10 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
       log("Lookup started.");
       invalidateMapSoon("lookup start");
 
-      const lookup = await lookupByAddress(rawAddr);
+      const lookup = options.lookupPayload || await lookupByAddress(rawAddr);
+      if (options.lookupPayload) {
+        log("Loaded saved project results from local storage.");
+      }
       const addrF = lookup.addressFeature || null;
       const candidates = addrF ? [addrF] : [];
       if (!addrF) {
@@ -1709,6 +1746,18 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         []
       ));
 
+      if (state.projectContext.projectId) {
+        cards.push(card(
+          "Project",
+          state.projectContext.projectName || state.projectContext.projectId,
+          [
+            ["Client", state.projectContext.client || "(none)"],
+            ["Address", addressDisplay],
+          ],
+          []
+        ));
+      }
+
       const pAttrs = parcel.attributes || {};
       cards.push(card(
         "Parcel",
@@ -1792,6 +1841,15 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         }
       } catch (e) {
         log(`Parcel/subdivision/aliquot export geometry fetch failed: ${e.message || e}`, "warn");
+      }
+
+      if (state.projectContext.projectId) {
+        saveProjectLookupSnapshot(state.projectContext.projectId, {
+          savedAt: new Date().toISOString(),
+          address: rawAddr,
+          lookup,
+        });
+        log(`Saved lookup results to project ${state.projectContext.projectName || state.projectContext.projectId}.`);
       }
 
       invalidateMapSoon("lookup complete");
@@ -1964,6 +2022,28 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
 
   // initial log
   clearLog();
+  if (state.projectContext.projectId) {
+    if (state.projectContext.address) {
+      $("addr").value = state.projectContext.address;
+    }
+    log(`Project loaded: ${state.projectContext.projectName || state.projectContext.projectId} (${state.projectContext.client || "no client"}).`);
+    const snapshot = loadProjectLookupSnapshot(state.projectContext.projectId);
+    if (snapshot && state.projectContext.autostart) {
+      log(`Restoring saved project results from ${snapshot.savedAt || "unknown time"}.`);
+      doLookup({ lookupPayload: snapshot.lookup }).catch((err) => {
+        log(`Saved result restore failed, running live lookup: ${err.message || err}`, "warn");
+        doLookup().catch((liveErr) => {
+          log(`Lookup failed: ${liveErr.message || liveErr}`, "bad");
+          console.error(liveErr);
+        });
+      });
+    } else if (state.projectContext.autostart) {
+      doLookup().catch((err) => {
+        log(`Lookup failed: ${err.message || err}`, "bad");
+        console.error(err);
+      });
+    }
+  }
   log("Ready. Enter an address and click Lookup.");
   invalidateMapSoon("initial");
 })();

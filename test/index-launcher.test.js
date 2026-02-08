@@ -30,3 +30,18 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /<title>SurveyFoundry Launcher<\/title>/);
   assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
 });
+
+
+test('launcher includes SurveyFoundry project manager and RecordQuarry start workflow', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /aria-label="RecordQuarry project manager"/, 'launcher should render project manager panel');
+  assert.match(launcherHtml, /id="projectName"/, 'launcher should include project name input');
+  assert.match(launcherHtml, /id="projectClient"/, 'launcher should include project client input');
+  assert.match(launcherHtml, /id="projectAddress"/, 'launcher should include project address input');
+  assert.match(launcherHtml, /const\s+PROJECT_STORAGE_KEY\s*=\s*'surveyfoundryProjects'/, 'launcher should persist project metadata in localStorage');
+  assert.match(launcherHtml, /function\s+openProject\(project\)/, 'launcher should define project start helper');
+  assert.match(launcherHtml, /openApp\(`RecordQuarry\.html\?\$\{params\.toString\(\)\}`\)/, 'project start should open RecordQuarry with encoded project query params');
+  assert.match(launcherHtml, /autostart:\s*'1'/, 'project start should request RecordQuarry autostart lookup');
+  assert.match(launcherHtml, /start\.textContent\s*=\s*'Start in RecordQuarry'/, 'project list rows should offer RecordQuarry start action');
+});

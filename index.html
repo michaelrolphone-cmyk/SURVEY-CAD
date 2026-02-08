@@ -82,6 +82,53 @@
       font-size: 0.95rem;
     }
 
+    .project-panel {
+      margin-bottom: 1rem;
+      padding: 0.9rem;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.55);
+    }
+
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 0.7rem;
+    }
+
+    .project-grid input {
+      width: 100%;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 8px;
+      padding: 0.5rem 0.6rem;
+    }
+
+    .project-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      margin-top: 0.7rem;
+    }
+
+    .project-item {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.55rem;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 10px;
+      padding: 0.55rem 0.65rem;
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .project-item small {
+      color: var(--muted);
+    }
+
     .app-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -185,6 +232,17 @@
   <main>
     <section class="home" id="homeView" aria-label="App launcher home">
       <p class="subtitle">Choose an app to open in the embedded viewer.</p>
+      <div class="project-panel" aria-label="RecordQuarry project manager">
+        <strong>Project manager</strong>
+        <p class="subtitle" style="margin-top:0.35rem">Create SurveyFoundry projects for RecordQuarry, PointForge, and LineSmith.</p>
+        <div class="project-grid">
+          <input id="projectName" type="text" placeholder="Project name" />
+          <input id="projectClient" type="text" placeholder="Client" />
+          <input id="projectAddress" type="text" placeholder="Address" />
+        </div>
+        <button id="createProjectButton" type="button">Create project</button>
+        <div id="projectList" class="project-list"></div>
+      </div>
       <div class="app-grid" id="appGrid"></div>
     </section>
 
@@ -209,8 +267,86 @@
     const appFrame = document.getElementById('appFrame');
     const backButton = document.getElementById('backButton');
     const reloadButton = document.getElementById('reloadButton');
+    const projectNameInput = document.getElementById('projectName');
+    const projectClientInput = document.getElementById('projectClient');
+    const projectAddressInput = document.getElementById('projectAddress');
+    const createProjectButton = document.getElementById('createProjectButton');
+    const projectList = document.getElementById('projectList');
+
+    const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
 
     let currentApp = null;
+    let projects = [];
+
+    function loadProjects() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY) || '[]');
+        projects = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        projects = [];
+      }
+    }
+
+    function saveProjects() {
+      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+    }
+
+    function openProject(project) {
+      const params = new URLSearchParams({
+        projectId: String(project.id),
+        address: String(project.address || ''),
+        projectName: String(project.name || ''),
+        client: String(project.client || ''),
+        autostart: '1',
+      });
+      openApp(`RecordQuarry.html?${params.toString()}`);
+    }
+
+    function renderProjects() {
+      projectList.innerHTML = '';
+      if (!projects.length) {
+        projectList.innerHTML = '<small>No projects yet.</small>';
+        return;
+      }
+
+      projects.forEach((project) => {
+        const row = document.createElement('div');
+        row.className = 'project-item';
+
+        const info = document.createElement('div');
+        info.innerHTML = `<strong>${project.name}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small>`;
+
+        const start = document.createElement('button');
+        start.type = 'button';
+        start.textContent = 'Start in RecordQuarry';
+        start.addEventListener('click', () => openProject(project));
+
+        row.appendChild(info);
+        row.appendChild(start);
+        projectList.appendChild(row);
+      });
+    }
+
+    function createProject() {
+      const name = projectNameInput.value.trim();
+      const client = projectClientInput.value.trim();
+      const address = projectAddressInput.value.trim();
+      if (!name || !address) return;
+
+      projects.unshift({
+        id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        client,
+        address,
+        createdAt: new Date().toISOString(),
+      });
+      saveProjects();
+      renderProjects();
+
+      projectNameInput.value = '';
+      projectClientInput.value = '';
+      projectAddressInput.value = '';
+    }
 
     function showHome() {
       homeView.classList.remove('hidden');
@@ -265,6 +401,7 @@
     }
 
     backButton.addEventListener('click', showHome);
+    createProjectButton.addEventListener('click', createProject);
     reloadButton.addEventListener('click', () => {
       if (!currentApp) return;
       appFrame.src = currentApp;
@@ -290,6 +427,9 @@
 
       openApp(`${file}${url.search}`);
     });
+
+    loadProjects();
+    renderProjects();
 
     loadApps().catch((err) => {
       appGrid.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
