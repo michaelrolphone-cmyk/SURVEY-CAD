@@ -4,10 +4,11 @@ import { readFile } from 'node:fs/promises';
 
 const indexHtmlPath = new URL('../index.html', import.meta.url);
 
-test('launcher cards show app name only and larger icons', async () => {
+test('launcher cards show app name, description, and larger icons', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
   assert.match(launcherHtml, /\.app-icon\s*\{[\s\S]*width:\s*56px;[\s\S]*height:\s*56px;/i);
+  assert.match(launcherHtml, /<p class=\"app-description\">\$\{app\.description \|\| ''\}<\/p>/);
   assert.doesNotMatch(launcherHtml, /<span>\$\{app\.entryHtml\}<\/span>/);
   assert.match(launcherHtml, /option\.textContent\s*=\s*app\.name;/);
   assert.doesNotMatch(launcherHtml, /option\.textContent\s*=\s*`\$\{app\.name\}\s*\(\$\{app\.entryHtml\}\)`;/);
