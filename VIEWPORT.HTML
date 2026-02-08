@@ -1103,6 +1103,88 @@
     };
   }
 
+  function worldToApproxLatLng(x, y) {
+    return clampLatLng(y, x);
+  }
+
+  function syncViewToGeoreference(payload) {
+    const geo = payload?.georeference;
+    const pointsList = Array.isArray(geo?.points) ? geo.points.filter((pt)=>
+      Number.isFinite(Number(pt?.x)) &&
+      Number.isFinite(Number(pt?.y)) &&
+      Number.isFinite(Number(pt?.lat)) &&
+      Number.isFinite(Number(pt?.lng))
+    ) : [];
+    if (!pointsList.length) return false;
+
+    const avg = pointsList.reduce((acc, pt)=>({
+      x: acc.x + Number(pt.x),
+      y: acc.y + Number(pt.y),
+      lat: acc.lat + Number(pt.lat),
+      lng: acc.lng + Number(pt.lng)
+    }), { x:0, y:0, lat:0, lng:0 });
+
+    const n = pointsList.length;
+    const cx = avg.x / n;
+    const cy = avg.y / n;
+    const centerLL = clampLatLng(avg.lat / n, avg.lng / n);
+
+    const spans = pointsList.reduce((acc, pt)=>{
+      const ll = clampLatLng(Number(pt.lat), Number(pt.lng));
+      acc.worldMinX = Math.min(acc.worldMinX, Number(pt.x));
+      acc.worldMaxX = Math.max(acc.worldMaxX, Number(pt.x));
+      acc.worldMinY = Math.min(acc.worldMinY, Number(pt.y));
+      acc.worldMaxY = Math.max(acc.worldMaxY, Number(pt.y));
+      acc.latMin = Math.min(acc.latMin, ll.lat);
+      acc.latMax = Math.max(acc.latMax, ll.lat);
+      acc.lngMin = Math.min(acc.lngMin, ll.lng);
+      acc.lngMax = Math.max(acc.lngMax, ll.lng);
+      return acc;
+    }, {
+      worldMinX: Infinity,
+      worldMaxX: -Infinity,
+      worldMinY: Infinity,
+      worldMaxY: -Infinity,
+      latMin: Infinity,
+      latMax: -Infinity,
+      lngMin: Infinity,
+      lngMax: -Infinity
+    });
+
+    const worldWidth = Math.max(1e-9, spans.worldMaxX - spans.worldMinX);
+    const worldHeight = Math.max(1e-9, spans.worldMaxY - spans.worldMinY);
+    const latSpan = Math.max(1e-9, spans.latMax - spans.latMin);
+    const lngSpan = Math.max(1e-9, spans.lngMax - spans.lngMin);
+
+    const feetPerDegreeX = worldWidth / lngSpan;
+    const feetPerDegreeY = worldHeight / latSpan;
+    if (!Number.isFinite(feetPerDegreeX) || !Number.isFinite(feetPerDegreeY)) return false;
+
+    const rect = canvas.getBoundingClientRect();
+    const centerScreenX = rect.width * 0.5;
+    const centerScreenY = rect.height * 0.5;
+
+    const targetScaleX = 256 / (360 * feetPerDegreeX);
+    const targetScaleY = 256 / (360 * feetPerDegreeY);
+    const targetScale = clamp((targetScaleX + targetScaleY) * 0.5, 1e-6, 1e6);
+
+    const worldCenterApprox = worldToApproxLatLng(cx, cy);
+    const projectedCenterX = centerLL.lng * feetPerDegreeX;
+    const projectedCenterY = centerLL.lat * feetPerDegreeY;
+    const offsetX = cx - projectedCenterX;
+    const offsetY = cy - projectedCenterY;
+
+    const nextPanX = centerScreenX - (worldCenterApprox.lng * feetPerDegreeX + offsetX) * targetScale;
+    const nextPanY = centerScreenY + (worldCenterApprox.lat * feetPerDegreeY + offsetY) * targetScale;
+
+    if (!Number.isFinite(nextPanX) || !Number.isFinite(nextPanY) || !Number.isFinite(targetScale)) return false;
+
+    view.scale = targetScale;
+    view.panX = nextPanX;
+    view.panY = nextPanY;
+    return true;
+  }
+
   function ensureMapLayer() {
     if (mapInstance || !window.L) return;
     mapInstance = L.map("mapLayer", {
@@ -2174,6 +2256,10 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         return false;
       }
       importCsvText(payload.csv, "PointForge import");
+      const aligned = syncViewToGeoreference(payload);
+      if (aligned && mapLayerState.enabled) {
+        syncMapToView(true);
+      }
       localStorage.removeItem(POINTFORGE_IMPORT_STORAGE_KEY);
       return true;
     } catch (_err) {

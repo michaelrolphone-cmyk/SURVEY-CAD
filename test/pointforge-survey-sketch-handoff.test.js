@@ -13,6 +13,8 @@ test('POINT_TRANSFORMER.HTML exposes Open in Survey Sketch handoff controls', as
   assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into Survey Sketch code field');
   assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into Survey Sketch notes field');
   assert.match(html, /rows\.push\(\[number, x, y, z, code, notes\]\)/, 'PointForge should preserve both code and notes when handing off to Survey Sketch');
+  assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for Survey Sketch map alignment');
+  assert.match(html, /georeference:\s*\{[\s\S]*type:\s*"idaho-state-plane-usft"[\s\S]*zone,[\s\S]*swapXY,[\s\S]*points:\s*georeferencePoints/, 'PointForge handoff payload should include georeference metadata and sample points');
 });
 
 test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
@@ -22,6 +24,8 @@ test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
   assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'Survey Sketch should define PointForge import bootstrap logic');
   assert.match(html, /params\.get\("source"\)\s*!==\s*"pointforge"/, 'Survey Sketch import bootstrap should be gated by query param');
   assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'Survey Sketch should reuse CSV import pipeline for PointForge payloads');
+  assert.match(html, /const\s+aligned\s*=\s*syncViewToGeoreference\(payload\)/, 'Survey Sketch should apply georeference alignment when PointForge provides it');
+  assert.match(html, /if \(aligned && mapLayerState\.enabled\) \{[\s\S]*syncMapToView\(true\);/, 'Survey Sketch should refresh map view after georeference alignment when map layer is enabled');
 });
 
 
