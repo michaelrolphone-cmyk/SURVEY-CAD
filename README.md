@@ -175,6 +175,8 @@ PointForge export now performs CP&F lookups for aliquot/section (PLSS) corners b
 
 `RecordQuarry.html` now shows a processing modal while export flows are busy gathering CPNF instrument numbers for aliquot/section corner notes, so long-running CP&F lookups have visible progress feedback before CSV download or PointForge handoff completes.
 
+RecordQuarry.html now applies mobile-first layout guards so the Leaflet map retains a real viewport height and export controls wrap instead of clipping on narrow screens.
+
 `RecordQuarry.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
 `RecordQuarry.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
 
