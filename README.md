@@ -228,6 +228,7 @@ curl -X POST "http://localhost:3001/extract?maxPages=1&dpi=220&debug=1" \
   -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
 curl -X POST "http://localhost:3001/extract?maxPages=3&dpi=400&allowSlow=1" \
   -F "pdf=@/absolute/path/to/ros.pdf;type=application/pdf"
+curl "http://localhost:3001/extract/jobs/<jobId>"   # poll async OCR job status/result
 ```
 
 `/extract` response shape:
@@ -243,9 +244,12 @@ If Tesseract has no installed OCR languages (for example missing `eng.traineddat
 - `maxPages` (default request value `1`)
 - `dpi` (default request value `220`)
 - `debug` (`1` to include diagnostics)
-- `allowSlow` (`1` to bypass safety clamping; use only if your dyno/runtime budget can tolerate longer OCR jobs)
+- `allowSlow` (`1` to bypass safety clamping and run in async job mode)
+- `async` (`1` to force async job mode even when `allowSlow=0`)
 
-When `allowSlow` is not enabled, the API clamps expensive runs to reduce timeout/503 risk on Heroku-style 30s request limits (defaults can be tuned with `ROS_OCR_MAX_PAGES` and `ROS_OCR_DPI`).
+When `allowSlow=1` (or `async=1`), `/extract` immediately returns `202 Accepted` with `jobId`/`statusUrl` and performs OCR in the background. Poll `GET /extract/jobs/:jobId` until `status` becomes `completed` (includes full extraction payload) or `failed` (includes error).
+
+When `allowSlow` is not enabled, the API clamps expensive runs to reduce timeout/503 risk on Heroku-style 30s request limits (defaults can be tuned with `ROS_OCR_MAX_PAGES` and `ROS_OCR_DPI`). This avoids relying on router timeout changes that are not configurable on standard Heroku web dynos.
 
 ### ROS OCR CLI
 
