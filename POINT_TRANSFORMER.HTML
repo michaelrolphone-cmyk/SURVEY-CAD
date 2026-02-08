@@ -489,6 +489,7 @@
 
         <div class="row" style="margin-top:10px;">
           <button id="btnProcess" class="btn">Process</button>
+          <button id="btnRenumber" class="btn secondary" disabled>Renumber Output</button>
           <button id="btnDownload" class="btn secondary" disabled>Download</button>
           <button id="btnOpenLineSmith" class="btn secondary" disabled>Open in LineSmith</button>
 
@@ -710,14 +711,11 @@
     // -----------------------------
     // Main transform
     // -----------------------------
-    function transformPoints(text, options = {}){
+    function transformPoints(text){
       const rawLines = text.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
       const records = [];
       const log = [];
       let parsedCount = 0;
-      const renumberStart = Number.isInteger(options.renumberStart) && options.renumberStart > 0
-        ? options.renumberStart
-        : 1;
 
       for (let i=0; i<rawLines.length; i++){
         const line = rawLines[i];
@@ -937,12 +935,6 @@
 
       const passthrough = records.filter(r => r.passthrough).sort((a,b)=>a.idx-b.idx);
 
-      sortable.forEach((r, index)=>{
-        const nextNumber = renumberStart + index;
-        r.newNum = nextNumber;
-        r.fields[0] = String(nextNumber);
-      });
-
       const outLines = [];
       for (const r of sortable) outLines.push(r.fields.map(csvEscape).join(","));
       for (const r of passthrough) outLines.push(r.fields.map(csvEscape).join(","));
@@ -953,9 +945,6 @@
         else if (g.kind === "series") log.push(`  suffix series (${g.key}) -> ${g.block}-${g.block+99}  (${g.count})`);
         else log.push(`  suffix singletons (G${g.suffix}) -> ${g.block}-${g.block+99}  (${g.count})`);
       }
-      log.push(`SEQUENTIAL RENUMBER`);
-      log.push(`  start: ${renumberStart}`);
-      log.push(`  assigned: ${sortable.length}`);
 
       return {
         recordsSorted: sortable,
@@ -998,6 +987,7 @@
     const elLog = document.getElementById("log");
     const elDownload = document.getElementById("btnDownload");
     const elProcess = document.getElementById("btnProcess");
+    const elRenumber = document.getElementById("btnRenumber");
     const elOpenLineSmith = document.getElementById("btnOpenLineSmith");
     const elAuto = document.getElementById("autoProcess");
     const elZone = document.getElementById("zone");
@@ -1459,6 +1449,7 @@
         elLog.textContent = "";
         latestOutputText = "";
         latestTransformed = null;
+        elRenumber.disabled = true;
         elDownload.disabled = true;
         elOpenLineSmith.disabled = true;
         if (layer) layer.clearLayers();
@@ -1469,10 +1460,7 @@
 
       ensureImportContextForPaste(false);
 
-      const parsedStart = Number.parseInt(elRenumberStart.value, 10);
-      const renumberStart = Number.isInteger(parsedStart) && parsedStart > 0 ? parsedStart : 1;
-      elRenumberStart.value = String(renumberStart);
-      const res = transformPoints(input, { renumberStart });
+      const res = transformPoints(input);
       latestTransformed = res;
       latestOutputText = res.outputText;
 
@@ -1483,6 +1471,7 @@
       const plotted = refreshMap(res.recordsSorted);
       setStats(res.stats, plotted);
 
+      elRenumber.disabled = !latestOutputText;
       elDownload.disabled = !latestOutputText;
       elOpenLineSmith.disabled = !latestTransformed?.recordsSorted?.length;
     }
@@ -1499,6 +1488,41 @@
       refreshPointEditorTables();
     });
 
+
+    function renumberOutputFromStart(startValue){
+      if (!latestOutputText) return;
+      const parsedStart = Number.parseInt(startValue, 10);
+      const renumberStart = Number.isInteger(parsedStart) && parsedStart > 0 ? parsedStart : 1;
+      elRenumberStart.value = String(renumberStart);
+
+      const lines = String(latestOutputText || "").split(/\r?\n/);
+      let nextNumber = renumberStart;
+      const renumberedLines = lines.map((line)=>{
+        if (!line.trim()) return line;
+        const fields = parseCSVLine(line);
+        if (fields.length < 2) return line;
+        fields[0] = String(nextNumber++);
+        return fields.map(csvEscape).join(",");
+      });
+
+      latestOutputText = renumberedLines.join("\n");
+      elOut.value = latestOutputText;
+
+      const rows = parsePointRows(latestOutputText);
+      if (latestTransformed?.recordsSorted?.length){
+        const count = Math.min(rows.length, latestTransformed.recordsSorted.length);
+        for (let i = 0; i < count; i++){
+          latestTransformed.recordsSorted[i].fields[0] = rows[i].number;
+        }
+      }
+
+      elLog.textContent = `${elLog.textContent}\nSEQUENTIAL RENUMBER\n  start: ${renumberStart}`.trim();
+      refreshPointEditorTables();
+      elOpenLineSmith.disabled = !latestTransformed?.recordsSorted?.length;
+    }
+
+    elRenumber.addEventListener("click", ()=>renumberOutputFromStart(elRenumberStart.value));
+
     // Manual process
     elProcess.addEventListener("click", ()=>processNow());
 
@@ -1511,11 +1535,6 @@
       t = setTimeout(()=>processNow(), 250);
     });
 
-    elRenumberStart.addEventListener("input", ()=>{
-      if (!elAuto.checked) return;
-      if (t) clearTimeout(t);
-      t = setTimeout(()=>processNow(), 250);
-    });
 
     elToggleInputView.addEventListener("click", ()=>setPointEditorView(!usePointEditorView));
 
