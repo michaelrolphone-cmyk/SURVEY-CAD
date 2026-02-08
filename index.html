@@ -50,6 +50,17 @@
       letter-spacing: 0.01em;
     }
 
+    .header-meta {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 0.84rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: min(48vw, 430px);
+      text-align: right;
+    }
+
     .launcher-icon {
       width: 42px;
       height: 42px;
@@ -339,6 +350,7 @@
   <header>
     <img src="/assets/icons/SurveyFoundry.png" alt="SurveyFoundry app icon" class="launcher-icon" />
     <h1>SurveyFoundry App Launcher</h1>
+    <span id="activeProjectHeader" class="header-meta" aria-live="polite"></span>
   </header>
 
   <main>
@@ -406,6 +418,7 @@
     const closeProjectManagerButton = document.getElementById('closeProjectManagerButton');
     const projectModalBackdrop = document.getElementById('projectModalBackdrop');
     const activeProjectSummary = document.getElementById('activeProjectSummary');
+    const activeProjectHeader = document.getElementById('activeProjectHeader');
     const footerLogoWrap = document.querySelector('.footer-logo-wrap');
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
@@ -486,6 +499,7 @@
       activeProjectSummary.textContent = activeProject
         ? `Active project: ${activeProject.name}`
         : 'No active project selected.';
+      activeProjectHeader.textContent = activeProject ? `Active project: ${activeProject.name}` : '';
 
       projectList.innerHTML = '';
       if (!projects.length) {
