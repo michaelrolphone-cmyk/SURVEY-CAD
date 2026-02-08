@@ -197,6 +197,13 @@ Catalog endpoint:
 curl "http://localhost:3000/api/apps"
 ```
 
+Launcher icon mappings now use the shipped PNG assets for core apps:
+
+- `SurveyFoundry` → `/assets/icons/SurveyFoundry.png`
+- `RecordQuarry` → `/assets/icons/RecordQuarry.png`
+- `PointForge` → `/assets/icons/PointForge.png`
+- `LineSmith` → `/assets/icons/LineSmith.png`
+
 ### SurveyFoundry project workflow
 
 `index.html` (SurveyFoundry launcher) now includes a lightweight project manager for RecordQuarry/PointForge/LineSmith workflows:
@@ -204,6 +211,8 @@ curl "http://localhost:3000/api/apps"
 - Create a project with **project name**, **client**, and **address**.
 - Start that project directly in RecordQuarry via **Start in RecordQuarry**.
 - Launcher app cards now display each app's catalog description under the app name for quicker selection context.
+- Launcher app cards align app icons to the top-left of each card for consistent vertical layout with multi-line descriptions.
+- Launcher header now uses the SurveyFoundry app icon, and the legacy SurveyFoundry logo is moved to a centered enlarged footer treatment at the bottom of the launcher view.
 - Launcher opens `RecordQuarry.html` with query parameters (`projectId`, `projectName`, `client`, `address`, `autostart=1`).
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.
 - Re-opening the same project restores saved RecordQuarry results from local storage before falling back to a live lookup.

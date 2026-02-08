@@ -9,6 +9,7 @@ test('launcher cards show app name, description, and larger icons', async () => 
 
   assert.match(launcherHtml, /\.app-icon\s*\{[\s\S]*width:\s*56px;[\s\S]*height:\s*56px;/i);
   assert.match(launcherHtml, /<p class=\"app-description\">\$\{app\.description \|\| ''\}<\/p>/);
+  assert.match(launcherHtml, /\.app-card\s*\{[\s\S]*align-items:\s*flex-start;/i);
   assert.doesNotMatch(launcherHtml, /<span>\$\{app\.entryHtml\}<\/span>/);
   assert.match(launcherHtml, /option\.textContent\s*=\s*app\.name;/);
   assert.doesNotMatch(launcherHtml, /option\.textContent\s*=\s*`\$\{app\.name\}\s*\(\$\{app\.entryHtml\}\)`;/);
@@ -30,6 +31,10 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
 
   assert.match(launcherHtml, /<title>SurveyFoundry Launcher<\/title>/);
   assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
+  assert.match(launcherHtml, /<img src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon"\s*\/>/);
+  assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
+  assert.match(launcherHtml, /\.footer-logo-wrap\s*\{[\s\S]*justify-content:\s*center;/i);
+  assert.match(launcherHtml, /\.footer-logo\s*\{[\s\S]*width:\s*min\(320px, 58vw\);/i);
 });
 
 

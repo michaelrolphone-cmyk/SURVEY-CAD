@@ -18,7 +18,7 @@ test('app catalog exposes one icon entry for each app', () => {
   for (const app of APP_CATALOG) {
     assert.ok(app.name.length > 4);
     assert.ok(app.description.length > 20);
-    assert.match(app.iconPath, /^\/assets\/icons\/.+\.svg$/i);
+    assert.match(app.iconPath, /^\/assets\/icons\/.+\.(svg|png)$/i);
     assert.ok(app.entryHtml.toLowerCase().endsWith('.html'));
   }
 });
