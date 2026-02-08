@@ -68,7 +68,7 @@ function parseLonLat(urlObj) {
 }
 
 async function serveStaticFile(urlPath, staticDir, res) {
-  const requested = decodeURIComponent(urlPath === '/' ? '/VIEWPORT.HTML' : urlPath);
+  const requested = decodeURIComponent(urlPath === '/' ? '/index.html' : urlPath);
   const safePath = requested.replace(/^\/+/, '');
   const absPath = await resolveStaticPath(staticDir, safePath);
 
