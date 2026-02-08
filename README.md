@@ -227,7 +227,8 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 
 `index.html` (SurveyFoundry launcher) now includes a lightweight project manager for RecordQuarry/PointForge/LineSmith workflows:
 
-- Create a project with **project name**, **client**, and **address**.
+- Use **Choose project** to open a project-manager dialog so the launcher home stays focused on app selection.
+- Create a project with **project name**, **client**, and **address** (creation auto-activates the project and returns to launcher focus).
 - Start that project directly in RecordQuarry via **Start in RecordQuarry**.
 - Launcher app cards now display each app's catalog description under the app name for quicker selection context.
 - Launcher app cards align app icons to the top-left of each card for consistent vertical layout with multi-line descriptions.

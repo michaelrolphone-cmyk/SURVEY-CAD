@@ -107,6 +107,73 @@
       background: rgba(30, 41, 59, 0.55);
     }
 
+    .project-manager-launch {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.7rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.35);
+    }
+
+    .project-manager-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .project-manager-meta strong {
+      font-size: 0.95rem;
+    }
+
+    .project-manager-meta small {
+      color: var(--muted);
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .project-manager-button {
+      flex: none;
+    }
+
+    .project-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 4.5rem 1rem 1rem;
+      background: rgba(2, 6, 23, 0.65);
+      z-index: 5;
+    }
+
+    .project-modal-backdrop.hidden {
+      display: none;
+    }
+
+    .project-modal {
+      width: min(840px, 100%);
+      max-height: calc(100vh - 6rem);
+      overflow: auto;
+      border-radius: 12px;
+      background: var(--bg);
+      box-shadow: 0 14px 40px rgba(2, 6, 23, 0.45);
+    }
+
+    .project-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.75rem 0.9rem;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
     .project-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -277,16 +344,30 @@
   <main>
     <section class="home" id="homeView" aria-label="App launcher home">
       <p class="subtitle">Choose an app to open in the embedded viewer.</p>
-      <div class="project-panel" aria-label="RecordQuarry project manager">
-        <strong>Project manager</strong>
-        <p class="subtitle" style="margin-top:0.35rem">Create SurveyFoundry projects for RecordQuarry, PointForge, and LineSmith.</p>
-        <div class="project-grid">
-          <input id="projectName" type="text" placeholder="Project name" />
-          <input id="projectClient" type="text" placeholder="Client" />
-          <input id="projectAddress" type="text" placeholder="Address" />
+      <div class="project-manager-launch" aria-label="RecordQuarry project manager">
+        <div class="project-manager-meta">
+          <strong>Project manager</strong>
+          <small id="activeProjectSummary">No active project selected.</small>
         </div>
-        <button id="createProjectButton" type="button">Create project</button>
-        <div id="projectList" class="project-list"></div>
+        <button id="openProjectManagerButton" class="project-manager-button" type="button">Choose project</button>
+      </div>
+      <div id="projectModalBackdrop" class="project-modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="SurveyFoundry project manager dialog">
+        <div class="project-modal">
+          <div class="project-modal-header">
+            <strong>Project manager</strong>
+            <button id="closeProjectManagerButton" type="button">Close</button>
+          </div>
+          <div class="project-panel">
+            <p class="subtitle" style="margin-top:0.1rem">Create SurveyFoundry projects for RecordQuarry, PointForge, and LineSmith.</p>
+            <div class="project-grid">
+              <input id="projectName" type="text" placeholder="Project name" />
+              <input id="projectClient" type="text" placeholder="Client" />
+              <input id="projectAddress" type="text" placeholder="Address" />
+            </div>
+            <button id="createProjectButton" type="button">Create and activate project</button>
+            <div id="projectList" class="project-list"></div>
+          </div>
+        </div>
       </div>
       <div class="app-grid" id="appGrid"></div>
     </section>
@@ -321,6 +402,10 @@
     const projectAddressInput = document.getElementById('projectAddress');
     const createProjectButton = document.getElementById('createProjectButton');
     const projectList = document.getElementById('projectList');
+    const openProjectManagerButton = document.getElementById('openProjectManagerButton');
+    const closeProjectManagerButton = document.getElementById('closeProjectManagerButton');
+    const projectModalBackdrop = document.getElementById('projectModalBackdrop');
+    const activeProjectSummary = document.getElementById('activeProjectSummary');
     const footerLogoWrap = document.querySelector('.footer-logo-wrap');
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
@@ -366,6 +451,14 @@
       renderProjects();
     }
 
+    function openProjectManager() {
+      projectModalBackdrop.classList.remove('hidden');
+    }
+
+    function closeProjectManager() {
+      projectModalBackdrop.classList.add('hidden');
+    }
+
     function withActiveProject(file) {
       const project = getActiveProject();
       if (!project) return file;
@@ -389,6 +482,11 @@
     }
 
     function renderProjects() {
+      const activeProject = getActiveProject();
+      activeProjectSummary.textContent = activeProject
+        ? `Active project: ${activeProject.name}`
+        : 'No active project selected.';
+
       projectList.innerHTML = '';
       if (!projects.length) {
         projectList.innerHTML = '<small>No projects yet.</small>';
@@ -412,7 +510,10 @@
         makeActive.type = 'button';
         makeActive.textContent = project.id === activeProjectId ? 'Active project' : 'Set active project';
         makeActive.disabled = project.id === activeProjectId;
-        makeActive.addEventListener('click', () => setActiveProject(project.id));
+        makeActive.addEventListener('click', () => {
+          setActiveProject(project.id);
+          closeProjectManager();
+        });
 
         row.appendChild(info);
         row.appendChild(start);
@@ -427,15 +528,18 @@
       const address = projectAddressInput.value.trim();
       if (!name || !address) return;
 
-      projects.unshift({
+      const project = {
         id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name,
         client,
         address,
         createdAt: new Date().toISOString(),
-      });
+      };
+      projects.unshift(project);
+      setActiveProject(project.id);
       saveProjects();
       renderProjects();
+      closeProjectManager();
 
       projectNameInput.value = '';
       projectClientInput.value = '';
@@ -500,6 +604,13 @@
 
     backButton.addEventListener('click', showHome);
     createProjectButton.addEventListener('click', createProject);
+    openProjectManagerButton.addEventListener('click', openProjectManager);
+    closeProjectManagerButton.addEventListener('click', closeProjectManager);
+    projectModalBackdrop.addEventListener('click', (event) => {
+      if (event.target === projectModalBackdrop) {
+        closeProjectManager();
+      }
+    });
     reloadButton.addEventListener('click', () => {
       if (!currentApp) return;
       appFrame.src = currentApp;
