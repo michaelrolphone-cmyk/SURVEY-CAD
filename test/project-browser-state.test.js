@@ -1,12 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { loadStoredProjectFile, PROJECT_FILE_STORAGE_PREFIX } from '../src/project-browser-state.js';
+import {
+  loadStoredProjectFile,
+  PROJECT_FILE_STORAGE_PREFIX,
+  PROJECT_POINT_FILE_STORAGE_PREFIX,
+  buildPointFileUploadRecord,
+  appendPointFileResource,
+  saveStoredProjectFile,
+} from '../src/project-browser-state.js';
 
 function makeStorage(entries = {}) {
+  const store = { ...entries };
   return {
     getItem(key) {
-      return Object.prototype.hasOwnProperty.call(entries, key) ? entries[key] : null;
+      return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
+    },
+    setItem(key, value) {
+      store[key] = value;
+    },
+    dump() {
+      return { ...store };
     },
   };
 }
@@ -37,13 +51,56 @@ test('loadStoredProjectFile ignores malformed project-file snapshots', () => {
   assert.equal(loaded, null);
 });
 
+test('buildPointFileUploadRecord normalizes csv and txt uploads into project resources', () => {
+  const upload = buildPointFileUploadRecord({
+    projectId: 'project-77',
+    fileName: 'Topo Notes.txt',
+    text: 'Point,Northing,Easting\n1,100,200\n',
+    now: 1700000000000,
+  });
+
+  assert.equal(upload.resource.folder, 'point-files');
+  assert.equal(upload.resource.exportFormat, 'csv');
+  assert.equal(upload.resource.reference.type, 'local-storage');
+  assert.match(upload.storageKey, new RegExp(`^${PROJECT_POINT_FILE_STORAGE_PREFIX}:project-77:`));
+  assert.equal(upload.payload.name, 'Topo Notes.txt');
+  assert.equal(upload.payload.text, 'Point,Northing,Easting\n1,100,200');
+});
+
+test('appendPointFileResource appends point resources and saveStoredProjectFile persists updates', () => {
+  const storage = makeStorage();
+  const projectId = 'project-abc';
+  const projectFile = {
+    schemaVersion: '1.0.0',
+    folders: [{ key: 'point-files', index: [] }],
+  };
+
+  const appended = appendPointFileResource(projectFile, { id: 'point-1' });
+  const saved = saveStoredProjectFile(storage, projectId, projectFile);
+  const loaded = loadStoredProjectFile(storage, projectId);
+
+  assert.equal(appended, true);
+  assert.equal(saved, true);
+  assert.equal(loaded.folders[0].index.length, 1);
+  assert.equal(loaded.folders[0].index[0].id, 'point-1');
+});
+
 test('Project Browser prefers stored project file snapshots before loading API template', async () => {
   const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
 
   assert.match(projectBrowserHtml, /<script type="module">/, 'Project Browser should use module scripts to import shared state helpers');
-  assert.match(projectBrowserHtml, /import\s*\{\s*loadStoredProjectFile\s*\}\s*from\s*'\.\/src\/project-browser-state\.js'/, 'Project Browser should import persisted snapshot loader');
+  assert.match(projectBrowserHtml, /import\s*\{[\s\S]*loadStoredProjectFile[\s\S]*\}\s*from\s*'\.\/src\/project-browser-state\.js'/, 'Project Browser should import persisted snapshot loader');
   assert.match(projectBrowserHtml, /const storedProjectFile = loadStoredProjectFile\(window\.localStorage, activeProjectId\);/, 'Project Browser should attempt to load local project-file snapshots');
-  assert.match(projectBrowserHtml, /if \(storedProjectFile\) \{[\s\S]*renderTree\(storedProjectFile,\s*\{\s*projectId:\s*activeProjectId,\s*projectName\s*\}\);[\s\S]*return;/, 'Project Browser should render persisted files and skip template requests when available');
+  assert.match(projectBrowserHtml, /if \(storedProjectFile\) \{[\s\S]*renderTree\(storedProjectFile,\s*projectContext\);[\s\S]*return;/, 'Project Browser should render persisted files and skip template requests when available');
+});
+
+test('Project Browser supports point file drag-and-drop and mobile file picker attachments', async () => {
+  const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+
+  assert.match(projectBrowserHtml, /picker\.accept\s*=\s*'\.csv,text\/csv,\.txt,text\/plain'/, 'Project Browser should allow csv and txt through file picker');
+  assert.match(projectBrowserHtml, /panel\.addEventListener\('drop',\s*\(event\)\s*=>\s*\{[\s\S]*attachUploadedPointFiles\(event\.dataTransfer\?\.files, context\)/, 'Project Browser should support desktop drag-and-drop upload');
+  assert.match(projectBrowserHtml, /saveStoredProjectFile\(window\.localStorage, context\.activeProjectId, context\.projectFile\)/, 'Project Browser should persist updated project-file snapshot after attaching uploads');
+  assert.match(projectBrowserHtml, /buildPointFileUploadRecord\(\{[\s\S]*projectId:\s*context\.activeProjectId,[\s\S]*fileName:\s*file\.name,[\s\S]*text,/, 'Project Browser should convert picked files into point-file project resources');
 });
 
 test('Project Browser can open persisted point files directly in PointForge', async () => {

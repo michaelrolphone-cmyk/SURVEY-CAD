@@ -180,6 +180,7 @@ When launched with an active project, PointForge now also writes imported and ex
 `PROJECT_BROWSER.html` now prefers the persisted in-browser project-file snapshot (`surveyfoundryProjectFile:<projectId>`) so CP&Fs and Point Files added during Quarry → Forge → Smith workflows appear immediately; it falls back to `/api/project-file/template` only when no stored snapshot exists.
 Point-file rows in `PROJECT_BROWSER.html` now include **Open in PointForge**, which stores the selected local-storage-backed point file and navigates to `POINT_TRANSFORMER.HTML?source=project-browser` so PointForge auto-loads that point set into input.
 Point-file rows are also directly tappable/clickable (with keyboard Enter/Space support), so mobile users can open a point file in PointForge without needing the small action button.
+Project Browser point-file folders now support desktop drag-and-drop uploads and a mobile-friendly **Choose Point Files** picker (`.csv` and `.txt`/`text/csv`), which attaches files to the active project's persisted project-file snapshot for immediate PointForge launch.
 PointForge also now includes a **Switch to Point Editor View** toggle that swaps input/output textareas for a LineSmith-style tabular point editor/read-only output table (`#`, `X`, `Y`, `Z`, `Code`, `Notes`) while keeping transform processing behavior unchanged.
 
 Project Browser → PointForge deep-link command:
