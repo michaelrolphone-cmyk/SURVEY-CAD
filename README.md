@@ -215,6 +215,7 @@ Launcher icon mappings now use the shipped PNG assets for core apps:
 - Launcher app cards now display each app's catalog description under the app name for quicker selection context.
 - Launcher app cards align app icons to the top-left of each card for consistent vertical layout with multi-line descriptions.
 - Launcher header now uses the SurveyFoundry app icon, and the legacy SurveyFoundry logo is moved to a centered enlarged footer treatment at the bottom of the launcher view.
+- Launcher header icon/title are vertically centered together, the footer logo appears only on the launcher home screen, and on mobile the embedded app viewer presents a full-width iframe.
 - Launcher opens `RecordQuarry.html` with query parameters (`projectId`, `projectName`, `client`, `address`, `autostart=1`).
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.

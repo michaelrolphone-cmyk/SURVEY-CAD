@@ -32,7 +32,7 @@
 
     header {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 0.8rem;
       padding: 1rem 1.2rem;
       border-bottom: 1px solid rgba(148, 163, 184, 0.2);
@@ -206,6 +206,10 @@
       gap: 0.8rem;
     }
 
+    .footer-logo-wrap.hidden {
+      display: none;
+    }
+
     .toolbar {
       display: flex;
       gap: 0.6rem;
@@ -243,6 +247,24 @@
       min-height: 460px;
       border: 1px solid rgba(148, 163, 184, 0.35);
       border-radius: 12px;
+    }
+
+    @media (max-width: 760px) {
+      .viewer {
+        padding: 0;
+        gap: 0;
+      }
+
+      .toolbar {
+        padding: 0.8rem 1rem;
+      }
+
+      iframe {
+        border-left: 0;
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 0;
+      }
     }
   </style>
 </head>
@@ -299,6 +321,7 @@
     const projectAddressInput = document.getElementById('projectAddress');
     const createProjectButton = document.getElementById('createProjectButton');
     const projectList = document.getElementById('projectList');
+    const footerLogoWrap = document.querySelector('.footer-logo-wrap');
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
     const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
@@ -422,6 +445,7 @@
     function showHome() {
       homeView.classList.remove('hidden');
       viewerView.classList.add('hidden');
+      footerLogoWrap?.classList.remove('hidden');
       currentApp = null;
       appFrame.removeAttribute('src');
     }
@@ -433,6 +457,7 @@
       appSelect.value = file;
       homeView.classList.add('hidden');
       viewerView.classList.remove('hidden');
+      footerLogoWrap?.classList.add('hidden');
     }
 
     function renderApps() {
