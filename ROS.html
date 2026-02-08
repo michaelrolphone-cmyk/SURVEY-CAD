@@ -1366,6 +1366,69 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     return `<b>Aliquot</b><br/>${escapeHtml(label)}<div class="hr"></div><div class="small"><b>CP&amp;F PDFs</b><br/>${linkHtml}</div>`;
   }
 
+  function flattenCpfRecordLinks(records = []) {
+    const links = [];
+    const seen = new Set();
+    for (const record of records) {
+      for (const url of (record?.links || [])) {
+        const key = canonicalizeUrl(url);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        links.push(url);
+      }
+    }
+    return links;
+  }
+
+  async function queryCpfRecordsForAliquot(feature) {
+    const corners = getPolygonCornerMarkers(feature, 'aliquot');
+    const out = [];
+    const seen = new Set();
+
+    for (const corner of corners) {
+      const records = await queryCpfRecordsNearCorner(corner.north, corner.east);
+      for (const record of records) {
+        const links = [];
+        for (const url of (record?.links || [])) {
+          const key = canonicalizeUrl(url);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          links.push(url);
+        }
+        if (!links.length) continue;
+        out.push({
+          instrument: record.instrument,
+          distanceMeters: record.distanceMeters,
+          links,
+        });
+      }
+      if (out.length >= 8) break;
+    }
+
+    return out;
+  }
+
+  async function lazyLoadAliquotSummaryCpfLinks(targets = []) {
+    for (const target of targets) {
+      const node = document.querySelector(`[data-aliquot-cpf-links="${target.token}"]`);
+      if (!node) continue;
+      try {
+        const records = await queryCpfRecordsForAliquot(target.feature);
+        const html = cpfLinksHtml(records);
+        node.innerHTML = html;
+        if (flattenCpfRecordLinks(records).length) {
+          log(`Loaded CP&F PDF links for summary ${target.label}.`);
+        } else {
+          node.innerHTML = '<span class="small">No CP&amp;F PDF links found.</span>';
+          log(`No CP&F PDF links found for summary ${target.label}.`, 'warn');
+        }
+      } catch (e) {
+        node.innerHTML = `<span class="small" style="color:#ffb3b3">CP&amp;F lookup failed: ${escapeHtml(e.message || e)}</span>`;
+        log(`CP&F summary lookup failed for ${target.label}: ${e.message || e}`, 'warn');
+      }
+    }
+  }
+
   // -----------------------------
   // Export helpers
   // -----------------------------
@@ -1665,15 +1728,21 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         []
       ));
 
+      const aliquotSummaryCpfTargets = [];
       if (state.aliquotFeatures.length) {
         const aliquotCards = state.aliquotFeatures.slice(0, 6).map((f, idx) => {
           const a = f.attributes || {};
           const title = a.ALIQUOT || a.ALIQUOT_LABEL || `Aliquot #${idx + 1}`;
+          const token = `aliquot-${idx + 1}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          aliquotSummaryCpfTargets.push({ token, feature: f, label: `Aliquot #${idx + 1}` });
           return card(
             `Aliquot #${idx + 1}`,
             title,
             summarizeAttrs(a),
-            buildPdfProxyLinks(a, "Open CP&F PDF (API)"),
+            [
+              ...buildPdfProxyLinks(a, "Open CP&F PDF (API)"),
+              `<div class="small"><b>Corner CP&amp;F records</b><br/><span data-aliquot-cpf-links="${token}">Loading CP&amp;F records…</span></div>`
+            ],
             { onSelect: () => centerMapOnFeature(f, layers.aliquots, `Aliquot #${idx + 1}`) }
           );
         });
@@ -1701,6 +1770,9 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
       }
 
       setSummaryCards(cards);
+      if (aliquotSummaryCpfTargets.length) {
+        lazyLoadAliquotSummaryCpfLinks(aliquotSummaryCpfTargets);
+      }
 
       state.exportGeoJSON = buildExportGeoJSON();
       $("btnExportGeo").disabled = false;
