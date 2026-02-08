@@ -142,6 +142,7 @@ curl -X POST "http://localhost:3000/extract?maxPages=3&dpi=400&allowSlow=1" \
 
 `VIEWPORT.HTML` drag locking behavior: points and lines are locked by default and can only be drag-moved after you double-click to toggle them to movable. Persisted/imported movable flags now only unlock dragging when the value is strict boolean `true`.
 `VIEWPORT.HTML` also includes **Display** toggles so you can independently hide/show drawn point **codes** and **notes** while keeping point numbers visible.
+`VIEWPORT.HTML` now draws line **bearing + distance** labels when zoom/line length allows the text to fit beside the segment and when the computed label bounds do not overlap existing point text labels. The Selection section also includes an inspector card that reports bearing + distance for either the actively selected line or exactly two selected points.
 
 
 ### ROS standalone tool command
