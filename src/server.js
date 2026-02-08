@@ -69,6 +69,36 @@ function parseLonLat(urlObj) {
   return { lon, lat };
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildFallbackStaticMapSvg(lat, lon, address = '') {
+  const title = address.trim() || `Lat ${lat.toFixed(5)}, Lon ${lon.toFixed(5)}`;
+  const safeTitle = escapeHtml(title);
+  const safeCoordinates = escapeHtml(`${lat.toFixed(6)}, ${lon.toFixed(6)}`);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="Project map fallback for ${safeTitle}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#bg)" />
+  <circle cx="800" cy="500" r="14" fill="#ef4444" />
+  <circle cx="800" cy="500" r="42" fill="none" stroke="#f87171" stroke-opacity="0.55" stroke-width="4" />
+  <text x="800" y="560" fill="#e2e8f0" text-anchor="middle" font-size="36" font-family="Inter, system-ui, sans-serif">${safeTitle}</text>
+  <text x="800" y="610" fill="#94a3b8" text-anchor="middle" font-size="24" font-family="Inter, system-ui, sans-serif">${safeCoordinates}</text>
+</svg>`;
+}
+
 async function readJsonBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -139,6 +169,7 @@ export function createSurveyServer({
   client = new SurveyCadClient(),
   staticDir = DEFAULT_STATIC_DIR,
   rosOcrHandler,
+  staticMapFetcher = fetch,
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
@@ -228,6 +259,45 @@ export function createSurveyServer({
         const payload = await client.geocodeAddress(address);
         sendJson(res, 200, payload);
         return;
+      }
+
+      if (urlObj.pathname === '/api/static-map') {
+        const { lon, lat } = parseLonLat(urlObj);
+        const address = urlObj.searchParams.get('address') || '';
+        const center = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+        const map = new URL('https://staticmap.openstreetmap.de/staticmap.php');
+        map.searchParams.set('center', center);
+        map.searchParams.set('zoom', '17');
+        map.searchParams.set('size', '1600x1000');
+        map.searchParams.set('markers', `${center},red-pushpin`);
+        map.searchParams.set('maptype', 'mapnik');
+
+        try {
+          const upstream = await staticMapFetcher(map.toString(), {
+            headers: {
+              Accept: 'image/png,image/*;q=0.8,*/*;q=0.5',
+              'User-Agent': 'survey-cad/1.0 static-map-proxy',
+            },
+          });
+
+          if (!upstream.ok) {
+            throw new Error(`Failed static map (${upstream.status})`);
+          }
+
+          const imageBuffer = Buffer.from(await upstream.arrayBuffer());
+          res.statusCode = 200;
+          res.setHeader('Content-Type', upstream.headers.get('content-type') || 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=1800');
+          res.end(imageBuffer);
+          return;
+        } catch {
+          const fallbackSvg = buildFallbackStaticMapSvg(lat, lon, address);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+          res.setHeader('Cache-Control', 'public, max-age=300');
+          res.end(fallbackSvg);
+          return;
+        }
       }
 
 

@@ -62,8 +62,8 @@ test('launcher fetches and applies static map background for active project addr
 
   assert.match(launcherHtml, /const\s+backgroundMapUrlCache\s*=\s*new Map\(\);/, 'launcher should cache map background URLs per address');
   assert.match(launcherHtml, /function\s+setLauncherBackground\(mapUrl = ''\)/, 'launcher should support dynamic background switching');
-  assert.match(launcherHtml, /function\s+buildStaticMapUrl\(lat, lon\)/, 'launcher should derive static map URL from geocoded coordinates');
-  assert.match(launcherHtml, /https:\/\/staticmap\.openstreetmap\.de\/staticmap\.php/, 'launcher should use an OSM static map image as active project backdrop');
+  assert.match(launcherHtml, /function\s+buildStaticMapUrl\(lat, lon, address = ''\)/, 'launcher should derive static map URL from geocoded coordinates');
+  assert.match(launcherHtml, /new URL\('\/api\/static-map',\s*window\.location\.origin\)/, 'launcher should build static map URLs through the local static map proxy endpoint');
   assert.match(launcherHtml, /fetch\(`\/api\/geocode\?address=\$\{encodeURIComponent\(address\)\}`\)/, 'launcher should geocode active project address before rendering map background');
   assert.match(launcherHtml, /if \(!Number\.isFinite\(geocode\?\.lat\) \|\| !Number\.isFinite\(geocode\?\.lon\)\)/, 'launcher should validate geocode coordinates before using them');
   assert.match(launcherHtml, /syncActiveProjectBackground\(\);/, 'renderProjects should refresh the launcher background for active project changes');

@@ -503,14 +503,13 @@
       }
     }
 
-    function buildStaticMapUrl(lat, lon) {
-      const center = `${lat.toFixed(6)},${lon.toFixed(6)}`;
-      const map = new URL('https://staticmap.openstreetmap.de/staticmap.php');
-      map.searchParams.set('center', center);
-      map.searchParams.set('zoom', '17');
-      map.searchParams.set('size', '1600x1000');
-      map.searchParams.set('markers', `${center},red-pushpin`);
-      map.searchParams.set('maptype', 'mapnik');
+    function buildStaticMapUrl(lat, lon, address = '') {
+      const map = new URL('/api/static-map', window.location.origin);
+      map.searchParams.set('lat', lat.toFixed(6));
+      map.searchParams.set('lon', lon.toFixed(6));
+      if (address) {
+        map.searchParams.set('address', address);
+      }
       return map.toString();
     }
 
@@ -543,7 +542,7 @@
           throw new Error('Geocode response missing lat/lon');
         }
 
-        const mapUrl = buildStaticMapUrl(geocode.lat, geocode.lon);
+        const mapUrl = buildStaticMapUrl(geocode.lat, geocode.lon, address);
         backgroundMapUrlCache.set(cacheKey, mapUrl);
         setLauncherBackground(mapUrl);
       } catch (err) {

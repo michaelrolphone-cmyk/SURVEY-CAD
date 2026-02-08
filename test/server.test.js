@@ -387,3 +387,41 @@ test('server exposes project-file template and compile endpoints', async () => {
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+test('server static map endpoint proxies upstream image and falls back to SVG when unavailable', async () => {
+  const imageBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]);
+  const mapCalls = [];
+  const app = await startApiServer(new SurveyCadClient(), {
+    staticMapFetcher: async (url) => {
+      mapCalls.push(url);
+      if (mapCalls.length === 1) {
+        return new Response(imageBytes, {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' },
+        });
+      }
+      throw new Error('upstream unavailable');
+    },
+  });
+
+  try {
+    const okRes = await fetch(`http://127.0.0.1:${app.port}/api/static-map?lat=43.61001&lon=-116.20001&address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(okRes.status, 200);
+    assert.match(okRes.headers.get('content-type') || '', /image\/png/i);
+    const okBody = new Uint8Array(await okRes.arrayBuffer());
+    assert.deepEqual(Array.from(okBody), Array.from(imageBytes));
+
+    const fallbackRes = await fetch(`http://127.0.0.1:${app.port}/api/static-map?lat=43.61&lon=-116.2&address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(fallbackRes.status, 200);
+    assert.match(fallbackRes.headers.get('content-type') || '', /image\/svg\+xml/i);
+    const fallbackBody = await fallbackRes.text();
+    assert.match(fallbackBody, /Project map fallback/i);
+    assert.match(fallbackBody, /100 Main St, Boise/i);
+
+    assert.equal(mapCalls.length, 2);
+    assert.match(mapCalls[0], /staticmap\.openstreetmap\.de\/staticmap\.php/);
+    assert.match(mapCalls[0], /center=43\.610010%2C-116\.200010/);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
