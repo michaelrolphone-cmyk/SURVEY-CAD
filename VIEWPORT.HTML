@@ -168,6 +168,9 @@
     .inspectorRow{ display:flex; justify-content:space-between; gap:8px; margin-bottom:4px; }
     .inspectorRow:last-child{ margin-bottom:0; }
     .inspectorRow b{ color:var(--text); }
+    .inspectorLinks{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .inspectorLinks a{ color:var(--accent); text-decoration:none; border:1px solid #2a3550; border-radius:999px; padding:3px 8px; font-size:11px; }
+    .inspectorLinks a:hover{ background:#182238; }
 
     .canvasWrap{
       grid-area:canvas;
@@ -671,6 +674,7 @@
         <button id="deleteSelected" class="danger">Delete Selected</button>
         <button id="clearSelection">Clear Selection</button>
       </div>
+      <div id="pointInspector" class="inspectorCard">Select one point to inspect point details.</div>
       <div id="lineInspector" class="inspectorCard">Select one line or two points to inspect bearing + distance.</div>
       <div id="status" class="status">Ready.</div>
     </div>
@@ -1030,6 +1034,7 @@
   const hudRedo = $("#hudRedo");
   const selSummary = $("#selSummary");
   const lineInspector = $("#lineInspector");
+  const pointInspector = $("#pointInspector");
   const toolHint = $("#toolHint");
 
   const pointsCount = $("#pointsCount");
@@ -1113,6 +1118,7 @@
 
   const FEET_TO_METERS = 0.3048006096012192;
   let mapGeoreference = null;
+  const ADA_CPF_PDF_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/";
 
   const MAP_TILESETS = {
     satellite: {
@@ -2102,6 +2108,71 @@
   // -------------------------
   // Point editor panel
   // -------------------------
+  function parseCpfInstruments(value = "") {
+    const raw = String(value ?? "").trim();
+    if (!raw) return [];
+    const normalized = raw.replace(/^CPNFS?:\s*/i, "");
+    const parts = normalized
+      .split(/\.\.\.|[,;|\n]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return [...new Set(parts)];
+  }
+
+  function buildCpfInstrumentUrl(instrument) {
+    return ADA_CPF_PDF_BASE + encodeURIComponent(String(instrument).trim()) + ".pdf";
+  }
+
+  function updatePointInspectorFromSelection() {
+    pointInspector.innerHTML = "";
+    const p = selectedPointId ? points.get(selectedPointId) : null;
+    if (!p) {
+      pointInspector.textContent = "Select one point to inspect point details.";
+      return;
+    }
+    const rows = [
+      ["Point", p.num],
+      ["X", p.x],
+      ["Y", p.y],
+      ["Z", p.z],
+      ["Code", p.code || "—"]
+    ];
+    for (const [label, value] of rows) {
+      const row = document.createElement("div");
+      row.className = "inspectorRow";
+      const left = document.createElement("span");
+      left.textContent = label;
+      const right = document.createElement("b");
+      right.textContent = String(value);
+      row.append(left, right);
+      pointInspector.appendChild(row);
+    }
+
+    const cpfInstruments = parseCpfInstruments(p.notes);
+    const cpfRow = document.createElement("div");
+    cpfRow.className = "inspectorRow";
+    const cpfLabel = document.createElement("span");
+    cpfLabel.textContent = "CP&F";
+    const cpfValue = document.createElement("b");
+    cpfValue.textContent = cpfInstruments.length ? cpfInstruments.join(", ") : "None";
+    cpfRow.append(cpfLabel, cpfValue);
+    pointInspector.appendChild(cpfRow);
+
+    if (cpfInstruments.length) {
+      const links = document.createElement("div");
+      links.className = "inspectorLinks";
+      for (const instrument of cpfInstruments) {
+        const a = document.createElement("a");
+        a.href = buildCpfInstrumentUrl(instrument);
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = `Open ${instrument}`;
+        links.appendChild(a);
+      }
+      pointInspector.appendChild(links);
+    }
+  }
+
   function updatePointEditorFromSelection() {
     const p = selectedPointId ? points.get(selectedPointId) : null;
     if (p) {
@@ -2115,6 +2186,7 @@
       $("#ptX").value = "";
       $("#ptY").value = "";
     }
+    updatePointInspectorFromSelection();
   }
 
   $("#applyPoint").addEventListener("click", () => {
