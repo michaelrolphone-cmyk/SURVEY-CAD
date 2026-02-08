@@ -14,6 +14,9 @@ test('ROS.html routes ROS PDF links through API server and exports marker corner
   const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
 
   assert.match(html, /buildRosPdfProxyUrl\(p\.url\)/, 'ROS PDF links should use API proxy URL');
+  assert.match(html, /function\s+buildPdfProxyLinks\s*\(/, 'helper should build shared API PDF links for ROS and aliquots');
+  assert.match(html, /Open\s+Aliquot\s+PDF\s*\(API\)/, 'aliquot cards should include API PDF links when available');
+  assert.doesNotMatch(html, /sv\.includes\("\/"\)/, 'relative PDF fields without slash should still be proxied');
   assert.match(html, /drawCornerMarkers\(/, 'corner markers should be drawn on the map');
   assert.match(html, /buildPolygonCornerCsvRowsPNEZD\(/, 'polygon corner CSV rows should be exported');
   assert.match(html, /buildPointMarkerCsvRowsPNEZD\(/, 'marker point CSV rows should be exported');

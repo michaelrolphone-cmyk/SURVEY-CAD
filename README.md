@@ -103,7 +103,7 @@ The static HTML tools use `src/browser-survey-client.js` so network calls flow t
 - `loadSectionAtPoint(lon, lat)` → `/api/section`
 - `loadAliquotsAtPoint(lon, lat, outSR?)` → `/api/aliquots`
 - `loadSubdivisionAtPoint(lon, lat, outSR?)` → `/api/subdivision`
-- `buildRosPdfProxyUrl(url)` → `/api/ros-pdf?url=...` (stream ROS PDFs through the API server)
+- `buildRosPdfProxyUrl(url)` → `/api/ros-pdf?url=...` (stream ROS/aliquot PDFs through the API server to avoid browser CORS blocking; supports absolute URLs and relative PDF paths found in ArcGIS attributes)
 
 ### Static HTML files
 
@@ -146,5 +146,6 @@ All CLI commands print JSON to stdout.
 
 - `ROS.html` now includes BLM aliquot lookup/mapping in the map results panel.
 - ROS cards now link PDFs through `/api/ros-pdf` so PDFs are loaded via this app server.
+- Aliquot cards now also surface any PDF attribute links and route them through `/api/ros-pdf`.
 - Subdivision boundary and parcel/subdivision/aliquot corner markers are drawn on the map.
 - Parcel CSV export from `ROS.html` now includes subdivision corners, aliquot corners, and marker rows (address + ROS points + corner markers) in P,N,E,Z,D format (EPSG:2243).
