@@ -207,7 +207,16 @@ export function createSurveyServer({
       if (urlObj.pathname === '/api/subdivision') {
         const { lon, lat } = parseLonLat(urlObj);
         const outSR = Number(urlObj.searchParams.get('outSR') || 4326);
-        const subdivision = await client.loadSubdivisionAtPoint(lon, lat, outSR);
+        let subdivision;
+        try {
+          subdivision = await client.loadSubdivisionAtPoint(lon, lat, outSR);
+        } catch (err) {
+          if (outSR !== 4326) {
+            subdivision = await client.loadSubdivisionAtPoint(lon, lat, 4326);
+          } else {
+            throw err;
+          }
+        }
         sendJson(res, 200, { subdivision });
         return;
       }
