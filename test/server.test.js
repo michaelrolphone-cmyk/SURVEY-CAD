@@ -160,7 +160,7 @@ test('server exposes survey APIs and static html', async () => {
     const launcherRes = await fetch(`http://127.0.0.1:${app.port}/`);
     assert.equal(launcherRes.status, 200);
     const launcherHtml = await launcherRes.text();
-    assert.match(launcherHtml, /SURVEY CAD App Launcher/i);
+    assert.match(launcherHtml, /SURVEY CAD Launcher/i);
     assert.match(launcherHtml, /api\/apps/);
     assert.match(launcherHtml, /app-icon/);
 
