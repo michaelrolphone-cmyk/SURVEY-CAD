@@ -42,6 +42,9 @@ test('ROS.html loads CP&F PDF links when a corner marker is selected', async () 
   assert.match(html, /ADA_CPF_WEBMAP_ITEM_ID/, 'CP&F web map id should be configured');
   assert.match(html, /discoverAdaCpfLayerViaJsonp\(/, 'should discover CP&F layer from Ada web map');
   assert.match(html, /queryCpfRecordsNearCorner\(/, 'corner selection should query nearby CP&F records');
+  assert.match(html, /typeof\s+v\s*===\s*'object'\s*\?\s*JSON\.stringify\(v\)\s*:\s*String\(v\)/, 'jsonp query helper should serialize object params as JSON for ArcGIS geometry payloads');
+  assert.match(html, /haversineMeters\(lat, lon, y, x\)/, 'corner CP&F lookup should compute feature distance from selected corner');
+  assert.match(html, /record\.distanceMeters\s*==\s*null\s*\|\|\s*record\.distanceMeters\s*<=\s*\(radius\s*\+\s*0\.5\)/, 'corner CP&F lookup should filter to records near the selected corner instead of section-wide results');
   assert.match(html, /buildCpfPdfLinks\(/, 'CP&F lookup should build candidate PDF links from instrument/url/name fields');
   assert.match(html, /buildRosPdfProxyUrl\(url\)/, 'CP&F links should route through API PDF proxy');
   assert.match(html, /marker\.on\('click', async \(\) => \{[\s\S]*queryCpfRecordsNearCorner\(corner\.north, corner\.east\)/, 'corner marker click handler should trigger CP&F lookup');
