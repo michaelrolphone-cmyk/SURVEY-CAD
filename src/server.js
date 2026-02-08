@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import SurveyCadClient from './survey-api.js';
 import { createRosOcrApp } from './ros-ocr-api.js';
+import { listApps } from './app-catalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -155,6 +156,11 @@ export function createSurveyServer({
 
       if (urlObj.pathname === '/health') {
         sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/apps') {
+        sendJson(res, 200, { apps: listApps() });
         return;
       }
 
