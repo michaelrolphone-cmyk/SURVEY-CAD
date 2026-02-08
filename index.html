@@ -209,7 +209,6 @@
     const appFrame = document.getElementById('appFrame');
     const backButton = document.getElementById('backButton');
     const reloadButton = document.getElementById('reloadButton');
-    const closeButton = document.getElementById('closeButton');
 
     let currentApp = null;
 
@@ -266,7 +265,6 @@
     }
 
     backButton.addEventListener('click', showHome);
-    closeButton.addEventListener('click', showHome);
     reloadButton.addEventListener('click', () => {
       if (!currentApp) return;
       appFrame.src = currentApp;
