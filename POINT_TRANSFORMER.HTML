@@ -1063,6 +1063,10 @@
 
     function buildSurveySketchImportPayload(recordsSorted){
       const rows = [["number","x","y","z","code","notes"]];
+      const georeferencePoints = [];
+      const zone = elZone.value || "west";
+      const def = PROJ_DEFS_USFT[zone];
+      const swapXY = true;
 
       for (const record of recordsSorted || []){
         if (!Array.isArray(record?.fields) || record.fields.length < 4) continue;
@@ -1080,12 +1084,31 @@
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
         rows.push([number, x, y, z, code, notes]);
+
+        try {
+          const projectedX = swapXY ? y : x;
+          const projectedY = swapXY ? x : y;
+          const ll = proj4(def, "WGS84", [projectedX, projectedY]);
+          const lon = ll[0];
+          const lat = ll[1];
+          if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            georeferencePoints.push({ x, y, lat, lng: lon });
+          }
+        } catch (_err) {
+          // Ignore malformed coordinates and continue exporting CSV rows.
+        }
       }
 
       return {
         source: "pointforge-transformer",
         exportedAt: new Date().toISOString(),
-        csv: rows.map((row)=>row.map(csvEscape).join(",")).join("\n")
+        csv: rows.map((row)=>row.map(csvEscape).join(",")).join("\n"),
+        georeference: {
+          type: "idaho-state-plane-usft",
+          zone,
+          swapXY,
+          points: georeferencePoints
+        }
       };
     }
 
