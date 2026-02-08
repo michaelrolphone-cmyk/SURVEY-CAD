@@ -67,6 +67,38 @@
       padding: 0.42rem 0.55rem;
     }
 
+    .upload-panel {
+      margin-left: 1.65rem;
+      border: 1px dashed rgba(56, 189, 248, 0.45);
+      border-radius: 10px;
+      padding: 0.75rem;
+      background: rgba(15, 23, 42, 0.5);
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .upload-panel.drag-active {
+      border-color: #7dd3fc;
+      background: rgba(14, 116, 144, 0.2);
+    }
+
+    .upload-actions {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .upload-actions input[type="file"] {
+      display: none;
+    }
+
+    .upload-status {
+      font-size: 0.82rem;
+      color: var(--muted);
+      min-height: 1.1rem;
+    }
+
     .tree-root,
     .folder-row {
       background: var(--panel);
@@ -171,7 +203,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource } from './src/project-browser-state.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
 
@@ -232,6 +264,94 @@
       }
     }
 
+    function isSupportedPointFile(file) {
+      const name = file?.name || '';
+      return /\.(csv|txt)$/i.test(name);
+    }
+
+    async function attachUploadedPointFiles(files, context) {
+      const accepted = Array.from(files || []).filter(isSupportedPointFile);
+      if (!accepted.length) {
+        context.setUploadStatus('No supported files found. Use .csv or .txt files.');
+        return;
+      }
+
+      if (!context.activeProjectId || !context.projectFile) {
+        context.setUploadStatus('Select an active project before attaching point files.');
+        return;
+      }
+
+      let attachedCount = 0;
+      for (const file of accepted) {
+        const text = await file.text();
+        const upload = buildPointFileUploadRecord({
+          projectId: context.activeProjectId,
+          fileName: file.name,
+          text,
+        });
+        if (!upload) continue;
+        localStorage.setItem(upload.storageKey, JSON.stringify(upload.payload));
+        const appended = appendPointFileResource(context.projectFile, upload.resource);
+        if (appended) attachedCount += 1;
+      }
+
+      if (!attachedCount) {
+        context.setUploadStatus('No valid point records were added.');
+        return;
+      }
+
+      saveStoredProjectFile(window.localStorage, context.activeProjectId, context.projectFile);
+      context.setUploadStatus(`Attached ${attachedCount} point file${attachedCount === 1 ? '' : 's'} to this project.`);
+      renderTree(context.projectFile, context);
+    }
+
+    function createPointFileUploadPanel(context) {
+      const panel = document.createElement('div');
+      panel.className = 'upload-panel';
+
+      const title = document.createElement('div');
+      title.className = 'muted';
+      title.textContent = 'Attach point files (.csv or .txt): drag files here on desktop, or choose files on mobile.';
+      panel.appendChild(title);
+
+      const actions = document.createElement('div');
+      actions.className = 'upload-actions';
+
+      const picker = document.createElement('input');
+      picker.type = 'file';
+      picker.accept = '.csv,text/csv,.txt,text/plain';
+      picker.multiple = true;
+      picker.addEventListener('change', () => attachUploadedPointFiles(picker.files, context));
+
+      const pickerButton = document.createElement('button');
+      pickerButton.type = 'button';
+      pickerButton.className = 'launch-btn';
+      pickerButton.textContent = 'Choose Point Files';
+      pickerButton.addEventListener('click', () => picker.click());
+
+      actions.appendChild(pickerButton);
+      actions.appendChild(picker);
+      panel.appendChild(actions);
+
+      const status = document.createElement('div');
+      status.className = 'upload-status';
+      status.textContent = context.uploadStatus || '';
+      panel.appendChild(status);
+
+      panel.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        panel.classList.add('drag-active');
+      });
+      panel.addEventListener('dragleave', () => panel.classList.remove('drag-active'));
+      panel.addEventListener('drop', (event) => {
+        event.preventDefault();
+        panel.classList.remove('drag-active');
+        attachUploadedPointFiles(event.dataTransfer?.files, context);
+      });
+
+      return panel;
+    }
+
     function renderTree(projectFile, projectContext = {}) {
       treeContainer.innerHTML = '';
 
@@ -245,6 +365,10 @@
         folderRow.className = 'folder-row';
         folderRow.innerHTML = `<span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span>`;
         treeContainer.appendChild(folderRow);
+
+        if (folder.key === 'point-files') {
+          treeContainer.appendChild(createPointFileUploadPanel(projectContext));
+        }
 
         const indexFile = document.createElement('div');
         indexFile.className = 'file-row';
@@ -318,9 +442,24 @@
         ? `Active project: ${projectName} (${activeProjectId})`
         : 'No active project selected. Showing a template project structure.';
 
+      let uploadStatus = '';
+      const projectContext = {
+        activeProjectId,
+        projectId: activeProjectId,
+        projectName,
+        projectFile: null,
+        uploadStatus: '',
+        setUploadStatus(message) {
+          uploadStatus = message;
+          this.uploadStatus = message;
+        },
+      };
+
       const storedProjectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
       if (storedProjectFile) {
-        renderTree(storedProjectFile, { projectId: activeProjectId, projectName });
+        projectContext.projectFile = storedProjectFile;
+        projectContext.uploadStatus = uploadStatus;
+        renderTree(storedProjectFile, projectContext);
         return;
       }
 
@@ -340,7 +479,9 @@
           throw new Error('Malformed response from project template endpoint.');
         }
 
-        renderTree(payload.projectFile, { projectId: activeProjectId, projectName });
+        projectContext.projectFile = payload.projectFile;
+        projectContext.uploadStatus = uploadStatus;
+        renderTree(payload.projectFile, projectContext);
       } catch (err) {
         renderError(`Project browser failed to load: ${err.message}`);
       }
