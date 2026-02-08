@@ -241,7 +241,8 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 `index.html` (SurveyFoundry launcher) now includes a lightweight project manager for RecordQuarry/PointForge/LineSmith workflows:
 
 - Use **Choose project** to open a project-manager dialog so the launcher home stays focused on app selection.
-- Create a project with **project name**, **client**, and **address** (creation auto-activates the project and returns to launcher focus).
+- Create a project with **project name**, **client**, **client contact info**, **billing rate**, **address**, and **project description** (creation auto-activates the project and returns to launcher focus).
+- Existing projects can be managed in-place with **Rename**, **Edit details**, and **Delete** actions.
 - Start that project directly in RecordQuarry via **Start in RecordQuarry**.
 - Launcher app cards now display each app's catalog description under the app name for quicker selection context.
 - Launcher app cards align app icons to the top-left of each card for consistent vertical layout with multi-line descriptions.
@@ -290,9 +291,11 @@ Experimental apps:
 Entry: `src/cli.js`
 
 ```bash
+npm run cli -- --help
 node src/cli.js lookup --address "1600 W Front St, Boise"
 node src/cli.js section --lat 43.61 --lon -116.20
 node src/cli.js aliquots --lat 43.61 --lon -116.20
+node src/cli.js parcel --lat 43.61 --lon -116.20 --outSR 2243
 ```
 
 All CLI commands print JSON to stdout.
