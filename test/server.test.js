@@ -388,14 +388,26 @@ test('server exposes project-file template and compile endpoints', async () => {
   }
 });
 
-test('server static map endpoint proxies upstream image and falls back to SVG when unavailable', async () => {
-  const imageBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]);
+test('server static map endpoint proxies upstream image, retries tile fallback, and falls back to SVG when unavailable', async () => {
+  const staticBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]);
+  const tileBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x46]);
   const mapCalls = [];
+  let callCount = 0;
   const app = await startApiServer(new SurveyCadClient(), {
     staticMapFetcher: async (url) => {
       mapCalls.push(url);
-      if (mapCalls.length === 1) {
-        return new Response(imageBytes, {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Response(staticBytes, {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' },
+        });
+      }
+      if (callCount === 2) {
+        return new Response('unavailable', { status: 503 });
+      }
+      if (callCount === 3) {
+        return new Response(tileBytes, {
           status: 200,
           headers: { 'Content-Type': 'image/png' },
         });
@@ -409,17 +421,23 @@ test('server static map endpoint proxies upstream image and falls back to SVG wh
     assert.equal(okRes.status, 200);
     assert.match(okRes.headers.get('content-type') || '', /image\/png/i);
     const okBody = new Uint8Array(await okRes.arrayBuffer());
-    assert.deepEqual(Array.from(okBody), Array.from(imageBytes));
+    assert.deepEqual(Array.from(okBody), Array.from(staticBytes));
 
-    const fallbackRes = await fetch(`http://127.0.0.1:${app.port}/api/static-map?lat=43.61&lon=-116.2&address=${encodeURIComponent('100 Main St, Boise')}`);
-    assert.equal(fallbackRes.status, 200);
-    assert.match(fallbackRes.headers.get('content-type') || '', /image\/svg\+xml/i);
-    const fallbackBody = await fallbackRes.text();
-    assert.match(fallbackBody, /Project map fallback/i);
-    assert.match(fallbackBody, /100 Main St, Boise/i);
+    const tileFallbackRes = await fetch(`http://127.0.0.1:${app.port}/api/static-map?lat=43.61&lon=-116.2&address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(tileFallbackRes.status, 200);
+    assert.match(tileFallbackRes.headers.get('content-type') || '', /image\/png/i);
+    const tileFallbackBody = new Uint8Array(await tileFallbackRes.arrayBuffer());
+    assert.deepEqual(Array.from(tileFallbackBody), Array.from(tileBytes));
 
-    assert.equal(mapCalls.length, 2);
-    assert.match(mapCalls[0], /staticmap\.openstreetmap\.de\/staticmap\.php/);
+    const svgFallbackRes = await fetch(`http://127.0.0.1:${app.port}/api/static-map?lat=43.62&lon=-116.21&address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(svgFallbackRes.status, 200);
+    assert.match(svgFallbackRes.headers.get('content-type') || '', /image\/svg\+xml/i);
+    const svgFallbackBody = await svgFallbackRes.text();
+    assert.match(svgFallbackBody, /Project map fallback/i);
+    assert.match(svgFallbackBody, /100 Main St, Boise/i);
+
+    assert.ok(mapCalls.some((url) => /staticmap\.openstreetmap\.de\/staticmap\.php/.test(url)));
+    assert.ok(mapCalls.some((url) => /tile\.openstreetmap\.org\/17\//.test(url)));
     assert.match(mapCalls[0], /center=43\.610010%2C-116\.200010/);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));

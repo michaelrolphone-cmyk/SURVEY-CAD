@@ -99,6 +99,19 @@ function buildFallbackStaticMapSvg(lat, lon, address = '') {
 </svg>`;
 }
 
+function lonLatToTile(lat, lon, zoom = 17) {
+  const clampedLat = Math.max(Math.min(lat, 85.05112878), -85.05112878);
+  const n = 2 ** zoom;
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const latRad = (clampedLat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(latRad) + (1 / Math.cos(latRad))) / Math.PI) / 2) * n);
+  return {
+    x: Math.min(Math.max(x, 0), n - 1),
+    y: Math.min(Math.max(y, 0), n - 1),
+    zoom,
+  };
+}
+
 async function readJsonBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -271,25 +284,38 @@ export function createSurveyServer({
         map.searchParams.set('size', '1600x1000');
         map.searchParams.set('markers', `${center},red-pushpin`);
         map.searchParams.set('maptype', 'mapnik');
+        const tile = lonLatToTile(lat, lon, 17);
+        const tileUrl = `https://tile.openstreetmap.org/${tile.zoom}/${tile.x}/${tile.y}.png`;
+
+        const candidates = [map.toString(), tileUrl];
 
         try {
-          const upstream = await staticMapFetcher(map.toString(), {
-            headers: {
-              Accept: 'image/png,image/*;q=0.8,*/*;q=0.5',
-              'User-Agent': 'survey-cad/1.0 static-map-proxy',
-            },
-          });
+          for (const candidate of candidates) {
+            let upstream;
+            try {
+              upstream = await staticMapFetcher(candidate, {
+                headers: {
+                  Accept: 'image/png,image/*;q=0.8,*/*;q=0.5',
+                  'User-Agent': 'survey-cad/1.0 static-map-proxy',
+                },
+              });
+            } catch {
+              continue;
+            }
 
-          if (!upstream.ok) {
-            throw new Error(`Failed static map (${upstream.status})`);
+            if (!upstream.ok) {
+              continue;
+            }
+
+            const imageBuffer = Buffer.from(await upstream.arrayBuffer());
+            res.statusCode = 200;
+            res.setHeader('Content-Type', upstream.headers.get('content-type') || 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=1800');
+            res.end(imageBuffer);
+            return;
           }
 
-          const imageBuffer = Buffer.from(await upstream.arrayBuffer());
-          res.statusCode = 200;
-          res.setHeader('Content-Type', upstream.headers.get('content-type') || 'image/png');
-          res.setHeader('Cache-Control', 'public, max-age=1800');
-          res.end(imageBuffer);
-          return;
+          throw new Error('No static map provider available');
         } catch {
           const fallbackSvg = buildFallbackStaticMapSvg(lat, lon, address);
           res.statusCode = 200;
