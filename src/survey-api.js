@@ -127,6 +127,37 @@ export function haversineMeters(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
+function findObjectIdAttribute(attrs = {}) {
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === null || value === undefined || value === "") continue;
+    if (/^(OBJECTID|FID)$/i.test(key) || /_?OBJECTID$/i.test(key)) {
+      return { field: key, value };
+    }
+  }
+  return null;
+}
+
+function pickContainingOrNearest(features, lon, lat) {
+  if (!features.length) return null;
+
+  const containing = features.find((f) => pointInPolygon([lon, lat], f.geometry));
+  if (containing) return containing;
+
+  let nearest = null;
+  let nearestMeters = Infinity;
+  for (const feature of features) {
+    const centroid = centroidOfPolygon(feature.geometry);
+    if (!centroid) continue;
+    const meters = haversineMeters(lat, lon, centroid.y, centroid.x);
+    if (meters < nearestMeters) {
+      nearestMeters = meters;
+      nearest = feature;
+    }
+  }
+
+  return nearest || features[0];
+}
+
 export class SurveyCadClient {
   constructor(options = {}) {
     this.config = {
@@ -248,9 +279,13 @@ export class SurveyCadClient {
       units: "esriSRUnit_Meter",
       outFields: "*",
       returnGeometry: true,
-      outSR,
+      outSR: 4326,
     });
-    return (response.features || [])[0] || null;
+
+    const best = pickContainingOrNearest(response.features || [], lon, lat);
+    if (!best || outSR === 4326) return best;
+
+    return (await this.refetchFeatureInOutSR(this.config.layers.parcels, best, outSR)) || best;
   }
 
   async findContainingPolygon(layerId, lon, lat, searchMeters = 2000) {
@@ -303,12 +338,32 @@ export class SurveyCadClient {
       units: "esriSRUnit_Meter",
       outFields: "*",
       returnGeometry: true,
-      outSR,
+      outSR: 4326,
     });
 
     const features = response.features || [];
-    const containing = features.find((f) => pointInPolygon([lon, lat], f.geometry));
-    return containing || features[0] || null;
+    const best = pickContainingOrNearest(features, lon, lat);
+    if (!best || outSR === 4326) return best;
+
+    return (await this.refetchFeatureInOutSR(layerId, best, outSR)) || best;
+  }
+
+  async refetchFeatureInOutSR(layerId, feature, outSR) {
+    const objectId = findObjectIdAttribute(feature?.attributes || {});
+    if (!objectId) return null;
+
+    const value = Number(objectId.value);
+    const whereValue = Number.isFinite(value)
+      ? String(value)
+      : `'${escapeSql(String(objectId.value))}'`;
+
+    const response = await this.arcQuery(layerId, {
+      where: `${objectId.field} = ${whereValue}`,
+      outFields: "*",
+      returnGeometry: true,
+      outSR,
+    });
+    return (response.features || [])[0] || null;
   }
 
   async loadSubdivisionAtPoint(lon, lat, outSR = 4326, searchMeters = 2500) {
