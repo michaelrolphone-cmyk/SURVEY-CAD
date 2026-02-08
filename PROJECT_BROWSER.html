@@ -108,6 +108,14 @@
     .folder-row {
       margin-top: 0.45rem;
       background: var(--panel-alt);
+      justify-content: space-between;
+    }
+
+    .folder-title {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      min-width: 0;
     }
 
     .file-row {
@@ -284,6 +292,67 @@
       window.open(pdfUrl, '_blank', 'noopener,noreferrer');
     }
 
+    function escapeHtml(text = '') {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function openCpfPrintPreview(resources = []) {
+      const printableResources = resources
+        .map((entry) => ({
+          entry,
+          url: getCpfPdfUrl(entry),
+        }))
+        .filter((item) => item.url);
+
+      if (!printableResources.length) {
+        renderError('No printable CP&F PDF records were found for this project.');
+        return;
+      }
+
+      const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+      if (!printWindow) {
+        renderError('Your browser blocked the print-preview window. Please allow pop-ups and try again.');
+        return;
+      }
+
+      const pagesMarkup = printableResources.map(({ entry, url }, index) => `
+        <section class="page-block">
+          <h2>${index + 1}. ${escapeHtml(entry.title || entry.id || 'CP&F')}</h2>
+          <embed src="${escapeHtml(url)}" type="application/pdf" class="pdf-frame" />
+        </section>
+      `).join('');
+
+      printWindow.document.write(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CP&amp;F Print Preview</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 1rem; color: #0f172a; }
+    .toolbar { position: sticky; top: 0; background: #fff; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; }
+    .print-button { font: inherit; padding: 0.45rem 0.8rem; border-radius: 6px; border: 1px solid #334155; background: #fff; cursor: pointer; }
+    .page-block { page-break-after: always; break-after: page; margin-bottom: 1.5rem; }
+    .page-block:last-of-type { page-break-after: auto; break-after: auto; }
+    .pdf-frame { width: 100%; height: 92vh; border: 1px solid #94a3b8; border-radius: 8px; }
+    @media print { .toolbar { display: none; } body { margin: 0; } .pdf-frame { border: none; border-radius: 0; height: 100vh; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" class="print-button" onclick="window.print()">Print all CP&amp;F PDFs</button>
+  </div>
+  ${pagesMarkup}
+</body>
+</html>`);
+      printWindow.document.close();
+      printWindow.focus();
+    }
+
     function loadActiveProjectContext(activeProjectId) {
       try {
         const projects = JSON.parse(localStorage.getItem('surveyfoundryProjects') || '[]');
@@ -393,7 +462,19 @@
       for (const folder of projectFile.folders || []) {
         const folderRow = document.createElement('div');
         folderRow.className = 'folder-row';
-        folderRow.innerHTML = `<span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span>`;
+        folderRow.innerHTML = `<span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
+
+        if (folder.key === 'cpfs') {
+          const printAllButton = document.createElement('button');
+          printAllButton.type = 'button';
+          printAllButton.className = 'launch-btn';
+          printAllButton.textContent = 'Print all';
+          printAllButton.title = 'Builds a single print preview containing each CP&F PDF in order';
+          printAllButton.addEventListener('click', () => openCpfPrintPreview(folder.index));
+          printAllButton.disabled = !folder.index.some((entry) => entry?.exportFormat === 'pdf');
+          folderRow.appendChild(printAllButton);
+        }
+
         treeContainer.appendChild(folderRow);
 
         if (folder.key === 'point-files') {
