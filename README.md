@@ -99,6 +99,7 @@ curl "http://localhost:3000/api/apps"
 
 ```bash
 curl "http://localhost:3000/api/geocode?address=1600%20W%20Front%20St%2C%20Boise"
+curl "http://localhost:3000/api/static-map?lat=43.610000&lon=-116.200000&address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/section?lon=-116.2&lat=43.61"
 curl "http://localhost:3000/api/parcel?lon=-116.2&lat=43.61&outSR=2243&searchMeters=150"
@@ -252,7 +253,8 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 - Launcher opens `RecordQuarry.html` with query parameters (`projectId`, `projectName`, `client`, `address`, `autostart=1`).
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
 - Launcher header now displays the active project name whenever a project is active, giving persistent context while moving between tools.
-- When a project is active and includes an address, the launcher geocodes that address via `GET /api/geocode` and applies an OpenStreetMap static map image as the launcher background.
+- When a project is active and includes an address, the launcher geocodes that address via `GET /api/geocode` and requests a background image through `GET /api/static-map` (server proxy).
+If the upstream static map provider is unavailable, `/api/static-map` returns a generated SVG fallback that still shows the project title and coordinates so the launcher background never appears blank.
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.
 - Re-opening the same project restores saved RecordQuarry results from local storage before falling back to a live lookup.
 - Exporting from RecordQuarry to PointForge also writes/updates a project-file snapshot in local storage (`surveyfoundryProjectFile:<projectId>`) so discovered CP&F references persist with the project record.
