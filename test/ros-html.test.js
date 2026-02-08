@@ -49,3 +49,14 @@ test('ROS.html loads CP&F PDF links when a corner marker is selected', async () 
   assert.match(html, /buildRosPdfProxyUrl\(url\)/, 'CP&F links should route through API PDF proxy');
   assert.match(html, /marker\.on\('click', async \(\) => \{[\s\S]*queryCpfRecordsNearCorner\(corner\.north, corner\.east\)/, 'corner marker click handler should trigger CP&F lookup');
 });
+
+
+test('ROS.html can export unique boundary points directly to PointForge', async () => {
+  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+
+  assert.match(html, /id="btnExportPointForge"/, 'ROS should render an Export to PointForge button');
+  assert.match(html, /const\s+POINTFORGE_ROS_IMPORT_STORAGE_KEY\s*=\s*"pointforgeRosImport"/, 'ROS should use a stable localStorage key for PointForge handoff');
+  assert.match(html, /\$\("btnExportPointForge"\)\.disabled\s*=\s*false/, 'ROS should enable PointForge export after loading export geometry');
+  assert.match(html, /localStorage\.setItem\(POINTFORGE_ROS_IMPORT_STORAGE_KEY,\s*JSON\.stringify\(\{[\s\S]*csv:\s*uniquePart\.csv/, 'ROS should persist export payload with unique CSV points');
+  assert.match(html, /window\.open\('\/POINT_TRANSFORMER\.HTML\?source=ros',\s*'_blank',\s*'noopener,noreferrer'\)/, 'ROS should open PointForge in a new tab with source flag');
+});
