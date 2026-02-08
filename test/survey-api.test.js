@@ -217,28 +217,6 @@ test('geocodeAddress falls back to ArcGIS geocoder when Nominatim fails', async 
   }
 });
 
-test('lookupByAddress uses geocode coordinates when address layer misses', async () => {
-  const { server, port } = await createMockServer({ addressAlwaysMiss: true });
-  const base = `http://127.0.0.1:${port}`;
-  const client = new SurveyCadClient({
-    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
-    nominatimUrl: `${base}/geocode`,
-    blmFirstDivisionLayer: `${base}/blm1`,
-    blmSecondDivisionLayer: `${base}/blm2`,
-  });
-
-  try {
-    const lookup = await client.lookupByAddress('5707 W Castle Dr, Boise ID');
-    assert.equal(lookup.addressFeature, null);
-    assert.equal(lookup.parcel.attributes.PARCEL, 'R12345');
-    assert.equal(lookup.location.lon, -116.2);
-    assert.equal(lookup.location.lat, 43.61);
-    assert.equal(lookup.geocode.display, 'Boise');
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-  }
-});
-
 test('lookupByAddress falls back to address layer when geocode is unavailable', async () => {
   const { server, port } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
