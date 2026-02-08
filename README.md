@@ -178,6 +178,7 @@ PointForge export now performs CP&F lookups for aliquot/section (PLSS) corners b
 
 `ROS.html` Summary cards for ROS and aliquots are now interactive: selecting a summary item centers/zooms the map to that feature and opens the related popup when possible.
 Aliquot Summary cards and aliquot map popups both surface CP&F PDF links routed through `/api/ros-pdf`.
+Aliquot Summary cards now also lazy-load corner-derived CP&F records after card render, ensuring CP&F PDFs appear when available even when aliquot attributes do not include direct PDF fields.
 
 
 ## App Icons Catalog

@@ -46,6 +46,12 @@ test('ROS.html summary cards can center/zoom map for ROS and aliquots and aliquo
   assert.match(html, /function\s+buildAliquotPopupHtml\s*\(/, 'aliquot marker popups should use shared popup builder');
   assert.match(html, /Open CP&F PDF \(API\)/, 'aliquot popup/summary should label CP&F PDF links');
   assert.match(html, /l\.bindPopup\(popupHtml\)/, 'aliquot map markers should bind popup HTML with CP&F links');
+  assert.match(html, /Corner CP&amp;F records/, 'aliquot summary cards should include a corner CP&F records section');
+  assert.match(html, /data-aliquot-cpf-links=/, 'aliquot summary cards should render lazy-load placeholder nodes for CP&F links');
+  assert.match(html, /function\s+lazyLoadAliquotSummaryCpfLinks\s*\(/, 'aliquot summary should lazy-load CP&F links after rendering cards');
+  assert.match(html, /lazyLoadAliquotSummaryCpfLinks\(aliquotSummaryCpfTargets\)/, 'lookup flow should trigger lazy loading for aliquot summary CP&F links');
+  assert.match(html, /function\s+queryCpfRecordsForAliquot\s*\(/, 'aliquot summary lazy loading should query CP&F records from aliquot corners');
+  assert.match(html, /function\s+flattenCpfRecordLinks\s*\(/, 'aliquot summary should de-duplicate CP&F links from multiple corners');
 });
 
 
