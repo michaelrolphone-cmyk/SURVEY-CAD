@@ -51,7 +51,7 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
   assert.match(launcherHtml, /\.footer-logo-wrap\s*\{[\s\S]*justify-content:\s*center;/i);
   assert.match(launcherHtml, /\.footer-logo-wrap\.hidden\s*\{[\s\S]*display:\s*none;/i);
-  assert.match(launcherHtml, /\.footer-logo\s*\{[\s\S]*width:\s*min\(640px, 100vw\);/i);
+  assert.match(launcherHtml, /\.footer-logo\s*\{[\s\S]*width:\s*min\(1280px, 100vw\);/i);
   assert.match(launcherHtml, /footerLogoWrap\?\.classList\.remove\('hidden'\);/, 'showHome should display footer logo only on launcher home screen');
   assert.match(launcherHtml, /footerLogoWrap\?\.classList\.add\('hidden'\);/, 'openApp should hide footer logo when an app is opened');
 });
