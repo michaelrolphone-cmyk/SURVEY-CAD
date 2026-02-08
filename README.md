@@ -257,7 +257,13 @@ open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&act
 Current apps in the catalog:
 
 - **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
-- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure.
+- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select) with a slide-out tools drawer.
+
+Mobile launch command:
+
+```bash
+open "http://localhost:3000/VIEWPORT.HTML"
+```
 - **RecordQuarry** (`RecordQuarry.html`): Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.
 - **ROS Basis Extractor** (`ROS_OCR.html`): OCR-based basis-of-bearing extraction from uploaded PDFs.
 - **PLSS + CP&F Explorer** (`CPNF.HTML`): aliquot/corner viewer with Ada County CP&F lookups.

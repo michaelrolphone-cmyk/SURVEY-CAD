@@ -40,13 +40,16 @@
     .app{
       height:100vh;
       display:grid;
-      grid-template-columns: 440px 1fr;
+      grid-template-columns: 1fr minmax(320px, 440px);
+      grid-template-areas:"canvas panel";
     }
     .panel{
+      grid-area:panel;
       background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border-right:1px solid var(--border);
+      border-left:1px solid var(--border);
       padding:12px 12px 10px;
       overflow:auto;
+      z-index:5;
     }
     .panel h1{
       font-size:14px;
@@ -167,9 +170,22 @@
     .inspectorRow b{ color:var(--text); }
 
     .canvasWrap{
+      grid-area:canvas;
       position:relative;
       overflow:hidden;
       background:#000;
+    }
+    .drawerToggle{
+      display:none;
+      position:absolute;
+      top:10px;
+      right:10px;
+      z-index:7;
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:8px 12px;
+      background:#101010;
+      color:var(--text);
     }
     .mapBackdrop{
       position:absolute;
@@ -192,6 +208,7 @@
       height:100%;
       display:block;
       cursor:crosshair;
+      touch-action:none;
     }
     .hud{
       position:absolute;
@@ -386,10 +403,26 @@
       flex:1;
       min-height: 0;
     }
+
+    @media (max-width: 960px) {
+      .app{ grid-template-columns:1fr; grid-template-areas:"canvas"; }
+      .panel{
+        position:fixed;
+        top:0;
+        right:0;
+        height:100vh;
+        width:min(88vw, 420px);
+        transform:translateX(100%);
+        transition:transform .2s ease;
+        box-shadow:-18px 0 50px rgba(0,0,0,.45);
+      }
+      .app.drawerOpen .panel{ transform:translateX(0); }
+      .drawerToggle{ display:block; }
+    }
   </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="appShell">
   <div class="panel">
     <h1>LineSmith — Points & Bearings</h1>
 
@@ -420,7 +453,7 @@
       <div class="hint">
         <b>Locked by default:</b> points/lines won’t drag-move unless you <b>double-click</b> them to toggle “movable”.
         <br><b>Multi-select:</b> hold <b>Shift</b> while clicking.
-        <br><b>Window select:</b> click-drag in empty space (Select tool) to marquee-select points + lines.
+        <br><b>Window select:</b> Shift+drag in empty space (desktop) or long-press blank space then drag (mobile).
       </div>
       <div class="kbd">
         <div><span>Toggle movable</span><code>DblClick</code></div>
@@ -659,6 +692,7 @@
   </div>
 
   <div class="canvasWrap">
+    <button id="drawerToggle" class="drawerToggle">Tools</button>
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>
     <div class="hud">
@@ -980,6 +1014,8 @@
   // -------------------------
   const canvas = $("#c");
   const ctx = canvas.getContext("2d");
+  const appShell = $("#appShell");
+  const drawerToggle = $("#drawerToggle");
   const mapBackdrop = $("#mapBackdrop");
   const mapEnabledInput = $("#mapLayerEnabled");
   const mapTileTypeInput = $("#mapTileType");
@@ -1039,6 +1075,29 @@
     dragStartPanX: 0, dragStartPanY: 0,
     dragStartWorldX: 0, dragStartWorldY: 0,
     dragObj: null
+  };
+
+  const mobileInteraction = {
+    longPressMs: 450,
+    moveTolerance: 10,
+    pointerDown: false,
+    moved: false,
+    activePointerId: null,
+    downX: 0,
+    downY: 0,
+    longPressTimer: null,
+    suppressClick: false
+  };
+
+  const touchGesture = {
+    mode: null,
+    points: new Map(),
+    startDistance: 0,
+    startScale: 0,
+    startPanX: 0,
+    startPanY: 0,
+    startCenter: null,
+    boxSelectActive: false
   };
 
   const labelVisibility = {
@@ -1886,6 +1945,17 @@
   syncPointLabelVisibility();
   $("#toolPointOnLine").addEventListener("click", ()=>setTool("pointOnLine"));
   $("#toolPan").addEventListener("click", ()=>setTool("pan"));
+
+  if (drawerToggle) {
+    drawerToggle.addEventListener("click", () => {
+      const isOpen = appShell?.classList.contains("drawerOpen");
+      setDrawerOpen(!isOpen);
+    });
+  }
+
+  window.addEventListener("resize", () => {
+    if (!isMobileViewport()) setDrawerOpen(false);
+  });
 
   $("#undoBtn").addEventListener("click", ()=>history.undoAction());
   $("#redoBtn").addEventListener("click", ()=>history.redoAction());
@@ -2833,6 +2903,48 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     return tool === "pan" || keys.space || mouse.button === 1;
   }
 
+  function clearLongPressTimer() {
+    if (mobileInteraction.longPressTimer) {
+      window.clearTimeout(mobileInteraction.longPressTimer);
+      mobileInteraction.longPressTimer = null;
+    }
+  }
+
+  function setDrawerOpen(open) {
+    if (!appShell) return;
+    appShell.classList.toggle("drawerOpen", !!open);
+    if (drawerToggle) drawerToggle.textContent = open ? "Close" : "Tools";
+  }
+
+  function isMobileViewport() {
+    return window.matchMedia("(max-width: 960px)").matches;
+  }
+
+  function updateTouchPoint(e) {
+    const rect = canvas.getBoundingClientRect();
+    touchGesture.points.set(e.pointerId, {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  }
+
+  function removeTouchPoint(pointerId) {
+    touchGesture.points.delete(pointerId);
+  }
+
+  function getTouchCenter() {
+    const pts = [...touchGesture.points.values()];
+    if (!pts.length) return null;
+    const sum = pts.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+    return { x: sum.x / pts.length, y: sum.y / pts.length };
+  }
+
+  function getTouchDistance() {
+    const pts = [...touchGesture.points.values()];
+    if (pts.length < 2) return 0;
+    return dist(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+  }
+
   // ADDED: hard-reset keys/drag on blur so Space-pan can't get "stuck"
   window.addEventListener("blur", () => {
     keys.space = false;
@@ -2902,7 +3014,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     mouse.down = true;
     mouse.button = e.button;
 
-    const additive = e.shiftKey;
+    const additive = e.shiftKey || (mouse.button === 0 && touchGesture.boxSelectActive);
 
     if (toolIsPan()) {
       beginDrag({type:"pan"});
@@ -2953,7 +3065,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         return;
       }
 
-      if (e.button === 0) {
+      if (e.button === 0 && (e.shiftKey || touchGesture.boxSelectActive)) {
         beginDrag({type:"marquee", x0: mouse.x, y0: mouse.y, x1: mouse.x, y1: mouse.y, additive});
         return;
       }
@@ -3050,6 +3162,116 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       return;
     }
   });
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch" || modalIsOpen()) return;
+    e.preventDefault();
+    mobileInteraction.pointerDown = true;
+    mobileInteraction.moved = false;
+    mobileInteraction.activePointerId = e.pointerId;
+    updateMouseFromEvent(e);
+    mobileInteraction.downX = mouse.x;
+    mobileInteraction.downY = mouse.y;
+    updateTouchPoint(e);
+    canvas.setPointerCapture?.(e.pointerId);
+
+    if (touchGesture.points.size === 2) {
+      clearLongPressTimer();
+      touchGesture.mode = "pinch";
+      touchGesture.boxSelectActive = false;
+      touchGesture.startDistance = Math.max(1, getTouchDistance());
+      touchGesture.startScale = view.scale;
+      touchGesture.startPanX = view.panX;
+      touchGesture.startPanY = view.panY;
+      touchGesture.startCenter = getTouchCenter();
+      return;
+    }
+
+    if (touchGesture.points.size === 1) {
+      touchGesture.mode = "pending";
+      clearLongPressTimer();
+      mobileInteraction.longPressTimer = window.setTimeout(() => {
+        if (!mobileInteraction.pointerDown || mobileInteraction.moved) return;
+        updateMouseFromEvent(e);
+        const pid = pickPoint(mouse.x, mouse.y, 14);
+        const lpick = pid ? null : pickLine(mouse.x, mouse.y, 12);
+        if (pid) {
+          selectedPointIds = [pid];
+          selectedPointId = pid;
+          selectedLines = [];
+          lastSelectedLineId = null;
+          updatePointEditorFromSelection();
+          schedulePointsTableRender();
+          const p = points.get(pid);
+          if (isMovable(p?.movable)) {
+            history.push("move point");
+            beginDrag({type:"point", id: pid, _moved:false});
+            touchGesture.mode = "drag-selection";
+          }
+        } else if (lpick) {
+          selectedPointIds = [];
+          selectedPointId = null;
+          selectedLines = [{ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t }];
+          lastSelectedLineId = lpick.lineId;
+          updatePointEditorFromSelection();
+          schedulePointsTableRender();
+          const ln = lines.get(lpick.lineId);
+          if (isMovable(ln?.movable)) {
+            history.push("move line");
+            beginDrag({type:"line", id: lpick.lineId, _moved:false});
+            touchGesture.mode = "drag-selection";
+          }
+        } else {
+          touchGesture.boxSelectActive = true;
+          beginDrag({type:"marquee", x0: mouse.x, y0: mouse.y, x1: mouse.x, y1: mouse.y, additive:false});
+          touchGesture.mode = "box-select";
+        }
+      }, mobileInteraction.longPressMs);
+    }
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "touch" || modalIsOpen()) return;
+    e.preventDefault();
+    updateTouchPoint(e);
+    updateMouseFromEvent(e);
+
+    const moveDist = dist(mobileInteraction.downX, mobileInteraction.downY, mouse.x, mouse.y);
+    if (moveDist > mobileInteraction.moveTolerance) {
+      mobileInteraction.moved = true;
+      clearLongPressTimer();
+    }
+
+    if (touchGesture.points.size === 2 && touchGesture.mode === "pinch") {
+      const center = getTouchCenter();
+      const distance = Math.max(1, getTouchDistance());
+      if (!center || !touchGesture.startCenter) return;
+      const factor = distance / Math.max(1, touchGesture.startDistance);
+      const newScale = clamp(touchGesture.startScale * factor, MIN_SCALE, MAX_SCALE);
+      view.scale = newScale;
+      view.panX = touchGesture.startPanX + (center.x - touchGesture.startCenter.x);
+      view.panY = touchGesture.startPanY + (center.y - touchGesture.startCenter.y);
+      return;
+    }
+
+    if (touchGesture.points.size === 1 && touchGesture.mode === "pending" && moveDist > mobileInteraction.moveTolerance) {
+      touchGesture.mode = "pan";
+      beginDrag({type:"pan"});
+    }
+  });
+
+  function handlePointerUp(e) {
+    if (e.pointerType !== "touch") return;
+    removeTouchPoint(e.pointerId);
+    clearLongPressTimer();
+    mobileInteraction.pointerDown = false;
+    if (mouse.drag) handleMouseUpCommon();
+    touchGesture.mode = null;
+    touchGesture.boxSelectActive = false;
+  }
+
+  canvas.addEventListener("pointerup", handlePointerUp);
+  canvas.addEventListener("pointercancel", handlePointerUp);
 
   canvas.addEventListener("mousemove", (e) => {
     if (modalIsOpen()) return;
