@@ -175,6 +175,7 @@ LineSmith now solves a best-fit affine transform from Idaho State Plane West (US
 
 `RecordQuarry.html` also supports one-click **Export to PointForge** for unique parcel/subdivision/aliquot boundary vertices. The button stores a temporary payload in browser local storage and navigates to `POINT_TRANSFORMER.HTML?source=ros` (inside the launcher iframe when embedded, or current tab when standalone), where PointForge auto-loads the incoming CSV points.
 PointForge export now performs CP&F lookups for aliquot/section (PLSS) corners before writing the handoff payload, and only includes PLSS points that have matching CP&F instrument records (parcel/subdivision points are still exported as usual).
+When launched with an active project, RecordQuarry also updates a project-file snapshot in browser local storage (`surveyfoundryProjectFile:<projectId>`), adding all discovered CP&F instrument references into the `CP&Fs` folder and recording the outgoing PointForge CSV handoff in `Point Files`.
 
 `RecordQuarry.html` **Export CSV** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
 
@@ -235,6 +236,7 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.
 - Re-opening the same project restores saved RecordQuarry results from local storage before falling back to a live lookup.
+- Exporting from RecordQuarry to PointForge also writes/updates a project-file snapshot in local storage (`surveyfoundryProjectFile:<projectId>`) so discovered CP&F references persist with the project record.
 
 Example launcher deep-link with active project context:
 

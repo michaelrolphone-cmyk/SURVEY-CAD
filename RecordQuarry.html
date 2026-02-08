@@ -424,6 +424,7 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
   const ADA_CPF_PDF_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/";
   const POINTFORGE_ROS_IMPORT_STORAGE_KEY = "pointforgeRosImport";
   const PROJECT_LOOKUP_STORAGE_PREFIX = "surveyfoundryProjectLookup";
+  const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
 
   // pdf.js worker
   if (!window.pdfjsLib) {
@@ -471,6 +472,10 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     return `${PROJECT_LOOKUP_STORAGE_PREFIX}:${projectId}`;
   }
 
+  function projectFileStorageKey(projectId) {
+    return `${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`;
+  }
+
   function loadProjectLookupSnapshot(projectId) {
     if (!projectId) return null;
     try {
@@ -487,6 +492,148 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
   function saveProjectLookupSnapshot(projectId, snapshot) {
     if (!projectId || !snapshot) return;
     localStorage.setItem(projectLookupStorageKey(projectId), JSON.stringify(snapshot));
+  }
+
+  function slugify(value, fallback = 'resource') {
+    const slug = String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return slug || fallback;
+  }
+
+  function createProjectFileFolder(key, label, description) {
+    return { key, label, description, index: [] };
+  }
+
+  function defaultProjectFile(context = {}) {
+    const projectId = context.projectId || `project-${Date.now()}`;
+    const projectName = context.projectName || 'Untitled Project';
+    return {
+      schemaVersion: '1.0.0',
+      generatedAt: new Date().toISOString(),
+      project: {
+        id: projectId,
+        name: projectName,
+        client: context.client || '',
+        address: context.address || '',
+      },
+      archive: {
+        type: 'zip',
+        rootFolderName: `${slugify(projectName, 'surveyfoundry-project')}-${slugify(projectId, 'project')}`,
+      },
+      folders: [
+        createProjectFileFolder('ros', 'RoS', 'Record of Survey source files and exports.'),
+        createProjectFileFolder('cpfs', 'CP&Fs', 'Corner Perpetuation & Filing references resolved by instrument number.'),
+        createProjectFileFolder('point-files', 'Point Files', 'PointForge-managed points exported as CSV.'),
+        createProjectFileFolder('drawings', 'Drawings', 'LineSmith drawing packages generated from linked point files.'),
+        createProjectFileFolder('deeds', 'Deeds', 'Deed references and exported documents.'),
+        createProjectFileFolder('plats', 'Plats', 'Subdivision plats and plat-related exhibits.'),
+        createProjectFileFolder('invoices', 'Invoices', 'Billing artifacts and project invoices.'),
+        createProjectFileFolder('other', 'Other', 'Future expansion area for additional project evidence types.'),
+      ],
+    };
+  }
+
+  function loadProjectFileSnapshot(projectContext = {}) {
+    const projectId = projectContext.projectId || '';
+    if (!projectId) return null;
+    try {
+      const raw = localStorage.getItem(projectFileStorageKey(projectId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.folders)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveProjectFileSnapshot(projectContext = {}, projectFile) {
+    const projectId = projectContext.projectId || '';
+    if (!projectId || !projectFile) return;
+    localStorage.setItem(projectFileStorageKey(projectId), JSON.stringify(projectFile));
+  }
+
+  function ensureProjectFileFolder(projectFile, folderKey) {
+    if (!projectFile || !Array.isArray(projectFile.folders)) return null;
+    const existing = projectFile.folders.find((folder) => folder.key === folderKey);
+    if (existing) {
+      if (!Array.isArray(existing.index)) existing.index = [];
+      return existing;
+    }
+    const fallback = createProjectFileFolder(folderKey, folderKey, '');
+    projectFile.folders.push(fallback);
+    return fallback;
+  }
+
+  function parseCpfInstrumentsFromNotesMap(notesByCoordinate = new Map()) {
+    const instruments = new Set();
+    for (const note of notesByCoordinate.values()) {
+      const raw = String(note || '').trim();
+      if (!raw) continue;
+      const normalized = raw.replace(/^CPNFS:\s*/i, '');
+      for (const item of normalized.split('...')) {
+        const instrument = item.trim();
+        if (instrument) instruments.add(instrument);
+      }
+    }
+    return [...instruments].sort();
+  }
+
+  function addProjectFileResource(projectFile, resource) {
+    const folder = ensureProjectFileFolder(projectFile, resource.folder);
+    if (!folder) return;
+    const exists = folder.index.some((item) => (
+      item?.reference?.type === resource.reference.type
+      && String(item?.reference?.value ?? '') === String(resource.reference.value ?? '')
+    ));
+    if (!exists) folder.index.push(resource);
+  }
+
+  function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount }) {
+    if (!projectContext.projectId) return null;
+
+    const projectFile = loadProjectFileSnapshot(projectContext) || defaultProjectFile(projectContext);
+    const exportTimestamp = new Date().toISOString();
+    const cpfInstruments = parseCpfInstrumentsFromNotesMap(notesByCoordinate);
+
+    for (const instrument of cpfInstruments) {
+      addProjectFileResource(projectFile, {
+        id: `cpf-${slugify(instrument, 'instrument')}`,
+        folder: 'cpfs',
+        title: `CP&F ${instrument}`,
+        exportFormat: 'pdf',
+        reference: {
+          type: 'instrument-number',
+          value: instrument,
+          resolverHint: 'lookup-cpf-pdf',
+          metadata: { instrument },
+        },
+      });
+    }
+
+    addProjectFileResource(projectFile, {
+      id: `pointforge-export-${Date.now()}`,
+      folder: 'point-files',
+      title: `PointForge export ${exportTimestamp}`,
+      exportFormat: 'csv',
+      reference: {
+        type: 'local-storage',
+        value: POINTFORGE_ROS_IMPORT_STORAGE_KEY,
+        resolverHint: 'local-pointforge-export',
+        metadata: {
+          source: 'RecordQuarry',
+          exportedAt: exportTimestamp,
+          pointCount: Number(pointCount) || 0,
+          csvLength: String(csv || '').length,
+        },
+      },
+    });
+
+    projectFile.generatedAt = exportTimestamp;
+    saveProjectFileSnapshot(projectContext, projectFile);
+    return { projectFile, cpfCount: cpfInstruments.length };
   }
 
   // -----------------------------
@@ -1998,6 +2145,15 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         exportedAt: new Date().toISOString(),
         csv: uniquePart.csv,
       }));
+      const projectFileUpdate = persistPointForgeExportProjectFile({
+        projectContext: state.projectContext,
+        notesByCoordinate,
+        csv: uniquePart.csv,
+        pointCount: uniquePart.count,
+      });
+      if (projectFileUpdate) {
+        log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references).`);
+      }
       openLinkedApp('/POINT_TRANSFORMER.HTML?source=ros');
       log(`Sent ${uniquePart.count} unique boundary points to PointForge.`);
     } catch (e) {
