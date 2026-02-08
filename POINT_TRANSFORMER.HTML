@@ -1075,11 +1075,11 @@
         const y = Number(record.fields[2]);
         const zRaw = trimOrEmpty(record.fields[3]);
         const z = Number.isFinite(Number(zRaw)) ? Number(zRaw) : 0;
-        const notes = trimOrEmpty(record.fields[record.fields.length - 1]);
+        const code = trimOrEmpty(record.fields[record.fields.length - 1]);
 
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
-        rows.push([number, x, y, z, "", notes]);
+        rows.push([number, x, y, z, code, ""]);
       }
 
       return {

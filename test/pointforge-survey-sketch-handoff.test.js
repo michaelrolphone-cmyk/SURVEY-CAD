@@ -10,6 +10,7 @@ test('POINT_TRANSFORMER.HTML exposes Open in Survey Sketch handoff controls', as
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app"[\s\S]*path,/, 'PointForge should notify launcher iframe host to navigate embedded app');
   assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate Survey Sketch using launcher-aware helper');
+  assert.match(html, /rows\.push\(\[number, x, y, z, code, ""\]\)/, 'PointForge should map transformed description values into Survey Sketch code field');
 });
 
 test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
