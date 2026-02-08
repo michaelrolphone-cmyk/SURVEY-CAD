@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Survey Sketch — Points & Bearings</title>
+  <title>LineSmith — Points & Bearings</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -391,7 +391,7 @@
 <body>
 <div class="app">
   <div class="panel">
-    <h1>Survey Sketch — Points & Bearings</h1>
+    <h1>LineSmith — Points & Bearings</h1>
 
     <div class="section">
       <div class="title">
@@ -732,7 +732,7 @@
   const dist2 = (ax,ay,bx,by)=>{ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; };
   const dist = (ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
   const fmt = (n)=> (Number.isFinite(n) ? (Math.abs(n) < 1e6 ? n.toFixed(3) : n.toExponential(6)) : "NaN");
-  const POINTFORGE_IMPORT_STORAGE_KEY = "surveySketchPointforgeImport";
+  const POINTFORGE_IMPORT_STORAGE_KEY = "lineSmithPointforgeImport";
 
   const parseNum = (s, def=0) => {
     const n = Number(String(s).trim());

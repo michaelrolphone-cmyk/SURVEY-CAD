@@ -1,4 +1,4 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ROS / Parcel Lookup icon">
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RecordQuarry icon">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#2A9D8F" />
@@ -8,5 +8,5 @@
   <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#bg)" />
   <circle cx="256" cy="196" r="112" fill="#E9F5DB" fill-opacity="0.95"/>
   <text x="256" y="214" text-anchor="middle" font-size="72" font-family="Arial, sans-serif" font-weight="700" fill="#2A9D8F">ROS</text>
-  <text x="256" y="354" text-anchor="middle" font-size="36" font-family="Arial, sans-serif" font-weight="600" fill="#ffffff">ROS / Parcel Lookup</text>
+  <text x="256" y="354" text-anchor="middle" font-size="36" font-family="Arial, sans-serif" font-weight="600" fill="#ffffff">RecordQuarry</text>
 </svg>
