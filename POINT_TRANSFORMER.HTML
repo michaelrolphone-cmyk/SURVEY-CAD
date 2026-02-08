@@ -936,6 +936,7 @@
     const st_zone = document.getElementById("st_zone");
 
     const SURVEY_SKETCH_IMPORT_STORAGE_KEY = "surveySketchPointforgeImport";
+    const ROS_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeRosImport";
 
     let latestOutputText = "";
     let latestTransformed = null;
@@ -1187,12 +1188,43 @@
       window.open("/VIEWPORT.HTML?source=pointforge", "_blank", "noopener,noreferrer");
     });
 
+
+    function tryImportRosPayload(){
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("source") !== "ros") return false;
+
+      const raw = localStorage.getItem(ROS_POINTFORGE_IMPORT_STORAGE_KEY);
+      if (!raw){
+        elMapHint.innerHTML = `<span class="warn">ROS launch detected, but no import payload was found in local storage.</span>`;
+        return false;
+      }
+
+      try {
+        const payload = JSON.parse(raw);
+        if (!payload?.csv || !String(payload.csv).trim()){
+          elMapHint.innerHTML = `<span class="warn">ROS payload was invalid (missing CSV content).</span>`;
+          localStorage.removeItem(ROS_POINTFORGE_IMPORT_STORAGE_KEY);
+          return false;
+        }
+
+        elIn.value = String(payload.csv);
+        processNow();
+        localStorage.removeItem(ROS_POINTFORGE_IMPORT_STORAGE_KEY);
+        return true;
+      } catch (_error){
+        elMapHint.innerHTML = `<span class="warn">ROS payload could not be parsed.</span>`;
+        localStorage.removeItem(ROS_POINTFORGE_IMPORT_STORAGE_KEY);
+        return false;
+      }
+    }
+
     // Init: blank textarea (no sample data), locked defaults already set in HTML
     initMap();
     elIn.value = "";
     setBasemap("street");
     setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
     elMapHint.textContent = "Load a file or paste points to plot. Basemap toggle: Street / Satellite.";
+    tryImportRosPayload();
   </script>
 </body>
 </html>

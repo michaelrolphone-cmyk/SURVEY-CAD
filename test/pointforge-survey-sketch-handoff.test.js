@@ -18,3 +18,14 @@ test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
   assert.match(html, /params\.get\("source"\)\s*!==\s*"pointforge"/, 'Survey Sketch import bootstrap should be gated by query param');
   assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'Survey Sketch should reuse CSV import pipeline for PointForge payloads');
 });
+
+
+test('POINT_TRANSFORMER.HTML auto-imports ROS export payloads when launched from ROS tool', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+ROS_POINTFORGE_IMPORT_STORAGE_KEY\s*=\s*"pointforgeRosImport"/, 'PointForge should use a stable localStorage key for ROS handoff payloads');
+  assert.match(html, /function\s+tryImportRosPayload\(\)/, 'PointForge should define ROS import bootstrap logic');
+  assert.match(html, /params\.get\("source"\)\s*!==\s*"ros"/, 'PointForge ROS import bootstrap should be gated by query param');
+  assert.match(html, /localStorage\.getItem\(ROS_POINTFORGE_IMPORT_STORAGE_KEY\)/, 'PointForge should read ROS payload from localStorage');
+  assert.match(html, /elIn\.value\s*=\s*String\(payload\.csv\);[\s\S]*processNow\(\);/, 'PointForge should load ROS CSV payload and process it immediately');
+});

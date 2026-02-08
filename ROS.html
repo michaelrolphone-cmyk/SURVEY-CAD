@@ -316,6 +316,7 @@
         <div class="row">
           <button id="btnExportGeo" class="secondary" disabled>Export GeoJSON</button>
           <button id="btnExportParcelCSV" class="secondary" disabled title="Exports unique parcel, subdivision, and aliquot vertices as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export Unique Parcel/Subdivision/Aliquots CSV (IDW ft)</button>
+          <button id="btnExportPointForge" class="secondary" disabled title="Sends unique parcel, subdivision, and aliquot vertices to PointForge">Export to PointForge</button>
         </div>
       </div>
 
@@ -362,6 +363,7 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
   const ADA_PORTAL_BASE = "https://gisprod.adacounty.id.gov/arcgis";
   const ADA_CPF_WEBMAP_ITEM_ID = "019521c7932442f0b4b581f641cbf236";
   const ADA_CPF_PDF_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/";
+  const POINTFORGE_ROS_IMPORT_STORAGE_KEY = "pointforgeRosImport";
 
   // pdf.js worker
   if (!window.pdfjsLib) {
@@ -1373,6 +1375,7 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     clearLog();
     $("btnExportGeo").disabled = true;
     $("btnExportParcelCSV").disabled = true;
+    $("btnExportPointForge").disabled = true;
     state.exportGeoJSON = null;
     state.parcelFeature2243 = null;
     state.subdivisionFeature2243 = null;
@@ -1562,7 +1565,8 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
 
         if (state.parcelFeature2243?.geometry?.rings?.length) {
           $("btnExportParcelCSV").disabled = false;
-        log("Export geometry ready (IDW ft): parcel, subdivision, and aliquot vertices.");
+          $("btnExportPointForge").disabled = false;
+          log("Export geometry ready (IDW ft): parcel, subdivision, and aliquot vertices.");
         } else {
           log("Parcel export geometry not available (no rings).", "warn");
         }
@@ -1591,6 +1595,7 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
     setSummaryCards([]);
     $("btnExportGeo").disabled = true;
     $("btnExportParcelCSV").disabled = true;
+    $("btnExportPointForge").disabled = true;
     state.exportGeoJSON = null;
     state.parcelFeature = null;
     state.parcelFeature2243 = null;
@@ -1628,6 +1633,33 @@ import { buildUniquePolygonCsvRowsPNEZD } from "./src/ros-export.js";
       log(`Exported unique boundary CSV (PNEZD, IDW ft): points=${uniquePart.count}.`);
     } catch (e) {
       log(`Parcel CSV export failed: ${e.message || e}`, "bad");
+      console.error(e);
+    }
+  });
+
+  $("btnExportPointForge").addEventListener("click", () => {
+    try {
+      if (!state.parcelFeature2243) {
+        throw new Error("PointForge export geometry not loaded yet. Run Lookup again.");
+      }
+
+      const exportFeatures = [
+        state.parcelFeature2243,
+        state.subdivisionFeature2243,
+        ...(state.aliquotFeatures2243 || []),
+      ].filter(Boolean);
+      const uniquePart = buildUniquePolygonCsvRowsPNEZD(exportFeatures, 1, 'BOUNDARY_CORNER');
+      if (!uniquePart.count) throw new Error('No boundary vertices available to export to PointForge.');
+
+      localStorage.setItem(POINTFORGE_ROS_IMPORT_STORAGE_KEY, JSON.stringify({
+        source: 'ros-html',
+        exportedAt: new Date().toISOString(),
+        csv: uniquePart.csv,
+      }));
+      window.open('/POINT_TRANSFORMER.HTML?source=ros', '_blank', 'noopener,noreferrer');
+      log(`Sent ${uniquePart.count} unique boundary points to PointForge.`);
+    } catch (e) {
+      log(`PointForge export failed: ${e.message || e}`, "bad");
       console.error(e);
     }
   });

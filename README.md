@@ -161,6 +161,8 @@ open http://localhost:3000/POINT_TRANSFORMER.HTML
 
 In PointForge, click **Open in Survey Sketch** after processing points; this opens `VIEWPORT.HTML?source=pointforge` and auto-imports the transformed points via browser local storage.
 
+`ROS.html` also supports one-click **Export to PointForge** for unique parcel/subdivision/aliquot boundary vertices. The button stores a temporary payload in browser local storage and opens `POINT_TRANSFORMER.HTML?source=ros`, where PointForge auto-loads the incoming CSV points.
+
 `ROS.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
 `ROS.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
 
@@ -254,6 +256,7 @@ CLI prints the same JSON payload returned by `/extract`.
 ### ROS.html enhancements
 
 - `ROS.html` now includes BLM aliquot lookup/mapping in the map results panel.
+- `ROS.html` now includes an **Export to PointForge** button that opens `POINT_TRANSFORMER.HTML?source=ros` and transfers unique boundary CSV points via local storage.
 - ROS cards now link PDFs through `/api/ros-pdf` so PDFs are loaded via this app server.
 - Aliquot cards now also surface any PDF attribute links and route them through `/api/ros-pdf`.
 - Clicking a parcel/subdivision/aliquot corner marker in `ROS.html` now queries nearby Ada County CP&F records and shows CP&F PDF download links (proxied through `/api/ros-pdf`).
