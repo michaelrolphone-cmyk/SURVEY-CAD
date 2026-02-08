@@ -23,7 +23,12 @@
     body {
       margin: 0;
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: radial-gradient(circle at top, #1e293b 0%, var(--bg) 55%);
+      background-color: var(--bg);
+      background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.95)), radial-gradient(circle at top, #1e293b 0%, var(--bg) 55%);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
       color: var(--text);
       min-height: 100vh;
       display: flex;
@@ -487,6 +492,66 @@
     let currentApp = null;
     let projects = [];
     let activeProjectId = null;
+    const backgroundMapUrlCache = new Map();
+    let backgroundRequestToken = 0;
+
+    function setLauncherBackground(mapUrl = '') {
+      if (mapUrl) {
+        document.body.style.backgroundImage = `linear-gradient(rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.88)), url("${mapUrl}")`;
+      } else {
+        document.body.style.backgroundImage = 'linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.95)), radial-gradient(circle at top, #1e293b 0%, var(--bg) 55%)';
+      }
+    }
+
+    function buildStaticMapUrl(lat, lon) {
+      const center = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+      const map = new URL('https://staticmap.openstreetmap.de/staticmap.php');
+      map.searchParams.set('center', center);
+      map.searchParams.set('zoom', '17');
+      map.searchParams.set('size', '1600x1000');
+      map.searchParams.set('markers', `${center},red-pushpin`);
+      map.searchParams.set('maptype', 'mapnik');
+      return map.toString();
+    }
+
+    async function syncActiveProjectBackground() {
+      const activeProject = getActiveProject();
+      const address = activeProject?.address?.trim();
+      const requestToken = ++backgroundRequestToken;
+
+      if (!address) {
+        setLauncherBackground('');
+        return;
+      }
+
+      const cacheKey = address.toLowerCase();
+      if (backgroundMapUrlCache.has(cacheKey)) {
+        setLauncherBackground(backgroundMapUrlCache.get(cacheKey));
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+        if (!response.ok) {
+          throw new Error(`Failed geocode (${response.status})`);
+        }
+
+        const geocode = await response.json();
+        if (requestToken !== backgroundRequestToken) return;
+
+        if (!Number.isFinite(geocode?.lat) || !Number.isFinite(geocode?.lon)) {
+          throw new Error('Geocode response missing lat/lon');
+        }
+
+        const mapUrl = buildStaticMapUrl(geocode.lat, geocode.lon);
+        backgroundMapUrlCache.set(cacheKey, mapUrl);
+        setLauncherBackground(mapUrl);
+      } catch (err) {
+        if (requestToken !== backgroundRequestToken) return;
+        setLauncherBackground('');
+        console.warn('Unable to load active project map background', err);
+      }
+    }
 
     function loadProjects() {
       try {
@@ -631,6 +696,7 @@
         ? `Active project: ${activeProject.name}`
         : 'No active project selected.';
       activeProjectHeader.textContent = activeProject ? `Active project: ${activeProject.name}` : '';
+      syncActiveProjectBackground();
 
       projectList.innerHTML = '';
       if (!projects.length) {

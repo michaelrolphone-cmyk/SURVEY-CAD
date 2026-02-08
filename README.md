@@ -252,6 +252,7 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 - Launcher opens `RecordQuarry.html` with query parameters (`projectId`, `projectName`, `client`, `address`, `autostart=1`).
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
 - Launcher header now displays the active project name whenever a project is active, giving persistent context while moving between tools.
+- When a project is active and includes an address, the launcher geocodes that address via `GET /api/geocode` and applies an OpenStreetMap static map image as the launcher background.
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.
 - Re-opening the same project restores saved RecordQuarry results from local storage before falling back to a live lookup.
 - Exporting from RecordQuarry to PointForge also writes/updates a project-file snapshot in local storage (`surveyfoundryProjectFile:<projectId>`) so discovered CP&F references persist with the project record.
