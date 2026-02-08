@@ -130,3 +130,15 @@ test('launcher project manager is opened from a button and closes after activati
   assert.match(launcherHtml, /activeProjectSummary\.textContent\s*=\s*activeProject[\s\S]*'No active project selected\.'/, 'launcher home should show active project summary text');
   assert.match(launcherHtml, /activeProjectHeader\.textContent\s*=\s*activeProject\s*\?\s*`Active project: \$\{activeProject\.name\}`\s*:\s*'';/, 'launcher header should show active project when selected and clear when none active');
 });
+
+test('launcher project manager enforces sequential project status progression', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /const\s+PROJECT_STATUS_SEQUENCE\s*=\s*\[[\s\S]*'Proposed',[\s\S]*'Researched',[\s\S]*'Calculated',[\s\S]*'Tied',[\s\S]*'Drafted',[\s\S]*'Pin Set',[\s\S]*'Final Drafted',[\s\S]*'Submitted',[\s\S]*'Recorded',[\s\S]*'Billed',[\s\S]*'Paid',[\s\S]*'Archived',[\s\S]*\];/, 'launcher should define the full project status sequence in order');
+  assert.match(launcherHtml, /function\s+advanceProjectStatus\(projectId\)/, 'launcher should define a status advancement helper');
+  assert.match(launcherHtml, /project\.status\s*=\s*PROJECT_STATUS_SEQUENCE\[currentIndex \+ 1\];/, 'status advancement should move to the next sequential status only');
+  assert.match(launcherHtml, /<small>Status: \$\{currentStatus\}<\/small>/, 'project row should show current status');
+  assert.match(launcherHtml, /advanceStatus\.textContent\s*=\s*nextStatus\s*\?\s*`Advance to \$\{nextStatus\}`\s*:\s*'Status complete';/, 'status action should expose next sequential status or completion state');
+  assert.match(launcherHtml, /status:\s*'Proposed',/, 'new projects should start in Proposed status');
+  assert.match(launcherHtml, /const\s+knownStatus\s*=\s*PROJECT_STATUS_SEQUENCE\.includes\(project\?\.status\)\s*\?\s*project\.status\s*:\s*'Proposed';/, 'loaded projects should normalize missing/unknown statuses to Proposed');
+});
