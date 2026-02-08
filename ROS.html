@@ -976,12 +976,19 @@ import { buildParcelCsvPNEZD, buildPolygonCornerCsvRowsPNEZD, buildPointMarkerCs
       if (!v) continue;
       const sv = String(v);
       if (/^https?:\/\//i.test(sv) && /\.pdf(\?|$)/i.test(sv)) links.push({ key: k, url: sv });
-      if (!/^https?:\/\//i.test(sv) && /\.pdf(\?|$)/i.test(sv) && sv.includes("/")) {
+      if (!/^https?:\/\//i.test(sv) && /\.pdf(\?|$)/i.test(sv)) {
         links.push({ key: k, url: new URL(sv, BASE).toString() });
       }
     }
     const seen = new Set();
     return links.filter(l => (seen.has(l.url) ? false : (seen.add(l.url), true)));
+  }
+
+  function buildPdfProxyLinks(attrs, linkText = "Open PDF (API)") {
+    const pdfs = findPdfLinks(attrs || {});
+    return pdfs.map((p) => (
+      `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(p.url))}">${escapeHtml(linkText)}</a> <span class="small">(${escapeHtml(p.key)})</span>`
+    ));
   }
 
   // -----------------------------
@@ -1263,6 +1270,15 @@ import { buildParcelCsvPNEZD, buildPolygonCornerCsvRowsPNEZD, buildPointMarkerCs
         []
       ));
 
+      if (state.aliquotFeatures.length) {
+        const aliquotCards = state.aliquotFeatures.slice(0, 6).map((f, idx) => {
+          const a = f.attributes || {};
+          const title = a.ALIQUOT || a.ALIQUOT_LABEL || `Aliquot #${idx + 1}`;
+          return card(`Aliquot #${idx + 1}`, title, summarizeAttrs(a), buildPdfProxyLinks(a, "Open Aliquot PDF (API)"));
+        });
+        cards.push(...aliquotCards);
+      }
+
       if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
       if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
@@ -1270,9 +1286,7 @@ import { buildParcelCsvPNEZD, buildPolygonCornerCsvRowsPNEZD, buildPointMarkerCs
       if (ros.length) {
         const rosCards = ros.slice(0, 10).map((f, idx) => {
           const a = f.attributes || {};
-          const pdfs = findPdfLinks(a);
-          const links = pdfs.map(p => `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(p.url))}">Open PDF (API)</a> <span class="small">(${escapeHtml(p.key)})</span>`);
-          return card(`Record of Survey #${idx+1}`, bestRosLabel(a), summarizeAttrs(a), links);
+          return card(`Record of Survey #${idx+1}`, bestRosLabel(a), summarizeAttrs(a), buildPdfProxyLinks(a));
         });
         cards.push(...rosCards);
       } else {
