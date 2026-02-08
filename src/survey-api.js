@@ -117,6 +117,20 @@ export function pointInPolygon(pointXY, geom) {
   return true;
 }
 
+export function centroidOfPolygon(geom) {
+  const ring = geom?.rings?.[0] || [];
+  if (!ring.length) return null;
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  for (const [x, y] of ring) {
+    sx += x;
+    sy += y;
+    n += 1;
+  }
+  return { x: sx / n, y: sy / n };
+}
+
 export function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const toRad = (d) => (d * Math.PI) / 180;

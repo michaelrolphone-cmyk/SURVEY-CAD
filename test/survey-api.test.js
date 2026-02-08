@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, pointInPolygon } from '../src/survey-api.js';
+import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, pointInPolygon, centroidOfPolygon } from '../src/survey-api.js';
 
 function createMockServer(options = {}) {
   const { strictAddressMiss = false, addressAlwaysMiss = false, failProjectedRefetch = false } = options;
@@ -165,6 +165,15 @@ test('arcgisQueryUrl serializes objects as JSON', () => {
   const url = arcgisQueryUrl('https://x/y/24', { geometry: { x: 1, y: 2 }, where: '1=1' });
   assert.match(url, /geometry=%7B%22x%22%3A1%2C%22y%22%3A2%7D/);
   assert.match(url, /f=json/);
+});
+
+
+
+test('centroidOfPolygon returns average point for first ring', () => {
+  const centroid = centroidOfPolygon({
+    rings: [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]],
+  });
+  assert.deepEqual(centroid, { x: 0.8, y: 0.8 });
 });
 
 test('pointInPolygon handles holes', () => {
@@ -352,6 +361,22 @@ test('lookupByAddress throws clear error when address and geocode both fail', as
   }
 });
 
+
+
+test('findContainingPolygonWithOutSr chooses nearest polygon when point is not contained', async () => {
+  const { server, port } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+  });
+
+  try {
+    const polygon = await client.findContainingPolygonWithOutSr(18, -116.305, 43.495, 2243, 2500);
+    assert.equal(polygon.attributes.NAME, 'off-target');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
 test('loadSubdivisionAtPoint supports outSR override', async () => {
   const { server, port, requests } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
