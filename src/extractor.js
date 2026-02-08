@@ -73,6 +73,55 @@ async function tesseractLangs(runCommand = run) {
   }
 }
 
+function buildTesseractEnv(baseEnv, tessdataPrefix) {
+  if (!tessdataPrefix) return baseEnv;
+  return { ...baseEnv, TESSDATA_PREFIX: tessdataPrefix };
+}
+
+async function detectTessdataPrefix() {
+  if (process.env.TESSDATA_PREFIX) return process.env.TESSDATA_PREFIX;
+
+  const candidates = [
+    '/app/.apt/usr/share/tesseract-ocr/5/tessdata',
+    '/app/.apt/usr/share/tesseract-ocr/4.00/tessdata',
+    '/usr/share/tesseract-ocr/5/tessdata',
+    '/usr/share/tesseract-ocr/4.00/tessdata',
+    '/usr/share/tessdata',
+  ];
+
+  for (const dir of candidates) {
+    try {
+      const files = await fs.readdir(dir);
+      if (files.some((f) => f.endsWith('.traineddata'))) return dir;
+    } catch {}
+  }
+  return null;
+}
+
+function withTessdata(runCommand, tessdataPrefix) {
+  return (cmd, args, opts = {}) => {
+    if (cmd !== 'tesseract' || !tessdataPrefix) return runCommand(cmd, args, opts);
+    const env = buildTesseractEnv({ ...process.env, ...(opts.env || {}) }, tessdataPrefix);
+    return runCommand(cmd, args, { ...opts, env });
+  };
+}
+
+function selectOcrLanguage(langs, preferred = 'eng') {
+  if (!Array.isArray(langs) || !langs.length) {
+    return {
+      lang: null,
+      warning: 'Tesseract reported no OCR languages. Install tessdata (for example, eng.traineddata) or set TESSDATA_PREFIX.',
+    };
+  }
+
+  if (langs.includes(preferred)) return { lang: preferred, warning: null };
+
+  return {
+    lang: langs[0],
+    warning: `Preferred OCR language "${preferred}" is unavailable; using "${langs[0]}" instead.`,
+  };
+}
+
 async function ocrImage(imgPath, { psm = 6, lang = 'eng', runCommand = run } = {}) {
   const { out } = await runCommand('tesseract', [imgPath, 'stdout', '-l', lang, '--oem', '1', '--psm', String(psm)]);
   return norm(out);
@@ -245,7 +294,7 @@ async function makeVariantImage(inputPath, { roi, rotateDeg, prep }, outPath) {
   await img.png().toFile(outPath);
 }
 
-async function extractFromImageVariants(pagePng, pageIndex, tmpDir, candidates, errors, runCommand) {
+async function extractFromImageVariants(pagePng, pageIndex, tmpDir, candidates, errors, runCommand, ocrLang) {
   const rotations = [0, 90, 270];
   const preps = ['otsu', 'fixed'];
   const psms = [6, 11];
@@ -255,7 +304,7 @@ async function extractFromImageVariants(pagePng, pageIndex, tmpDir, candidates, 
       const out = path.join(tmpDir, `full-p${pageIndex}-${prep}-psm${psm}.png`);
       try {
         await makeVariantImage(pagePng, { roi: null, rotateDeg: 0, prep }, out);
-        const text = await ocrImage(out, { psm, runCommand });
+        const text = await ocrImage(out, { psm, runCommand, lang: ocrLang });
         if (!text) continue;
 
         if (/\bbear\w*\b.*\bbased\s+on\b/i.test(text) || /\bbasis\b.*\bbear\w*/i.test(text)) {
@@ -289,7 +338,7 @@ async function extractFromImageVariants(pagePng, pageIndex, tmpDir, candidates, 
           const out = path.join(tmpDir, `roi-${roi.name}-p${pageIndex}-r${rot}-${prep}-psm${psm}.png`);
           try {
             await makeVariantImage(pagePng, { roi, rotateDeg: rot, prep }, out);
-            const text = await ocrImage(out, { psm, runCommand });
+            const text = await ocrImage(out, { psm, runCommand, lang: ocrLang });
             if (!text || !containsBasisLabel(text)) continue;
 
             const parsed = pickBestNearBasis(text);
@@ -324,19 +373,42 @@ export async function extractBasisFromPdf(pdfPath, { maxPages = 2, dpi = 300, de
 
   const candidates = [];
   const errors = [];
+  let ocrWarning = null;
+  let ocrLang = 'eng';
+  const tessdataPrefix = await detectTessdataPrefix();
+  const ocrRunCommand = withTessdata(runCommand, tessdataPrefix);
 
   let diagnostics = null;
   if (debug) {
+    const langs = await tesseractLangs(ocrRunCommand);
     diagnostics = {
-      tesseract_version: await tesseractVersion(runCommand),
-      tesseract_langs: await tesseractLangs(runCommand),
+      tesseract_version: await tesseractVersion(ocrRunCommand),
+      tesseract_langs: langs,
       maxPages,
       dpi,
+      tessdata_prefix: tessdataPrefix,
     };
+    const selected = selectOcrLanguage(langs);
+    ocrLang = selected.lang;
+    ocrWarning = selected.warning;
+  } else {
+    const selected = selectOcrLanguage(await tesseractLangs(ocrRunCommand));
+    ocrLang = selected.lang;
+    ocrWarning = selected.warning;
   }
 
   try {
-    const pagePngs = await renderPdfToPngs(pdfPath, { maxPages, dpi, outDir: tmpDir, runCommand });
+    if (!ocrLang) {
+      const out = { pdf: path.basename(pdfPath), best: null, candidates: [] };
+      if (debug) {
+        out.diagnostics = { ...diagnostics, errors: [ocrWarning] };
+      }
+      return out;
+    }
+
+    if (ocrWarning) errors.push(ocrWarning);
+
+    const pagePngs = await renderPdfToPngs(pdfPath, { maxPages, dpi, outDir: tmpDir, runCommand: ocrRunCommand });
     if (!pagePngs.length) {
       return {
         pdf: path.basename(pdfPath),
@@ -347,7 +419,7 @@ export async function extractBasisFromPdf(pdfPath, { maxPages = 2, dpi = 300, de
     }
 
     for (let i = 0; i < pagePngs.length; i += 1) {
-      await extractFromImageVariants(pagePngs[i], i, tmpDir, candidates, errors, runCommand);
+      await extractFromImageVariants(pagePngs[i], i, tmpDir, candidates, errors, ocrRunCommand, ocrLang);
     }
 
     candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
@@ -362,3 +434,4 @@ export async function extractBasisFromPdf(pdfPath, { maxPages = 2, dpi = 300, de
 }
 
 export { containsBasisLabel, findBearings, parseBasisReference, pickBestNearBasis, scoreCandidate };
+export { buildTesseractEnv, selectOcrLanguage };

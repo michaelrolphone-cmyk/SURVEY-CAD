@@ -6,6 +6,8 @@ import {
   parseBasisReference,
   pickBestNearBasis,
   scoreCandidate,
+  buildTesseractEnv,
+  selectOcrLanguage,
 } from '../src/extractor.js';
 
 test('containsBasisLabel detects basis text despite OCR noise', () => {
@@ -39,4 +41,25 @@ test('scoreCandidate prefers complete label hits', () => {
   const weak = scoreCandidate({ source: 'statement', bearing: null, distance: null, basis_reference: null, psm: 6, prep: 'fixed' });
   const strong = scoreCandidate({ source: 'label', bearing: 'N 01°00\'00" E', distance: 123, basis_reference: 'foo', psm: 11, prep: 'otsu' });
   assert.ok(strong > weak);
+});
+
+test('selectOcrLanguage prefers english, falls back, and reports missing tessdata', () => {
+  assert.deepEqual(selectOcrLanguage(['eng', 'osd']), { lang: 'eng', warning: null });
+  assert.deepEqual(selectOcrLanguage(['spa', 'osd']), {
+    lang: 'spa',
+    warning: 'Preferred OCR language "eng" is unavailable; using "spa" instead.',
+  });
+  assert.deepEqual(selectOcrLanguage([]), {
+    lang: null,
+    warning: 'Tesseract reported no OCR languages. Install tessdata (for example, eng.traineddata) or set TESSDATA_PREFIX.',
+  });
+});
+
+
+test('buildTesseractEnv sets TESSDATA_PREFIX when provided', () => {
+  assert.deepEqual(buildTesseractEnv({ PATH: '/usr/bin' }, null), { PATH: '/usr/bin' });
+  assert.deepEqual(buildTesseractEnv({ PATH: '/usr/bin' }, '/app/.apt/usr/share/tesseract-ocr/5/tessdata'), {
+    PATH: '/usr/bin',
+    TESSDATA_PREFIX: '/app/.apt/usr/share/tesseract-ocr/5/tessdata',
+  });
 });
