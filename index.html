@@ -469,6 +469,20 @@
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
     const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
+    const PROJECT_STATUS_SEQUENCE = [
+      'Proposed',
+      'Researched',
+      'Calculated',
+      'Tied',
+      'Drafted',
+      'Pin Set',
+      'Final Drafted',
+      'Submitted',
+      'Recorded',
+      'Billed',
+      'Paid',
+      'Archived',
+    ];
 
     let currentApp = null;
     let projects = [];
@@ -477,7 +491,15 @@
     function loadProjects() {
       try {
         const parsed = JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY) || '[]');
-        projects = Array.isArray(parsed) ? parsed : [];
+        projects = Array.isArray(parsed)
+          ? parsed.map((project) => {
+              const knownStatus = PROJECT_STATUS_SEQUENCE.includes(project?.status) ? project.status : 'Proposed';
+              return {
+                ...project,
+                status: knownStatus,
+              };
+            })
+          : [];
       } catch {
         projects = [];
       }
@@ -574,6 +596,20 @@
       renderProjects();
     }
 
+    function advanceProjectStatus(projectId) {
+      const project = projects.find((entry) => entry.id === projectId);
+      if (!project) return;
+
+      const currentStatus = PROJECT_STATUS_SEQUENCE.includes(project.status) ? project.status : 'Proposed';
+      const currentIndex = PROJECT_STATUS_SEQUENCE.indexOf(currentStatus);
+      if (currentIndex === PROJECT_STATUS_SEQUENCE.length - 1) return;
+
+      project.status = PROJECT_STATUS_SEQUENCE[currentIndex + 1];
+      project.updatedAt = new Date().toISOString();
+      saveProjects();
+      renderProjects();
+    }
+
     function deleteProject(projectId) {
       const project = projects.find((entry) => entry.id === projectId);
       if (!project) return;
@@ -608,10 +644,13 @@
 
         const info = document.createElement('div');
         const activeBadge = project.id === activeProjectId ? ' (active)' : '';
+        const currentStatus = PROJECT_STATUS_SEQUENCE.includes(project.status) ? project.status : 'Proposed';
+        const currentStatusIndex = PROJECT_STATUS_SEQUENCE.indexOf(currentStatus);
+        const nextStatus = PROJECT_STATUS_SEQUENCE[currentStatusIndex + 1] || null;
         const billingRateText = project.billingRate ? `$${project.billingRate}/hr` : 'Rate not set';
         const clientContactText = project.clientContact || 'No client contact';
         const descriptionText = project.description || 'No project description';
-        info.innerHTML = `<strong>${project.name}${activeBadge}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small><br/><small>${clientContactText} • ${billingRateText}</small><br/><small>${descriptionText}</small>`;
+        info.innerHTML = `<strong>${project.name}${activeBadge}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small><br/><small>Status: ${currentStatus}</small><br/><small>${clientContactText} • ${billingRateText}</small><br/><small>${descriptionText}</small>`;
 
         const start = document.createElement('button');
         start.type = 'button';
@@ -637,6 +676,12 @@
         edit.textContent = 'Edit details';
         edit.addEventListener('click', () => editProject(project.id));
 
+        const advanceStatus = document.createElement('button');
+        advanceStatus.type = 'button';
+        advanceStatus.textContent = nextStatus ? `Advance to ${nextStatus}` : 'Status complete';
+        advanceStatus.disabled = !nextStatus;
+        advanceStatus.addEventListener('click', () => advanceProjectStatus(project.id));
+
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.textContent = 'Delete';
@@ -649,6 +694,7 @@
         actions.appendChild(makeActive);
         actions.appendChild(rename);
         actions.appendChild(edit);
+        actions.appendChild(advanceStatus);
         actions.appendChild(remove);
 
         row.appendChild(info);
@@ -674,6 +720,7 @@
         billingRate,
         address,
         description,
+        status: 'Proposed',
         createdAt: new Date().toISOString(),
       };
       projects.unshift(project);
