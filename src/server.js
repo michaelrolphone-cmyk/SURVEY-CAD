@@ -277,17 +277,11 @@ export function createSurveyServer({
       if (urlObj.pathname === '/api/static-map') {
         const { lon, lat } = parseLonLat(urlObj);
         const address = urlObj.searchParams.get('address') || '';
-        const center = `${lat.toFixed(6)},${lon.toFixed(6)}`;
-        const map = new URL('https://staticmap.openstreetmap.de/staticmap.php');
-        map.searchParams.set('center', center);
-        map.searchParams.set('zoom', '17');
-        map.searchParams.set('size', '1600x1000');
-        map.searchParams.set('markers', `${center},red-pushpin`);
-        map.searchParams.set('maptype', 'mapnik');
         const tile = lonLatToTile(lat, lon, 17);
+        const satelliteTileUrl = `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${tile.zoom}/${tile.y}/${tile.x}`;
         const tileUrl = `https://tile.openstreetmap.org/${tile.zoom}/${tile.x}/${tile.y}.png`;
 
-        const candidates = [map.toString(), tileUrl];
+        const candidates = [satelliteTileUrl, tileUrl];
 
         try {
           for (const candidate of candidates) {

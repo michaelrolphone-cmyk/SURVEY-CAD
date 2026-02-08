@@ -436,9 +436,9 @@ test('server static map endpoint proxies upstream image, retries tile fallback, 
     assert.match(svgFallbackBody, /Project map fallback/i);
     assert.match(svgFallbackBody, /100 Main St, Boise/i);
 
-    assert.ok(mapCalls.some((url) => /staticmap\.openstreetmap\.de\/staticmap\.php/.test(url)));
+    assert.ok(mapCalls.some((url) => /services\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/17\//.test(url)));
     assert.ok(mapCalls.some((url) => /tile\.openstreetmap\.org\/17\//.test(url)));
-    assert.match(mapCalls[0], /center=43\.610010%2C-116\.200010/);
+    assert.match(mapCalls[0], /MapServer\/tile\/17\/47857\/23228$/);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }

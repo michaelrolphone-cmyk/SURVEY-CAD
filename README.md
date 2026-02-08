@@ -257,7 +257,7 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
 - Launcher header now displays the active project name whenever a project is active, giving persistent context while moving between tools.
 - When a project is active and includes an address, the launcher geocodes that address via `GET /api/geocode` and requests a background image through `GET /api/static-map` (server proxy).
-If the upstream static map provider is unavailable, `/api/static-map` now retries a direct OpenStreetMap street-tile image for the same coordinates before returning the generated SVG fallback so the launcher prefers real street-map imagery whenever possible.
+`/api/static-map` now prefers Esri World Imagery satellite tiles for project backgrounds, retries a direct OpenStreetMap street tile for the same coordinates if satellite is unavailable, and finally returns the generated SVG fallback when no upstream imagery source is reachable.
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.
 - Re-opening the same project restores saved RecordQuarry results from local storage before falling back to a live lookup.
 - Exporting from RecordQuarry to PointForge also writes/updates a project-file snapshot in local storage (`surveyfoundryProjectFile:<projectId>`) so discovered CP&F references persist with the project record.
