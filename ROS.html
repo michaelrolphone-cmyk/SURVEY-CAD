@@ -239,6 +239,41 @@
     }
     .summaryPanel .phead{background:rgba(255,255,255,.03);}
     .summaryPanel .pbody{max-height:280px;}
+
+    .busyModal{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(1, 5, 20, 0.74);
+      backdrop-filter: blur(1px);
+      z-index:9999;
+      padding:16px;
+    }
+    .busyModal.is-open{display:flex;}
+    .busyModalCard{
+      width:min(460px, 100%);
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:var(--panel2);
+      box-shadow:0 18px 46px rgba(0,0,0,.42);
+      padding:18px 16px;
+      text-align:center;
+    }
+    .busySpinner{
+      width:34px;
+      height:34px;
+      margin:0 auto 10px;
+      border-radius:50%;
+      border:3px solid rgba(255,255,255,.2);
+      border-top-color:var(--good);
+      animation:spinBusy .85s linear infinite;
+    }
+    @keyframes spinBusy {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 
@@ -337,6 +372,14 @@
   </div>
 </div>
 
+<div id="busyModal" class="busyModal" role="status" aria-live="polite" aria-hidden="true">
+  <div class="busyModalCard">
+    <div class="busySpinner" aria-hidden="true"></div>
+    <div id="busyModalMessage">Processing export…</div>
+    <div class="small" style="margin-top:8px">Gathering CPNF instrument numbers for exported points.</div>
+  </div>
+</div>
+
 <script type="module">
 import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
 import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
@@ -388,6 +431,14 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     logEl.scrollTop = logEl.scrollHeight;
   }
   function clearLog() { logEl.textContent = ""; }
+
+  function setBusyModalOpen(isOpen, message = 'Processing export…') {
+    const modal = $("busyModal");
+    const msg = $("busyModalMessage");
+    msg.textContent = message;
+    modal.classList.toggle('is-open', !!isOpen);
+    modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+  }
 
   // -----------------------------
   // JSONP for ArcGIS (no CORS)
@@ -1661,6 +1712,7 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         !point.sources.has('parcel') && !point.sources.has('subdivision')
       )));
       log(`Looking up CP&F instrument notes for ${plssPoints.size} aliquot/section point(s)...`);
+      setBusyModalOpen(true, 'Exporting CSV… gathering CPNF instrument numbers');
       const notesByCoordinate = await buildCpfNotesByCoordinate(plssPoints);
 
       const finalExport = buildRosBoundaryCsvRowsPNEZD({
@@ -1677,6 +1729,8 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     } catch (e) {
       log(`Parcel CSV export failed: ${e.message || e}`, "bad");
       console.error(e);
+    } finally {
+      setBusyModalOpen(false);
     }
   });
 
@@ -1699,6 +1753,7 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         !point.sources.has('parcel') && !point.sources.has('subdivision')
       )));
       log(`Looking up CP&F instrument notes for ${plssPoints.size} PointForge aliquot/section point(s)...`);
+      setBusyModalOpen(true, 'Exporting to PointForge… gathering CPNF instrument numbers');
       const notesByCoordinate = await buildCpfNotesByCoordinate(plssPoints);
 
       const uniquePart = buildRosBoundaryCsvRowsPNEZD({
@@ -1722,6 +1777,8 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     } catch (e) {
       log(`PointForge export failed: ${e.message || e}`, "bad");
       console.error(e);
+    } finally {
+      setBusyModalOpen(false);
     }
   });
 

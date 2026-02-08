@@ -167,6 +167,8 @@ PointForge export now performs CP&F lookups for aliquot/section (PLSS) corners b
 
 `ROS.html` **Export Unique Parcel/Subdivision/Aliquots CSV (IDW ft)** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
 
+`ROS.html` now shows a processing modal while export flows are busy gathering CPNF instrument numbers for aliquot/section corner notes, so long-running CP&F lookups have visible progress feedback before CSV download or PointForge handoff completes.
+
 `ROS.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
 `ROS.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
 

@@ -64,3 +64,14 @@ test('ROS.html can export unique boundary points directly to PointForge', async 
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*'survey-cad:navigate-app'[\s\S]*path,/, 'ROS should notify launcher iframe host to navigate embedded app');
   assert.match(html, /openLinkedApp\('\/POINT_TRANSFORMER\.HTML\?source=ros'\)/, 'ROS should navigate PointForge using launcher-aware helper');
 });
+
+test('ROS.html shows a busy processing modal while CPNF instrument numbers are gathered for exports', async () => {
+  const html = await readFile(new URL('../ROS.html', import.meta.url), 'utf8');
+
+  assert.match(html, /id="busyModal"\s+class="busyModal"/, 'ROS should render an export processing modal container');
+  assert.match(html, /Gathering CPNF instrument numbers for exported points\./, 'modal copy should explain CPNF instrument gathering progress');
+  assert.match(html, /function\s+setBusyModalOpen\s*\(/, 'ROS should expose a helper to toggle the processing modal');
+  assert.match(html, /setBusyModalOpen\(true, 'Exporting CSV… gathering CPNF instrument numbers'\)/, 'CSV export should open modal before CPNF lookup');
+  assert.match(html, /setBusyModalOpen\(true, 'Exporting to PointForge… gathering CPNF instrument numbers'\)/, 'PointForge export should open modal before CPNF lookup');
+  assert.match(html, /setBusyModalOpen\(false\);[\s\S]*\}\s*\);/, 'exports should close the modal in completion paths');
+});
