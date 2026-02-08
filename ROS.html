@@ -1680,11 +1680,26 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
     }
   });
 
-  $("btnExportPointForge").addEventListener("click", () => {
+  $("btnExportPointForge").addEventListener("click", async () => {
     try {
       if (!state.parcelFeature2243) {
         throw new Error("PointForge export geometry not loaded yet. Run Lookup again.");
       }
+
+      const baseExport = buildRosBoundaryCsvRowsPNEZD({
+        parcelFeature2243: state.parcelFeature2243,
+        subdivisionFeature2243: state.subdivisionFeature2243,
+        sectionFeature2243: state.sectionFeature2243,
+        aliquotFeatures2243: state.aliquotFeatures2243 || [],
+        startPoint: 1,
+      });
+      if (!baseExport.count) throw new Error('No boundary vertices available to export to PointForge.');
+
+      const plssPoints = new Map([...baseExport.points.entries()].filter(([, point]) => (
+        !point.sources.has('parcel') && !point.sources.has('subdivision')
+      )));
+      log(`Looking up CP&F instrument notes for ${plssPoints.size} PointForge aliquot/section point(s)...`);
+      const notesByCoordinate = await buildCpfNotesByCoordinate(plssPoints);
 
       const uniquePart = buildRosBoundaryCsvRowsPNEZD({
         parcelFeature2243: state.parcelFeature2243,
@@ -1692,8 +1707,10 @@ import { buildRosBoundaryCsvRowsPNEZD } from "./src/ros-export.js";
         sectionFeature2243: state.sectionFeature2243,
         aliquotFeatures2243: state.aliquotFeatures2243 || [],
         startPoint: 1,
+        notesByCoordinate,
+        includePlssWithoutNotes: false,
       });
-      if (!uniquePart.count) throw new Error('No boundary vertices available to export to PointForge.');
+      if (!uniquePart.count) throw new Error('No parcel/subdivision points or CP&F-backed PLSS points available to export to PointForge.');
 
       localStorage.setItem(POINTFORGE_ROS_IMPORT_STORAGE_KEY, JSON.stringify({
         source: 'ros-html',

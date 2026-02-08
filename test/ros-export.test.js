@@ -145,3 +145,41 @@ test('buildRosBoundaryCsvRowsPNEZD does not emit section-only corners when no al
   assert.equal(lines.length, 4);
   assert.ok(lines.every((line) => /,COR,$/.test(line)), 'should only include parcel corners');
 });
+
+
+test('buildRosBoundaryCsvRowsPNEZD can omit PLSS-only points without CP&F notes', () => {
+  const parcel = {
+    geometry: { rings: [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]] },
+  };
+  const section = {
+    geometry: { rings: [[[0, 0], [400, 0], [400, 400], [0, 400], [0, 0]]] },
+  };
+  const aliquots = [
+    {
+      geometry: {
+        rings: [[
+          [100, 100], [200, 100], [200, 200], [100, 200], [100, 100],
+        ]],
+      },
+    },
+  ];
+
+  const notesByCoordinate = new Map([
+    ['200.000000000,200.000000000', 'CPNFS: 1234567'],
+  ]);
+
+  const { csv, count } = buildRosBoundaryCsvRowsPNEZD({
+    parcelFeature2243: parcel,
+    sectionFeature2243: section,
+    aliquotFeatures2243: aliquots,
+    notesByCoordinate,
+    includePlssWithoutNotes: false,
+  });
+
+  const lines = csv.trim().split('\n');
+  assert.equal(count, 5);
+  assert.equal(lines.length, 5);
+  assert.ok(lines.some((line) => /,COR,$/.test(line)), 'should still include parcel points');
+  assert.ok(lines.some((line) => /,CSECOR,CPNFS: 1234567$/.test(line)), 'should include CP&F-backed PLSS point');
+  assert.ok(lines.every((line) => !/,16COR,$/.test(line)), 'should exclude unbacked PLSS points');
+});
