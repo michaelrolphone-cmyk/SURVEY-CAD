@@ -163,6 +163,7 @@ In PointForge, click **Open in Survey Sketch** after processing points; this nav
 PointForge handoff uses `number,x,y,z,code,notes` ordering (code immediately after z, notes immediately after code), preserving both values when importing into Survey Sketch.
 
 `ROS.html` also supports one-click **Export to PointForge** for unique parcel/subdivision/aliquot boundary vertices. The button stores a temporary payload in browser local storage and navigates to `POINT_TRANSFORMER.HTML?source=ros` (inside the launcher iframe when embedded, or current tab when standalone), where PointForge auto-loads the incoming CSV points.
+PointForge export now performs CP&F lookups for aliquot/section (PLSS) corners before writing the handoff payload, and only includes PLSS points that have matching CP&F instrument records (parcel/subdivision points are still exported as usual).
 
 `ROS.html` **Export Unique Parcel/Subdivision/Aliquots CSV (IDW ft)** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
 

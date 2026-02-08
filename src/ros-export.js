@@ -217,6 +217,7 @@ export function buildRosBoundaryCsvRowsPNEZD({
   aliquotFeatures2243 = [],
   startPoint = 1,
   notesByCoordinate = new Map(),
+  includePlssWithoutNotes = true,
 } = {}) {
   const points = new Map();
   const sources = [
@@ -236,6 +237,7 @@ export function buildRosBoundaryCsvRowsPNEZD({
   let pointNumber = startPoint;
 
   for (const [key, point] of points.entries()) {
+    const isPlssOnlyPoint = !point.sources.has('parcel') && !point.sources.has('subdivision');
     let code = 'COR';
     if (point.sources.has('parcel')) code = 'COR';
     else if (point.sources.has('subdivision')) code = 'SUB';
@@ -244,6 +246,7 @@ export function buildRosBoundaryCsvRowsPNEZD({
     }
 
     const note = notesByCoordinate.get(key) || '';
+    if (!includePlssWithoutNotes && isPlssOnlyPoint && !String(note).trim()) continue;
     lines.push([
       pointNumber,
       point.north.toFixed(3),
