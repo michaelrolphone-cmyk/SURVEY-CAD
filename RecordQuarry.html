@@ -2427,10 +2427,34 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       $("addr").value = state.projectContext.address;
     }
     log(`Project loaded: ${state.projectContext.projectName || state.projectContext.projectId} (${state.projectContext.client || "no client"}).`);
-    const snapshot = loadProjectLookupSnapshot(state.projectContext.projectId);
-    if (snapshot && state.projectContext.autostart) {
-      log(`Restoring saved project results from ${snapshot.savedAt || "unknown time"}.`);
-      doLookup({ lookupPayload: snapshot.lookup, selectionSnapshot: snapshot.selection }).catch((err) => {
+
+    const hasProjectAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
+    const projectSnapshot = loadProjectLookupSnapshot(state.projectContext.projectId);
+    const projectAddressSnapshot = hasProjectAddress ? loadAddressLookupSnapshot(state.projectContext.address) : null;
+
+    let launchLookupPayload = null;
+    let launchSelectionSnapshot = null;
+
+    if (hasProjectAddress) {
+      if (projectAddressSnapshot?.lookup) {
+        launchLookupPayload = projectAddressSnapshot.lookup;
+        launchSelectionSnapshot = projectAddressSnapshot.selection;
+        log(`Restoring cached results for project address from ${projectAddressSnapshot.savedAt || "unknown time"}.`);
+      } else if (projectSnapshot?.lookup) {
+        launchLookupPayload = projectSnapshot.lookup;
+        launchSelectionSnapshot = projectSnapshot.selection;
+        log(`Restoring saved project results from ${projectSnapshot.savedAt || "unknown time"}.`);
+      }
+      doLookup({ lookupPayload: launchLookupPayload, selectionSnapshot: launchSelectionSnapshot }).catch((err) => {
+        log(`Saved result restore failed, running live lookup: ${err.message || err}`, "warn");
+        doLookup().catch((liveErr) => {
+          log(`Lookup failed: ${liveErr.message || liveErr}`, "bad");
+          console.error(liveErr);
+        });
+      });
+    } else if (projectSnapshot?.lookup && state.projectContext.autostart) {
+      log(`Restoring saved project results from ${projectSnapshot.savedAt || "unknown time"}.`);
+      doLookup({ lookupPayload: projectSnapshot.lookup, selectionSnapshot: projectSnapshot.selection }).catch((err) => {
         log(`Saved result restore failed, running live lookup: ${err.message || err}`, "warn");
         doLookup().catch((liveErr) => {
           log(`Lookup failed: ${liveErr.message || liveErr}`, "bad");
