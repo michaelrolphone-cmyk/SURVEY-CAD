@@ -1898,10 +1898,11 @@
     }
   };
 
-  function serializeState() {
+  function serializeState(options = {}) {
+    const { includeView = true } = options;
     const pts = Array.from(points.values()).map(p => ({...p}));
     const lns = Array.from(lines.values()).map(l => ({...l}));
-    return JSON.stringify({
+    const serialized = {
       nextId,
       points: pts,
       lines: lns,
@@ -1912,16 +1913,17 @@
         lastSelectedLineId
       },
       construction: {...construction},
-      view: {...view},
       mapGeoreference: mapGeoreference ? {
         lat: { ...mapGeoreference.lat },
         lng: { ...mapGeoreference.lng }
       } : null,
       modal: { open: !modal.classList.contains("hidden"), left: modalWindow.style.left, top: modalWindow.style.top, w: modalWindow.style.width, h: modalWindow.style.height }
-    });
+    };
+    if (includeView) serialized.view = { ...view };
+    return JSON.stringify(serialized);
   }
 
-  function restoreState(json, { skipSync = false } = {}) {
+  function restoreState(json, { skipSync = false, applyView = true } = {}) {
     const s = JSON.parse(json);
     nextId = s.nextId ?? 1;
 
@@ -1938,7 +1940,7 @@
 
     construction = s.construction ?? { startPointId:null };
 
-    if (s.view) {
+    if (applyView && s.view) {
       view.scale = s.view.scale ?? view.scale;
       view.panX = s.view.panX ?? view.panX;
       view.panY = s.view.panY ?? view.panY;
@@ -1988,7 +1990,7 @@
     if (collab.stateDebounce) clearTimeout(collab.stateDebounce);
     collab.stateDebounce = setTimeout(() => {
       collab.stateDebounce = null;
-      sendCollabMessage({ type: "state", state: serializeState() });
+      sendCollabMessage({ type: "state", state: serializeState({ includeView: false }) });
     }, 120);
   }
 
@@ -2031,7 +2033,7 @@
         }
         if (message.state) {
           collab.applyingRemoteState = true;
-          restoreState(message.state, { skipSync: true });
+          restoreState(message.state, { skipSync: true, applyView: false });
           collab.applyingRemoteState = false;
         }
         return;
@@ -2060,7 +2062,7 @@
 
       if (message.type === "state" && message.state) {
         collab.applyingRemoteState = true;
-        restoreState(message.state, { skipSync: true });
+        restoreState(message.state, { skipSync: true, applyView: false });
         collab.applyingRemoteState = false;
       }
     });
