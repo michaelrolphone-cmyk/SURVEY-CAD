@@ -7,6 +7,7 @@ import { createRosOcrApp } from './ros-ocr-api.js';
 import { listApps } from './app-catalog.js';
 import { buildProjectArchivePlan, createProjectFile } from './project-file.js';
 import { LocalStorageSyncStore } from './localstorage-sync-store.js';
+import { createLineforgeCollabService } from './lineforge-collab.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -187,8 +188,9 @@ export function createSurveyServer({
   localStorageSyncStore = new LocalStorageSyncStore(),
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
+  const lineforgeCollab = createLineforgeCollabService();
 
-  return createServer(async (req, res) => {
+  const server = createServer(async (req, res) => {
     if (!req.url) {
       sendJson(res, 400, { error: 'Missing request URL.' });
       return;
@@ -422,6 +424,15 @@ export function createSurveyServer({
       sendJson(res, getErrorStatusCode(err), { error: err.message || 'Bad request.' });
     }
   });
+
+  server.on('upgrade', (req, socket, head) => {
+    const handled = lineforgeCollab.handleUpgrade(req, socket, head);
+    if (!handled && !socket.destroyed) {
+      socket.destroy();
+    }
+  });
+
+  return server;
 }
 
 export function startServer({ port = Number(process.env.PORT) || 3000, host = '0.0.0.0', ...opts } = {}) {

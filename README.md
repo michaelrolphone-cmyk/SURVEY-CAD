@@ -117,6 +117,14 @@ curl -X POST "http://localhost:3000/api/localstorage-sync" \
   -d "{"version":1739072645000,"snapshot":{"surveyfoundryProjects":"[]","surveyfoundryLocalStorageVersion":"1739072645000"}}"
 ```
 
+WebSocket endpoint for LineSmith realtime collaboration:
+
+```bash
+# browser client connects automatically from VIEWPORT.HTML
+# manual endpoint format
+ws://localhost:3000/ws/lineforge?room=<room-id>
+```
+
 Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. Geocoding now tries Nominatim first and then automatically falls back to ArcGIS World Geocode when Nominatim fails. `/api/lookup` will still return a successful payload when geocoding fails but the Ada County address layer returns a match (including a fallback query that relaxes directional/suffix filters). If both data sources fail to locate the address, `/api/lookup` returns a clear validation error instead of bubbling an upstream HTTP error.
 When requesting projected output (`outSR`, e.g. `2243`) from `/api/parcel` and `/api/subdivision`, the server now first resolves the containing feature in WGS84 and then refetches that exact record by `OBJECTID` in the requested spatial reference to keep CSV/export geometry aligned with the looked-up address. If the projected refetch is rejected by the upstream ArcGIS layer, the API now gracefully falls back to the original WGS84 geometry instead of failing the request. If `/api/subdivision` receives an upstream projection error for the initial requested `outSR`, the server retries the same lookup in WGS84 (`4326`) and still returns a successful payload when possible. `/api/subdivision` and related lookup flows also fall back to nearest returned polygon when the point is outside all returned rings, preventing centroid helper runtime errors and preserving a valid geometry response.
 
@@ -241,6 +249,16 @@ Project Browser → LineSmith drawing deep-link command:
 ```bash
 npm start
 open "http://localhost:3000/VIEWPORT.HTML?source=project-browser-drawing&activeProjectId=project-123&activeProjectName=Demo%20Project"
+```
+
+LineSmith collaborative session launch examples:
+
+```bash
+npm start
+# shared room by explicit collab room id
+open "http://localhost:3000/VIEWPORT.HTML?collabRoom=demo-shared"
+# or tie collaboration room to a drawing id
+open "http://localhost:3000/VIEWPORT.HTML?drawingId=boundary-a"
 ```
 
 `PROJECT_BROWSER.html` CP&F folder rows now include a **Print all** action that opens a single HTML print-preview window and embeds every CP&F PDF (in listed order) for one-shot browser printing.
