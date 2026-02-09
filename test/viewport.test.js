@@ -37,6 +37,13 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
 });
 
 
+
+
+test('VIEWPORT.HTML renders unlocked lines in maroon for movement warning', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /ctx\.strokeStyle = isMovable\(ln\.movable\) \? "#800000" : "#fff";/, 'unlocked lines should render maroon while locked lines remain white');
+});
 test('VIEWPORT.HTML includes command line controls for line, move, rotate, and inverse workflows', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
