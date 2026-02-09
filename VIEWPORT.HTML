@@ -3819,6 +3819,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     const drawingsFolder = projectFile.folders.find((folder) => folder.key === "drawings");
     if (!drawingsFolder) return;
     if (!Array.isArray(drawingsFolder.index)) drawingsFolder.index = [];
+    drawingsFolder.index = drawingsFolder.index.filter((entry) => entry && typeof entry === "object");
     const resourceId = `linesmith-${drawingId}`;
     const existing = drawingsFolder.index.find((entry) => entry.id === resourceId);
     const next = {
