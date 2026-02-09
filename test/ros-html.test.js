@@ -91,6 +91,9 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   assert.match(html, /const\s+PROJECT_FILE_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectFile"/, 'ROS should use a stable localStorage prefix for project file snapshots');
   assert.match(html, /function\s+persistPointForgeExportProjectFile\s*\(/, 'ROS should persist PointForge export references into the active project file');
   assert.match(html, /parseCpfInstrumentsFromNotesMap\(notesByCoordinate\)/, 'PointForge export project file should parse CP&F instruments from gathered notes');
+  assert.match(html, /function\s+normalizeCpInstrumentNumber\s*\(/, 'RecordQuarry should normalize CP&F instrument numbers before saving');
+  assert.match(html, /replace\(\/\\s\+\/g, ' '\)\s*\.toUpperCase\(\)/, 'instrument normalization should collapse whitespace and uppercase values to avoid duplicate variants');
+  assert.match(html, /referenceType === 'instrument-number'[\s\S]*normalizeCpInstrumentNumber\(item\?\.reference\?\.value\) === referenceValue/, 'project file duplicate check should compare normalized instrument-number references');
   assert.match(html, /folder:\s*'cpfs'[\s\S]*reference:\s*\{[\s\S]*type:\s*'instrument-number'/, 'PointForge export project file should add CP&F instrument references');
   assert.match(html, /folder:\s*'point-files'[\s\S]*type:\s*'local-storage'[\s\S]*POINTFORGE_ROS_IMPORT_STORAGE_KEY/, 'PointForge export project file should add the PointForge CSV handoff reference');
   assert.match(html, /\$\("btnExportPointForge"\)\.disabled\s*=\s*false/, 'ROS should enable PointForge export after loading export geometry');

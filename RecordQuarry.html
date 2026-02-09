@@ -650,21 +650,47 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       if (!raw) continue;
       const normalized = raw.replace(/^CPNFS:\s*/i, '');
       for (const item of normalized.split('...')) {
-        const instrument = item.trim();
+        const instrument = normalizeCpInstrumentNumber(item);
         if (instrument) instruments.add(instrument);
       }
     }
     return [...instruments].sort();
   }
 
+  function normalizeCpInstrumentNumber(value) {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toUpperCase();
+  }
+
   function addProjectFileResource(projectFile, resource) {
     const folder = ensureProjectFileFolder(projectFile, resource.folder);
     if (!folder) return;
+    const referenceType = String(resource?.reference?.type ?? '').trim();
+    const referenceValue = referenceType === 'instrument-number'
+      ? normalizeCpInstrumentNumber(resource?.reference?.value)
+      : String(resource?.reference?.value ?? '');
+    if (!referenceType || !referenceValue) return;
+
     const exists = folder.index.some((item) => (
-      item?.reference?.type === resource.reference.type
-      && String(item?.reference?.value ?? '') === String(resource.reference.value ?? '')
+      String(item?.reference?.type ?? '').trim() === referenceType
+      && (
+        referenceType === 'instrument-number'
+          ? normalizeCpInstrumentNumber(item?.reference?.value) === referenceValue
+          : String(item?.reference?.value ?? '') === referenceValue
+      )
     ));
-    if (!exists) folder.index.push(resource);
+    if (!exists) {
+      folder.index.push({
+        ...resource,
+        reference: {
+          ...(resource.reference || {}),
+          type: referenceType,
+          value: referenceValue,
+        },
+      });
+    }
   }
 
   function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount }) {
@@ -952,7 +978,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     const values = [];
     const seen = new Set();
     for (const record of records) {
-      const inst = record?.instrument == null ? '' : String(record.instrument).trim();
+      const inst = normalizeCpInstrumentNumber(record?.instrument);
       if (!inst || seen.has(inst)) continue;
       seen.add(inst);
       values.push(inst);
