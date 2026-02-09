@@ -14,6 +14,8 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.doesNotMatch(html, /transformPoints\(input,\s*\{\s*renumberStart\s*\}\)/, 'PointForge should not apply sequential renumbering during normal processing');
   assert.doesNotMatch(html, /sortable\.forEach\(\(r,\s*index\)=>\{[\s\S]*renumberStart/, 'PointForge transform should not force sequential renumbering by default');
   assert.match(html, /id="btnOpenLineSmith"/, 'PointForge should render the LineSmith handoff button');
+  assert.match(html, /<div class="statusbar">[\s\S]*id="btnOpenLineSmith"\s+class="btn workflowPrimary workflowHeaderAction"/, 'PointForge should place the LineSmith workflow button in the upper-right status area as a primary action');
+  assert.doesNotMatch(html, /<div class="row" style="margin-top:10px;">[\s\S]*id="btnOpenLineSmith"/, 'PointForge should not keep the LineSmith handoff button in the lower ingest controls row');
   assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app"[\s\S]*path,/, 'PointForge should notify launcher iframe host to navigate embedded app');

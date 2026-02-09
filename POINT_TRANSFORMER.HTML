@@ -124,6 +124,7 @@
       align-items: center;
       min-width: 280px;
     }
+    .workflowHeaderAction{ margin-left:auto; }
     .chip{
       display:inline-flex;
       align-items:center;
@@ -294,6 +295,15 @@
       border-color: rgba(255,255,255,.26);
       box-shadow: 0 0 0 1px rgba(255,255,255,.07) inset, 0 0 22px rgba(255,255,255,.06);
     }
+    .btn.workflowPrimary{
+      border-color: rgba(0,229,255,.55);
+      background: linear-gradient(180deg, rgba(0,229,255,.32), rgba(0,229,255,.12));
+      box-shadow: 0 0 0 1px rgba(0,229,255,.20) inset, 0 0 26px rgba(0,229,255,.18);
+    }
+    .btn.workflowPrimary:hover{
+      border-color: rgba(255,43,214,.45);
+      box-shadow: 0 0 0 1px rgba(255,43,214,.16) inset, 0 0 30px rgba(255,43,214,.20);
+    }
     .btn[disabled]{ opacity: .45; cursor: not-allowed; filter: grayscale(.2); box-shadow: none; }
 
     .pill{
@@ -445,6 +455,7 @@
       </div>
 
       <div class="statusbar">
+        <button id="btnOpenLineSmith" class="btn workflowPrimary workflowHeaderAction" disabled>Open in LineSmith</button>
         <span class="chip"><span class="dot"></span> SYSTEM: ONLINE</span>
         <span class="chip">DATUM: <span class="mono">NAD83 (NO_TRANS)</span></span>
         <span class="chip">PIPELINE: <span class="mono">PARSE → RENUMB → SORT → PLOT</span></span>
@@ -491,7 +502,6 @@
           <button id="btnProcess" class="btn">Process</button>
           <button id="btnRenumber" class="btn secondary" disabled>Renumber Output</button>
           <button id="btnDownload" class="btn secondary" disabled>Download</button>
-          <button id="btnOpenLineSmith" class="btn secondary" disabled>Open in LineSmith</button>
 
           <span class="pill">
             <label for="renumberStart" style="color:var(--text); margin:0;">Renumber start</label>

@@ -83,6 +83,8 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /id="btnExportPointForge"/, 'ROS should render an Export to PointForge button');
+  assert.match(html, /<header>[\s\S]*id="btnExportPointForge"\s+class="workflowPrimary workflowAction"/, 'ROS should place the PointForge workflow button in the upper-right header as a primary action');
+  assert.doesNotMatch(html, /<div class="h">Map \+ Results<\/div>[\s\S]*id="btnExportPointForge"/, 'ROS should not keep the PointForge workflow button in the map panel action row');
   assert.match(html, /const\s+POINTFORGE_ROS_IMPORT_STORAGE_KEY\s*=\s*"pointforgeRosImport"/, 'ROS should use a stable localStorage key for PointForge handoff');
   assert.match(html, /const\s+PROJECT_FILE_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectFile"/, 'ROS should use a stable localStorage prefix for project file snapshots');
   assert.match(html, /function\s+persistPointForgeExportProjectFile\s*\(/, 'ROS should persist PointForge export references into the active project file');
