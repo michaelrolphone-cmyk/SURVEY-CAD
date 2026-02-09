@@ -690,6 +690,7 @@
         <button id="restoreDrawingVersion">Restore Saved Version…</button>
       </div>
       <div class="hint mini" id="drawingSaveHint">Open LineSmith from an active SurveyFoundry project to enable project-linked drawing saves.</div>
+      <div class="hint mini" id="collabStatus">Collaboration: offline</div>
     </div>
 
     <div class="section">
@@ -1067,8 +1068,21 @@
   const queryParams = new URLSearchParams(window.location.search);
   const activeProjectId = queryParams.get("activeProjectId") || "";
   const activeProjectName = queryParams.get("activeProjectName") || "";
+  const collabRoomParam = queryParams.get("drawingId") || queryParams.get("collabRoom") || "";
   let activeDrawingStorageKey = "";
   let lastSavedDrawingSnapshot = "";
+
+  const collab = {
+    socket: null,
+    roomId: "",
+    clientId: "",
+    color: "#ffffff",
+    peers: new Map(),
+    remoteCursors: new Map(),
+    stateDebounce: null,
+    applyingRemoteState: false,
+    enabled: false
+  };
 
   function setStatus(msg, kind="") {
     const el = $("#status");
@@ -1853,6 +1867,7 @@
       if (this.undo.length > this.max) this.undo.shift();
       this.redo.length = 0;
       updateUndoRedoHUD();
+      scheduleCollabStateSync();
     },
     undoAction() {
       if (!this.undo.length) { setStatus("Nothing to undo.", "warn"); return; }
@@ -1862,6 +1877,7 @@
       restoreState(prev);
       setStatus("Undo.", "ok");
       updateUndoRedoHUD();
+      scheduleCollabStateSync();
     },
     redoAction() {
       if (!this.redo.length) { setStatus("Nothing to redo.", "warn"); return; }
@@ -1871,6 +1887,7 @@
       restoreState(next);
       setStatus("Redo.", "ok");
       updateUndoRedoHUD();
+      scheduleCollabStateSync();
     }
   };
 
@@ -1897,7 +1914,7 @@
     });
   }
 
-  function restoreState(json) {
+  function restoreState(json, { skipSync = false } = {}) {
     const s = JSON.parse(json);
     nextId = s.nextId ?? 1;
 
@@ -1936,6 +1953,146 @@
     }
 
     if (mapLayerState.enabled) syncMapToView(true);
+    if (!skipSync) scheduleCollabStateSync();
+  }
+
+  function resolveCollabRoomId() {
+    if (activeDrawingStorageKey) return activeDrawingStorageKey;
+    if (activeProjectId) {
+      const drawingName = String($("#drawingName")?.value || "").trim() || "default";
+      const drawingId = normalizeDrawingId(drawingName);
+      return drawingStorageKey(activeProjectId, drawingId);
+    }
+    return collabRoomParam || "global";
+  }
+
+  function setCollabStatus(text) {
+    const el = $("#collabStatus");
+    if (el) el.textContent = `Collaboration: ${text}`;
+  }
+
+  function sendCollabMessage(payload) {
+    if (!collab.enabled || !collab.socket || collab.socket.readyState !== WebSocket.OPEN) return;
+    collab.socket.send(JSON.stringify(payload));
+  }
+
+  function scheduleCollabStateSync() {
+    if (!collab.enabled || collab.applyingRemoteState) return;
+    if (collab.stateDebounce) clearTimeout(collab.stateDebounce);
+    collab.stateDebounce = setTimeout(() => {
+      collab.stateDebounce = null;
+      sendCollabMessage({ type: "state", state: serializeState() });
+    }, 120);
+  }
+
+  function connectCollaboration() {
+    const roomId = resolveCollabRoomId();
+    if (!roomId) return;
+    collab.roomId = roomId;
+    collab.enabled = true;
+
+    const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const wsUrl = `${scheme}://${window.location.host}/ws/lineforge?room=${encodeURIComponent(roomId)}`;
+    setCollabStatus(`connecting (${roomId})…`);
+    const socket = new WebSocket(wsUrl);
+    collab.socket = socket;
+
+    socket.addEventListener("open", () => {
+      setCollabStatus(`connected (${roomId})`);
+    });
+
+    socket.addEventListener("close", () => {
+      setCollabStatus("offline");
+      collab.remoteCursors.clear();
+      collab.peers.clear();
+    });
+
+    socket.addEventListener("message", (event) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      if (message.type === "welcome") {
+        collab.clientId = message.clientId || "";
+        collab.color = message.color || "#ffffff";
+        collab.peers.clear();
+        for (const peer of (message.peers || [])) {
+          collab.peers.set(peer.clientId, { color: peer.color || "#ffffff" });
+        }
+        if (message.state) {
+          collab.applyingRemoteState = true;
+          restoreState(message.state, { skipSync: true });
+          collab.applyingRemoteState = false;
+        }
+        return;
+      }
+
+      if (message.type === "peer-joined") {
+        collab.peers.set(message.clientId, { color: message.color || "#ffffff" });
+        return;
+      }
+
+      if (message.type === "peer-left") {
+        collab.peers.delete(message.clientId);
+        collab.remoteCursors.delete(message.clientId);
+        return;
+      }
+
+      if (message.type === "cursor") {
+        collab.remoteCursors.set(message.clientId, {
+          color: message.color || collab.peers.get(message.clientId)?.color || "#ffffff",
+          x: Number(message.cursor?.x) || 0,
+          y: Number(message.cursor?.y) || 0,
+          at: Number(message.at) || Date.now()
+        });
+        return;
+      }
+
+      if (message.type === "state" && message.state) {
+        collab.applyingRemoteState = true;
+        restoreState(message.state, { skipSync: true });
+        collab.applyingRemoteState = false;
+      }
+    });
+  }
+
+  function broadcastCursor() {
+    sendCollabMessage({
+      type: "cursor",
+      cursor: {
+        x: mouse.wx,
+        y: mouse.wy
+      }
+    });
+  }
+
+  function drawRemoteCursors() {
+    if (!collab.remoteCursors.size) return;
+    const expiryMs = 8000;
+    const now = Date.now();
+    for (const [clientId, cursor] of collab.remoteCursors.entries()) {
+      if (now - cursor.at > expiryMs) {
+        collab.remoteCursors.delete(clientId);
+        continue;
+      }
+      const sp = worldToScreen(cursor.x, cursor.y);
+      ctx.save();
+      ctx.strokeStyle = cursor.color;
+      ctx.fillStyle = cursor.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sp.x - 8, sp.y);
+      ctx.lineTo(sp.x + 8, sp.y);
+      ctx.moveTo(sp.x, sp.y - 8);
+      ctx.lineTo(sp.x, sp.y + 8);
+      ctx.stroke();
+      ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(clientId.slice(0, 6), sp.x + 10, sp.y - 10);
+      ctx.restore();
+    }
   }
 
   function updateUndoRedoHUD() {
@@ -2667,6 +2824,7 @@
 
     // crosshair & snap box
     drawCrosshair(W,H);
+    drawRemoteCursors();
 
     // HUD
     hudMouse.textContent = `x: ${fmt(mouse.wx)}, y: ${fmt(mouse.wy)}`;
@@ -4955,6 +5113,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   canvas.addEventListener("mousemove", (e) => {
     if (modalIsOpen()) return;
     updateMouseFromEvent(e);
+    broadcastCursor();
     if (!mouse.drag) return;
 
     if (mouse.dragObj?.type === "pan") {
@@ -5248,6 +5407,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     }
 
     const openedFromProjectBrowser = tryImportProjectBrowserDrawingPayload();
+    connectCollaboration();
     if (openedFromProjectBrowser) return;
 
     const importedFromPointforge = tryImportPointforgePayload();
