@@ -307,7 +307,7 @@
       if (!pdfUrl) return '';
       // PDF Open Parameters hide most built-in viewer chrome and ask for fit-to-page scaling.
       // Browsers may ignore unsupported flags, but this prevents sidebar/tool UI in engines that support them.
-      return `${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
+      return `${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`;
     }
 
     function openCpfPdfFromResource(resource) {
@@ -384,9 +384,8 @@
         return;
       }
 
-      const pagesMarkup = printableResources.map(({ entry, url }, index) => `
+      const pagesMarkup = printableResources.map(({ url }, index) => `
         <section class="page-block">
-          <h2>${index + 1}. ${escapeHtml(entry.title || entry.id || 'CP&F')}</h2>
           <iframe src="${escapeHtml(buildPrintPreviewPdfUrl(url))}" title="CP&amp;F PDF ${index + 1}" class="pdf-frame"></iframe>
         </section>
       `).join('');
@@ -400,10 +399,14 @@
     body { font-family: Inter, system-ui, sans-serif; margin: 1rem; color: #0f172a; }
     .toolbar { position: sticky; top: 0; background: #fff; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; }
     .print-button { font: inherit; padding: 0.45rem 0.8rem; border-radius: 6px; border: 1px solid #334155; background: #fff; cursor: pointer; }
-    .page-block { page-break-after: always; break-after: page; margin-bottom: 1.5rem; }
-    .page-block:last-of-type { page-break-after: auto; break-after: auto; }
-    .pdf-frame { width: 100%; height: 92vh; border: 1px solid #94a3b8; border-radius: 8px; }
-    @media print { .toolbar { display: none; } body { margin: 0; } .pdf-frame { border: none; border-radius: 0; height: 100vh; } }
+    .page-block { margin: 0 0 1rem; }
+    .pdf-frame { width: 100%; height: 98vh; border: 1px solid #94a3b8; border-radius: 8px; display: block; }
+    @media print {
+      .toolbar { display: none; }
+      body { margin: 0; }
+      .page-block { margin: 0; break-inside: avoid; page-break-inside: avoid; }
+      .pdf-frame { border: none; border-radius: 0; height: 100vh; }
+    }
   </style>
 </head>
 <body>
