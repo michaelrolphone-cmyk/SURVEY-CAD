@@ -166,6 +166,12 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
 
 
 
+test('VIEWPORT.HTML keeps desktop collapse handle visible outside inspector panel edge', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /\.panel\{[\s\S]*overflow-y:auto;[\s\S]*overflow-x:visible;/, 'panel should allow horizontal overflow so the collapse tab can render outside the panel edge');
+});
+
 test('VIEWPORT.HTML includes desktop drawer collapse and edge expand affordances for Point Forge inspector controls', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
@@ -197,6 +203,8 @@ test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate 
   assert.match(html, /setTool\("select"\);[\s\S]*Select items to rotate with a window or click selection/, 'rotate workflow should prompt user to window/click select items when none are selected');
   assert.match(html, /if \(rotateSelectionSession\.active && !rotateSelectionSession\.awaitingSelection\) \{[\s\S]*handleRotateSelectionCanvasPick\(mouse\.x, mouse\.y\);/, 'rotate pick interception should allow marquee selection while waiting for rotation selection');
   assert.match(html, /if \(rotateSelectionSession\.active\) \{[\s\S]*rotateSelectionSession\.awaitingSelection && rotateIds\.length[\s\S]*syncRotateWorkflowToast\(\);[\s\S]*\}/, 'marquee selection should advance rotate workflow and refresh toast guidance');
+});
+
 test('VIEWPORT.HTML right-click cancels active command before clearing selection', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
