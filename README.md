@@ -212,7 +212,7 @@ open "http://localhost:3000/VIEWPORT.HTML?source=project-browser-drawing&activeP
 
 `PROJECT_BROWSER.html` CP&F folder rows now include a **Print all** action that opens a single HTML print-preview window and embeds every CP&F PDF (in listed order) for one-shot browser printing.
 `PROJECT_BROWSER.html` now opens the CP&F **Print all** preview with a writable same-origin popup handle (without `noopener`) so browsers can reliably inject the preview markup instead of showing a blank tab + blocked-popup warning.
-The CP&F print preview now renders each PDF in an iframe with PDF open parameters (`#toolbar=0&navpanes=0&scrollbar=0&view=FitH`) so browser PDF viewers hide side panes/toolbars when supported and request fit-to-page scaling for cleaner combined prints.
+The CP&F print preview now renders each PDF in an iframe with PDF open parameters (`#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`) so browser PDF viewers hide side panes/toolbars when supported and request full-page fit scaling for cleaner combined prints. The preview also omits injected per-file headings to avoid nearly blank separator pages between PDFs when printing.
 
 `RecordQuarry.html` **Export CSV** now emits simplified point codes in the description column (`COR`, `SUB`, `SECOR`, `14COR`, `16COR`, `CSECOR`) and appends a notes column. For aliquot/section corners with matching CP&F records, the notes value is formatted as `CPNFS: <instrument>...<instrument>`.
 

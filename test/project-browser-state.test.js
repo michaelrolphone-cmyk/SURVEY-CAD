@@ -194,8 +194,9 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /printAllButton\.textContent\s*=\s*'Print all'/, 'CP&F folder should render a Print all action');
   assert.match(projectBrowserHtml, /printAllButton\.addEventListener\('click',\s*\(\)\s*=>\s*openCpfPrintPreview\(folder\.index\)\)/, 'Print all action should open a combined CP&F print preview');
   assert.match(projectBrowserHtml, /function\s+buildPrintPreviewPdfUrl\s*\(/, 'Print preview should define a helper to append PDF fit/hide-viewer parameters');
-  assert.match(projectBrowserHtml, /#toolbar=0&navpanes=0&scrollbar=0&view=FitH/, 'Print preview PDF URLs should request hidden viewer chrome and fit-to-page scaling');
+  assert.match(projectBrowserHtml, /#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit/, 'Print preview PDF URLs should request hidden viewer chrome and fit-to-page scaling');
   assert.match(projectBrowserHtml, /<iframe src="\$\{escapeHtml\(buildPrintPreviewPdfUrl\(url\)\)\}" title="CP&amp;F PDF \$\{index \+ 1\}" class="pdf-frame"><\/iframe>/, 'Print preview should render each PDF in an iframe with print-oriented URL parameters');
+  assert.doesNotMatch(projectBrowserHtml, /<h2>\$\{index \+ 1\}\./, 'Print preview should not inject heading-only pages between PDFs');
   assert.match(projectBrowserHtml, /onclick="window\.print\(\)"/, 'Print preview should include a direct print button');
 });
 
