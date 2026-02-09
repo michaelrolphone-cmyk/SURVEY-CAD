@@ -230,6 +230,36 @@
       margin:2px 1px;
       background:var(--border);
     }
+    .quickToolField{
+      display:inline-flex;
+      flex-direction:row;
+      align-items:center;
+      gap:6px;
+      color:var(--muted);
+      font-size:11px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:#121212;
+      padding:0 8px;
+      min-height:34px;
+    }
+    .quickToolField input[type="checkbox"]{
+      margin:0;
+      width:14px;
+      height:14px;
+      padding:0;
+      border-radius:4px;
+      flex:0 0 auto;
+    }
+    .quickToolField select{
+      border:0;
+      background:transparent;
+      color:var(--text);
+      padding:0;
+      min-height:22px;
+      min-width:140px;
+    }
+    .quickToolField select:focus{ outline:none; }
     .mapBackdrop{
       position:absolute;
       inset:0;
@@ -761,6 +791,18 @@
     <button id="drawerToggle" class="drawerToggle">Tools</button>
     <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
       <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
+      <label class="quickToolField" title="Show map layer behind canvas"><input id="quickMapLayerEnabled" type="checkbox" /> Map</label>
+      <div class="quickToolField" title="Map tiles">
+        <select id="quickMapTileType" aria-label="Quick Map Tile Type">
+          <option value="satellite" selected>Satellite</option>
+          <option value="osmStandard">OSM Standard</option>
+          <option value="osmHumanitarian">OSM Humanitarian</option>
+          <option value="osmCycle">OSM Cycle</option>
+        </select>
+      </div>
+      <label class="quickToolField" title="Toggle point code labels"><input id="quickShowPointCodes" type="checkbox" checked /> Codes</label>
+      <label class="quickToolField" title="Toggle point notes labels"><input id="quickShowPointNotes" type="checkbox" checked /> Notes</label>
+      <span class="quickToolDivider" aria-hidden="true"></span>
       <button id="quickSelect" class="quickToolBtn primary" title="Select / Move" aria-label="Select / Move"><i class="fa-solid fa-arrow-pointer"></i></button>
       <button id="quickAddPoint" class="quickToolBtn" title="Add Point" aria-label="Add Point"><i class="fa-solid fa-circle-plus"></i></button>
       <button id="quickLineByPoints" class="quickToolBtn" title="Line by Points" aria-label="Line by Points"><i class="fa-solid fa-share-nodes"></i></button>
@@ -1176,6 +1218,12 @@
   const mapTileTypeInput = $("#mapTileType");
   const mapOpacityInput = $("#mapOpacity");
   const mapOpacityValue = $("#mapOpacityValue");
+  const quickMapEnabledInput = $("#quickMapLayerEnabled");
+  const quickMapTileTypeInput = $("#quickMapTileType");
+  const showPointCodesInput = $("#showPointCodes");
+  const showPointNotesInput = $("#showPointNotes");
+  const quickShowPointCodesInput = $("#quickShowPointCodes");
+  const quickShowPointNotesInput = $("#quickShowPointNotes");
 
   const hudTool = $("#hudTool");
   const hudMouse = $("#hudMouse");
@@ -1455,6 +1503,8 @@
   }
 
   function applyMapTileType() {
+    if (mapTileTypeInput) mapTileTypeInput.value = mapLayerState.tileType;
+    if (quickMapTileTypeInput) quickMapTileTypeInput.value = mapLayerState.tileType;
     if (!mapInstance) return;
     const tile = MAP_TILESETS[mapLayerState.tileType] || MAP_TILESETS.satellite;
     if (mapTileLayer) mapInstance.removeLayer(mapTileLayer);
@@ -1483,6 +1533,8 @@
 
   function setMapLayerEnabled(enabled) {
     mapLayerState.enabled = enabled === true;
+    if (mapEnabledInput) mapEnabledInput.checked = mapLayerState.enabled;
+    if (quickMapEnabledInput) quickMapEnabledInput.checked = mapLayerState.enabled;
     if (mapLayerState.enabled) {
       ensureMapLayer();
       if (points.size > 0) {
@@ -2197,18 +2249,43 @@
   $("#toolLine2pt").addEventListener("click", ()=>{ construction.startPointId = null; setTool("line2pt"); });
   $("#toolLineDB").addEventListener("click", ()=>setTool("lineDB"));
 
-  function syncPointLabelVisibility() {
-    labelVisibility.codes = $("#showPointCodes").checked;
-    labelVisibility.notes = $("#showPointNotes").checked;
+  function setPointCodeVisibility(enabled) {
+    labelVisibility.codes = !!enabled;
+    if (showPointCodesInput) showPointCodesInput.checked = labelVisibility.codes;
+    if (quickShowPointCodesInput) quickShowPointCodesInput.checked = labelVisibility.codes;
   }
 
-  $("#showPointCodes").addEventListener("change", () => {
-    syncPointLabelVisibility();
+  function setPointNotesVisibility(enabled) {
+    labelVisibility.notes = !!enabled;
+    if (showPointNotesInput) showPointNotesInput.checked = labelVisibility.notes;
+    if (quickShowPointNotesInput) quickShowPointNotesInput.checked = labelVisibility.notes;
+  }
+
+  function setMapTileType(tileType) {
+    mapLayerState.tileType = String(tileType || "satellite");
+    if (mapTileTypeInput) mapTileTypeInput.value = mapLayerState.tileType;
+    if (quickMapTileTypeInput) quickMapTileTypeInput.value = mapLayerState.tileType;
+    applyMapTileType();
+    syncMapToView(true);
+  }
+
+  showPointCodesInput?.addEventListener("change", () => {
+    setPointCodeVisibility(showPointCodesInput.checked);
     setStatus(`Point code labels ${labelVisibility.codes ? "shown" : "hidden"}.`, "ok");
   });
 
-  $("#showPointNotes").addEventListener("change", () => {
-    syncPointLabelVisibility();
+  quickShowPointCodesInput?.addEventListener("change", () => {
+    setPointCodeVisibility(quickShowPointCodesInput.checked);
+    setStatus(`Point code labels ${labelVisibility.codes ? "shown" : "hidden"}.`, "ok");
+  });
+
+  showPointNotesInput?.addEventListener("change", () => {
+    setPointNotesVisibility(showPointNotesInput.checked);
+    setStatus(`Point notes labels ${labelVisibility.notes ? "shown" : "hidden"}.`, "ok");
+  });
+
+  quickShowPointNotesInput?.addEventListener("change", () => {
+    setPointNotesVisibility(quickShowPointNotesInput.checked);
     setStatus(`Point notes labels ${labelVisibility.notes ? "shown" : "hidden"}.`, "ok");
   });
 
@@ -2216,17 +2293,25 @@
     setMapLayerEnabled(mapEnabledInput.checked);
     setStatus(`Map layer ${mapLayerState.enabled ? "enabled" : "disabled"}.`, "ok");
   });
+  quickMapEnabledInput?.addEventListener("change", () => {
+    setMapLayerEnabled(quickMapEnabledInput.checked);
+    setStatus(`Map layer ${mapLayerState.enabled ? "enabled" : "disabled"}.`, "ok");
+  });
   mapTileTypeInput.addEventListener("change", () => {
-    mapLayerState.tileType = String(mapTileTypeInput.value || "satellite");
-    applyMapTileType();
-    syncMapToView(true);
+    setMapTileType(mapTileTypeInput.value);
+  });
+  quickMapTileTypeInput?.addEventListener("change", () => {
+    setMapTileType(quickMapTileTypeInput.value);
   });
   mapOpacityInput.addEventListener("input", () => {
     mapLayerState.opacity = clamp(parseNum(mapOpacityInput.value, 10) / 100, 0, 1);
     applyMapOpacity();
   });
 
-  syncPointLabelVisibility();
+  setPointCodeVisibility(true);
+  setPointNotesVisibility(true);
+  if (quickMapEnabledInput) quickMapEnabledInput.checked = mapEnabledInput.checked;
+  if (quickMapTileTypeInput) quickMapTileTypeInput.value = mapTileTypeInput.value;
   $("#toolPointOnLine").addEventListener("click", ()=>setTool("pointOnLine"));
   $("#toolPan").addEventListener("click", ()=>setTool("pan"));
 
@@ -2832,10 +2917,15 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     }
     const drawingNameInput = $("#drawingName");
     const hint = $("#drawingSaveHint");
-    const drawingName = String(drawingNameInput?.value || "").trim();
+    let drawingName = String(drawingNameInput?.value || "").trim();
     if (!drawingName) {
-      setStatus("Enter a drawing name before saving.", "warn");
-      return;
+      const response = window.prompt("Name this drawing before saving:", "Boundary Base Map");
+      drawingName = String(response || "").trim();
+      if (!drawingName) {
+        setStatus("Enter a drawing name before saving.", "warn");
+        return;
+      }
+      if (drawingNameInput) drawingNameInput.value = drawingName;
     }
 
     const drawingId = normalizeDrawingId(drawingName);
