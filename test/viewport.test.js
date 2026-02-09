@@ -203,6 +203,16 @@ test('VIEWPORT.HTML includes desktop drawer collapse and edge expand affordances
   assert.match(html, /drawerEdgeExpand\.addEventListener\("click", \(\) => setPanelCollapsed\(false\)\);/, 'edge expand control should reopen the panel on click');
 });
 
+test('VIEWPORT.HTML resizes and re-syncs map viewport when collapsing desktop inspector drawer', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /let\s+mapViewportSignature\s*=\s*""/, 'map sync should track the last rendered canvas viewport size signature');
+  assert.match(html, /const\s+viewportSignature\s*=\s*`\$\{Math\.round\(rect\.width\)\}x\$\{Math\.round\(rect\.height\)\}`;/, 'map sync should derive a viewport signature from canvas width and height');
+  assert.match(html, /if \(force \|\| mapViewportSignature !== viewportSignature\) \{[\s\S]*mapInstance\.invalidateSize\(false\);/, 'map sync should invalidate Leaflet size whenever the canvas viewport dimensions change');
+  assert.match(html, /function\s+setPanelCollapsed\(collapsed\) \{[\s\S]*window\.requestAnimationFrame\(\(\) => \{[\s\S]*resize\(\);[\s\S]*if \(mapLayerState\.enabled\) syncMapToView\(true\);[\s\S]*\}\);/, 'desktop panel collapse should force canvas resize and map re-sync on the next frame');
+});
+
+
 test('VIEWPORT.HTML starts desktop marquee selection on primary-button blank-canvas drag', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

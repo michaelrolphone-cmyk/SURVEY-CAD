@@ -1513,6 +1513,7 @@
     tileType: "satellite",
     opacity: 0.66
   };
+  let mapViewportSignature = "";
 
   const FEET_TO_METERS = 0.3048006096012192;
   let mapGeoreference = null;
@@ -1741,11 +1742,15 @@
     if (!mapLayerState.enabled || !mapInstance) return;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
+    const viewportSignature = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    if (force || mapViewportSignature !== viewportSignature) {
+      mapViewportSignature = viewportSignature;
+      mapInstance.invalidateSize(false);
+    }
     const center = screenToWorld(rect.width * 0.5, rect.height * 0.5);
     const ll = worldToLatLng(center.x, center.y);
     const zoom = scaleToLeafletZoomForLat(view.scale, ll.lat);
     mapInstance.setView([ll.lat, ll.lng], zoom, { animate: false });
-    if (force) mapInstance.invalidateSize(false);
   }
 
   function setMapLayerEnabled(enabled) {
@@ -4149,6 +4154,10 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     if (!appShell) return;
     const shouldCollapse = !isMobileViewport() && !!collapsed;
     appShell.classList.toggle("panelCollapsed", shouldCollapse);
+    window.requestAnimationFrame(() => {
+      resize();
+      if (mapLayerState.enabled) syncMapToView(true);
+    });
   }
 
   function isMobileViewport() {
