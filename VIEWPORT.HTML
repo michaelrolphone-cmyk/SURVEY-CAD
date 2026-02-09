@@ -2788,8 +2788,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     }
     const options = record.versions
       .map((version, index) => `${index + 1}: ${version.savedAt}`)
-      .join("
-");
+      .join("\n");
     const response = window.prompt(`Restore which version for ${record.drawingName}?\n${options}\nEnter version number:`, String(record.versions.length));
     if (response === null) return;
     const parsed = Number(response);
