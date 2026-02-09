@@ -157,6 +157,7 @@ test('Project Browser supports point file drag-and-drop and mobile file picker a
   assert.match(projectBrowserHtml, /panel\.addEventListener\('drop',\s*\(event\)\s*=>\s*\{[\s\S]*attachUploadedPointFiles\(event\.dataTransfer\?\.files, context\)/, 'Project Browser should support desktop drag-and-drop upload');
   assert.match(projectBrowserHtml, /saveStoredProjectFile\(window\.localStorage, context\.activeProjectId, context\.projectFile\)/, 'Project Browser should persist updated project-file snapshot after attaching uploads');
   assert.match(projectBrowserHtml, /buildPointFileUploadRecord\(\{[\s\S]*projectId:\s*context\.activeProjectId,[\s\S]*fileName:\s*file\.name,[\s\S]*text,/, 'Project Browser should convert picked files into point-file project resources');
+  assert.doesNotMatch(projectBrowserHtml, /indexFile\.innerHTML\s*=\s*'<span class=\"icon\">📄<\/span>index\.json'/, 'Project Browser should hide folder metadata index.json rows from the visible tree');
 });
 
 test('Project Browser can open persisted point files directly in PointForge', async () => {

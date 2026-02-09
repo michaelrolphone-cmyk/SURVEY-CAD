@@ -545,11 +545,6 @@
           treeContainer.appendChild(createPointFileUploadPanel(projectContext));
         }
 
-        const indexFile = document.createElement('div');
-        indexFile.className = 'file-row';
-        indexFile.innerHTML = '<span class="icon">📄</span>index.json';
-        treeContainer.appendChild(indexFile);
-
         if (!folder.index.length) {
           const empty = document.createElement('div');
           empty.className = 'empty';
