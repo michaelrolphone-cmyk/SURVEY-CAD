@@ -5072,6 +5072,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     e.preventDefault();
     updateTouchPoint(e);
     updateMouseFromEvent(e);
+    broadcastCursor();
 
     const moveDist = dist(mobileInteraction.downX, mobileInteraction.downY, mouse.x, mouse.y);
     if (moveDist > mobileInteraction.moveTolerance) {
@@ -5121,6 +5122,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       const dy = mouse.y - mouse.dragStartY;
       view.panX = mouse.dragStartPanX + dx;
       view.panY = mouse.dragStartPanY + dy;
+      scheduleCollabStateSync();
       return;
     }
 
@@ -5147,6 +5149,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         $("#ptX").value = p.x;
         $("#ptY").value = p.y;
       }
+      scheduleCollabStateSync();
       schedulePointsTableRender();
       return;
     }
@@ -5171,6 +5174,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
       if (Math.abs(dx) > 1e-12 || Math.abs(dy) > 1e-12) mouse.dragObj._moved = true;
 
+      scheduleCollabStateSync();
       schedulePointsTableRender();
       return;
     }
@@ -5250,6 +5254,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         updateUndoRedoHUD();
       } else {
         setStatus("Move committed. (Undo available)", "ok");
+        scheduleCollabStateSync();
       }
       schedulePointsTableRender();
     }
