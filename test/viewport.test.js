@@ -244,6 +244,7 @@ test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate 
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="workflowToast"\s+class="workflowToast hidden"/, 'canvas should include a top-right workflow toast container');
+  assert.match(html, /@media \(max-width: 960px\) \{[\s\S]*\.workflowToast\{[\s\S]*bottom:110px;[\s\S]*left:8px;[\s\S]*\}/, 'mobile workflow toast should move above the bottom command toolbar to avoid blocking tool access');
   assert.match(html, /function\s+renderWorkflowToast\(\)/, 'workflow toast should render from reusable helper function');
   assert.match(html, /function\s+showWorkflowToast\(\{\s*title, message, steps, currentStepIndex\s*\}\)/, 'workflow toast should expose reusable show API for multi-step tools');
   assert.match(html, /function\s+hideWorkflowToast\(\)/, 'workflow toast should expose reusable hide API');
