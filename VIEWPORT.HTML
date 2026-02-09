@@ -2335,7 +2335,6 @@
 
     // lines
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "#fff";
     const lineLabelCandidates = [];
     for (const ln of lines.values()) {
       const a = points.get(ln.a);
@@ -2343,6 +2342,7 @@
       if (!a || !b) continue;
       const sa = worldToScreen(a.x,a.y);
       const sb = worldToScreen(b.x,b.y);
+      ctx.strokeStyle = isMovable(ln.movable) ? "#800000" : "#fff";
       ctx.beginPath();
       ctx.moveTo(sa.x, sa.y);
       ctx.lineTo(sb.x, sb.y);
