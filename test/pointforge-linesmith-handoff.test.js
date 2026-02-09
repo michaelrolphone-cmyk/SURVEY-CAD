@@ -35,7 +35,7 @@ test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
 
   assert.match(html, /const\s+POINTFORGE_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'LineSmith should read the same handoff localStorage key');
   assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'LineSmith should define PointForge import bootstrap logic');
-  assert.match(html, /params\.get\("source"\)\s*!==\s*"pointforge"/, 'LineSmith import bootstrap should be gated by query param');
+  assert.match(html, /launchSource\s*!==\s*"pointforge"/, 'LineSmith import bootstrap should be gated by query param');
   assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'LineSmith should reuse CSV import pipeline for PointForge payloads');
   assert.match(html, /const\s+aligned\s*=\s*syncViewToGeoreference\(payload\)/, 'LineSmith should apply georeference alignment when PointForge provides it');
   assert.match(html, /if \(aligned && mapLayerState\.enabled\) \{[\s\S]*syncMapToView\(true\);/, 'LineSmith should refresh map view after georeference alignment when map layer is enabled');
