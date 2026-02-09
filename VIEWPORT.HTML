@@ -762,6 +762,10 @@
         <button id="deleteSelected" class="danger">Delete Selected</button>
         <button id="clearSelection">Clear Selection</button>
       </div>
+      <div class="grid2" style="margin-top:8px;">
+        <button id="rotateSelectionReference" class="primary">Rotate Selection (Reference)</button>
+      </div>
+      <div class="hint mini">Pick base point → reference angle point → target angle point.</div>
       <div id="pointInspector" class="inspectorCard">Select one point to inspect point details.</div>
       <div id="lineInspector" class="inspectorCard">Select one line or two points to inspect bearing + distance.</div>
       <div id="status" class="status">Ready.</div>
@@ -1253,6 +1257,12 @@
   let selectedPointIds = [];    // multi points (ordered)
   let selectedLines = [];       // [{ lineId, grip, t }]
   let lastSelectedLineId = null;
+  const rotateSelectionSession = {
+    active: false,
+    step: 0,
+    basePoint: null,
+    fromPoint: null
+  };
 
   // Construction
   let tool = "select";
@@ -1727,6 +1737,112 @@
     selectedLines = selectedLines.filter(s => s.lineId !== lid);
     if (lastSelectedLineId === lid) lastSelectedLineId = null;
     updateCounts();
+  }
+
+  function getRotatablePointIdsFromSelection() {
+    const ids = new Set();
+    for (const pid of selectedPointIds) {
+      if (points.has(pid)) ids.add(pid);
+    }
+    for (const sel of selectedLines) {
+      const ln = lines.get(sel.lineId);
+      if (!ln) continue;
+      if (points.has(ln.a)) ids.add(ln.a);
+      if (points.has(ln.b)) ids.add(ln.b);
+    }
+    return [...ids];
+  }
+
+  function cancelRotateSelectionSession(silent=true) {
+    rotateSelectionSession.active = false;
+    rotateSelectionSession.step = 0;
+    rotateSelectionSession.basePoint = null;
+    rotateSelectionSession.fromPoint = null;
+    if (!silent) setStatus("Rotate selection canceled.", "warn");
+  }
+
+  function startRotateSelectionSession() {
+    const rotateIds = getRotatablePointIdsFromSelection();
+    if (!rotateIds.length) {
+      setStatus("Select at least one point or line to rotate.", "warn");
+      return;
+    }
+    rotateSelectionSession.active = true;
+    rotateSelectionSession.step = 0;
+    rotateSelectionSession.basePoint = null;
+    rotateSelectionSession.fromPoint = null;
+    setStatus("Rotate selection: click base point.", "ok");
+  }
+
+  function resolveRotatePickWorldPoint(screenX, screenY) {
+    const pid = pickPoint(screenX, screenY, 12);
+    if (pid && points.has(pid)) {
+      const p = points.get(pid);
+      return { x: p.x, y: p.y, label: `point ${p.num}` };
+    }
+    const w = screenToWorld(screenX, screenY);
+    return { x: w.x, y: w.y, label: `(${fmt(w.x)}, ${fmt(w.y)})` };
+  }
+
+  function rotateSelectedFromReference(basePoint, fromPoint, toPoint) {
+    const rotateIds = getRotatablePointIdsFromSelection();
+    if (!rotateIds.length) {
+      setStatus("Select at least one point or line to rotate.", "warn");
+      cancelRotateSelectionSession(true);
+      return;
+    }
+
+    const baseAngle = Math.atan2(fromPoint.y - basePoint.y, fromPoint.x - basePoint.x);
+    const targetAngle = Math.atan2(toPoint.y - basePoint.y, toPoint.x - basePoint.x);
+    const delta = targetAngle - baseAngle;
+    const cos = Math.cos(delta);
+    const sin = Math.sin(delta);
+
+    history.push("rotate selection (reference)");
+    for (const pid of rotateIds) {
+      const p = points.get(pid);
+      if (!p) continue;
+      const dx = p.x - basePoint.x;
+      const dy = p.y - basePoint.y;
+      p.x = basePoint.x + (dx * cos - dy * sin);
+      p.y = basePoint.y + (dx * sin + dy * cos);
+    }
+
+    updatePointEditorFromSelection();
+    schedulePointsTableRender();
+    const deltaDeg = (delta * 180 / Math.PI);
+    setStatus(`Rotated ${rotateIds.length} point(s) by ${fmt(deltaDeg)}° about ${fmt(basePoint.x)}, ${fmt(basePoint.y)}.`, "ok");
+  }
+
+  function handleRotateSelectionCanvasPick(screenX, screenY) {
+    const picked = resolveRotatePickWorldPoint(screenX, screenY);
+    if (rotateSelectionSession.step === 0) {
+      rotateSelectionSession.basePoint = picked;
+      rotateSelectionSession.step = 1;
+      setStatus(`Base point set at ${picked.label}. Click reference-angle point.`, "ok");
+      return;
+    }
+
+    if (rotateSelectionSession.step === 1) {
+      const base = rotateSelectionSession.basePoint;
+      if (dist(base.x, base.y, picked.x, picked.y) < 1e-9) {
+        setStatus("Reference-angle point must differ from base point.", "warn");
+        return;
+      }
+      rotateSelectionSession.fromPoint = picked;
+      rotateSelectionSession.step = 2;
+      setStatus(`Reference angle set from base to ${picked.label}. Click target-angle point.`, "ok");
+      return;
+    }
+
+    const base = rotateSelectionSession.basePoint;
+    if (dist(base.x, base.y, picked.x, picked.y) < 1e-9) {
+      setStatus("Target-angle point must differ from base point.", "warn");
+      return;
+    }
+
+    rotateSelectedFromReference(base, rotateSelectionSession.fromPoint, picked);
+    cancelRotateSelectionSession(true);
   }
 
   // -------------------------
@@ -2238,6 +2354,7 @@
   });
 
   $("#clearSelection").addEventListener("click", () => clearSelection());
+  $("#rotateSelectionReference").addEventListener("click", () => startRotateSelectionSession());
   $("#clearConstruction").addEventListener("click", () => {
     construction.startPointId = null;
     setStatus("Construction cleared.", "");
@@ -3531,6 +3648,11 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       doDeleteSelected();
     }
 
+    if (!typing && e.key === "Escape" && rotateSelectionSession.active) {
+      e.preventDefault();
+      cancelRotateSelectionSession(false);
+    }
+
     if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey) {
       const key = e.key.toLowerCase();
       if (key === "z") {
@@ -3587,6 +3709,11 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     const pid = pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
+
+    if (rotateSelectionSession.active) {
+      if (e.button === 0) handleRotateSelectionCanvasPick(mouse.x, mouse.y);
+      return;
+    }
 
     if (tool === "select") {
       if (pid) {

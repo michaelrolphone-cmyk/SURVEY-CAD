@@ -39,6 +39,22 @@ test('VIEWPORT.HTML only treats strict boolean true as movable for point/line dr
   assert.match(html, /if \(isMovable\(ln\?\.movable\)\)\s*\{\s*history\.push\("move line"\)/, 'line drag should require strict movable true');
 });
 
+
+
+test('VIEWPORT.HTML supports reference-angle rotation of selected geometry from canvas picks', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="rotateSelectionReference"\s+class="primary"/, 'selection panel should include a reference-angle rotate action');
+  assert.match(html, /function\s+getRotatablePointIdsFromSelection\(\)/, 'LineSmith should gather unique selected points and line endpoints for rotation');
+  assert.match(html, /function\s+startRotateSelectionSession\(\)/, 'LineSmith should define a staged rotate session bootstrap');
+  assert.match(html, /Rotate selection: click base point\./, 'rotate workflow should prompt for the base point first');
+  assert.match(html, /function\s+rotateSelectedFromReference\(basePoint, fromPoint, toPoint\)/, 'LineSmith should rotate selection based on reference and target angle picks');
+  assert.match(html, /history\.push\("rotate selection \(reference\)"\)/, 'reference-angle rotate should create an undo entry');
+  assert.match(html, /Math\.atan2\(fromPoint\.y - basePoint\.y, fromPoint\.x - basePoint\.x\)/, 'rotate should compute source angle from base and reference points');
+  assert.match(html, /Math\.atan2\(toPoint\.y - basePoint\.y, toPoint\.x - basePoint\.x\)/, 'rotate should compute target angle from base and destination points');
+  assert.match(html, /if \(!typing && e\.key === "Escape" && rotateSelectionSession\.active\)/, 'Esc should cancel active reference-angle rotation session');
+  assert.match(html, /if \(rotateSelectionSession\.active\) \{[\s\S]*handleRotateSelectionCanvasPick\(mouse\.x, mouse\.y\);[\s\S]*return;/, 'canvas clicks should route to rotate pick stages while rotate mode is active');
+});
 test('VIEWPORT.HTML restores persisted movable flags as strict booleans', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
