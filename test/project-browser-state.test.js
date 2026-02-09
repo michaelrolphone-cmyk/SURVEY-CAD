@@ -129,6 +129,7 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /resource\.addEventListener\('click',\s*\(\)\s*=>\s*openCpfPdfFromResource\(entry\)\)/, 'CP&F row tap should open the PDF link');
   assert.match(projectBrowserHtml, /openButton\.textContent\s*=\s*'Open PDF'/, 'Project Browser should render an Open PDF button for CP&F entries');
   assert.match(projectBrowserHtml, /function\s+openCpfPrintPreview\s*\(/, 'Project Browser should define a bulk CP&F print-preview builder');
+  assert.match(projectBrowserHtml, /window\.open\('', '_blank'\)/, 'Print preview should open a writable popup window for inline HTML content');
   assert.match(projectBrowserHtml, /printAllButton\.textContent\s*=\s*'Print all'/, 'CP&F folder should render a Print all action');
   assert.match(projectBrowserHtml, /printAllButton\.addEventListener\('click',\s*\(\)\s*=>\s*openCpfPrintPreview\(folder\.index\)\)/, 'Print all action should open a combined CP&F print preview');
   assert.match(projectBrowserHtml, /<embed src="\$\{escapeHtml\(url\)\}" type="application\/pdf" class="pdf-frame" \/>/, 'Print preview should embed each PDF page in order for printing');
