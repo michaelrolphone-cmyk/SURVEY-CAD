@@ -160,15 +160,23 @@ test('RecordQuarry.html restores and saves project lookup snapshots when launche
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /const\s+PROJECT_LOOKUP_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectLookup"/, 'RecordQuarry should use a stable localStorage prefix for project lookup snapshots');
+  assert.match(html, /const\s+ADDRESS_LOOKUP_STORAGE_PREFIX\s*=\s*"surveyfoundryAddressLookup"/, 'RecordQuarry should use a stable localStorage prefix for per-address lookup snapshots');
+  assert.match(html, /const\s+LAST_LOOKUP_ADDRESS_STORAGE_KEY\s*=\s*"surveyfoundryLastLookupAddress"/, 'RecordQuarry should track the latest looked-up address for restore-on-open behavior');
   assert.match(html, /function\s+getProjectContext\(\)/, 'RecordQuarry should parse launcher-provided project context from URL params');
   assert.match(html, /params\.get\(\"projectId\"\)\s*\|\|\s*params\.get\(\"activeProjectId\"\)/, 'RecordQuarry should accept activeProjectId launcher param aliases');
   assert.match(html, /params\.get\(\"projectName\"\)\s*\|\|\s*params\.get\(\"activeProjectName\"\)/, 'RecordQuarry should accept activeProjectName launcher param aliases');
   assert.match(html, /params\.get\(\"client\"\)\s*\|\|\s*params\.get\(\"activeClient\"\)/, 'RecordQuarry should accept activeClient launcher param aliases');
   assert.match(html, /function\s+loadProjectLookupSnapshot\(projectId\)/, 'RecordQuarry should load saved project lookup snapshots');
   assert.match(html, /function\s+saveProjectLookupSnapshot\(projectId, snapshot\)/, 'RecordQuarry should persist lookup snapshots back to project storage');
-  assert.match(html, /const\s+lookup\s*=\s*options\.lookupPayload\s*\|\|\s*await\s*lookupByAddress\(rawAddr\)/, 'lookup flow should support restoring cached project lookup payloads');
-  assert.match(html, /saveProjectLookupSnapshot\(state\.projectContext\.projectId,\s*\{[\s\S]*lookup,/, 'lookup flow should save the latest lookup payload per project id');
-  assert.match(html, /doLookup\(\{ lookupPayload:\s*snapshot\.lookup \}\)/, 'autostart flow should restore cached lookup payload when project snapshot exists');
+  assert.match(html, /function\s+loadAddressLookupSnapshot\(address\)/, 'RecordQuarry should load per-address lookup snapshots');
+  assert.match(html, /function\s+saveAddressLookupSnapshot\(address, snapshot\)/, 'RecordQuarry should persist per-address lookup snapshots');
+  assert.match(html, /function\s+readSelectionSnapshot\(\)/, 'RecordQuarry should serialize selected and deselected export state');
+  assert.match(html, /function\s+applySelectionSnapshot\(selection = null\)/, 'RecordQuarry should restore selected and deselected export state');
+  assert.match(html, /const\s+cachedAddressSnapshot\s*=\s*\(!options\.lookupPayload && !options\.disableAddressCache\)/, 'lookup flow should check per-address cache before network lookups');
+  assert.match(html, /const\s+lookup\s*=\s*options\.lookupPayload\s*\|\|\s*cachedAddressSnapshot\?\.lookup\s*\|\|\s*await\s*lookupByAddress\(rawAddr\)/, 'lookup flow should support restoring cached project and address lookup payloads');
+  assert.match(html, /saveLookupSnapshotsForCurrentState\(rawAddr\);/, 'lookup flow should persist lookup and selection snapshots for project and per-address restores');
+  assert.match(html, /doLookup\(\{ lookupPayload:\s*snapshot\.lookup, selectionSnapshot:\s*snapshot\.selection \}\)/, 'autostart flow should restore cached lookup payload and selection snapshot when project snapshot exists');
+  assert.match(html, /const\s+snapshot\s*=\s*loadMostRecentAddressLookupSnapshot\(\);/, 'standalone boot flow should attempt loading the most recent cached address lookup');
 });
 
 test('RecordQuarry.html keeps aliquots deselected by default and behind parcel interaction layers', async () => {
