@@ -31,6 +31,24 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /\$\("#quickExtend"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#extendToIntersect"\)\.click\(\)\)/, 'quick Extend should delegate to existing extend action');
   assert.match(html, /\$\("#quickTrimIntersect"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#trimToIntersect"\)\.click\(\)\)/, 'quick Trim\/Intersect should delegate to existing trim action');
 });
+
+
+test('VIEWPORT.HTML includes command line controls for line, move, rotate, and inverse workflows', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="commandInput"\s+type="text"/, 'LineSmith should expose a command line text input');
+  assert.match(html, /id="runCommand"\s+class="primary"/, 'LineSmith should expose a command execution button');
+  assert.match(html, /function\s+runCommandLine\(rawCommand\)/, 'LineSmith should parse and execute command line input');
+  assert.match(html, /if \(cmd === "line"\)/, 'command line should support line creation by point numbers');
+  assert.match(html, /Usage: line <point1> <point2>/, 'line command should provide usage guidance for missing arguments');
+  assert.match(html, /if \(cmd === "move"\)/, 'command line should support move command');
+  assert.match(html, /Usage: move <dx> <dy>/, 'move command should provide usage guidance for missing arguments');
+  assert.match(html, /if \(cmd === "rotate"\)/, 'command line should support rotate command');
+  assert.match(html, /startRotateSelectionSession\(\)/, 'rotate command should trigger staged rotate workflow');
+  assert.match(html, /if \(cmd === "inverse"\)/, 'command line should support inverse command');
+  assert.match(html, /lineMeasurement\(a, b\)/, 'inverse command should compute bearing and distance from two points');
+  assert.match(html, /commandInput\?\.addEventListener\("keydown", \(e\) => \{[\s\S]*e\.key !== "Enter"/, 'command line should execute from Enter key');
+});
 test('VIEWPORT.HTML only treats strict boolean true as movable for point/line drag', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
