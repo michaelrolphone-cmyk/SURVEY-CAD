@@ -3219,7 +3219,7 @@
       return;
     }
 
-    if (trigger === "escape" && lastUnlockedEntity) {
+    if ((trigger === "escape" || trigger === "right-click") && lastUnlockedEntity) {
       const sameEntityPending = pendingEscapeLockEntity
         && pendingEscapeLockEntity.type === lastUnlockedEntity.type
         && pendingEscapeLockEntity.id === lastUnlockedEntity.id;
@@ -3228,7 +3228,7 @@
         lockLastUnlockedEntityFromEscape();
       } else {
         pendingEscapeLockEntity = { ...lastUnlockedEntity };
-        setStatus("Press Escape again to lock the last unlocked point/line.", "warn");
+        setStatus("Press Escape or right-click again to lock the last unlocked point/line.", "warn");
       }
       return;
     }
@@ -4977,7 +4977,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   canvas.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     updateMouseFromEvent(e);
-    runCanvasCancelOrClearAction();
+    runCanvasCancelOrClearAction({ trigger: "right-click" });
   });
 
   canvas.addEventListener("pointerdown", (e) => {
