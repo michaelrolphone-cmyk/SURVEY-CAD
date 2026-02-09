@@ -8,6 +8,9 @@ import {
   buildPointFileUploadRecord,
   appendPointFileResource,
   saveStoredProjectFile,
+  removeResourceById,
+  extractCpfInstrumentsFromPointNote,
+  findCpfPointLinks,
 } from '../src/project-browser-state.js';
 
 function makeStorage(entries = {}) {
@@ -85,6 +88,59 @@ test('appendPointFileResource appends point resources and saveStoredProjectFile 
   assert.equal(loaded.folders[0].index[0].id, 'point-1');
 });
 
+
+
+test('removeResourceById removes matching resources from the requested folder', () => {
+  const projectFile = {
+    folders: [
+      { key: 'cpfs', index: [{ id: 'cpf-1' }, { id: 'cpf-2' }] },
+      { key: 'point-files', index: [{ id: 'points-1' }] },
+    ],
+  };
+
+  const removed = removeResourceById(projectFile, 'cpfs', 'cpf-2');
+
+  assert.equal(removed, true);
+  assert.deepEqual(projectFile.folders[0].index.map((entry) => entry.id), ['cpf-1']);
+});
+
+test('extractCpfInstrumentsFromPointNote parses CPNFS note instruments', () => {
+  const note = 'CPNFS: 2019-12345...2020-00077... 2024-88990 ';
+
+  const instruments = extractCpfInstrumentsFromPointNote(note);
+
+  assert.deepEqual(instruments, ['2019-12345', '2020-00077', '2024-88990']);
+});
+
+test('findCpfPointLinks returns linked point numbers for a CP&F instrument', () => {
+  const projectFile = {
+    folders: [{
+      key: 'point-files',
+      index: [{
+        id: 'points-1',
+        title: 'Boundary Export.csv',
+        reference: { value: 'surveyfoundryPointFile:project-5:points-1' },
+      }],
+    }],
+  };
+
+  const storage = makeStorage({
+    'surveyfoundryPointFile:project-5:points-1': JSON.stringify({
+      text: [
+        'number,x,y,z,code,notes',
+        '10,1,2,0,COR,"CPNFS: 2019-12345...2021-22222"',
+        '11,3,4,0,SECOR,"CPNFS: 2020-00077"',
+      ].join('\n'),
+    }),
+  });
+
+  const links = findCpfPointLinks(projectFile, storage, '2019-12345');
+
+  assert.equal(links.length, 1);
+  assert.equal(links[0].pointFileTitle, 'Boundary Export.csv');
+  assert.equal(links[0].pointNumber, '10');
+  assert.equal(links[0].pointCode, 'COR');
+});
 test('Project Browser prefers stored project file snapshots before loading API template', async () => {
   const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
 
@@ -128,6 +184,10 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /const\s+canOpenCpfPdf\s*=\s*folder\.key\s*===\s*'cpfs'\s*&&\s*entry\?\.exportFormat\s*===\s*'pdf'/, 'Project Browser should detect CP&F pdf entries as openable');
   assert.match(projectBrowserHtml, /resource\.addEventListener\('click',\s*\(\)\s*=>\s*openCpfPdfFromResource\(entry\)\)/, 'CP&F row tap should open the PDF link');
   assert.match(projectBrowserHtml, /openButton\.textContent\s*=\s*'Open PDF'/, 'Project Browser should render an Open PDF button for CP&F entries');
+  assert.match(projectBrowserHtml, /deleteButton\.textContent\s*=\s*'Delete'/, 'Project Browser should render a delete button for CP&F entries');
+  assert.match(projectBrowserHtml, /function\s+deleteCpfResource\s*\(/, 'Project Browser should define a CP&F delete handler');
+  assert.match(projectBrowserHtml, /findCpfPointLinks\(projectContext\?\.projectFile, window\.localStorage, instrument\)/, 'CP&F delete flow should detect linked point references by instrument');
+  assert.match(projectBrowserHtml, /window\.confirm\(`This CP&F is linked to/, 'CP&F delete flow should ask for confirmation when linked points exist');
   assert.match(projectBrowserHtml, /function\s+openCpfPrintPreview\s*\(/, 'Project Browser should define a bulk CP&F print-preview builder');
   assert.match(projectBrowserHtml, /window\.open\('', '_blank'\)/, 'Print preview should open a writable popup window for inline HTML content');
   assert.match(projectBrowserHtml, /printAllButton\.textContent\s*=\s*'Print all'/, 'CP&F folder should render a Print all action');

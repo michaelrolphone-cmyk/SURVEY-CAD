@@ -211,7 +211,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource, removeResourceById, findCpfPointLinks } from './src/project-browser-state.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
@@ -317,6 +317,40 @@
         return;
       }
       window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    function describeCpfPointLinks(links = []) {
+      if (!Array.isArray(links) || !links.length) return '';
+      return links
+        .map((link, index) => `${index + 1}. ${link.pointFileTitle} → Point ${link.pointNumber} (${link.pointCode})`)
+        .join('\n');
+    }
+
+    function deleteCpfResource(folder, resource, projectContext) {
+      const instrument = String(resource?.reference?.value || resource?.reference?.metadata?.instrument || '').trim();
+      const links = findCpfPointLinks(projectContext?.projectFile, window.localStorage, instrument);
+      let shouldDelete = true;
+      if (links.length) {
+        const detail = describeCpfPointLinks(links);
+        shouldDelete = window.confirm(`This CP&F is linked to ${links.length} point${links.length === 1 ? '' : 's'}:\n\n${detail}\n\nDelete CP&F anyway?`);
+      }
+      if (!shouldDelete) return;
+
+      const removed = removeResourceById(projectContext?.projectFile, folder?.key, resource?.id);
+      if (!removed) {
+        renderError(`Could not delete CP&F ${resource?.title || resource?.id || ''}.`);
+        return;
+      }
+
+      const saved = saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+      if (!saved) {
+        renderError('CP&F was removed in memory, but project snapshot could not be saved.');
+        return;
+      }
+
+      const deletedTitle = resource?.title || resource?.id || instrument || 'CP&F record';
+      projectContext.setUploadStatus(`Deleted ${deletedTitle}.`);
+      renderTree(projectContext.projectFile, projectContext);
     }
 
     function escapeHtml(text = '') {
@@ -603,6 +637,17 @@
               openCpfPdfFromResource(entry);
             });
             resource.appendChild(openButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'launch-btn';
+            deleteButton.textContent = 'Delete';
+            deleteButton.title = 'Delete this CP&F from the project file';
+            deleteButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              deleteCpfResource(folder, entry, projectContext);
+            });
+            resource.appendChild(deleteButton);
           }
 
           treeContainer.appendChild(resource);
