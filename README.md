@@ -196,6 +196,16 @@ LineSmith now also supports reference-angle rotation for selected geometry: clic
 Project Browser drawing rows in `PROJECT_BROWSER.html` now include **Open in LineSmith**, launching `VIEWPORT.HTML?source=project-browser-drawing` and auto-loading the latest saved drawing version from project storage.
 PointForge now also includes a **Renumber start** control (default `1`) with a **Renumber Output** action button; standard Process behavior remains unchanged, and sequential repacking is only applied when the renumber button is pressed (for example, start at `1000` to move the set into a new range).
 
+PointForge now uses a simplified launcher-aligned visual theme (header, panels, chips, and action buttons) to match SurveyFoundry app launcher and RecordQuarry styling while reducing UI clutter around ingest/map/output workflows.
+
+PointForge direct launch command:
+
+```bash
+npm start
+open http://localhost:3000/POINT_TRANSFORMER.HTML
+```
+
+
 Project Browser → PointForge deep-link command:
 
 ```bash

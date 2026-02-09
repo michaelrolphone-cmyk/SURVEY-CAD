@@ -95,3 +95,13 @@ test('POINT_TRANSFORMER.HTML omits internal default-lock and passthrough comment
   assert.doesNotMatch(html, /Input:\s*<span class="kbd">NAME,X,Y,Z\[,CODE\[,NOTES\]\]<\/span>\. Output sorted by point number\./, 'PointForge should not render verbose input/output commentary text');
   assert.doesNotMatch(html, /plus code\/notes passthrough/, 'PointForge should not render code\/notes passthrough commentary text');
 });
+
+
+test('POINT_TRANSFORMER.HTML uses launcher-aligned simplified styling tokens', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /--bg0:#0f172a;/, 'PointForge should align base background token with launcher styling');
+  assert.match(html, /--text:#e2e8f0;/, 'PointForge should align text token with launcher styling');
+  assert.match(html, /--c1:#2a3dff;/, 'PointForge should align primary action color with RecordQuarry workflow blue');
+  assert.doesNotMatch(html, /body::after\s*\{[\s\S]*animation:\s*scan/, 'PointForge should not render animated scanline overlay clutter');
+});
