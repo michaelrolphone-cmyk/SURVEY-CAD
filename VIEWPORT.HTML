@@ -1928,14 +1928,25 @@
     nextId = s.nextId ?? 1;
 
     points.clear();
-    for (const p of (s.points || [])) points.set(p.id, { ...p, movable: isMovable(p.movable) });
+    for (const p of (s.points || [])) {
+      if (!p || typeof p !== "object" || p.id == null) continue;
+      points.set(p.id, { ...p, movable: isMovable(p.movable) });
+    }
 
     lines.clear();
-    for (const l of (s.lines || [])) lines.set(l.id, { ...l, movable: isMovable(l.movable) });
+    for (const l of (s.lines || [])) {
+      if (!l || typeof l !== "object" || l.id == null || l.a == null || l.b == null) continue;
+      lines.set(l.id, { ...l, movable: isMovable(l.movable) });
+    }
 
     selectedPointId = s.selection?.selectedPointId ?? null;
-    selectedPointIds = s.selection?.selectedPointIds ?? [];
-    selectedLines = s.selection?.selectedLines ?? [];
+    if (selectedPointId != null && !points.has(selectedPointId)) selectedPointId = null;
+    selectedPointIds = Array.isArray(s.selection?.selectedPointIds)
+      ? s.selection.selectedPointIds.filter((id) => points.has(id))
+      : [];
+    selectedLines = Array.isArray(s.selection?.selectedLines)
+      ? s.selection.selectedLines.filter((entry) => entry?.id != null && lines.has(entry.id))
+      : [];
     lastSelectedLineId = s.selection?.lastSelectedLineId ?? null;
 
     construction = s.construction ?? { startPointId:null };
