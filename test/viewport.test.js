@@ -320,6 +320,14 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /const\s+fallbackGeoreference\s*=\s*sanitizeMapGeoreference\(record\.latestMapGeoreference\);[\s\S]*state\.mapGeoreference\s*=\s*fallbackGeoreference;/, 'version materialization should restore latest georeference when differential history omitted that field');
   assert.match(html, /latestMapGeoreference,/, 'project browser metadata should carry the latest georeference snapshot');
   assert.match(html, /if \(mapLayerState\.enabled\) syncMapToView\(true\);/, 'restoring a drawing should resync map view after georeference hydration');
+  assert.match(html, /let\s+lastSavedDrawingSnapshot\s*=\s*"";/, 'LineSmith should track a saved-state snapshot for unsaved-change prompts');
+  assert.match(html, /function\s+markDrawingAsSaved\(\)/, 'LineSmith should expose helper to refresh saved snapshot baseline');
+  assert.match(html, /function\s+hasUnsavedDrawingChanges\(\)/, 'LineSmith should expose helper to compare current state against last saved snapshot');
+  assert.match(html, /window\.addEventListener\("message", \(event\) => \{[\s\S]*survey-cad:request-unsaved-state[\s\S]*hasUnsavedChanges: hasUnsavedDrawingChanges\(\)/, 'LineSmith should reply to launcher unsaved-state checks');
+  assert.match(html, /survey-cad:request-save-before-navigate:response/, 'LineSmith should respond to launcher save-before-leave requests');
+  assert.match(html, /saved = saveDrawingToProject\(\);/, 'LineSmith should attempt project save when launcher requests save-before-navigation');
+  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*return false;[\s\S]*markDrawingAsSaved\(\);[\s\S]*return true;/, 'save workflow should return explicit success status and refresh saved snapshot baseline');
+  assert.match(html, /requestAnimationFrame\(draw\);[\s\S]*markDrawingAsSaved\(\);/, 'boot should initialize unsaved-change baseline before new edits occur');
 });
 
 

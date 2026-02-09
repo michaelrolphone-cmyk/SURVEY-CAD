@@ -1068,6 +1068,7 @@
   const activeProjectId = queryParams.get("activeProjectId") || "";
   const activeProjectName = queryParams.get("activeProjectName") || "";
   let activeDrawingStorageKey = "";
+  let lastSavedDrawingSnapshot = "";
 
   function setStatus(msg, kind="") {
     const el = $("#status");
@@ -3591,6 +3592,15 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     return JSON.parse(serializeState());
   }
 
+  function markDrawingAsSaved() {
+    lastSavedDrawingSnapshot = serializeState();
+  }
+
+  function hasUnsavedDrawingChanges() {
+    if (!lastSavedDrawingSnapshot) return false;
+    return serializeState() !== lastSavedDrawingSnapshot;
+  }
+
   function loadStoredDrawingRecord(storageKey) {
     if (!storageKey) return null;
     try {
@@ -3625,6 +3635,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     const state = materializeDrawingVersion(record, versionIndex);
     if (!state) return false;
     restoreState(JSON.stringify(state));
+    markDrawingAsSaved();
     return true;
   }
 
@@ -3671,7 +3682,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   function saveDrawingToProject() {
     if (!activeProjectId) {
       setStatus("Open LineSmith from an active project to save drawing history.", "warn");
-      return;
+      return false;
     }
     const drawingNameInput = $("#drawingName");
     const hint = $("#drawingSaveHint");
@@ -3681,7 +3692,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       drawingName = String(response || "").trim();
       if (!drawingName) {
         setStatus("Enter a drawing name before saving.", "warn");
-        return;
+        return false;
       }
       if (drawingNameInput) drawingNameInput.value = drawingName;
     }
@@ -3741,6 +3752,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     });
     if (hint) hint.textContent = `Saved ${record.versions.length} version(s) for "${drawingName}" in project ${activeProjectId}.`;
     setStatus(`Saved drawing "${drawingName}" to project history (${record.versions.length} version${record.versions.length === 1 ? "" : "s"}).`, "ok");
+    markDrawingAsSaved();
+    return true;
   }
 
   function promptRestoreDrawingVersion() {
@@ -5170,6 +5183,36 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   setInterval(updateDerivedSelectionInfo, 250);
   setInterval(updateLineInspector, 250);
 
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.source !== window.parent) return;
+    const message = event.data;
+    if (!message || typeof message.type !== "string") return;
+
+    if (message.type === "survey-cad:request-unsaved-state") {
+      window.parent.postMessage({
+        type: "survey-cad:request-unsaved-state:response",
+        requestId: message.requestId,
+        hasUnsavedChanges: hasUnsavedDrawingChanges(),
+        canSave: Boolean(activeProjectId),
+      }, window.location.origin);
+      return;
+    }
+
+    if (message.type === "survey-cad:request-save-before-navigate") {
+      const hadUnsavedChanges = hasUnsavedDrawingChanges();
+      let saved = !hadUnsavedChanges;
+      if (hadUnsavedChanges) {
+        saved = saveDrawingToProject();
+      }
+      window.parent.postMessage({
+        type: "survey-cad:request-save-before-navigate:response",
+        requestId: message.requestId,
+        saved: Boolean(saved),
+      }, window.location.origin);
+    }
+  });
+
   // -------------------------
   // Boot
   // -------------------------
@@ -5187,6 +5230,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     updateUndoRedoHUD();
     updateCounts();
     requestAnimationFrame(draw);
+    markDrawingAsSaved();
 
     const drawingHint = $("#drawingSaveHint");
     if (drawingHint) {

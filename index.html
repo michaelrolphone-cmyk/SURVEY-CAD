@@ -523,6 +523,51 @@
     let localStorageSyncSnapshot = '';
     let localStorageSyncLock = false;
 
+    function requestAppFrameMessage(messageType, extraPayload = {}) {
+      if (!currentApp || !appFrame.contentWindow) return Promise.resolve(null);
+      const requestId = `${messageType}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      return new Promise((resolve) => {
+        const timeout = window.setTimeout(() => {
+          window.removeEventListener('message', onMessage);
+          resolve(null);
+        }, 400);
+
+        function onMessage(event) {
+          if (event.origin !== window.location.origin) return;
+          if (event.source !== appFrame.contentWindow) return;
+          const payload = event.data;
+          if (!payload || payload.type !== `${messageType}:response` || payload.requestId !== requestId) return;
+          window.clearTimeout(timeout);
+          window.removeEventListener('message', onMessage);
+          resolve(payload);
+        }
+
+        window.addEventListener('message', onMessage);
+        appFrame.contentWindow.postMessage({ type: messageType, requestId, ...extraPayload }, window.location.origin);
+      });
+    }
+
+    async function confirmNavigateHomeFromApp() {
+      const unsavedState = await requestAppFrameMessage('survey-cad:request-unsaved-state');
+      if (!unsavedState?.hasUnsavedChanges) return true;
+
+      const choice = window.prompt(
+        'You have unsaved LineSmith changes. Type "save" to save before leaving, "discard" to leave without saving, or "cancel" to stay on this page.',
+        'cancel'
+      );
+      if (choice === null) return false;
+
+      const normalized = choice.trim().toLowerCase();
+      if (normalized === 'discard' || normalized === 'd') return true;
+      if (normalized === 'save' || normalized === 's') {
+        const saveResult = await requestAppFrameMessage('survey-cad:request-save-before-navigate');
+        if (saveResult?.saved) return true;
+        window.alert('LineSmith could not save your latest changes. You are still on the page.');
+        return false;
+      }
+      return false;
+    }
+
     function setLauncherBackground(mapUrl = '') {
       if (mapUrl) {
         document.body.style.backgroundImage = `linear-gradient(rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.88)), url("${mapUrl}")`;
@@ -1017,9 +1062,11 @@
     createProjectButton.addEventListener('click', createProject);
     openProjectManagerButton.addEventListener('click', openProjectManager);
     closeProjectManagerButton.addEventListener('click', closeProjectManager);
-    launcherHomeLink.addEventListener('click', (event) => {
+    launcherHomeLink.addEventListener('click', async (event) => {
       event.preventDefault();
       if (!currentApp) return;
+      const canNavigateHome = await confirmNavigateHomeFromApp();
+      if (!canNavigateHome) return;
       showHome();
     });
     projectModalBackdrop.addEventListener('click', (event) => {
