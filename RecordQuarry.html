@@ -599,10 +599,10 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
         rootFolderName: `${slugify(projectName, 'surveyfoundry-project')}-${slugify(projectId, 'project')}`,
       },
       folders: [
+        createProjectFileFolder('drawings', 'Drawings', 'LineSmith drawing packages generated from linked point files.'),
         createProjectFileFolder('ros', 'RoS', 'Record of Survey source files and exports.'),
         createProjectFileFolder('cpfs', 'CP&Fs', 'Corner Perpetuation & Filing references resolved by instrument number.'),
         createProjectFileFolder('point-files', 'Point Files', 'PointForge-managed points exported as CSV.'),
-        createProjectFileFolder('drawings', 'Drawings', 'LineSmith drawing packages generated from linked point files.'),
         createProjectFileFolder('deeds', 'Deeds', 'Deed references and exported documents.'),
         createProjectFileFolder('plats', 'Plats', 'Subdivision plats and plat-related exhibits.'),
         createProjectFileFolder('invoices', 'Invoices', 'Billing artifacts and project invoices.'),
