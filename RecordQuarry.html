@@ -392,7 +392,7 @@
   <div class="busyModalCard">
     <div class="busySpinner" aria-hidden="true"></div>
     <div id="busyModalMessage">Processing export…</div>
-    <div class="small" style="margin-top:8px">Gathering CPNF instrument numbers for exported points.</div>
+    <div id="busyModalDetail" class="small" style="margin-top:8px">Gathering CPNF instrument numbers for exported points.</div>
   </div>
 </div>
 
@@ -450,10 +450,12 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
   }
   function clearLog() { logEl.textContent = ""; }
 
-  function setBusyModalOpen(isOpen, message = 'Processing export…') {
+  function setBusyModalOpen(isOpen, message = 'Processing export…', detail = 'Gathering CPNF instrument numbers for exported points.') {
     const modal = $("busyModal");
     const msg = $("busyModalMessage");
+    const detailEl = $("busyModalDetail");
     msg.textContent = message;
+    detailEl.textContent = detail;
     modal.classList.toggle('is-open', !!isOpen);
     modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
   }
@@ -1810,6 +1812,9 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
   // Main flow
   // -----------------------------
   async function doLookup(options = {}) {
+    const lookupButton = $("btnLookup");
+    lookupButton.disabled = true;
+    setBusyModalOpen(true, 'Loading RecordQuarry data…', 'Querying address, parcel, subdivision, section, township, ROS, and aliquot records.');
     clearLog();
     $("btnExportGeo").disabled = true;
     $("btnExportParcelCSV").disabled = true;
@@ -2080,6 +2085,9 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       log(`Error: ${e.message || e}`, "bad");
       console.error(e);
       invalidateMapSoon("after error");
+    } finally {
+      setBusyModalOpen(false);
+      lookupButton.disabled = false;
     }
   }
 

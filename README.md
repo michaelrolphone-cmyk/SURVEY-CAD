@@ -200,6 +200,8 @@ open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&act
 
 `RecordQuarry.html` now shows a processing modal while export flows are busy gathering CPNF instrument numbers for aliquot/section corner notes, so long-running CP&F lookups have visible progress feedback before CSV download or PointForge handoff completes.
 
+`RecordQuarry.html` now also shows a loading modal during **Lookup** runs (and temporarily disables the Lookup button) so address/parcel/subdivision/section/township/ROS/aliquot fetches have visible progress feedback while data is loading.
+
 RecordQuarry.html now applies mobile-first layout guards so the Leaflet map retains a real viewport height and export controls wrap instead of clipping on narrow screens.
 
 `RecordQuarry.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).

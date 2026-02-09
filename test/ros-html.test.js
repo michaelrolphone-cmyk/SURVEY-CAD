@@ -101,8 +101,12 @@ test('RecordQuarry.html shows a busy processing modal while CPNF instrument numb
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /id="busyModal"\s+class="busyModal"/, 'ROS should render an export processing modal container');
+  assert.match(html, /id="busyModalDetail"/, 'modal should render a detail line that can be reused for lookup and export progress text');
   assert.match(html, /Gathering CPNF instrument numbers for exported points\./, 'modal copy should explain CPNF instrument gathering progress');
-  assert.match(html, /function\s+setBusyModalOpen\s*\(/, 'ROS should expose a helper to toggle the processing modal');
+  assert.match(html, /function\s+setBusyModalOpen\s*\(isOpen,\s*message\s*=\s*'Processing export…',\s*detail\s*=\s*'Gathering CPNF instrument numbers for exported points\.'\)/, 'ROS should expose a helper to toggle modal messaging for both lookup and export progress');
+  assert.match(html, /setBusyModalOpen\(true, 'Loading RecordQuarry data…', 'Querying address, parcel, subdivision, section, township, ROS, and aliquot records\.'\);/, 'lookup should show a loading modal while RecordQuarry fetches data');
+  assert.match(html, /const\s+lookupButton\s*=\s*\$\("btnLookup"\);[\s\S]*lookupButton\.disabled\s*=\s*true;/, 'lookup should disable the Lookup button while requests are running');
+  assert.match(html, /finally\s*\{[\s\S]*setBusyModalOpen\(false\);[\s\S]*lookupButton\.disabled\s*=\s*false;/, 'lookup should always close modal and re-enable Lookup button');
   assert.match(html, /setBusyModalOpen\(true, 'Exporting CSV… gathering CPNF instrument numbers'\)/, 'CSV export should open modal before CPNF lookup');
   assert.match(html, /setBusyModalOpen\(true, 'Exporting to PointForge… gathering CPNF instrument numbers'\)/, 'PointForge export should open modal before CPNF lookup');
   assert.match(html, /setBusyModalOpen\(false\);[\s\S]*\}\s*\);/, 'exports should close the modal in completion paths');
