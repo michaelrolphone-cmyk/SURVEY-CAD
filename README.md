@@ -212,6 +212,7 @@ open http://localhost:3000/POINT_TRANSFORMER.HTML
 ```
 
 In PointForge, click **Open in LineSmith** from the **upper-right header workflow button** after processing points; this navigates to `VIEWPORT.HTML?source=pointforge` (inside the launcher iframe when embedded, or current tab when standalone) and auto-imports the transformed points via browser local storage, with the map layer defaulted on for the imported handoff view.
+PointForge header copy is now intentionally minimal (badge-only) on mobile so the **Open in LineSmith** workflow button stays visible without text wrapping pushing the action out of view.
 PointForge handoff uses `number,x,y,z,code,notes` ordering (code immediately after z, notes immediately after code), and now writes the exact state-plane drawing coordinates expected by LineSmith with no additional normalization at import handoff.
 PointForge handoff payloads now also include georeference metadata (`zone`, `swapXY`, and sampled WGS84 lat/lon pairs) so LineSmith can align map zoom/centering to imported state-plane coordinates instead of treating feet values as degrees.
 PointForge-triggered LineSmith launches now import points before collaboration hydration and skip applying stale welcome-state snapshots from prior rooms, preventing imported drawings from being replaced by the previously open drawing state.

@@ -15,6 +15,9 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.doesNotMatch(html, /sortable\.forEach\(\(r,\s*index\)=>\{[\s\S]*renumberStart/, 'PointForge transform should not force sequential renumbering by default');
   assert.match(html, /id="btnOpenLineSmith"/, 'PointForge should render the LineSmith handoff button');
   assert.match(html, /<div class="statusbar">[\s\S]*id="btnOpenLineSmith"\s+class="btn workflowPrimary workflowHeaderAction"/, 'PointForge should place the LineSmith workflow button in the upper-right status area as a primary action');
+  assert.doesNotMatch(html, /G\/REF RENUMB \+ MAP PREVIEW/, 'PointForge should remove long header subtitle text so the mobile workflow action remains visible');
+  assert.doesNotMatch(html, /NAD83 Idaho West map preview and point renumbering\./, 'PointForge should remove the secondary header copy that pushes the workflow action below the fold on mobile');
+  assert.match(html, /@media \(max-width: 700px\)\{[\s\S]*\.workflowHeaderAction\{ margin-left: 0; width: 100%; \}/, 'PointForge mobile layout should stretch the workflow header action to remain visible');
   assert.doesNotMatch(html, /<div class="row" style="margin-top:10px;">[\s\S]*id="btnOpenLineSmith"/, 'PointForge should not keep the LineSmith handoff button in the lower ingest controls row');
   assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
