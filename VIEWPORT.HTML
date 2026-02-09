@@ -1056,6 +1056,11 @@
     currentStepIndex: -1
   };
 
+  const lineIntersectionCommandSession = {
+    active: false,
+    mode: ""
+  };
+
   function renderWorkflowToast() {
     const root = $("#workflowToast");
     const titleEl = $("#workflowToastTitle");
@@ -1101,6 +1106,38 @@
     workflowToastState.steps = Array.isArray(steps) ? steps.map((item) => String(item)) : [];
     workflowToastState.currentStepIndex = clamp(Number(currentStepIndex) || 0, 0, Math.max(0, workflowToastState.steps.length - 1));
     renderWorkflowToast();
+  }
+
+  function syncLineIntersectionCommandToast() {
+    if (!lineIntersectionCommandSession.active) return;
+    const selectedCount = Math.min(2, selectedLines.length);
+    const isExtend = lineIntersectionCommandSession.mode === "extend";
+    showWorkflowToast({
+      title: isExtend ? "Extend to Intersect Workflow" : "Trim to Intersect Workflow",
+      message: selectedCount < 2
+        ? `Select ${selectedCount === 0 ? "the first" : "the second"} line (Shift-click adds to selection).`
+        : "Two lines selected. Running command...",
+      steps: [
+        "Select first line",
+        "Select second line",
+        isExtend ? "Extend active line to intersection" : "Trim active line to intersection"
+      ],
+      currentStepIndex: selectedCount
+    });
+  }
+
+  function startLineIntersectionCommand(mode) {
+    lineIntersectionCommandSession.active = true;
+    lineIntersectionCommandSession.mode = mode;
+    setTool("select");
+    syncLineIntersectionCommandToast();
+    setStatus(`Line ${mode}: select two lines to continue.`, "warn");
+  }
+
+  function stopLineIntersectionCommand() {
+    lineIntersectionCommandSession.active = false;
+    lineIntersectionCommandSession.mode = "";
+    syncToolWorkflowToast();
   }
 
   function deepClone(value) {
@@ -2091,6 +2128,7 @@
   }
 
   function syncToolWorkflowToast() {
+    if (lineIntersectionCommandSession.active) return;
     if (rotateSelectionSession.active) return;
     const payload = getToolWorkflowToastPayload(tool);
     if (!payload) {
@@ -2952,6 +2990,11 @@
 
     if (rotateSelectionSession.active) {
       cancelRotateSelectionSession(true);
+      canceled = true;
+    }
+
+    if (lineIntersectionCommandSession.active) {
+      stopLineIntersectionCommand();
       canceled = true;
     }
 
@@ -4130,8 +4173,12 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
   $("#extendToIntersect").addEventListener("click", () => {
     const s = getTwoSelectedLines();
-    if (!s) { setStatus("Select two lines (Shift-click) to extend.", "warn"); return; }
+    if (!s) {
+      startLineIntersectionCommand("extend");
+      return;
+    }
 
+    stopLineIntersectionCommand();
     const hit = lineLineIntersection(s.a1, s.a2, s.b1, s.b2);
     if (!hit) { setStatus("Lines are parallel/colinear; no unique intersection.", "warn"); return; }
 
@@ -4171,7 +4218,11 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
   $("#trimToIntersect").addEventListener("click", () => {
     const s = getTwoSelectedLines();
-    if (!s) { setStatus("Select two lines (Shift-click) to trim.", "warn"); return; }
+    if (!s) {
+      startLineIntersectionCommand("trim");
+      return;
+    }
+    stopLineIntersectionCommand();
     const hit = lineLineIntersection(s.a1, s.a2, s.b1, s.b2);
     if (!hit) { setStatus("Lines are parallel/colinear; no unique intersection.", "warn"); return; }
 
@@ -4538,6 +4589,13 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : null;
         updatePointEditorFromSelection();
         schedulePointsTableRender();
+        if (lineIntersectionCommandSession.active) {
+          syncLineIntersectionCommandToast();
+          if (selectedLines.length >= 2) {
+            const commandButtonId = lineIntersectionCommandSession.mode === "extend" ? "#extendToIntersect" : "#trimToIntersect";
+            window.setTimeout(() => $(commandButtonId)?.click(), 0);
+          }
+        }
         if (rotateSelectionSession.active) {
           if (rotateSelectionSession.awaitingSelection && getRotatablePointIdsFromSelection().length) {
             rotateSelectionSession.awaitingSelection = false;
