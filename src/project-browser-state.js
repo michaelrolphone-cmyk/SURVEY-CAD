@@ -83,3 +83,89 @@ export function appendPointFileResource(projectFile, resource) {
   pointFolder.index.push(resource);
   return true;
 }
+
+export function removeResourceById(projectFile, folderKey, resourceId) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey || !resourceId) return false;
+  const folder = projectFile.folders.find((entry) => entry.key === folderKey);
+  if (!folder || !Array.isArray(folder.index)) return false;
+  const before = folder.index.length;
+  folder.index = folder.index.filter((entry) => entry?.id !== resourceId);
+  return folder.index.length !== before;
+}
+
+function parseCsvLine(line = '') {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (char === ',' && !inQuotes) {
+      cells.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  cells.push(current);
+  return cells;
+}
+
+export function extractCpfInstrumentsFromPointNote(note = '') {
+  const match = String(note).match(/CPNFS:\s*([^\r\n]+)/i);
+  if (!match) return [];
+  return match[1]
+    .split('...')
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
+export function findCpfPointLinks(projectFile, storage, instrument) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !storage || !instrument) return [];
+  const pointFolder = projectFile.folders.find((folder) => folder.key === 'point-files');
+  if (!pointFolder || !Array.isArray(pointFolder.index)) return [];
+
+  const target = String(instrument).trim().toLowerCase();
+  if (!target) return [];
+
+  const links = [];
+  for (const pointFile of pointFolder.index) {
+    const storageKey = pointFile?.reference?.value;
+    if (!storageKey) continue;
+    let text = '';
+    try {
+      const raw = storage.getItem(storageKey);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      text = String(parsed?.text || '');
+    } catch {
+      continue;
+    }
+    if (!text.trim()) continue;
+
+    const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    for (let lineIndex = 1; lineIndex < lines.length; lineIndex += 1) {
+      const fields = parseCsvLine(lines[lineIndex]);
+      const pointNumber = String(fields[0] || '').trim();
+      const pointCode = String(fields[4] || '').trim();
+      const note = String(fields[5] || '').trim();
+      const instruments = extractCpfInstrumentsFromPointNote(note);
+      if (!instruments.some((value) => value.toLowerCase() === target)) continue;
+      links.push({
+        pointFileTitle: pointFile?.title || pointFile?.id || 'Point File',
+        pointNumber: pointNumber || '(unknown)',
+        pointCode: pointCode || '(none)',
+      });
+    }
+  }
+  return links;
+}
