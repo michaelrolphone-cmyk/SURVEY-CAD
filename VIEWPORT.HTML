@@ -69,13 +69,13 @@
     .panelCollapseHandle{
       position:absolute;
       top:50%;
-      right:-14px;
+      left:-14px;
       transform:translateY(-50%);
       width:28px;
       height:64px;
       border:1px solid var(--border);
-      border-left:none;
-      border-radius:0 12px 12px 0;
+      border-right:none;
+      border-radius:12px 0 0 12px;
       background:#101010;
       color:var(--text);
       font-size:18px;
@@ -616,7 +616,7 @@
 <body>
 <div class="app" id="appShell">
   <div class="panel">
-    <button id="panelCollapseHandle" class="panelCollapseHandle" aria-label="Collapse controls drawer" title="Collapse controls drawer">←</button>
+    <button id="panelCollapseHandle" class="panelCollapseHandle" aria-label="Collapse controls drawer" title="Collapse controls drawer">→</button>
     <h1>LineSmith — Points & Bearings</h1>
 
     <div class="section">

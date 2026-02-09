@@ -176,7 +176,9 @@ test('VIEWPORT.HTML includes desktop drawer collapse and edge expand affordances
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /\.app\.panelCollapsed\{[\s\S]*grid-template-columns:\s*1fr\s+0;/, 'desktop layout should allow fully collapsing the controls panel width');
-  assert.match(html, /id="panelCollapseHandle"\s+class="panelCollapseHandle"/, 'controls panel should include a right-edge collapse handle');
+  assert.match(html, /id="panelCollapseHandle"\s+class="panelCollapseHandle"/, 'controls panel should include a collapse handle at the canvas edge');
+  assert.match(html, /\.panelCollapseHandle\{[\s\S]*left:-14px;[\s\S]*border-right:none;/, "collapse handle should hang from the panel left edge so it stays over the canvas boundary");
+  assert.match(html, /id="panelCollapseHandle"[^>]*>→<\/button>/, 'collapse handle affordance should point right to indicate collapsing the drawer');
   assert.match(html, /id="drawerEdgeExpand"\s+class="drawerEdgeExpand"/, 'canvas area should include a right-edge expand control when drawer is collapsed');
   assert.match(html, /function\s+setPanelCollapsed\(collapsed\)/, 'LineSmith should centralize panel collapse state updates in a helper');
   assert.match(html, /panelCollapseHandle\.addEventListener\("click", \(\) => setPanelCollapsed\(true\)\);/, 'collapse handle should collapse the panel on click');
