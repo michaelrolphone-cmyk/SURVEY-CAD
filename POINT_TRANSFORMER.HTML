@@ -124,6 +124,12 @@
       align-items: center;
       min-width: 280px;
     }
+    .mapMetaRow{
+      margin-top: 8px;
+      display:flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .workflowHeaderAction{ margin-left:auto; }
     .chip{
       display:inline-flex;
@@ -456,9 +462,6 @@
 
       <div class="statusbar">
         <button id="btnOpenLineSmith" class="btn workflowPrimary workflowHeaderAction" disabled>Open in LineSmith</button>
-        <span class="chip"><span class="dot"></span> SYSTEM: ONLINE</span>
-        <span class="chip">DATUM: <span class="mono">NAD83 (NO_TRANS)</span></span>
-        <span class="chip">PIPELINE: <span class="mono">PARSE → RENUMB → SORT → PLOT</span></span>
       </div>
     </div>
   </header>
@@ -589,6 +592,10 @@
         <div class="panelbody">
           <div id="map"></div>
           <div class="hint" id="mapHint">Load a file or paste points to plot.</div>
+          <div class="mapMetaRow">
+            <span class="chip">DATUM: <span class="mono">NAD83 (NO_TRANS)</span></span>
+            <span class="chip">PIPELINE: <span class="mono">PARSE → RENUMB → SORT → PLOT</span></span>
+          </div>
         </div>
       </section>
 
