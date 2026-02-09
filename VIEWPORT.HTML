@@ -10,6 +10,10 @@
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""
   />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+  />
   <style>
     :root{
       --bg:#0b0b0b;
@@ -189,6 +193,42 @@
       padding:8px 12px;
       background:#101010;
       color:var(--text);
+    }
+    .quickTools{
+      position:absolute;
+      top:10px;
+      left:10px;
+      z-index:6;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      max-width:min(100% - 130px, 920px);
+      padding:8px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:rgba(8,8,8,0.92);
+      backdrop-filter:blur(4px);
+    }
+    .quickToolBtn{
+      width:34px;
+      height:34px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:8px;
+      padding:0;
+      font-size:14px;
+    }
+    .quickToolBtn.primary{
+      border-color:#5c4b14;
+      background:#201a09;
+      color:#ffe7a0;
+    }
+    .quickToolBtn i{ pointer-events:none; }
+    .quickToolDivider{
+      width:1px;
+      margin:2px 1px;
+      background:var(--border);
     }
     .mapBackdrop{
       position:absolute;
@@ -421,6 +461,7 @@
       }
       .app.drawerOpen .panel{ transform:translateX(0); }
       .drawerToggle{ display:block; }
+      .quickTools{ max-width:calc(100% - 20px); }
     }
   </style>
 </head>
@@ -714,6 +755,21 @@
 
   <div class="canvasWrap">
     <button id="drawerToggle" class="drawerToggle">Tools</button>
+    <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
+      <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
+      <button id="quickSelect" class="quickToolBtn primary" title="Select / Move" aria-label="Select / Move"><i class="fa-solid fa-arrow-pointer"></i></button>
+      <button id="quickAddPoint" class="quickToolBtn" title="Add Point" aria-label="Add Point"><i class="fa-solid fa-circle-plus"></i></button>
+      <button id="quickLineByPoints" class="quickToolBtn" title="Line by Points" aria-label="Line by Points"><i class="fa-solid fa-share-nodes"></i></button>
+      <span class="quickToolDivider" aria-hidden="true"></span>
+      <button id="quickUndo" class="quickToolBtn" title="Undo" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
+      <button id="quickRedo" class="quickToolBtn" title="Redo" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
+      <button id="quickZoomExtents" class="quickToolBtn" title="Zoom Extents" aria-label="Zoom Extents"><i class="fa-solid fa-expand"></i></button>
+      <button id="quickCenter" class="quickToolBtn" title="Center (0,0)" aria-label="Center"><i class="fa-solid fa-crosshairs"></i></button>
+      <span class="quickToolDivider" aria-hidden="true"></span>
+      <button id="quickExtend" class="quickToolBtn" title="Extend to Intersect" aria-label="Extend"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+      <button id="quickTrimIntersect" class="quickToolBtn" title="Trim to Intersect" aria-label="Trim / Intersect"><i class="fa-solid fa-scissors"></i></button>
+      <button id="quickPointManager" class="quickToolBtn" title="Open Points Manager" aria-label="Point Manager"><i class="fa-solid fa-list"></i></button>
+    </div>
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>
     <div class="hud">
@@ -1991,6 +2047,10 @@
     for (const id of ["toolSelect","toolAddPoint","toolLine2pt","toolLineDB","toolPointOnLine","toolPan"]) {
       $("#"+id).classList.remove("primary");
     }
+    for (const id of ["quickSelect","quickAddPoint","quickLineByPoints"]) {
+      const quick = $("#" + id);
+      if (quick) quick.classList.remove("primary");
+    }
     const map = {
       select:"toolSelect",
       addPoint:"toolAddPoint",
@@ -2001,6 +2061,17 @@
     };
     const btn = map[t];
     if (btn) $("#"+btn).classList.add("primary");
+
+    const quickMap = {
+      select:"quickSelect",
+      addPoint:"quickAddPoint",
+      line2pt:"quickLineByPoints"
+    };
+    const quickBtn = quickMap[t];
+    if (quickBtn) {
+      const quickEl = $("#" + quickBtn);
+      if (quickEl) quickEl.classList.add("primary");
+    }
 
     setStatus(`Tool: ${label}`, "");
   }
@@ -2056,6 +2127,21 @@
 
   $("#undoBtn").addEventListener("click", ()=>history.undoAction());
   $("#redoBtn").addEventListener("click", ()=>history.redoAction());
+
+  $("#quickSave")?.addEventListener("click", () => $("#saveDrawingToProject").click());
+  $("#quickSelect")?.addEventListener("click", () => setTool("select"));
+  $("#quickAddPoint")?.addEventListener("click", () => setTool("addPoint"));
+  $("#quickLineByPoints")?.addEventListener("click", () => {
+    construction.startPointId = null;
+    setTool("line2pt");
+  });
+  $("#quickUndo")?.addEventListener("click", () => history.undoAction());
+  $("#quickRedo")?.addEventListener("click", () => history.redoAction());
+  $("#quickZoomExtents")?.addEventListener("click", () => zoomExtents());
+  $("#quickCenter")?.addEventListener("click", () => $("#zoomAllAndCenter").click());
+  $("#quickExtend")?.addEventListener("click", () => $("#extendToIntersect").click());
+  $("#quickTrimIntersect")?.addEventListener("click", () => $("#trimToIntersect").click());
+  $("#quickPointManager")?.addEventListener("click", () => openPointsManagerBtn?.click());
 
   $("#zoomExtents").addEventListener("click", () => zoomExtents());
   $("#zoomAllAndCenter").addEventListener("click", () => {
