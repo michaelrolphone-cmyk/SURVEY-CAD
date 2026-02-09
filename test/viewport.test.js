@@ -71,6 +71,10 @@ test('VIEWPORT.HTML supports reference-angle rotation of selected geometry from 
   assert.match(html, /Math\.atan2\(fromPoint\.y - basePoint\.y, fromPoint\.x - basePoint\.x\)/, 'rotate should compute source angle from base and reference points');
   assert.match(html, /Math\.atan2\(toPoint\.y - basePoint\.y, toPoint\.x - basePoint\.x\)/, 'rotate should compute target angle from base and destination points');
   assert.match(html, /if \(!typing && e\.key === "Escape" && rotateSelectionSession\.active\)/, 'Esc should cancel active reference-angle rotation session');
+  assert.match(html, /function\s+drawRotateSelectionPreview\(\)/, 'rotate workflow should draw on-canvas preview guides while picking reference and target angles');
+  assert.match(html, /ctx\.lineTo\(cursor\.x, cursor\.y\)/, 'rotate preview should draw a live line from base point to current cursor');
+  assert.match(html, /rotateSelectionSession\.step >= 2 && rotateSelectionSession\.fromPoint/, 'rotate preview should retain reference-bearing guide after reference point is set');
+  assert.match(html, /drawRotateSelectionPreview\(\);/, 'draw loop should render rotate preview overlays while session is active');
   assert.match(html, /if \(rotateSelectionSession\.active\) \{[\s\S]*handleRotateSelectionCanvasPick\(mouse\.x, mouse\.y\);[\s\S]*return;/, 'canvas clicks should route to rotate pick stages while rotate mode is active');
 });
 test('VIEWPORT.HTML restores persisted movable flags as strict booleans', async () => {

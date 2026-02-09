@@ -2088,6 +2088,32 @@
     ctx.restore();
   }
 
+  function drawRotateSelectionPreview() {
+    if (!rotateSelectionSession.active || rotateSelectionSession.step < 1 || !rotateSelectionSession.basePoint) return;
+
+    const base = worldToScreen(rotateSelectionSession.basePoint.x, rotateSelectionSession.basePoint.y);
+    const cursor = worldToScreen(mouse.wx, mouse.wy);
+
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,213,74,0.95)";
+    ctx.beginPath();
+    ctx.moveTo(base.x, base.y);
+    ctx.lineTo(cursor.x, cursor.y);
+    ctx.stroke();
+
+    if (rotateSelectionSession.step >= 2 && rotateSelectionSession.fromPoint) {
+      const from = worldToScreen(rotateSelectionSession.fromPoint.x, rotateSelectionSession.fromPoint.y);
+      ctx.strokeStyle = "rgba(57,255,121,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(from.x, from.y);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
   function draw() {
     const rect = canvas.getBoundingClientRect();
     const W = rect.width, H = rect.height;
@@ -2266,6 +2292,8 @@
 
     // marquee (selection window)
     drawMarquee();
+
+    drawRotateSelectionPreview();
 
     // crosshair & snap box
     drawCrosshair(W,H);
