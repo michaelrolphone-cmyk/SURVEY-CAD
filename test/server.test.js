@@ -114,6 +114,34 @@ test('server exposes survey APIs and static html', async () => {
     const healthRes = await fetch(`http://127.0.0.1:${app.port}/health`);
     assert.equal(healthRes.status, 200);
 
+    const localStorageInitialRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`);
+    assert.equal(localStorageInitialRes.status, 200);
+    const localStorageInitial = await localStorageInitialRes.json();
+    assert.equal(localStorageInitial.version, 0);
+
+    const localStorageUpdateRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ version: 100, snapshot: { sample: 'value' } }),
+    });
+    assert.equal(localStorageUpdateRes.status, 200);
+    const localStorageUpdate = await localStorageUpdateRes.json();
+    assert.equal(localStorageUpdate.status, 'server-updated');
+
+    const localStorageStaleRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ version: 99, snapshot: { sample: 'old' } }),
+    });
+    assert.equal(localStorageStaleRes.status, 200);
+    const localStorageStale = await localStorageStaleRes.json();
+    assert.equal(localStorageStale.status, 'client-stale');
+    assert.deepEqual(localStorageStale.state.snapshot, { sample: 'value' });
+
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();

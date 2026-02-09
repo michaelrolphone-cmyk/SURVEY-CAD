@@ -185,3 +185,15 @@ test('launcher project manager enforces sequential project status progression', 
   assert.match(launcherHtml, /status:\s*'Proposed',/, 'new projects should start in Proposed status');
   assert.match(launcherHtml, /const\s+knownStatus\s*=\s*PROJECT_STATUS_SEQUENCE\.includes\(project\?\.status\)\s*\?\s*project\.status\s*:\s*'Proposed';/, 'loaded projects should normalize missing/unknown statuses to Proposed');
 });
+
+test('launcher syncs localStorage to server with versioning and stale refresh handling', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /const\s+LOCAL_STORAGE_SYNC_VERSION_KEY\s*=\s*'surveyfoundryLocalStorageVersion';/, 'launcher should define a stable localStorage version key');
+  assert.match(launcherHtml, /fetch\('\/api\/localstorage-sync',\s*\{[\s\S]*method:\s*'POST'/, 'launcher should post localStorage snapshots to the sync API');
+  assert.match(launcherHtml, /if \(payload\?\.status === 'client-stale' && payload\?\.state\?\.snapshot\)/, 'launcher should detect stale local state from sync response');
+  assert.match(launcherHtml, /localStorage\.clear\(\);[\s\S]*localStorage\.setItem\(key, String\(value\)\);/, 'launcher should replace stale localStorage with server snapshot');
+  assert.match(launcherHtml, /sessionStorage\.setItem\(LAUNCHER_VIEW_STATE_KEY, JSON\.stringify\(\{ currentApp \}\)\);/, 'launcher should preserve open app before refresh');
+  assert.match(launcherHtml, /appFrame\.src = currentApp;/, 'launcher should refresh the same app view after stale data replacement');
+  assert.match(launcherHtml, /setInterval\(\(\) => \{[\s\S]*syncLocalStorageWithServer\(\)/, 'launcher should continuously sync localStorage updates');
+});

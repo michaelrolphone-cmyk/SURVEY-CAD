@@ -498,6 +498,8 @@
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
     const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
+    const LOCAL_STORAGE_SYNC_VERSION_KEY = 'surveyfoundryLocalStorageVersion';
+    const LAUNCHER_VIEW_STATE_KEY = 'surveyfoundryLauncherViewState';
     const PROJECT_STATUS_SEQUENCE = [
       'Proposed',
       'Researched',
@@ -518,6 +520,8 @@
     let activeProjectId = null;
     const backgroundMapUrlCache = new Map();
     let backgroundRequestToken = 0;
+    let localStorageSyncSnapshot = '';
+    let localStorageSyncLock = false;
 
     function setLauncherBackground(mapUrl = '') {
       if (mapUrl) {
@@ -573,6 +577,81 @@
         if (requestToken !== backgroundRequestToken) return;
         setLauncherBackground('');
         console.warn('Unable to load active project map background', err);
+      }
+    }
+
+
+    function getLocalStorageVersion() {
+      const version = Number(localStorage.getItem(LOCAL_STORAGE_SYNC_VERSION_KEY) || 0);
+      return Number.isFinite(version) ? Math.trunc(version) : 0;
+    }
+
+    function buildLocalStorageSnapshot() {
+      const snapshot = {};
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!key) continue;
+        const value = localStorage.getItem(key);
+        if (value !== null) {
+          snapshot[key] = value;
+        }
+      }
+      return snapshot;
+    }
+
+    function applyServerSnapshot(snapshot = {}) {
+      localStorageSyncLock = true;
+      const entries = Object.entries(snapshot || {});
+      localStorage.clear();
+      entries.forEach(([key, value]) => {
+        localStorage.setItem(key, String(value));
+      });
+      localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
+      localStorageSyncLock = false;
+    }
+
+    function refreshOpenApp() {
+      if (!currentApp) {
+        loadProjects();
+        loadActiveProject();
+        renderProjects();
+        return;
+      }
+      sessionStorage.setItem(LAUNCHER_VIEW_STATE_KEY, JSON.stringify({ currentApp }));
+      appFrame.src = currentApp;
+    }
+
+    async function syncLocalStorageWithServer() {
+      if (localStorageSyncLock) return;
+
+      const currentSnapshot = buildLocalStorageSnapshot();
+      const serializedSnapshot = JSON.stringify(currentSnapshot);
+
+      if (serializedSnapshot !== localStorageSyncSnapshot) {
+        const nextVersion = Date.now();
+        localStorage.setItem(LOCAL_STORAGE_SYNC_VERSION_KEY, String(nextVersion));
+      }
+
+      const snapshot = buildLocalStorageSnapshot();
+      const version = getLocalStorageVersion();
+      const response = await fetch('/api/localstorage-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ version, snapshot }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`localStorage sync failed (${response.status})`);
+      }
+
+      const payload = await response.json();
+      localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
+
+      if (payload?.status === 'client-stale' && payload?.state?.snapshot) {
+        applyServerSnapshot(payload.state.snapshot);
+        refreshOpenApp();
       }
     }
 
@@ -909,6 +988,19 @@
 
     }
 
+
+    function restoreLauncherViewState() {
+      try {
+        const state = JSON.parse(sessionStorage.getItem(LAUNCHER_VIEW_STATE_KEY) || 'null');
+        if (state?.currentApp) {
+          openApp(state.currentApp);
+        }
+      } catch {
+        // ignore parse errors
+      }
+      sessionStorage.removeItem(LAUNCHER_VIEW_STATE_KEY);
+    }
+
     async function loadApps() {
       const response = await fetch('/api/apps');
       if (!response.ok) {
@@ -956,7 +1048,19 @@
     loadActiveProject();
     renderProjects();
 
-    loadApps().catch((err) => {
+    localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
+    setInterval(() => {
+      syncLocalStorageWithServer().catch((err) => {
+        console.warn('localStorage sync unavailable', err);
+      });
+    }, 2000);
+
+    loadApps().then(() => {
+      restoreLauncherViewState();
+      syncLocalStorageWithServer().catch((err) => {
+        console.warn('initial localStorage sync failed', err);
+      });
+    }).catch((err) => {
       appSections.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
       console.error(err);
     });
