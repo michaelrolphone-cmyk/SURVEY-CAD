@@ -163,3 +163,12 @@ test('RecordQuarry.html restores and saves project lookup snapshots when launche
   assert.match(html, /saveProjectLookupSnapshot\(state\.projectContext\.projectId,\s*\{[\s\S]*lookup,/, 'lookup flow should save the latest lookup payload per project id');
   assert.match(html, /doLookup\(\{ lookupPayload:\s*snapshot\.lookup \}\)/, 'autostart flow should restore cached lookup payload when project snapshot exists');
 });
+
+test('RecordQuarry.html keeps aliquots deselected by default and behind parcel interaction layers', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /state\.selectedAliquotKeys\.clear\(\);[\s\S]*drawAliquots\(state\.aliquotFeatures, section\);/, 'lookup should leave all aliquots deselected by default before drawing aliquot geometry');
+  assert.match(html, /map\.createPane\('aliquotPolygons'\);[\s\S]*map\.getPane\('aliquotPolygons'\)\.style\.zIndex\s*=\s*'380';/, 'aliquot polygons should render on their own lower pane');
+  assert.match(html, /const\s+layer\s*=\s*L\.geoJSON\(gj,\s*\{[\s\S]*pane:\s*'aliquotPolygons',/, 'aliquot polygons should use the lower aliquot pane');
+  assert.match(html, /function\s+buildCornerMarkerEntries\(\)\s*\{[\s\S]*\{\s*role:\s*'aliquot'[\s\S]*\{\s*role:\s*'subdivision'[\s\S]*\{\s*role:\s*'parcel'/, 'corner marker layering should add aliquot markers before subdivision and parcel markers so parcel interactions remain reachable');
+});
