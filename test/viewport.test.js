@@ -170,6 +170,16 @@ test('VIEWPORT.HTML starts desktop marquee selection on primary-button blank-can
 });
 
 
+test('VIEWPORT.HTML right-click cancels active command before clearing selection', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+hasSelection\(\)\s*\{[\s\S]*selectedPointIds\.length > 0 \|\| selectedLines\.length > 0;/, 'LineSmith should provide a helper to detect whether point or line selection exists');
+  assert.match(html, /function\s+cancelActiveCanvasCommand\(\)\s*\{[\s\S]*if \(rotateSelectionSession\.active\) \{[\s\S]*cancelRotateSelectionSession\(true\);[\s\S]*if \(construction\.startPointId !== null\) \{[\s\S]*construction\.startPointId = null;[\s\S]*if \(tool !== "select" && tool !== "pan"\) \{[\s\S]*setTool\("select"\);/, 'right-click command cancellation should stop rotate sessions, clear in-progress construction starts, and return to select mode for drawing tools');
+  assert.match(html, /canvas\.addEventListener\("mousedown", \(e\) => \{[\s\S]*if \(e\.button !== 0\) return;/, 'canvas mousedown workflows should only execute on primary button to reserve right-click for command cancellation/selection clear');
+  assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*if \(cancelActiveCanvasCommand\(\)\) return;[\s\S]*if \(hasSelection\(\)\) clearSelection\(\);/, 'context-menu right-click should first cancel active commands and only clear selection when no command is active');
+});
+
+
 test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected point notes', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

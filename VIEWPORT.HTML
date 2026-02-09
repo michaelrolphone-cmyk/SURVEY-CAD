@@ -2593,6 +2593,35 @@
     setStatus("Selection cleared.", "");
   }
 
+  function hasSelection() {
+    return selectedPointIds.length > 0 || selectedLines.length > 0;
+  }
+
+  function cancelActiveCanvasCommand() {
+    let canceled = false;
+
+    if (rotateSelectionSession.active) {
+      cancelRotateSelectionSession(true);
+      canceled = true;
+    }
+
+    if (construction.startPointId !== null) {
+      construction.startPointId = null;
+      canceled = true;
+    }
+
+    if (tool !== "select" && tool !== "pan") {
+      setTool("select");
+      canceled = true;
+    }
+
+    if (canceled) {
+      setStatus("Command canceled. Selection kept (right-click again to clear selection).", "warn");
+    }
+
+    return canceled;
+  }
+
   function doDeleteSelected() {
     const hasPts = selectedPointIds.length > 0;
     const hasLns = selectedLines.length > 0;
@@ -3936,6 +3965,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       return;
     }
 
+    if (e.button !== 0) return;
+
     const pid = pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
@@ -3990,7 +4021,6 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         return;
       }
 
-      if (!additive) clearSelection();
       return;
     }
 
@@ -4081,6 +4111,15 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       setStatus("Select a line (click near it).", "warn");
       return;
     }
+  });
+
+  canvas.addEventListener("contextmenu", (e) => {
+    if (modalIsOpen()) return;
+    e.preventDefault();
+    updateMouseFromEvent(e);
+
+    if (cancelActiveCanvasCommand()) return;
+    if (hasSelection()) clearSelection();
   });
 
   canvas.addEventListener("pointerdown", (e) => {
