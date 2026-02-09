@@ -176,6 +176,12 @@ test('RecordQuarry.html restores and saves project lookup snapshots when launche
   assert.match(html, /const\s+lookup\s*=\s*options\.lookupPayload\s*\|\|\s*cachedAddressSnapshot\?\.lookup\s*\|\|\s*await\s*lookupByAddress\(rawAddr\)/, 'lookup flow should support restoring cached project and address lookup payloads');
   assert.match(html, /saveLookupSnapshotsForCurrentState\(rawAddr\);/, 'lookup flow should persist lookup and selection snapshots for project and per-address restores');
   assert.match(html, /doLookup\(\{ lookupPayload:\s*snapshot\.lookup, selectionSnapshot:\s*snapshot\.selection \}\)/, 'autostart flow should restore cached lookup payload and selection snapshot when project snapshot exists');
+  assert.match(html, /const\s+hasProjectAddress\s*=\s*Boolean\(normalizeAddressStorageKey\(state\.projectContext\.address\)\);/, 'project boot flow should detect when active project includes an address');
+  assert.match(html, /const\s+projectAddressSnapshot\s*=\s*hasProjectAddress\s*\?\s*loadAddressLookupSnapshot\(state\.projectContext\.address\)\s*:\s*null;/, 'project boot flow should load per-address cache when active project has an address');
+  assert.match(html, /if\s*\(hasProjectAddress\)\s*\{[\s\S]*doLookup\(\{ lookupPayload:\s*launchLookupPayload, selectionSnapshot:\s*launchSelectionSnapshot \}\)/, 'project boot flow should auto-run lookup when project address is present and use cached payload when available');
+  assert.match(html, /if\s*\(projectAddressSnapshot\?\.lookup\)\s*\{[\s\S]*log\(`Restoring cached results for project address/, 'project boot flow should prefer cached per-address data before project snapshot restore');
+  assert.match(html, /\} else if \(projectSnapshot\?\.lookup\) \{[\s\S]*log\(`Restoring saved project results from/, 'project boot flow should fallback to project snapshot when no per-address cache is available');
+  assert.match(html, /\} else if \(projectSnapshot\?\.lookup && state\.projectContext\.autostart\)/, 'project autostart without a project address should continue restoring project snapshots only when requested');
   assert.match(html, /const\s+snapshot\s*=\s*loadMostRecentAddressLookupSnapshot\(\);/, 'standalone boot flow should attempt loading the most recent cached address lookup');
 });
 
