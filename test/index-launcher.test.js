@@ -87,7 +87,9 @@ test('launcher mobile viewer uses full-width iframe layout', async () => {
 
   assert.match(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*\.viewer\s*\{[\s\S]*padding:\s*0;/i);
   assert.doesNotMatch(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*\.toolbar\s*\{/, 'mobile styles should not include removed toolbar block');
-  assert.match(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*iframe\s*\{[\s\S]*border-left:\s*0;[\s\S]*border-right:\s*0;[\s\S]*border-radius:\s*0;/i);
+  assert.match(launcherHtml, /#viewerView\s*\{[\s\S]*padding:\s*0;/i, 'desktop viewer container should remove padding around embedded app');
+  assert.match(launcherHtml, /iframe\s*\{[\s\S]*border:\s*0;[\s\S]*border-radius:\s*0;/i, 'iframe should render without border or corner radius');
+  assert.match(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*iframe\s*\{[\s\S]*border:\s*0;[\s\S]*border-radius:\s*0;/i);
 });
 
 
