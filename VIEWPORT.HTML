@@ -1118,7 +1118,7 @@
     showWorkflowToast({
       title: isExtend ? "Extend to Intersect Workflow" : "Trim to Intersect Workflow",
       message: selectedCount < 2
-        ? `${selectedCount === 0 ? firstStep : secondStep} (Shift-click adds to selection).`
+        ? `${selectedCount === 0 ? firstStep : secondStep} (${selectedCount === 0 ? "click line" : "click next line"}; Shift-click still supports normal multi-select).`
         : "Two lines selected. Running command...",
       steps: [
         firstStep,
@@ -4594,10 +4594,15 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       }
 
       if (lpick) {
+        const guidedLineSelection = lineIntersectionCommandSession.active;
         if (!additive) { selectedPointIds = []; selectedPointId = null; }
         const idx = selectedLines.findIndex(s => s.lineId === lpick.lineId);
-        if (!additive) selectedLines = [{ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t }];
-        else {
+        if (guidedLineSelection) {
+          if (idx >= 0) selectedLines[idx] = { lineId: lpick.lineId, grip: lpick.grip, t: lpick.t };
+          else selectedLines.push({ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t });
+        } else if (!additive) {
+          selectedLines = [{ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t }];
+        } else {
           if (idx >= 0) selectedLines.splice(idx,1);
           else selectedLines.push({ lineId: lpick.lineId, grip: lpick.grip, t: lpick.t });
         }
