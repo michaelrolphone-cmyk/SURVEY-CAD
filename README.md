@@ -274,6 +274,7 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 - Launcher app cards align app icons to the top-left of each card for consistent vertical layout with multi-line descriptions.
 - Launcher header now uses the SurveyFoundry app icon, and the legacy SurveyFoundry logo is moved to a centered enlarged footer treatment at the bottom of the launcher view.
 - Launcher header icon/title are vertically centered together, the footer logo appears only on the launcher home screen at a 1280px max-width display size, and on mobile the embedded app viewer presents a full-width iframe.
+- Launcher header icon now doubles as a home link (`/`) and is rendered at 84×84 (2× prior size), while the embedded viewer toolbar now keeps only **Reload app** (legacy **Back to launcher** and **Switch app** controls removed).
 - Launcher opens `RecordQuarry.html` with query parameters (`projectId`, `projectName`, `client`, `address`, `autostart=1`).
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
 - Launcher header now displays the active project name whenever a project is active, giving persistent context while moving between tools.
