@@ -372,6 +372,7 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
 - Launcher header now displays the active project name whenever a project is active, giving persistent context while moving between tools.
 - Leaving LineSmith with unsaved edits now opens a dedicated modal with **Save and leave**, **Discard changes**, and **Cancel** actions (replacing the old free-text browser prompt) to prevent accidental data loss.
+- Browser back/forward navigation now participates in launcher view history so pressing the app-launcher back button while LineSmith is open triggers the same unsaved-change guard and can return to launcher home when confirmed.
 - When a project is active and includes an address, the launcher geocodes that address via `GET /api/geocode` and requests a background image through `GET /api/static-map` (server proxy).
 `/api/static-map` now prefers Esri World Imagery satellite tiles for project backgrounds, retries a direct OpenStreetMap street tile for the same coordinates if satellite is unavailable, and finally returns the generated SVG fallback when no upstream imagery source is reachable.
 - RecordQuarry runs the lookup and saves the lookup payload snapshot to browser local storage under `surveyfoundryProjectLookup:<projectId>`.

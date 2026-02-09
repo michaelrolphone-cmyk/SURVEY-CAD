@@ -100,7 +100,7 @@ test('launcher header switches to opened app icon/title and shows back chevron a
   assert.match(launcherHtml, /\.launcher-home-link\.app-open \.launcher-icon\s*\{[\s\S]*width:\s*42px;[\s\S]*height:\s*42px;/i, 'opened app state should shrink header icon to half size for more app real estate');
   assert.match(launcherHtml, /const\s+LAUNCHER_HOME_TITLE\s*=\s*'SurveyFoundry App Launcher';/, 'launcher should define default home title constant');
   assert.match(launcherHtml, /function\s+updateHeaderForApp\(file\)\s*\{[\s\S]*launcherHeaderIcon\.src\s*=\s*appIconPath;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*appName;[\s\S]*launcherHomeLink\.classList\.add\('app-open'\);/, 'opening an app should update header title/icon and show back chevron state');
-  assert.match(launcherHtml, /function\s+showHome\(\)\s*\{[\s\S]*launcherHomeLink\.classList\.remove\('app-open'\);[\s\S]*launcherHeaderIcon\.src\s*=\s*LAUNCHER_HOME_ICON;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*LAUNCHER_HOME_TITLE;/, 'returning home should restore SurveyFoundry title and icon');
+  assert.match(launcherHtml, /function\s+showHome\(\{\s*historyMode\s*=\s*'push'\s*\}\s*=\s*\{\}\)\s*\{[\s\S]*launcherHomeLink\.classList\.remove\('app-open'\);[\s\S]*launcherHeaderIcon\.src\s*=\s*LAUNCHER_HOME_ICON;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*LAUNCHER_HOME_TITLE;/, 'returning home should restore SurveyFoundry title and icon');
   assert.match(launcherHtml, /launcherHomeLink\.addEventListener\('click',\s*async\s*\(event\)\s*=>\s*\{[\s\S]*event\.preventDefault\(\);[\s\S]*if \(!currentApp\) return;[\s\S]*const canNavigateHome = await confirmNavigateHomeFromApp\(\);[\s\S]*if \(!canNavigateHome\) return;[\s\S]*showHome\(\);/, 'clicking header icon/chevron should return to home when an app is open unless unsaved-change prompt cancels navigation');
 });
 
@@ -216,4 +216,15 @@ test('launcher syncs localStorage to server with versioning and stale refresh ha
   assert.match(launcherHtml, /sessionStorage\.setItem\(LAUNCHER_VIEW_STATE_KEY, JSON\.stringify\(\{ currentApp \}\)\);/, 'launcher should preserve open app before refresh');
   assert.match(launcherHtml, /appFrame\.src = currentApp;/, 'launcher should refresh the same app view after stale data replacement');
   assert.match(launcherHtml, /setInterval\(\(\) => \{[\s\S]*syncLocalStorageWithServer\(\)/, 'launcher should continuously sync localStorage updates');
+});
+
+test('launcher back-button navigation is wired through browser history state and unsaved guards', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /const\s+LAUNCHER_HISTORY_STATE_KEY\s*=\s*'survey-cad-launcher-view';/, 'launcher should declare a history state key for view transitions');
+  assert.match(launcherHtml, /function\s+writeHistoryState\(nextState, mode = 'push'\)/, 'launcher should centralize push/replace history behavior');
+  assert.match(launcherHtml, /window\.addEventListener\('popstate',\s*async\s*\(event\)\s*=>\s*\{/, 'launcher should react to browser back/forward events');
+  assert.match(launcherHtml, /confirmNavigateHomeFromApp\(\)/, 'popstate handling should reuse unsaved-change confirmation before leaving LineSmith');
+  assert.match(launcherHtml, /if \(!canNavigateHome\) \{[\s\S]*writeHistoryState\(buildAppHistoryState\(currentApp\), 'push'\);/, 'launcher should restore app history entry when user cancels leaving on back');
+  assert.match(launcherHtml, /if \(!window\.history\.state\?\.\[LAUNCHER_HISTORY_STATE_KEY\]\) \{[\s\S]*writeHistoryState\(buildHomeHistoryState\(\), 'replace'\);/, 'launcher should seed initial home history state for first back transition');
 });
