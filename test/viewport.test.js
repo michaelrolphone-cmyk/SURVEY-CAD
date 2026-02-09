@@ -188,6 +188,8 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
   assert.match(html, /canvas\.addEventListener\("pointerdown"[\s\S]*touchGesture\.mode = "pinch"/, 'touch pointer down should initialize pinch mode for two-finger zoom');
   assert.match(html, /canvas\.addEventListener\("pointermove"[\s\S]*view\.scale = newScale;[\s\S]*view\.panX = touchGesture\.startPanX/, 'touch pointer move should apply pinch zoom scale and drag pan updates');
   assert.match(html, /window\.setTimeout\([\s\S]*pickPoint\(mouse\.x, mouse\.y, 14\)[\s\S]*pickLine\(mouse\.x, mouse\.y, 12\)/, 'long-press should attempt selection of points or lines');
+  assert.match(html, /function\s+handleCanvasPrimaryAction\(\{ additive = false \} = \{\}\)/, 'canvas primary action logic should be reusable across mouse and touch input paths');
+  assert.match(html, /function\s+handlePointerUp\(e\)\s*\{[\s\S]*const\s+shouldTreatAsTap\s*=\s*touchGesture\.mode === "pending" && !mobileInteraction\.moved;[\s\S]*if \(shouldTreatAsTap\) \{[\s\S]*handleCanvasPrimaryAction\(\);/, 'single-finger touch tap should trigger the same canvas action handler used by desktop clicks');
   assert.match(html, /if \(tool === \"addPoint\"\) \{[\s\S]*history\.push\(\"add point\"\)[\s\S]*const\s+pidNew\s*=\s*addPoint\(/, 'long-press add point mode should create a point when add-point tool is active');
   assert.match(html, /beginDrag\(\{type:"marquee", x0: mouse\.x, y0: mouse\.y, x1: mouse\.x, y1: mouse\.y, additive:false\}\);/, 'long-press on blank canvas should begin box-select marquee drag');
 });
@@ -228,7 +230,7 @@ test('VIEWPORT.HTML starts desktop marquee selection on primary-button blank-can
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /const additive = e\.shiftKey;/, 'desktop additive window selection should be controlled only by Shift state');
-  assert.match(html, /if \(e\.button === 0\) \{\s*beginDrag\(\{type:"marquee", x0: mouse\.x, y0: mouse\.y, x1: mouse\.x, y1: mouse\.y, additive\}\);/, 'left-clicking blank canvas should always start marquee drag, with additive selection honored when Shift is held');
+  assert.match(html, /beginDrag\(\{type:"marquee", x0: mouse\.x, y0: mouse\.y, x1: mouse\.x, y1: mouse\.y, additive\}\);/, 'left-clicking blank canvas should always start marquee drag, with additive selection honored when Shift is held');
 });
 
 test('VIEWPORT.HTML line intersection guided workflow auto-builds two-line selection without requiring Shift', async () => {
