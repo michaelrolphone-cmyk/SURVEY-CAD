@@ -276,6 +276,13 @@
       margin-top: 10px;
     }
     @media (max-width: 540px){ .grid2{ grid-template-columns:1fr; } }
+    @media (max-width: 700px){
+      .top{ align-items: center; }
+      .brand,
+      .statusbar{ min-width: 0; }
+      .statusbar{ width: 100%; }
+      .workflowHeaderAction{ margin-left: 0; width: 100%; }
+    }
 
     .stats{
       margin-top: 10px;
@@ -396,10 +403,6 @@
       <div class="brand">
         <div class="title">
           <span class="badge">POINTFORGE</span>
-          <span>G/REF RENUMB + MAP PREVIEW</span>
-        </div>
-        <div class="sub">
-          NAD83 Idaho West map preview and point renumbering.
         </div>
       </div>
 
