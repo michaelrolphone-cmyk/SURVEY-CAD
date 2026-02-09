@@ -39,6 +39,16 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
 
 
 
+
+
+test('VIEWPORT.HTML line-between-selected prompts for nearest non-connected ordering when sequential point gaps are longer', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+shouldSuggestNearestNonConnectedOrder\(pointIds\)/, 'line-between-selected should detect when sequential numbering creates longer hops than nearest selected non-connected neighbors');
+  assert.match(html, /window\.confirm\([\s\S]*nearest non-connected selected points[\s\S]*sequential selected-point order/, 'line-between-selected should prompt the user to choose nearest non-connected or sequential ordering');
+  assert.match(html, /function\s+buildNearestNonConnectedOrder\(pointIds\)/, 'line-between-selected should build a nearest-neighbor order that prefers non-connected selected points');
+  assert.match(html, /Created \$\{created\} line\(s\) using \$\{connectionLabel\}:/, 'line-between-selected status message should report which ordering mode was used');
+});
 test('VIEWPORT.HTML renders unlocked lines in maroon for movement warning', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
