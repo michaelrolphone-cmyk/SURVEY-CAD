@@ -76,6 +76,10 @@ export function buildAliquotSelectionKey(feature, index = 0) {
   return `index:${index}`;
 }
 
+export function filterParcelFeatureForExport(parcelFeature2243, selectedParcel = true) {
+  return selectedParcel ? (parcelFeature2243 || null) : null;
+}
+
 export function filterAliquotFeaturesForExport(aliquotFeatures2243 = [], selectedAliquotKeys = null) {
   const features = aliquotFeatures2243 || [];
   if (!(selectedAliquotKeys instanceof Set) || !selectedAliquotKeys.size) return features;

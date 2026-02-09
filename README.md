@@ -211,6 +211,7 @@ RecordQuarry.html now applies mobile-first layout guards so the Leaflet map reta
 Aliquot Summary cards and aliquot map popups both surface CP&F PDF links routed through `/api/ros-pdf`.
 Aliquot Summary cards now also lazy-load corner-derived CP&F records after card render, ensuring CP&F PDFs appear when available even when aliquot attributes do not include direct PDF fields.
 RecordQuarry export now supports aliquot-level inclusion filters: click aliquot polygons on the map to toggle include/exclude state, or use the **Include in export** checkbox on each aliquot Summary card before running **Export CSV** or **Export to PointForge**.
+RecordQuarry parcel and aliquot export selection is now fully click-driven on the map: click parcel/aliquot polygons or their corner markers to toggle inclusion, with selected corners visually emphasized for confirmation; township overlays no longer steal those clicks.
 
 
 ## App Icons Catalog

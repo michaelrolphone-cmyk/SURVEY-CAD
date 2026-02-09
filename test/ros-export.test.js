@@ -8,6 +8,7 @@ import {
   buildRosBoundaryCsvRowsPNEZD,
   buildAliquotSelectionKey,
   filterAliquotFeaturesForExport,
+  filterParcelFeatureForExport,
 } from '../src/ros-export.js';
 
 test('buildParcelCsvPNEZD emits P,N,E,Z,D rows and strips duplicate closing vertex', () => {
@@ -206,4 +207,12 @@ test('filterAliquotFeaturesForExport returns only selected aliquots', () => {
   assert.equal(filtered.length, 2);
   assert.equal(filtered[0].attributes.OBJECTID, 1);
   assert.equal(filtered[1].attributes.ALIQUOT, 'nw');
+});
+
+
+test('filterParcelFeatureForExport honors parcel include toggle', () => {
+  const parcel = { geometry: { rings: [[[0,0],[1,0],[1,1],[0,1],[0,0]]] } };
+  assert.equal(filterParcelFeatureForExport(parcel, true), parcel);
+  assert.equal(filterParcelFeatureForExport(parcel, false), null);
+  assert.equal(filterParcelFeatureForExport(null, true), null);
 });
