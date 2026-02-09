@@ -324,7 +324,7 @@ open "http://localhost:3000/VIEWPORT.HTML?source=project-browser-drawing&activeP
 Current apps in the catalog:
 
 - **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
-- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select), plus long-press add-point placement when the Add Point tool is active, with a slide-out tools drawer. Desktop blank-canvas left-drag marquee selection remains enabled (Shift adds to selection).
+- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select), plus long-press add-point placement when the Add Point tool is active, with a slide-out tools drawer. Desktop blank-canvas left-drag marquee selection remains enabled (Shift adds to selection). On desktop, the inspector/controls drawer now has a right-edge collapse tab and a right-screen cutout expand tab for quick hide/show toggling.
 
 Mobile launch command:
 
