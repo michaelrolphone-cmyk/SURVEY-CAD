@@ -29,12 +29,13 @@ test('launcher renders experimental apps in a dedicated section after stable app
 
 
 
-test('launcher viewer toolbar keeps reload only and removes back/switch controls', async () => {
+test('launcher viewer removes toolbar controls and keeps iframe-only layout', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
-  assert.match(launcherHtml, /id="reloadButton"/, 'viewer should keep reload control');
+  assert.doesNotMatch(launcherHtml, /id="reloadButton"/, 'viewer should remove reload control');
   assert.doesNotMatch(launcherHtml, /id="backButton"/, 'viewer should remove back-to-launcher button');
   assert.doesNotMatch(launcherHtml, /id="appSelect"/, 'viewer should remove switch-app dropdown');
+  assert.doesNotMatch(launcherHtml, /reloadButton\.addEventListener/, 'viewer should no longer wire reload button behavior');
   assert.doesNotMatch(launcherHtml, /backButton\.addEventListener/, 'viewer should no longer wire back button behavior');
   assert.doesNotMatch(launcherHtml, /appSelect\.addEventListener/, 'viewer should no longer wire app-switch behavior');
 });
@@ -84,6 +85,7 @@ test('launcher mobile viewer uses full-width iframe layout', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
   assert.match(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*\.viewer\s*\{[\s\S]*padding:\s*0;/i);
+  assert.doesNotMatch(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*\.toolbar\s*\{/, 'mobile styles should not include removed toolbar block');
   assert.match(launcherHtml, /@media \(max-width: 760px\)\s*\{[\s\S]*iframe\s*\{[\s\S]*border-left:\s*0;[\s\S]*border-right:\s*0;[\s\S]*border-radius:\s*0;/i);
 });
 
