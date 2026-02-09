@@ -2011,9 +2011,97 @@
     "Select a target rotation"
   ];
 
+  function getToolWorkflowToastPayload(activeTool = tool) {
+    if (activeTool === "select") {
+      return {
+        title: "Select / Move Workflow",
+        message: "Click items to select, or drag a window to select multiple items.",
+        steps: ["Click item(s) or drag a selection window"],
+        currentStepIndex: 0
+      };
+    }
+
+    if (activeTool === "addPoint") {
+      return {
+        title: "Add Point Workflow",
+        message: "Click anywhere on the canvas to place a point.",
+        steps: ["Click canvas to place a point"],
+        currentStepIndex: 0
+      };
+    }
+
+    if (activeTool === "line2pt") {
+      const hasStart = construction.startPointId !== null;
+      return {
+        title: "Line: 2 Points Workflow",
+        message: hasStart
+          ? "Now click an endpoint (point or open space) to finish the line."
+          : "Click a start point, or click empty space to create one.",
+        steps: [
+          "Pick line start point",
+          "Pick line end point"
+        ],
+        currentStepIndex: hasStart ? 1 : 0
+      };
+    }
+
+    if (activeTool === "lineDB") {
+      const hasStart = construction.startPointId !== null;
+      return {
+        title: "Line: Dist/Bearing Workflow",
+        message: hasStart
+          ? "Enter distance + bearing, then click Create Point + Line."
+          : "Click a start point on the canvas first.",
+        steps: [
+          "Select start point",
+          "Enter distance + bearing",
+          "Click Create Point + Line"
+        ],
+        currentStepIndex: hasStart ? 2 : 0
+      };
+    }
+
+    if (activeTool === "pointOnLine") {
+      const hasLine = lastSelectedLineId != null && lines.has(lastSelectedLineId);
+      return {
+        title: "Point on Line Workflow",
+        message: hasLine
+          ? "Enter station/offset values, then click Create Point."
+          : "Click near a line to select it first.",
+        steps: [
+          "Select line",
+          "Enter station + offset",
+          "Click Create Point"
+        ],
+        currentStepIndex: hasLine ? 2 : 0
+      };
+    }
+
+    if (activeTool === "pan") {
+      return {
+        title: "Pan Workflow",
+        message: "Press and drag on the canvas to move your view.",
+        steps: ["Drag the canvas to pan"],
+        currentStepIndex: 0
+      };
+    }
+
+    return null;
+  }
+
+  function syncToolWorkflowToast() {
+    if (rotateSelectionSession.active) return;
+    const payload = getToolWorkflowToastPayload(tool);
+    if (!payload) {
+      hideWorkflowToast();
+      return;
+    }
+    showWorkflowToast(payload);
+  }
+
   function syncRotateWorkflowToast() {
     if (!rotateSelectionSession.active) {
-      hideWorkflowToast();
+      syncToolWorkflowToast();
       return;
     }
     const stepIndex = rotateSelectionSession.awaitingSelection ? 0 : clamp(rotateSelectionSession.step + 1, 1, rotateWorkflowSteps.length - 1);
@@ -2031,7 +2119,7 @@
     rotateSelectionSession.basePoint = null;
     rotateSelectionSession.fromPoint = null;
     rotateSelectionSession.awaitingSelection = false;
-    hideWorkflowToast();
+    syncToolWorkflowToast();
     if (!silent) setStatus("Rotate selection canceled.", "warn");
   }
 
@@ -2563,6 +2651,7 @@
     }
 
     setStatus(`Tool: ${label}`, "");
+    syncToolWorkflowToast();
   }
 
   function runCommandLine(rawCommand) {
@@ -3817,6 +3906,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     if (!selectedPointId) { setStatus("Select a start point first.", "warn"); return; }
     construction.startPointId = selectedPointId;
     setStatus(`Start point set to ${points.get(selectedPointId)?.num ?? "?"}.`, "ok");
+    syncToolWorkflowToast();
   });
 
   function clearPointNumberField() { $("#ptNum").value = ""; }
@@ -3855,6 +3945,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     updatePointEditorFromSelection();
     clearPointNumberField();
     setStatus(`Created point ${points.get(pid2).num} and line from ${sp.num}.\nAz: ${azimuthRadToQuadrantString(az)}  Dist: ${d}`, "ok");
+    syncToolWorkflowToast();
   });
 
   function runLineBetweenSelectedPoints({ returnToSelectionTool = false } = {}) {
@@ -4091,6 +4182,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     clearPointNumberField();
 
     setStatus(`Created point ${points.get(pid).num} on line at station ${station} offset ${offset}.`, "ok");
+    syncToolWorkflowToast();
   });
 
   $("#swapLineEnds").addEventListener("click", () => {
@@ -4373,6 +4465,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         if (pid) {
           construction.startPointId = pid;
           setStatus(`Line start set: point ${points.get(pid).num}. Click endpoint (point or empty space).`, "ok");
+          syncToolWorkflowToast();
           return;
         } else {
           const num = nextOpenPointNumber();
@@ -4382,6 +4475,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
           selectedPointId = pidNew;
           updatePointEditorFromSelection();
           setStatus(`Created start point ${points.get(pidNew).num}. Click endpoint.`, "ok");
+          syncToolWorkflowToast();
           return;
         }
       } else {
@@ -4404,6 +4498,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         updatePointEditorFromSelection();
         setStatus(`Created line to point ${points.get(endId).num}.`, "ok");
         schedulePointsTableRender();
+        syncToolWorkflowToast();
         return;
       }
     }
@@ -4416,6 +4511,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         updatePointEditorFromSelection();
         schedulePointsTableRender();
         setStatus(`Start point set: ${points.get(pid).num}. Enter dist/bearing then click "Create Point + Line".`, "ok");
+        syncToolWorkflowToast();
         return;
       }
       setStatus("Select a start point first (click a point).", "warn");
@@ -4429,6 +4525,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         lastSelectedLineId = lpick.lineId;
         setStatus("Line selected for station/offset. Enter station/offset and click 'Create Point'.", "ok");
         schedulePointsTableRender();
+        syncToolWorkflowToast();
         return;
       }
       setStatus("Select a line (click near it).", "warn");
