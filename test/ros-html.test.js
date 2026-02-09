@@ -179,3 +179,11 @@ test('RecordQuarry.html keeps aliquots deselected by default and behind parcel i
   assert.match(html, /const\s+layer\s*=\s*L\.geoJSON\(gj,\s*\{[\s\S]*pane:\s*'aliquotPolygons',/, 'aliquot polygons should use the lower aliquot pane');
   assert.match(html, /function\s+buildCornerMarkerEntries\(\)\s*\{[\s\S]*\{\s*role:\s*'aliquot'[\s\S]*\{\s*role:\s*'subdivision'[\s\S]*\{\s*role:\s*'parcel'/, 'corner marker layering should add aliquot markers before subdivision and parcel markers so parcel interactions remain reachable');
 });
+
+test('RecordQuarry.html omits internal service/layer label pills beneath the address input', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(html, /Service:\s*External\/ExternalMap/, 'address controls should not show service label pill copy');
+  assert.doesNotMatch(html, /Parcel:\s*layer\s*24/, 'address controls should not show parcel layer label pill copy');
+  assert.doesNotMatch(html, /Address:\s*layer\s*16/, 'address controls should not show address layer label pill copy');
+});

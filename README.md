@@ -240,6 +240,7 @@ The CP&F print preview now renders each PDF in an iframe with PDF open parameter
 `RecordQuarry.html` now shows a processing modal while export flows are busy gathering CPNF instrument numbers for aliquot/section corner notes, so long-running CP&F lookups have visible progress feedback before CSV download or PointForge handoff completes.
 
 `RecordQuarry.html` now also shows a loading modal during **Lookup** runs (and temporarily disables the Lookup button) so address/parcel/subdivision/section/township/ROS/aliquot fetches have visible progress feedback while data is loading.
+`RecordQuarry.html` lookup controls no longer render the internal service/layer pills beneath the address input (`Service: External/ExternalMap`, `Parcel: layer 24`, `Address: layer 16`) to keep the panel focused on user-facing actions.
 
 RecordQuarry.html now applies mobile-first layout guards so the Leaflet map retains a real viewport height and export controls wrap instead of clipping on narrow screens.
 
