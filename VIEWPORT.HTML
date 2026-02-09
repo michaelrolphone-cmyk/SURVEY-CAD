@@ -472,6 +472,23 @@
 
     <div class="section">
       <div class="title">
+        <b>Project Drawing Saves</b>
+        <span>named differential history</span>
+      </div>
+      <div class="grid2">
+        <label style="grid-column:1/-1;">Drawing name
+          <input id="drawingName" placeholder="Boundary Base Map" />
+        </label>
+      </div>
+      <div class="grid2" style="margin-top:8px;">
+        <button id="saveDrawingToProject" class="ok">Save Drawing to Project</button>
+        <button id="restoreDrawingVersion">Restore Saved Version…</button>
+      </div>
+      <div class="hint mini" id="drawingSaveHint">Open LineSmith from an active SurveyFoundry project to enable project-linked drawing saves.</div>
+    </div>
+
+    <div class="section">
+      <div class="title">
         <b>CSV</b>
         <span>number,x,y,z,code,notes</span>
       </div>
@@ -771,6 +788,9 @@
   const dist = (ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
   const fmt = (n)=> (Number.isFinite(n) ? (Math.abs(n) < 1e6 ? n.toFixed(3) : n.toExponential(6)) : "NaN");
   const POINTFORGE_IMPORT_STORAGE_KEY = "lineSmithPointforgeImport";
+  const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
+  const PROJECT_DRAWING_STORAGE_PREFIX = "surveyfoundryLineSmithDrawing";
+  const PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = "lineSmithProjectBrowserDrawingImport";
 
   const parseNum = (s, def=0) => {
     const n = Number(String(s).trim());
@@ -783,10 +803,81 @@
   };
   const $ = (q)=>document.querySelector(q);
 
+  const queryParams = new URLSearchParams(window.location.search);
+  const activeProjectId = queryParams.get("activeProjectId") || "";
+  const activeProjectName = queryParams.get("activeProjectName") || "";
+  let activeDrawingStorageKey = "";
+
   function setStatus(msg, kind="") {
     const el = $("#status");
     el.textContent = msg;
     el.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function deepClone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function diffState(previous, next) {
+    if (Object.is(previous, next)) return undefined;
+    if (Array.isArray(previous) && Array.isArray(next)) {
+      if (previous.length !== next.length) return deepClone(next);
+      const out = [];
+      let changed = false;
+      for (let i = 0; i < next.length; i += 1) {
+        const child = diffState(previous[i], next[i]);
+        out[i] = child;
+        if (child !== undefined) changed = true;
+      }
+      return changed ? out : undefined;
+    }
+    if (isPlainObject(previous) && isPlainObject(next)) {
+      const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+      const out = {};
+      let changed = false;
+      for (const key of keys) {
+        if (!(key in next)) {
+          out[key] = { __deleted: true };
+          changed = true;
+          continue;
+        }
+        const child = diffState(previous[key], next[key]);
+        if (child !== undefined) {
+          out[key] = child;
+          changed = true;
+        }
+      }
+      return changed ? out : undefined;
+    }
+    return deepClone(next);
+  }
+
+  function applyStateDiff(base, diff) {
+    if (diff === undefined) return deepClone(base);
+    if (Array.isArray(diff)) {
+      const source = Array.isArray(base) ? base : [];
+      return diff.map((part, index) => applyStateDiff(source[index], part));
+    }
+    if (isPlainObject(diff)) {
+      if (diff.__deleted) return undefined;
+      const source = isPlainObject(base) ? base : {};
+      const out = {};
+      const keys = new Set([...Object.keys(source), ...Object.keys(diff)]);
+      for (const key of keys) {
+        if (!(key in diff)) {
+          out[key] = deepClone(source[key]);
+          continue;
+        }
+        const merged = applyStateDiff(source[key], diff[key]);
+        if (merged !== undefined) out[key] = merged;
+      }
+      return out;
+    }
+    return deepClone(diff);
   }
 
   // -------------------------
@@ -2437,6 +2528,232 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     }
   }
 
+
+  function projectFileStorageKey(projectId) {
+    return `${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`;
+  }
+
+  function drawingStorageKey(projectId, drawingId) {
+    return `${PROJECT_DRAWING_STORAGE_PREFIX}:${projectId}:${drawingId}`;
+  }
+
+  function normalizeDrawingId(name = "") {
+    const slug = String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return slug || `drawing-${Date.now()}`;
+  }
+
+  function getSerializableStateObject() {
+    return JSON.parse(serializeState());
+  }
+
+  function loadStoredDrawingRecord(storageKey) {
+    if (!storageKey) return null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed?.versions)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function materializeDrawingVersion(record, versionIndex = -1) {
+    if (!record?.versions?.length) return null;
+    const targetIndex = versionIndex >= 0 ? Math.min(versionIndex, record.versions.length - 1) : record.versions.length - 1;
+    let state = deepClone(record.versions[0]?.baseState || null);
+    if (!state) return null;
+    for (let i = 1; i <= targetIndex; i += 1) {
+      state = applyStateDiff(state, record.versions[i]?.diffFromPrevious);
+    }
+    return state;
+  }
+
+  function restoreDrawingVersion(storageKey, versionIndex = -1) {
+    const record = loadStoredDrawingRecord(storageKey);
+    if (!record) return false;
+    const state = materializeDrawingVersion(record, versionIndex);
+    if (!state) return false;
+    restoreState(JSON.stringify(state));
+    return true;
+  }
+
+  function upsertProjectDrawingResource({ projectId, drawingId, drawingName, storageKey, versionCount, latestVersionId }) {
+    if (!projectId) return;
+    const key = projectFileStorageKey(projectId);
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    let projectFile;
+    try {
+      projectFile = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!Array.isArray(projectFile?.folders)) return;
+    const drawingsFolder = projectFile.folders.find((folder) => folder.key === "drawings");
+    if (!drawingsFolder) return;
+    if (!Array.isArray(drawingsFolder.index)) drawingsFolder.index = [];
+    const resourceId = `linesmith-${drawingId}`;
+    const existing = drawingsFolder.index.find((entry) => entry.id === resourceId);
+    const next = {
+      id: resourceId,
+      folder: "drawings",
+      title: drawingName,
+      exportFormat: "json",
+      reference: {
+        type: "local-storage",
+        value: storageKey,
+        resolverHint: "linesmith-drawing-history",
+        metadata: {
+          drawingId,
+          drawingName,
+          versionCount,
+          latestVersionId,
+        },
+      },
+    };
+    if (existing) Object.assign(existing, next);
+    else drawingsFolder.index.push(next);
+    localStorage.setItem(key, JSON.stringify(projectFile));
+  }
+
+  function saveDrawingToProject() {
+    if (!activeProjectId) {
+      setStatus("Open LineSmith from an active project to save drawing history.", "warn");
+      return;
+    }
+    const drawingNameInput = $("#drawingName");
+    const hint = $("#drawingSaveHint");
+    const drawingName = String(drawingNameInput?.value || "").trim();
+    if (!drawingName) {
+      setStatus("Enter a drawing name before saving.", "warn");
+      return;
+    }
+
+    const drawingId = normalizeDrawingId(drawingName);
+    const storageKey = drawingStorageKey(activeProjectId, drawingId);
+    const now = new Date().toISOString();
+    const currentState = getSerializableStateObject();
+    const existing = loadStoredDrawingRecord(storageKey);
+
+    let record;
+    if (!existing || !existing.versions?.length) {
+      record = {
+        schemaVersion: "1.0.0",
+        projectId: activeProjectId,
+        projectName: activeProjectName,
+        drawingId,
+        drawingName,
+        createdAt: now,
+        updatedAt: now,
+        versions: [
+          {
+            versionId: `v-${Date.now()}`,
+            savedAt: now,
+            label: drawingName,
+            baseState: currentState,
+          },
+        ],
+      };
+    } else {
+      const prevState = materializeDrawingVersion(existing, -1);
+      const diff = diffState(prevState, currentState);
+      const changePatch = diff === undefined ? {} : diff;
+      record = existing;
+      record.updatedAt = now;
+      record.drawingName = drawingName;
+      record.versions.push({
+        versionId: `v-${Date.now()}`,
+        savedAt: now,
+        label: drawingName,
+        diffFromPrevious: changePatch,
+      });
+    }
+
+    localStorage.setItem(storageKey, JSON.stringify(record));
+    activeDrawingStorageKey = storageKey;
+    upsertProjectDrawingResource({
+      projectId: activeProjectId,
+      drawingId,
+      drawingName,
+      storageKey,
+      versionCount: record.versions.length,
+      latestVersionId: record.versions[record.versions.length - 1]?.versionId || null,
+    });
+    if (hint) hint.textContent = `Saved ${record.versions.length} version(s) for "${drawingName}" in project ${activeProjectId}.`;
+    setStatus(`Saved drawing "${drawingName}" to project history (${record.versions.length} version${record.versions.length === 1 ? "" : "s"}).`, "ok");
+  }
+
+  function promptRestoreDrawingVersion() {
+    const storageKey = activeDrawingStorageKey;
+    if (!storageKey) {
+      setStatus("No project-linked drawing has been loaded yet.", "warn");
+      return;
+    }
+    const record = loadStoredDrawingRecord(storageKey);
+    if (!record?.versions?.length) {
+      setStatus("No saved versions were found for this drawing.", "warn");
+      return;
+    }
+    const options = record.versions
+      .map((version, index) => `${index + 1}: ${version.savedAt}`)
+      .join("
+");
+    const response = window.prompt(`Restore which version for ${record.drawingName}?\n${options}\nEnter version number:`, String(record.versions.length));
+    if (response === null) return;
+    const parsed = Number(response);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > record.versions.length) {
+      setStatus("Invalid version number.", "warn");
+      return;
+    }
+    history.push("restore drawing version");
+    const ok = restoreDrawingVersion(storageKey, parsed - 1);
+    if (!ok) {
+      setStatus("Failed to restore the selected drawing version.", "warn");
+      return;
+    }
+    setStatus(`Restored drawing version ${parsed} of ${record.versions.length}.`, "ok");
+  }
+
+  function tryImportProjectBrowserDrawingPayload() {
+    if (queryParams.get("source") !== "project-browser-drawing") return false;
+    const raw = localStorage.getItem(PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY);
+    if (!raw) {
+      setStatus("Project Browser drawing launch detected, but payload is missing.", "warn");
+      return false;
+    }
+    try {
+      const payload = JSON.parse(raw);
+      const storageKey = payload?.storageKey;
+      if (!storageKey) {
+        setStatus("Project Browser drawing payload was invalid.", "warn");
+        return false;
+      }
+      const restored = restoreDrawingVersion(storageKey, -1);
+      if (!restored) {
+        setStatus("Drawing file could not be opened from project storage.", "warn");
+        return false;
+      }
+      activeDrawingStorageKey = storageKey;
+      const drawingName = String(payload?.drawingName || "").trim();
+      if (drawingName) $("#drawingName").value = drawingName;
+      localStorage.removeItem(PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY);
+      setStatus(`Opened drawing "${drawingName || "Project Drawing"}" from Project Browser.`, "ok");
+      return true;
+    } catch {
+      setStatus("Project Browser drawing payload could not be parsed.", "warn");
+      return false;
+    }
+  }
+
+  $("#saveDrawingToProject").addEventListener("click", saveDrawingToProject);
+  $("#restoreDrawingVersion").addEventListener("click", promptRestoreDrawingVersion);
+
   $("#csvIn").addEventListener("change", async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -3612,6 +3929,17 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     updateUndoRedoHUD();
     updateCounts();
     requestAnimationFrame(draw);
+
+    const drawingHint = $("#drawingSaveHint");
+    if (drawingHint) {
+      drawingHint.textContent = activeProjectId
+        ? `Project-linked saves enabled for ${activeProjectName || activeProjectId}.`
+        : "Open LineSmith from an active SurveyFoundry project to enable project-linked drawing saves.";
+    }
+
+    const openedFromProjectBrowser = tryImportProjectBrowserDrawingPayload();
+    if (openedFromProjectBrowser) return;
+
     const importedFromPointforge = tryImportPointforgePayload();
     if (importedFromPointforge) return;
 
