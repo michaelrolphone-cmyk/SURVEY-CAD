@@ -422,3 +422,4 @@ CLI prints the same JSON payload returned by `/extract`.
 - CP&F lookups in `RecordQuarry.html` now JSON-encode ArcGIS geometry query parameters and filter returned records to the selected corner radius, preventing section-wide CP&F lists from appearing on each corner popup.
 - Subdivision boundary and parcel/subdivision/aliquot corner markers are drawn on the map.
 - Parcel CSV export from `RecordQuarry.html` now emits unique boundary points only (parcel + subdivision + aliquot corners), deduplicated to one row per coordinate in P,N,E,Z,D format (EPSG:2243); section-only corners that are not drawn are excluded.
+- `PROJECT_BROWSER.html` print previews now center CP&F PDF pages within the preview window and force a white background, reducing dark margins and unnecessary ink usage when printing.
