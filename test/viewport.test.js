@@ -343,3 +343,12 @@ test('VIEWPORT.HTML restores the last project drawing when launched directly wit
   assert.match(html, /if \(queryParams\.get\("source"\)\) return false;/, 'LineSmith should only restore last-opened drawings for direct launches without source');
   assert.match(html, /const\s+restoredLastDrawing\s*=\s*tryRestoreLastOpenedProjectDrawing\(\);[\s\S]*if \(restoredLastDrawing\) return;/, 'LineSmith boot should restore last-opened drawing before showing default ready state');
 });
+
+test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch cursor movement', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /canvas\.addEventListener\("pointermove", \(e\) => \{[\s\S]*broadcastCursor\(\);/, 'touch pointer movement should broadcast remote cursor updates for mobile users');
+  assert.match(html, /if \(mouse\.dragObj\?\.type === "point"\) \{[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'point drag should debounce-send collaboration state updates while dragging');
+  assert.match(html, /if \(mouse\.dragObj\?\.type === "line"\) \{[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'line drag should debounce-send collaboration state updates while dragging');
+  assert.match(html, /if \(mouse\.dragObj && mouse\.dragObj\.type !== "pan"\) \{[\s\S]*if \(!mouse\.dragObj\._moved\) \{[\s\S]*\} else \{[\s\S]*scheduleCollabStateSync\(\);/, 'drag commit should force a final collaboration state sync after movement');
+});
