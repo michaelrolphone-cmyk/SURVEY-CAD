@@ -54,10 +54,10 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
   assert.match(launcherHtml, /<title>SurveyFoundry Launcher<\/title>/);
-  assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
+  assert.match(launcherHtml, /<h1 id="launcherHeaderTitle">SurveyFoundry App Launcher<\/h1>/);
   assert.match(launcherHtml, /id="activeProjectHeader" class="header-meta" aria-live="polite"/, 'header should include active project status region');
-  assert.match(launcherHtml, /<a href="\/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<img src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon" \/>/);
-  assert.match(launcherHtml, /<header>[\s\S]*<a href="\/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<\/a>[\s\S]*<h1>SurveyFoundry App Launcher<\/h1>/, 'header should place launcher icon link before app title text on the left');
+  assert.match(launcherHtml, /<a href="\/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<span id="launcherBackChevron" class="launcher-back-chevron" aria-hidden="true">‹<\/span>[\s\S]*<img id="launcherHeaderIcon" src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon" \/>/);
+  assert.match(launcherHtml, /<header>[\s\S]*<a href="\/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<\/a>[\s\S]*<h1 id="launcherHeaderTitle">SurveyFoundry App Launcher<\/h1>/, 'header should place launcher icon link before app title text on the left');
   assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;[\s\S]*background:\s*linear-gradient\(135deg, #facc15, #f97316\);[\s\S]*border-radius:\s*999px;/i, 'header active project should render as a standout pill');
   assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
   assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
@@ -68,6 +68,20 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /body\s*\{[\s\S]*background-attachment:\s*fixed;/i, 'launcher body background should support full-screen static map backdrop');
   assert.match(launcherHtml, /footerLogoWrap\?\.classList\.remove\('hidden'\);/, 'showHome should display footer logo only on launcher home screen');
   assert.match(launcherHtml, /footerLogoWrap\?\.classList\.add\('hidden'\);/, 'openApp should hide footer logo when an app is opened');
+});
+
+
+
+test('launcher header switches to opened app icon/title and shows back chevron affordance', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /\.launcher-back-chevron\s*\{[\s\S]*display:\s*none;/i, 'back chevron should be hidden on home launcher state');
+  assert.match(launcherHtml, /\.launcher-home-link\.app-open \.launcher-back-chevron\s*\{[\s\S]*display:\s*inline-block;/i, 'back chevron should appear only when an app is open');
+  assert.match(launcherHtml, /\.launcher-home-link\.app-open \.launcher-icon\s*\{[\s\S]*width:\s*42px;[\s\S]*height:\s*42px;/i, 'opened app state should shrink header icon to half size for more app real estate');
+  assert.match(launcherHtml, /const\s+LAUNCHER_HOME_TITLE\s*=\s*'SurveyFoundry App Launcher';/, 'launcher should define default home title constant');
+  assert.match(launcherHtml, /function\s+updateHeaderForApp\(file\)\s*\{[\s\S]*launcherHeaderIcon\.src\s*=\s*appIconPath;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*appName;[\s\S]*launcherHomeLink\.classList\.add\('app-open'\);/, 'opening an app should update header title/icon and show back chevron state');
+  assert.match(launcherHtml, /function\s+showHome\(\)\s*\{[\s\S]*launcherHomeLink\.classList\.remove\('app-open'\);[\s\S]*launcherHeaderIcon\.src\s*=\s*LAUNCHER_HOME_ICON;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*LAUNCHER_HOME_TITLE;/, 'returning home should restore SurveyFoundry title and icon');
+  assert.match(launcherHtml, /launcherHomeLink\.addEventListener\('click',\s*\(event\)\s*=>\s*\{[\s\S]*event\.preventDefault\(\);[\s\S]*if \(!currentApp\) return;[\s\S]*showHome\(\);/, 'clicking header icon/chevron should return to home when an app is open');
 });
 
 test('launcher fetches and applies static map background for active project address', async () => {
