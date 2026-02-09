@@ -1490,6 +1490,30 @@
     return worldToApproxLatLng(x, y);
   }
 
+  function sanitizeMapGeoreference(candidate) {
+    if (!candidate) return null;
+    const latAx = Number(candidate?.lat?.ax);
+    const latBy = Number(candidate?.lat?.by);
+    const latC = Number(candidate?.lat?.c);
+    const lngAx = Number(candidate?.lng?.ax);
+    const lngBy = Number(candidate?.lng?.by);
+    const lngC = Number(candidate?.lng?.c);
+    if (
+      !Number.isFinite(latAx) ||
+      !Number.isFinite(latBy) ||
+      !Number.isFinite(latC) ||
+      !Number.isFinite(lngAx) ||
+      !Number.isFinite(lngBy) ||
+      !Number.isFinite(lngC)
+    ) {
+      return null;
+    }
+    return {
+      lat: { ax: latAx, by: latBy, c: latC },
+      lng: { ax: lngAx, by: lngBy, c: lngC }
+    };
+  }
+
   function scaleToLeafletZoomForLat(scale, lat) {
     if (!Number.isFinite(scale) || scale <= 0) return 2;
     if (!mapGeoreference) return scaleToLeafletZoom(scale);
@@ -1657,26 +1681,7 @@
       view.panY = s.view.panY ?? view.panY;
     }
 
-    mapGeoreference = s.mapGeoreference &&
-      Number.isFinite(Number(s.mapGeoreference?.lat?.ax)) &&
-      Number.isFinite(Number(s.mapGeoreference?.lat?.by)) &&
-      Number.isFinite(Number(s.mapGeoreference?.lat?.c)) &&
-      Number.isFinite(Number(s.mapGeoreference?.lng?.ax)) &&
-      Number.isFinite(Number(s.mapGeoreference?.lng?.by)) &&
-      Number.isFinite(Number(s.mapGeoreference?.lng?.c))
-      ? {
-        lat: {
-          ax: Number(s.mapGeoreference.lat.ax),
-          by: Number(s.mapGeoreference.lat.by),
-          c: Number(s.mapGeoreference.lat.c)
-        },
-        lng: {
-          ax: Number(s.mapGeoreference.lng.ax),
-          by: Number(s.mapGeoreference.lng.by),
-          c: Number(s.mapGeoreference.lng.c)
-        }
-      }
-      : null;
+    mapGeoreference = sanitizeMapGeoreference(s.mapGeoreference);
 
     updatePointEditorFromSelection();
     schedulePointsTableRender();
@@ -3048,6 +3053,10 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     for (let i = 1; i <= targetIndex; i += 1) {
       state = applyStateDiff(state, record.versions[i]?.diffFromPrevious);
     }
+    if (!state.mapGeoreference) {
+      const fallbackGeoreference = sanitizeMapGeoreference(record.latestMapGeoreference);
+      if (fallbackGeoreference) state.mapGeoreference = fallbackGeoreference;
+    }
     return state;
   }
 
@@ -3060,7 +3069,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     return true;
   }
 
-  function upsertProjectDrawingResource({ projectId, drawingId, drawingName, storageKey, versionCount, latestVersionId }) {
+  function upsertProjectDrawingResource({ projectId, drawingId, drawingName, storageKey, versionCount, latestVersionId, latestMapGeoreference }) {
     if (!projectId) return;
     const key = projectFileStorageKey(projectId);
     const raw = localStorage.getItem(key);
@@ -3091,6 +3100,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
           drawingName,
           versionCount,
           latestVersionId,
+          latestMapGeoreference,
         },
       },
     };
@@ -3156,6 +3166,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         diffFromPrevious: changePatch,
       });
     }
+    record.latestMapGeoreference = sanitizeMapGeoreference(currentState.mapGeoreference);
 
     localStorage.setItem(storageKey, JSON.stringify(record));
     activeDrawingStorageKey = storageKey;
@@ -3166,6 +3177,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       storageKey,
       versionCount: record.versions.length,
       latestVersionId: record.versions[record.versions.length - 1]?.versionId || null,
+      latestMapGeoreference: record.latestMapGeoreference,
     });
     if (hint) hint.textContent = `Saved ${record.versions.length} version(s) for "${drawingName}" in project ${activeProjectId}.`;
     setStatus(`Saved drawing "${drawingName}" to project history (${record.versions.length} version${record.versions.length === 1 ? "" : "s"}).`, "ok");

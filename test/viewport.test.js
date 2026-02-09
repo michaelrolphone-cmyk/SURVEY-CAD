@@ -196,6 +196,10 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.ok(html.includes('.join("\\n")'), 'restore workflow should join version choices with escaped newline separators');
   assert.match(html, /tryImportProjectBrowserDrawingPayload\(\)/, 'LineSmith should support opening saved drawing payloads launched from Project Browser');
   assert.match(html, /mapGeoreference:\s*mapGeoreference\s*\?\s*\{/, 'saved drawing snapshots should persist georeference transform data');
-  assert.match(html, /mapGeoreference\s*=\s*s\.mapGeoreference\s*&&/, 'restored drawing snapshots should hydrate georeference transform data');
+  assert.match(html, /function\s+sanitizeMapGeoreference\(candidate\)/, 'LineSmith should centralize georeference validation for restores and history fallback');
+  assert.match(html, /mapGeoreference\s*=\s*sanitizeMapGeoreference\(s\.mapGeoreference\);/, 'restored drawing snapshots should hydrate georeference transform data through sanitization');
+  assert.match(html, /record\.latestMapGeoreference\s*=\s*sanitizeMapGeoreference\(currentState\.mapGeoreference\);/, 'saving should persist a latest georeference fallback alongside differential versions');
+  assert.match(html, /const\s+fallbackGeoreference\s*=\s*sanitizeMapGeoreference\(record\.latestMapGeoreference\);[\s\S]*state\.mapGeoreference\s*=\s*fallbackGeoreference;/, 'version materialization should restore latest georeference when differential history omitted that field');
+  assert.match(html, /latestMapGeoreference,/, 'project browser metadata should carry the latest georeference snapshot');
   assert.match(html, /if \(mapLayerState\.enabled\) syncMapToView\(true\);/, 'restoring a drawing should resync map view after georeference hydration');
 });
