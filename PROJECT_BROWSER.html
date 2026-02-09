@@ -303,6 +303,13 @@
       return proxyUrl.toString();
     }
 
+    function buildPrintPreviewPdfUrl(pdfUrl) {
+      if (!pdfUrl) return '';
+      // PDF Open Parameters hide most built-in viewer chrome and ask for fit-to-page scaling.
+      // Browsers may ignore unsupported flags, but this prevents sidebar/tool UI in engines that support them.
+      return `${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
+    }
+
     function openCpfPdfFromResource(resource) {
       const pdfUrl = getCpfPdfUrl(resource);
       if (!pdfUrl) {
@@ -346,7 +353,7 @@
       const pagesMarkup = printableResources.map(({ entry, url }, index) => `
         <section class="page-block">
           <h2>${index + 1}. ${escapeHtml(entry.title || entry.id || 'CP&F')}</h2>
-          <embed src="${escapeHtml(url)}" type="application/pdf" class="pdf-frame" />
+          <iframe src="${escapeHtml(buildPrintPreviewPdfUrl(url))}" title="CP&amp;F PDF ${index + 1}" class="pdf-frame"></iframe>
         </section>
       `).join('');
 
