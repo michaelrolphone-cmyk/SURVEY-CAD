@@ -80,6 +80,14 @@ test('POINT_TRANSFORMER.HTML supports Project Browser point-file imports and poi
 });
 
 
+
+
+test('POINT_TRANSFORMER.HTML moves datum and pipeline chips below the map and removes system chip', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(html, /SYSTEM:\s*ONLINE/, 'PointForge should not render the system online status chip');
+  assert.match(html, /<div id="map"><\/div>[\s\S]*?<div class="hint" id="mapHint">[\s\S]*?<div class="mapMetaRow">[\s\S]*?DATUM:\s*<span class="mono">NAD83 \(NO_TRANS\)<\/span>[\s\S]*?PIPELINE:\s*<span class="mono">PARSE → RENUMB → SORT → PLOT<\/span>/, 'PointForge should render datum and pipeline chips below the map');
+});
 test('POINT_TRANSFORMER.HTML omits internal default-lock and passthrough commentary copy', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
 
