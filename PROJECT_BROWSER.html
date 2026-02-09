@@ -334,7 +334,10 @@
         return;
       }
 
-      const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+      // Use a plain same-origin popup so browsers return a writable window handle.
+      // Some engines return `null` when `noopener` is requested, which incorrectly
+      // triggers our popup-blocked error path and leaves a blank preview tab.
+      const printWindow = window.open('', '_blank');
       if (!printWindow) {
         renderError('Your browser blocked the print-preview window. Please allow pop-ups and try again.');
         return;
