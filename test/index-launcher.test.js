@@ -77,6 +77,7 @@ test('launcher header switches to opened app icon/title and shows back chevron a
 
   assert.match(launcherHtml, /\.launcher-back-chevron\s*\{[\s\S]*display:\s*none;/i, 'back chevron should be hidden on home launcher state');
   assert.match(launcherHtml, /\.launcher-home-link\.app-open \.launcher-back-chevron\s*\{[\s\S]*display:\s*inline-block;/i, 'back chevron should appear only when an app is open');
+  assert.match(launcherHtml, /\.launcher-home-link\.app-open \.launcher-icon\s*\{[\s\S]*width:\s*42px;[\s\S]*height:\s*42px;/i, 'opened app state should shrink header icon to half size for more app real estate');
   assert.match(launcherHtml, /const\s+LAUNCHER_HOME_TITLE\s*=\s*'SurveyFoundry App Launcher';/, 'launcher should define default home title constant');
   assert.match(launcherHtml, /function\s+updateHeaderForApp\(file\)\s*\{[\s\S]*launcherHeaderIcon\.src\s*=\s*appIconPath;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*appName;[\s\S]*launcherHomeLink\.classList\.add\('app-open'\);/, 'opening an app should update header title/icon and show back chevron state');
   assert.match(launcherHtml, /function\s+showHome\(\)\s*\{[\s\S]*launcherHomeLink\.classList\.remove\('app-open'\);[\s\S]*launcherHeaderIcon\.src\s*=\s*LAUNCHER_HOME_ICON;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*LAUNCHER_HOME_TITLE;/, 'returning home should restore SurveyFoundry title and icon');
