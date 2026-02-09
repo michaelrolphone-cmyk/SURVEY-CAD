@@ -4788,26 +4788,12 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     }
   });
 
-  canvas.addEventListener("mousedown", (e) => {
-    if (modalIsOpen()) return;
-    updateMouseFromEvent(e);
-    mouse.down = true;
-    mouse.button = e.button;
-
-    const additive = e.shiftKey;
-
-    if (toolIsPan()) {
-      beginDrag({type:"pan"});
-      return;
-    }
-
-    if (e.button !== 0) return;
-
+  function handleCanvasPrimaryAction({ additive = false } = {}) {
     const pid = pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
     if (rotateSelectionSession.active && !rotateSelectionSession.awaitingSelection) {
-      if (e.button === 0) handleRotateSelectionCanvasPick(mouse.x, mouse.y);
+      handleRotateSelectionCanvasPick(mouse.x, mouse.y);
       return;
     }
 
@@ -4880,11 +4866,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         return;
       }
 
-      if (e.button === 0) {
-        beginDrag({type:"marquee", x0: mouse.x, y0: mouse.y, x1: mouse.x, y1: mouse.y, additive});
-        return;
-      }
-
+      beginDrag({type:"marquee", x0: mouse.x, y0: mouse.y, x1: mouse.x, y1: mouse.y, additive});
       return;
     }
 
@@ -4980,6 +4962,23 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       setStatus("Select a line (click near it).", "warn");
       return;
     }
+  }
+
+  canvas.addEventListener("mousedown", (e) => {
+    if (modalIsOpen()) return;
+    updateMouseFromEvent(e);
+    mouse.down = true;
+    mouse.button = e.button;
+
+    const additive = e.shiftKey;
+
+    if (toolIsPan()) {
+      beginDrag({type:"pan"});
+      return;
+    }
+
+    if (e.button !== 0) return;
+    handleCanvasPrimaryAction({ additive });
   });
 
   canvas.addEventListener("contextmenu", (e) => {
@@ -5110,8 +5109,13 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     if (e.pointerType !== "touch") return;
     removeTouchPoint(e.pointerId);
     clearLongPressTimer();
+    updateMouseFromEvent(e);
+    const shouldTreatAsTap = touchGesture.mode === "pending" && !mobileInteraction.moved;
     mobileInteraction.pointerDown = false;
     if (mouse.drag) handleMouseUpCommon();
+    if (shouldTreatAsTap) {
+      handleCanvasPrimaryAction();
+    }
     touchGesture.mode = null;
     touchGesture.boxSelectActive = false;
   }
