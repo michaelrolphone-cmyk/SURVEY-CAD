@@ -117,6 +117,10 @@
       padding: 1.2rem;
     }
 
+    #viewerView {
+      padding: 0;
+    }
+
     .home.hidden,
     .viewer.hidden {
       display: none;
@@ -372,8 +376,8 @@
       width: 100%;
       flex: 1;
       min-height: 460px;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 12px;
+      border: 0;
+      border-radius: 0;
     }
 
     @media (max-width: 760px) {
@@ -383,9 +387,7 @@
       }
 
       iframe {
-        border-left: 0;
-        border-right: 0;
-        border-bottom: 0;
+        border: 0;
         border-radius: 0;
       }
     }
