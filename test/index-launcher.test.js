@@ -56,7 +56,7 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
   assert.match(launcherHtml, /id="activeProjectHeader" class="header-meta" aria-live="polite"/, 'header should include active project status region');
   assert.match(launcherHtml, /<a href="\/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<img src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon" \/>/);
-  assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;/i);
+  assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;[\s\S]*background:\s*linear-gradient\(135deg, #facc15, #f97316\);[\s\S]*border-radius:\s*999px;/i, 'header active project should render as a standout pill');
   assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
   assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
   assert.match(launcherHtml, /\.launcher-icon\s*\{[\s\S]*width:\s*84px;[\s\S]*height:\s*84px;/i, 'header launcher icon should render at twice the previous size');
@@ -152,7 +152,7 @@ test('launcher project manager is opened from a button and closes after activati
   assert.match(launcherHtml, /clientContact,\s*[\s\S]*billingRate,\s*[\s\S]*description,/, 'create flow should persist new metadata fields on saved project');
   assert.match(launcherHtml, /setActiveProject\(project\.id\);[\s\S]*saveProjects\(\);[\s\S]*renderProjects\(\);[\s\S]*closeProjectManager\(\);/, 'creating a project should auto-activate and close modal');
   assert.match(launcherHtml, /activeProjectSummary\.textContent\s*=\s*activeProject[\s\S]*'No active project selected\.'/, 'launcher home should show active project summary text');
-  assert.match(launcherHtml, /activeProjectHeader\.textContent\s*=\s*activeProject\s*\?\s*`Active project: \$\{activeProject\.name\}`\s*:\s*'';/, 'launcher header should show active project when selected and clear when none active');
+  assert.match(launcherHtml, /activeProjectHeader\.textContent\s*=\s*activeProject\s*\?\s*`\$\{activeProject\.name\}`\s*:\s*'';/, 'launcher header should show only the active project name when selected and clear when none active');
 });
 
 test('launcher project manager enforces sequential project status progression', async () => {
