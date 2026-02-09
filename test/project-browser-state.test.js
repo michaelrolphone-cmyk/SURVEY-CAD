@@ -134,3 +134,15 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /<embed src="\$\{escapeHtml\(url\)\}" type="application\/pdf" class="pdf-frame" \/>/, 'Print preview should embed each PDF page in order for printing');
   assert.match(projectBrowserHtml, /onclick="window\.print\(\)"/, 'Print preview should include a direct print button');
 });
+
+
+test('Project Browser can open drawing resources directly in LineSmith', async () => {
+  const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+
+  assert.match(projectBrowserHtml, /const\s+LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY\s*=\s*'lineSmithProjectBrowserDrawingImport'/, 'Project Browser should use a stable localStorage key for LineSmith drawing launches');
+  assert.match(projectBrowserHtml, /function\s+launchLineSmithFromDrawingResource\s*\(/, 'Project Browser should define LineSmith launch helper for drawing resources');
+  assert.match(projectBrowserHtml, /destination\.searchParams\.set\('source',\s*'project-browser-drawing'\)/, 'Project Browser should tag drawing launches for LineSmith bootstrap import');
+  assert.match(projectBrowserHtml, /const\s+canOpenLineSmithDrawing\s*=\s*folder\.key\s*===\s*'drawings'\s*&&\s*entry\?\.reference\?\.type\s*===\s*'local-storage'/, 'Project Browser should detect local drawing records as LineSmith-openable');
+  assert.match(projectBrowserHtml, /resource\.addEventListener\('click',\s*\(\)\s*=>\s*launchLineSmithFromDrawingResource\(entry, projectContext\)\)/, 'drawing row tap should launch LineSmith directly');
+  assert.match(projectBrowserHtml, /openButton\.textContent\s*=\s*'Open in LineSmith'/, 'Project Browser should render an Open in LineSmith button for drawing resources');
+});

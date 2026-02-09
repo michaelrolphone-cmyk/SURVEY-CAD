@@ -214,6 +214,7 @@
     import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource } from './src/project-browser-state.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
+    const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
     const ADA_CPF_PDF_BASE = 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/';
 
     const projectLabel = document.getElementById('projectLabel');
@@ -242,6 +243,25 @@
       const parsed = JSON.parse(raw);
       const text = parsed?.text;
       return typeof text === 'string' ? text : null;
+    }
+
+    function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
+      const storageKey = resource?.reference?.value;
+      if (!storageKey) {
+        renderError(`Selected drawing could not be opened. Missing storage key for ${resource?.title || 'resource'}.`);
+        return;
+      }
+
+      localStorage.setItem(LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY, JSON.stringify({
+        storageKey,
+        drawingName: resource.title || resource.id || 'Drawing',
+      }));
+
+      const destination = new URL('/VIEWPORT.HTML', window.location.origin);
+      destination.searchParams.set('source', 'project-browser-drawing');
+      if (projectContext.projectId) destination.searchParams.set('activeProjectId', projectContext.projectId);
+      if (projectContext.projectName) destination.searchParams.set('activeProjectName', projectContext.projectName);
+      openLinkedApp(`${destination.pathname}${destination.search}`);
     }
 
     function launchPointForgeFromResource(resource, projectContext = {}) {
@@ -499,6 +519,7 @@
           resource.className = 'file-row';
 
           const canLaunchPointForge = folder.key === 'point-files' && entry?.reference?.type === 'local-storage';
+          const canOpenLineSmithDrawing = folder.key === 'drawings' && entry?.reference?.type === 'local-storage';
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
 
@@ -522,6 +543,30 @@
             openButton.addEventListener('click', (event) => {
               event.stopPropagation();
               launchPointForgeFromResource(entry, projectContext);
+            });
+            resource.appendChild(openButton);
+          }
+
+          if (canOpenLineSmithDrawing) {
+            resource.classList.add('pointforge-openable');
+            resource.setAttribute('role', 'button');
+            resource.setAttribute('tabindex', '0');
+            resource.title = 'Tap to open this drawing in LineSmith';
+            resource.addEventListener('click', () => launchLineSmithFromDrawingResource(entry, projectContext));
+            resource.addEventListener('keydown', (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              launchLineSmithFromDrawingResource(entry, projectContext);
+            });
+
+            const openButton = document.createElement('button');
+            openButton.type = 'button';
+            openButton.className = 'launch-btn';
+            openButton.textContent = 'Open in LineSmith';
+            openButton.title = 'Loads this saved drawing into LineSmith';
+            openButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              launchLineSmithFromDrawingResource(entry, projectContext);
             });
             resource.appendChild(openButton);
           }

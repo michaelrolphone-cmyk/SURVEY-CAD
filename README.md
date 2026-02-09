@@ -185,6 +185,8 @@ Point-file rows are also directly tappable/clickable (with keyboard Enter/Space 
 CP&F rows in `PROJECT_BROWSER.html` now include **Open PDF** and are also directly tappable/clickable, opening the instrument PDF in a new browser tab/window through `/api/ros-pdf`.
 Project Browser point-file folders now support desktop drag-and-drop uploads and a mobile-friendly **Choose Point Files** picker (`.csv` and `.txt`/`text/csv`), which attaches files to the active project's persisted project-file snapshot for immediate PointForge launch.
 PointForge also now includes a **Switch to Point Editor View** toggle that swaps input/output textareas for a LineSmith-style tabular point editor/read-only output table (`#`, `X`, `Y`, `Z`, `Code`, `Notes`) while keeping transform processing behavior unchanged.
+LineSmith now includes **Project Drawing Saves** so you can name a drawing, save it into the active project's `Drawings` folder, and create differential save versions that can be restored to any prior state.
+Project Browser drawing rows in `PROJECT_BROWSER.html` now include **Open in LineSmith**, launching `VIEWPORT.HTML?source=project-browser-drawing` and auto-loading the latest saved drawing version from project storage.
 PointForge now also includes a **Renumber start** control (default `1`) with a **Renumber Output** action button; standard Process behavior remains unchanged, and sequential repacking is only applied when the renumber button is pressed (for example, start at `1000` to move the set into a new range).
 
 Project Browser → PointForge deep-link command:
@@ -192,6 +194,13 @@ Project Browser → PointForge deep-link command:
 ```bash
 npm start
 open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&activeProjectName=Demo%20Project"
+```
+
+Project Browser → LineSmith drawing deep-link command:
+
+```bash
+npm start
+open "http://localhost:3000/VIEWPORT.HTML?source=project-browser-drawing&activeProjectId=project-123&activeProjectName=Demo%20Project"
 ```
 
 `PROJECT_BROWSER.html` CP&F folder rows now include a **Print all** action that opens a single HTML print-preview window and embeds every CP&F PDF (in listed order) for one-shot browser printing.
@@ -276,6 +285,13 @@ Project Browser deep-link command:
 
 ```bash
 open "http://localhost:3000/PROJECT_BROWSER.html?activeProjectId=project-123&activeProjectName=Demo%20Project"
+```
+
+Project Browser → LineSmith drawing deep-link command:
+
+```bash
+npm start
+open "http://localhost:3000/VIEWPORT.HTML?source=project-browser-drawing&activeProjectId=project-123&activeProjectName=Demo%20Project"
 ```
 
 Current apps in the catalog:
