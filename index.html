@@ -66,9 +66,16 @@
       text-align: right;
     }
 
+    .launcher-home-link {
+      margin-left: 1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .launcher-icon {
-      width: 42px;
-      height: 42px;
+      width: 84px;
+      height: 84px;
       border-radius: 10px;
       object-fit: contain;
       border: 1px solid rgba(148, 163, 184, 0.4);
@@ -340,8 +347,7 @@
       flex-wrap: wrap;
     }
 
-    button,
-    select {
+    button {
       background: var(--panel);
       color: var(--text);
       border: 1px solid rgba(148, 163, 184, 0.35);
@@ -350,8 +356,7 @@
       font-size: 0.92rem;
     }
 
-    button:hover,
-    select:hover {
+    button:hover {
       background: var(--panel-hover);
     }
 
@@ -393,9 +398,11 @@
 </head>
 <body>
   <header>
-    <img src="/assets/icons/SurveyFoundry.png" alt="SurveyFoundry app icon" class="launcher-icon" />
     <h1>SurveyFoundry App Launcher</h1>
     <span id="activeProjectHeader" class="header-meta" aria-live="polite"></span>
+    <a href="/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">
+      <img src="/assets/icons/SurveyFoundry.png" alt="SurveyFoundry app icon" class="launcher-icon" />
+    </a>
   </header>
 
   <main>
@@ -434,9 +441,6 @@
 
     <section class="viewer hidden" id="viewerView" aria-label="Embedded app viewer">
       <div class="toolbar">
-        <button id="backButton" type="button">← Back to launcher</button>
-        <label for="appSelect" class="active-label">Switch app:</label>
-        <select id="appSelect" aria-label="Switch to another app"></select>
         <button id="reloadButton" type="button">↻ Reload app</button>
       </div>
       <iframe id="appFrame" title="Standalone app"></iframe>
@@ -453,9 +457,7 @@
     const homeView = document.getElementById('homeView');
     const viewerView = document.getElementById('viewerView');
     const appSections = document.getElementById('appSections');
-    const appSelect = document.getElementById('appSelect');
     const appFrame = document.getElementById('appFrame');
-    const backButton = document.getElementById('backButton');
     const reloadButton = document.getElementById('reloadButton');
     const projectNameInput = document.getElementById('projectName');
     const projectClientInput = document.getElementById('projectClient');
@@ -814,7 +816,6 @@
       const resolvedFile = withActiveProject(file);
       currentApp = resolvedFile;
       appFrame.src = resolvedFile;
-      appSelect.value = file;
       homeView.classList.add('hidden');
       viewerView.classList.remove('hidden');
       footerLogoWrap?.classList.add('hidden');
@@ -855,20 +856,12 @@
 
     function renderApps() {
       appSections.innerHTML = '';
-      appSelect.innerHTML = '';
-
       const stableApps = apps.filter((app) => !app.experimental);
       const experimentalApps = apps.filter((app) => app.experimental);
 
       renderAppSection('', stableApps);
       renderAppSection('Experimental', experimentalApps);
 
-      stableApps.concat(experimentalApps).forEach((app) => {
-        const option = document.createElement('option');
-        option.value = app.entryHtml;
-        option.textContent = app.name;
-        appSelect.appendChild(option);
-      });
     }
 
     async function loadApps() {
@@ -884,7 +877,6 @@
       renderApps();
     }
 
-    backButton.addEventListener('click', showHome);
     createProjectButton.addEventListener('click', createProject);
     openProjectManagerButton.addEventListener('click', openProjectManager);
     closeProjectManagerButton.addEventListener('click', closeProjectManager);
@@ -896,10 +888,6 @@
     reloadButton.addEventListener('click', () => {
       if (!currentApp) return;
       appFrame.src = currentApp;
-    });
-
-    appSelect.addEventListener('change', (event) => {
-      openApp(event.target.value);
     });
 
     window.addEventListener('message', (event) => {

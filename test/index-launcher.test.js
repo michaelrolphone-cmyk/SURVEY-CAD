@@ -11,8 +11,6 @@ test('launcher cards show app name, description, and larger icons', async () => 
   assert.match(launcherHtml, /<p class=\"app-description\">\$\{app\.description \|\| ''\}<\/p>/);
   assert.match(launcherHtml, /\.app-card\s*\{[\s\S]*align-items:\s*flex-start;/i);
   assert.doesNotMatch(launcherHtml, /<span>\$\{app\.entryHtml\}<\/span>/);
-  assert.match(launcherHtml, /option\.textContent\s*=\s*app\.name;/);
-  assert.doesNotMatch(launcherHtml, /option\.textContent\s*=\s*`\$\{app\.name\}\s*\(\$\{app\.entryHtml\}\)`;/);
 });
 
 
@@ -27,6 +25,18 @@ test('launcher renders experimental apps in a dedicated section after stable app
   assert.match(launcherHtml, /renderAppSection\('',\s*stableApps\);/, 'launcher should render stable apps before experimental apps');
   assert.match(launcherHtml, /renderAppSection\('Experimental',\s*experimentalApps\);/, 'launcher should render explicit experimental section heading');
   assert.match(launcherHtml, /\.app-section-title\s*\{[\s\S]*text-transform:\s*uppercase;/i, 'launcher should style section heading');
+});
+
+
+
+test('launcher viewer toolbar keeps reload only and removes back/switch controls', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /id="reloadButton"/, 'viewer should keep reload control');
+  assert.doesNotMatch(launcherHtml, /id="backButton"/, 'viewer should remove back-to-launcher button');
+  assert.doesNotMatch(launcherHtml, /id="appSelect"/, 'viewer should remove switch-app dropdown');
+  assert.doesNotMatch(launcherHtml, /backButton\.addEventListener/, 'viewer should no longer wire back button behavior');
+  assert.doesNotMatch(launcherHtml, /appSelect\.addEventListener/, 'viewer should no longer wire app-switch behavior');
 });
 
 test('launcher supports in-iframe app handoff navigation messages', async () => {
@@ -45,10 +55,11 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /<title>SurveyFoundry Launcher<\/title>/);
   assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
   assert.match(launcherHtml, /id="activeProjectHeader" class="header-meta" aria-live="polite"/, 'header should include active project status region');
-  assert.match(launcherHtml, /<img src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon"\s*\/>/);
+  assert.match(launcherHtml, /<a href="\/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<img src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon" \/>/);
   assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;/i);
   assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
   assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
+  assert.match(launcherHtml, /\.launcher-icon\s*\{[\s\S]*width:\s*84px;[\s\S]*height:\s*84px;/i, 'header launcher icon should render at twice the previous size');
   assert.match(launcherHtml, /\.footer-logo-wrap\s*\{[\s\S]*justify-content:\s*center;/i);
   assert.match(launcherHtml, /\.footer-logo-wrap\.hidden\s*\{[\s\S]*display:\s*none;/i);
   assert.match(launcherHtml, /\.footer-logo\s*\{[\s\S]*width:\s*min\(1280px, 100vw\);/i);
