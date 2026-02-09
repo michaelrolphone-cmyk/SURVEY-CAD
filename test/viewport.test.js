@@ -290,3 +290,15 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /latestMapGeoreference,/, 'project browser metadata should carry the latest georeference snapshot');
   assert.match(html, /if \(mapLayerState\.enabled\) syncMapToView\(true\);/, 'restoring a drawing should resync map view after georeference hydration');
 });
+
+
+test('VIEWPORT.HTML restores the last project drawing when launched directly with an active project', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+PROJECT_LAST_DRAWING_STORAGE_PREFIX\s*=\s*"surveyfoundryLastLineSmithDrawing"/, 'LineSmith should define a stable storage namespace for the last-opened project drawing');
+  assert.match(html, /function\s+saveLastOpenedProjectDrawing\(projectId, storageKey\)/, 'LineSmith should persist the last-opened drawing key by project');
+  assert.match(html, /saveLastOpenedProjectDrawing\(activeProjectId, storageKey\);/, 'LineSmith should update last-opened drawing state when a project drawing is saved or opened');
+  assert.match(html, /function\s+tryRestoreLastOpenedProjectDrawing\(\)/, 'LineSmith should define a direct-launch restore helper for last-opened drawings');
+  assert.match(html, /if \(queryParams\.get\("source"\)\) return false;/, 'LineSmith should only restore last-opened drawings for direct launches without source');
+  assert.match(html, /const\s+restoredLastDrawing\s*=\s*tryRestoreLastOpenedProjectDrawing\(\);[\s\S]*if \(restoredLastDrawing\) return;/, 'LineSmith boot should restore last-opened drawing before showing default ready state');
+});

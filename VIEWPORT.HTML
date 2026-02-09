@@ -1024,6 +1024,7 @@
   const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
   const PROJECT_DRAWING_STORAGE_PREFIX = "surveyfoundryLineSmithDrawing";
   const PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = "lineSmithProjectBrowserDrawingImport";
+  const PROJECT_LAST_DRAWING_STORAGE_PREFIX = "surveyfoundryLastLineSmithDrawing";
 
   const parseNum = (s, def=0) => {
     const n = Number(String(s).trim());
@@ -3451,6 +3452,20 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     return `${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`;
   }
 
+  function projectLastDrawingStorageKey(projectId) {
+    return `${PROJECT_LAST_DRAWING_STORAGE_PREFIX}:${projectId}`;
+  }
+
+  function saveLastOpenedProjectDrawing(projectId, storageKey) {
+    if (!projectId || !storageKey) return;
+    localStorage.setItem(projectLastDrawingStorageKey(projectId), storageKey);
+  }
+
+  function loadLastOpenedProjectDrawing(projectId) {
+    if (!projectId) return "";
+    return String(localStorage.getItem(projectLastDrawingStorageKey(projectId)) || "").trim();
+  }
+
   function drawingStorageKey(projectId, drawingId) {
     return `${PROJECT_DRAWING_STORAGE_PREFIX}:${projectId}:${drawingId}`;
   }
@@ -3606,6 +3621,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     localStorage.setItem(storageKey, JSON.stringify(record));
     activeDrawingStorageKey = storageKey;
+    saveLastOpenedProjectDrawing(activeProjectId, storageKey);
     upsertProjectDrawingResource({
       projectId: activeProjectId,
       drawingId,
@@ -3669,6 +3685,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         return false;
       }
       activeDrawingStorageKey = storageKey;
+    saveLastOpenedProjectDrawing(activeProjectId, storageKey);
       const drawingName = String(payload?.drawingName || "").trim();
       if (drawingName) $("#drawingName").value = drawingName;
       localStorage.removeItem(PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY);
@@ -3678,6 +3695,22 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       setStatus("Project Browser drawing payload could not be parsed.", "warn");
       return false;
     }
+  }
+
+
+  function tryRestoreLastOpenedProjectDrawing() {
+    if (queryParams.get("source")) return false;
+    if (!activeProjectId) return false;
+    const storageKey = loadLastOpenedProjectDrawing(activeProjectId);
+    if (!storageKey) return false;
+    const restored = restoreDrawingVersion(storageKey, -1);
+    if (!restored) return false;
+    activeDrawingStorageKey = storageKey;
+    const record = loadStoredDrawingRecord(storageKey);
+    const drawingName = String(record?.drawingName || "").trim();
+    if (drawingName) $("#drawingName").value = drawingName;
+    setStatus(`Opened last drawing for project ${activeProjectName || activeProjectId}.`, "ok");
+    return true;
   }
 
   $("#saveDrawingToProject").addEventListener("click", saveDrawingToProject);
@@ -4938,6 +4971,9 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     const importedFromPointforge = tryImportPointforgePayload();
     if (importedFromPointforge) return;
+
+    const restoredLastDrawing = tryRestoreLastOpenedProjectDrawing();
+    if (restoredLastDrawing) return;
 
     setStatus(
       "Ready.\n" +
