@@ -2,6 +2,12 @@ const PROJECT_FILE_SCHEMA_VERSION = '1.0.0';
 
 export const PROJECT_FILE_FOLDERS = [
   {
+    key: 'drawings',
+    label: 'Drawings',
+    description: 'LineSmith drawing packages generated from linked point files.',
+    defaultFormat: 'dxf',
+  },
+  {
     key: 'ros',
     label: 'RoS',
     description: 'Record of Survey source files and exports.',
@@ -18,12 +24,6 @@ export const PROJECT_FILE_FOLDERS = [
     label: 'Point Files',
     description: 'PointForge-managed points exported as CSV.',
     defaultFormat: 'csv',
-  },
-  {
-    key: 'drawings',
-    label: 'Drawings',
-    description: 'LineSmith drawing packages generated from linked point files.',
-    defaultFormat: 'dxf',
   },
   {
     key: 'deeds',
@@ -78,6 +78,12 @@ function normalizeResource(resource, index) {
   };
 }
 
+function getDrawingLastSavedTime(resource) {
+  const savedAt = resource?.reference?.metadata?.latestSavedAt || resource?.reference?.metadata?.savedAt;
+  const parsed = Date.parse(savedAt || '');
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
 export function createProjectFile({
   projectId,
   projectName,
@@ -106,7 +112,11 @@ export function createProjectFile({
       key: folder.key,
       label: folder.label,
       description: folder.description,
-      index: normalizedResources.filter((resource) => resource.folder === folder.key),
+      index: normalizedResources
+        .filter((resource) => resource.folder === folder.key)
+        .sort((a, b) => (folder.key === 'drawings'
+          ? getDrawingLastSavedTime(b) - getDrawingLastSavedTime(a)
+          : 0)),
     })),
   };
 }
