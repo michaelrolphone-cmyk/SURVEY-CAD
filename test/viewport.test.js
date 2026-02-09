@@ -353,4 +353,7 @@ test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch 
   assert.match(html, /if \(mouse\.dragObj\?\.type === "point"\) \{[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'point drag should debounce-send collaboration state updates while dragging');
   assert.match(html, /if \(mouse\.dragObj\?\.type === "line"\) \{[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'line drag should debounce-send collaboration state updates while dragging');
   assert.match(html, /if \(mouse\.dragObj && mouse\.dragObj\.type !== "pan"\) \{[\s\S]*if \(!mouse\.dragObj\._moved\) \{[\s\S]*\} else \{[\s\S]*scheduleCollabStateSync\(\);/, 'drag commit should force a final collaboration state sync after movement');
+
+  assert.match(html, /sendCollabMessage\(\{ type: "state", state: serializeState\(\{ includeView: false \}\) \}\);/, 'collaboration state sync should exclude local view pan and zoom from websocket payloads');
+  assert.match(html, /if \(message\.type === "state" && message\.state\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'remote collaboration state restores should not overwrite local user view pan/zoom');
 });
