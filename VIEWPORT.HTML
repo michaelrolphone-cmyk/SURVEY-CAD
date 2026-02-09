@@ -281,6 +281,40 @@
       margin:2px 1px;
       background:var(--border);
     }
+    .workflowToast{
+      position:absolute;
+      top:58px;
+      right:10px;
+      z-index:6;
+      width:min(340px, calc(100% - 20px));
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:rgba(15,15,15,0.94);
+      padding:10px;
+      box-shadow:0 8px 20px rgba(0,0,0,0.35);
+      backdrop-filter:blur(3px);
+    }
+    .workflowToast.hidden{ display:none; }
+    .workflowToastTitle{ font-weight:700; margin-bottom:4px; }
+    .workflowToastMessage{ color:var(--muted); font-size:11px; margin-bottom:8px; }
+    .workflowToastSteps{ list-style:none; margin:0; padding:0; display:grid; gap:5px; }
+    .workflowToastSteps li{
+      font-size:11px;
+      color:var(--muted);
+      border:1px solid #2b2b2b;
+      border-radius:7px;
+      padding:5px 7px;
+    }
+    .workflowToastSteps li.active{
+      color:#ffe7a0;
+      border-color:#5c4b14;
+      background:#201a09;
+    }
+    .workflowToastSteps li.done{
+      color:#9fd9ac;
+      border-color:#285836;
+      background:#102116;
+    }
     .quickToolField{
       display:inline-flex;
       flex-direction:row;
@@ -899,10 +933,16 @@
       <span class="quickToolDivider" aria-hidden="true"></span>
       <button id="quickExtend" class="quickToolBtn" title="Extend to Intersect" aria-label="Extend"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
       <button id="quickTrimIntersect" class="quickToolBtn" title="Trim to Intersect" aria-label="Trim / Intersect"><i class="fa-solid fa-scissors"></i></button>
+      <button id="quickRotateSelection" class="quickToolBtn" title="Rotate Selection (Reference)" aria-label="Rotate Selection"><i class="fa-solid fa-rotate"></i></button>
       <button id="quickPointManager" class="quickToolBtn" title="Open Points Manager" aria-label="Point Manager"><i class="fa-solid fa-list"></i></button>
     </div>
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>
+    <div id="workflowToast" class="workflowToast hidden" role="status" aria-live="polite" aria-atomic="true">
+      <div id="workflowToastTitle" class="workflowToastTitle"></div>
+      <div id="workflowToastMessage" class="workflowToastMessage"></div>
+      <ol id="workflowToastSteps" class="workflowToastSteps"></ol>
+    </div>
     <div class="commandBar" aria-label="LineSmith command line">
       <input id="commandInput" type="text" placeholder="Command (line, move, rotate, inverse). Example: line 101 205" aria-label="LineSmith command line input" />
       <button id="runCommand" class="primary">Run</button>
@@ -1004,6 +1044,61 @@
     const el = $("#status");
     el.textContent = msg;
     el.className = "status" + (kind ? " " + kind : "");
+  }
+
+  const workflowToastState = {
+    active: false,
+    title: "",
+    message: "",
+    steps: [],
+    currentStepIndex: -1
+  };
+
+  function renderWorkflowToast() {
+    const root = $("#workflowToast");
+    const titleEl = $("#workflowToastTitle");
+    const messageEl = $("#workflowToastMessage");
+    const stepsEl = $("#workflowToastSteps");
+    if (!root || !titleEl || !messageEl || !stepsEl) return;
+
+    if (!workflowToastState.active || !workflowToastState.steps.length) {
+      root.classList.add("hidden");
+      titleEl.textContent = "";
+      messageEl.textContent = "";
+      stepsEl.innerHTML = "";
+      return;
+    }
+
+    root.classList.remove("hidden");
+    titleEl.textContent = workflowToastState.title;
+    messageEl.textContent = workflowToastState.message;
+    stepsEl.innerHTML = "";
+
+    workflowToastState.steps.forEach((step, idx) => {
+      const li = document.createElement("li");
+      li.textContent = step;
+      if (idx < workflowToastState.currentStepIndex) li.classList.add("done");
+      else if (idx === workflowToastState.currentStepIndex) li.classList.add("active");
+      stepsEl.appendChild(li);
+    });
+  }
+
+  function hideWorkflowToast() {
+    workflowToastState.active = false;
+    workflowToastState.title = "";
+    workflowToastState.message = "";
+    workflowToastState.steps = [];
+    workflowToastState.currentStepIndex = -1;
+    renderWorkflowToast();
+  }
+
+  function showWorkflowToast({ title, message, steps, currentStepIndex }) {
+    workflowToastState.active = true;
+    workflowToastState.title = String(title || "");
+    workflowToastState.message = String(message || "");
+    workflowToastState.steps = Array.isArray(steps) ? steps.map((item) => String(item)) : [];
+    workflowToastState.currentStepIndex = clamp(Number(currentStepIndex) || 0, 0, Math.max(0, workflowToastState.steps.length - 1));
+    renderWorkflowToast();
   }
 
   function deepClone(value) {
@@ -1355,7 +1450,8 @@
     active: false,
     step: 0,
     basePoint: null,
-    fromPoint: null
+    fromPoint: null,
+    awaitingSelection: false
   };
 
   // Construction
@@ -1900,25 +1996,52 @@
     return [...ids];
   }
 
+  const rotateWorkflowSteps = [
+    "Select items to rotate",
+    "Select a point to rotate around",
+    "Select a basis of rotation",
+    "Select a target rotation"
+  ];
+
+  function syncRotateWorkflowToast() {
+    if (!rotateSelectionSession.active) {
+      hideWorkflowToast();
+      return;
+    }
+    const stepIndex = rotateSelectionSession.awaitingSelection ? 0 : clamp(rotateSelectionSession.step + 1, 1, rotateWorkflowSteps.length - 1);
+    showWorkflowToast({
+      title: "Rotate Selection Workflow",
+      message: rotateWorkflowSteps[stepIndex],
+      steps: rotateWorkflowSteps,
+      currentStepIndex: stepIndex
+    });
+  }
+
   function cancelRotateSelectionSession(silent=true) {
     rotateSelectionSession.active = false;
     rotateSelectionSession.step = 0;
     rotateSelectionSession.basePoint = null;
     rotateSelectionSession.fromPoint = null;
+    rotateSelectionSession.awaitingSelection = false;
+    hideWorkflowToast();
     if (!silent) setStatus("Rotate selection canceled.", "warn");
   }
 
   function startRotateSelectionSession() {
-    const rotateIds = getRotatablePointIdsFromSelection();
-    if (!rotateIds.length) {
-      setStatus("Select at least one point or line to rotate.", "warn");
-      return;
-    }
     rotateSelectionSession.active = true;
     rotateSelectionSession.step = 0;
     rotateSelectionSession.basePoint = null;
     rotateSelectionSession.fromPoint = null;
-    setStatus("Rotate selection: click base point.", "ok");
+    const rotateIds = getRotatablePointIdsFromSelection();
+    rotateSelectionSession.awaitingSelection = !rotateIds.length;
+
+    if (rotateSelectionSession.awaitingSelection) {
+      setTool("select");
+      setStatus("Select items to rotate with a window or click selection, then continue the rotate picks.", "warn");
+    } else {
+      setStatus("Rotate selection: click base point.", "ok");
+    }
+    syncRotateWorkflowToast();
   }
 
   function resolveRotatePickWorldPoint(screenX, screenY) {
@@ -1962,11 +2085,25 @@
   }
 
   function handleRotateSelectionCanvasPick(screenX, screenY) {
+    if (rotateSelectionSession.awaitingSelection) {
+      const rotateIds = getRotatablePointIdsFromSelection();
+      if (!rotateIds.length) {
+        setStatus("Select items to rotate before picking a rotate point.", "warn");
+        syncRotateWorkflowToast();
+        return;
+      }
+      rotateSelectionSession.awaitingSelection = false;
+      rotateSelectionSession.step = 0;
+      setStatus("Selection captured. Click base point.", "ok");
+      syncRotateWorkflowToast();
+    }
+
     const picked = resolveRotatePickWorldPoint(screenX, screenY);
     if (rotateSelectionSession.step === 0) {
       rotateSelectionSession.basePoint = picked;
       rotateSelectionSession.step = 1;
       setStatus(`Base point set at ${picked.label}. Click reference-angle point.`, "ok");
+      syncRotateWorkflowToast();
       return;
     }
 
@@ -1979,6 +2116,7 @@
       rotateSelectionSession.fromPoint = picked;
       rotateSelectionSession.step = 2;
       setStatus(`Reference angle set from base to ${picked.label}. Click target-angle point.`, "ok");
+      syncRotateWorkflowToast();
       return;
     }
 
@@ -2634,6 +2772,7 @@
   $("#quickCenter")?.addEventListener("click", () => $("#zoomAllAndCenter").click());
   $("#quickExtend")?.addEventListener("click", () => $("#extendToIntersect").click());
   $("#quickTrimIntersect")?.addEventListener("click", () => $("#trimToIntersect").click());
+  $("#quickRotateSelection")?.addEventListener("click", () => startRotateSelectionSession());
   $("#quickPointManager")?.addEventListener("click", () => openPointsManagerBtn?.click());
 
   $("#zoomExtents").addEventListener("click", () => zoomExtents());
@@ -4046,7 +4185,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     const pid = pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
-    if (rotateSelectionSession.active) {
+    if (rotateSelectionSession.active && !rotateSelectionSession.awaitingSelection) {
       if (e.button === 0) handleRotateSelectionCanvasPick(mouse.x, mouse.y);
       return;
     }
@@ -4063,6 +4202,14 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length-1] : null;
         updatePointEditorFromSelection();
         schedulePointsTableRender();
+        if (rotateSelectionSession.active) {
+          if (rotateSelectionSession.awaitingSelection && getRotatablePointIdsFromSelection().length) {
+            rotateSelectionSession.awaitingSelection = false;
+            rotateSelectionSession.step = 0;
+            setStatus("Selection captured. Click base point.", "ok");
+          }
+          syncRotateWorkflowToast();
+        }
 
         const p = points.get(pid);
         if (selectedPointId === pid && isMovable(p?.movable)) {
@@ -4083,6 +4230,14 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length-1].lineId : null;
         updatePointEditorFromSelection();
         schedulePointsTableRender();
+        if (rotateSelectionSession.active) {
+          if (rotateSelectionSession.awaitingSelection && getRotatablePointIdsFromSelection().length) {
+            rotateSelectionSession.awaitingSelection = false;
+            rotateSelectionSession.step = 0;
+            setStatus("Selection captured. Click base point.", "ok");
+          }
+          syncRotateWorkflowToast();
+        }
 
         const ln = lines.get(lpick.lineId);
         if (isMovable(ln?.movable)) {
@@ -4439,6 +4594,15 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     updatePointEditorFromSelection();
     schedulePointsTableRender();
     setStatus(`Window selected: ${ptsIn.length} point(s), ${lnsIn.length} line(s).`, "ok");
+    if (rotateSelectionSession.active) {
+      const rotateIds = getRotatablePointIdsFromSelection();
+      if (rotateSelectionSession.awaitingSelection && rotateIds.length) {
+        rotateSelectionSession.awaitingSelection = false;
+        rotateSelectionSession.step = 0;
+        setStatus(`Window selected: ${ptsIn.length} point(s), ${lnsIn.length} line(s). Click base point.`, "ok");
+      }
+      syncRotateWorkflowToast();
+    }
   }
 
   // ADDED: common mouseup handler + window-level mouseup to prevent stuck pan/drags
