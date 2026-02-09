@@ -500,6 +500,21 @@
       flex-direction:column;
       gap:10px;
     }
+    .connectLinesModalWindow{
+      position:relative;
+      width:min(360px, calc(100vw - 36px));
+      height:auto;
+      min-width:0;
+      min-height:0;
+      resize:none;
+    }
+    .connectLinesModalWindow .modalHeader{ cursor:default; }
+    .connectLinesModalBody{
+      height:auto;
+      overflow:visible;
+      flex-direction:row;
+      justify-content:flex-end;
+    }
     .tableWrap{
       border:1px solid var(--border);
       border-radius:12px;
@@ -1005,6 +1020,18 @@
   </div>
 </div>
 
+<div id="connectLinesModal" class="modalOverlay hidden" aria-hidden="true">
+  <div class="modalWindow connectLinesModalWindow">
+    <div class="modalHeader">
+      <b>Connect Lines</b>
+    </div>
+    <div class="modalBody connectLinesModalBody">
+      <button id="connectLinesSequential" class="primary">Sequentially</button>
+      <button id="connectLinesByDistance">By Distance</button>
+    </div>
+  </div>
+</div>
+
 <script
   src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -1475,6 +1502,9 @@
   const modalPointsCount = $("#modalPointsCount");
   const openPointsManagerBtn = $("#openPointsManager");
   const closePointsManagerBtn = $("#closePointsManager");
+  const connectLinesModal = $("#connectLinesModal");
+  const connectLinesSequentialBtn = $("#connectLinesSequential");
+  const connectLinesByDistanceBtn = $("#connectLinesByDistance");
 
   // -------------------------
   // Model
@@ -3094,7 +3124,39 @@
   // -------------------------
   // Modal (Points Manager)
   // -------------------------
-  function modalIsOpen(){ return !modal.classList.contains("hidden"); }
+  function modalIsOpen(){
+    return !modal.classList.contains("hidden") || !connectLinesModal.classList.contains("hidden");
+  }
+
+  function askConnectLinesOrder() {
+    return new Promise((resolve) => {
+      connectLinesModal.classList.remove("hidden");
+      connectLinesModal.setAttribute("aria-hidden", "false");
+
+      function cleanup(choice) {
+        connectLinesModal.classList.add("hidden");
+        connectLinesModal.setAttribute("aria-hidden", "true");
+        connectLinesSequentialBtn.removeEventListener("click", onSequential);
+        connectLinesByDistanceBtn.removeEventListener("click", onByDistance);
+        window.removeEventListener("keydown", onKeydown);
+        resolve(choice);
+      }
+
+      const onSequential = () => cleanup("sequential");
+      const onByDistance = () => cleanup("distance");
+      const onKeydown = (e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          cleanup("sequential");
+        }
+      };
+
+      connectLinesSequentialBtn.addEventListener("click", onSequential);
+      connectLinesByDistanceBtn.addEventListener("click", onByDistance);
+      window.addEventListener("keydown", onKeydown);
+      connectLinesSequentialBtn.focus();
+    });
+  }
 
   function openModal() {
     modal.classList.remove("hidden");
@@ -4027,7 +4089,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     syncToolWorkflowToast();
   });
 
-  function runLineBetweenSelectedPoints({ returnToSelectionTool = false } = {}) {
+  async function runLineBetweenSelectedPoints({ returnToSelectionTool = false } = {}) {
     if (selectedPointIds.length < 2) {
       setStatus("Select at least two points (Shift-click to multi-select, or window-drag).", "warn");
       return;
@@ -4129,10 +4191,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     let connectIds = ids;
     let connectionLabel = "selection order";
     if (shouldSuggestNearestNonConnectedOrder(ids)) {
-      const useNearestOrder = window.confirm(
-        "Some selected points are closer to a different non-connected selected point than to their sequential point number.\n\nClick OK to connect by nearest non-connected selected points, or Cancel to keep sequential selected-point order."
-      );
-      if (useNearestOrder) {
+      const orderChoice = await askConnectLinesOrder();
+      if (orderChoice === "distance") {
         connectIds = buildNearestNonConnectedOrder(ids);
         connectionLabel = "nearest non-connected selected points";
       }

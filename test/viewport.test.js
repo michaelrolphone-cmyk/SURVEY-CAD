@@ -29,7 +29,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickRotateSelection"[\s\S]*fa-rotate/, 'quick toolbar should include Rotate Selection icon shortcut');
   assert.match(html, /id="quickPointManager"[\s\S]*fa-list/, 'quick toolbar should include Point Manager icon shortcut');
   assert.match(html, /function\s+startLineByPointsFromToolbar\(\)\s*\{[\s\S]*if \(selectedPointIds\.length >= 2\) \{[\s\S]*runLineBetweenSelectedPoints\(\{ returnToSelectionTool: true \}\);[\s\S]*setTool\("line2pt"\);/, 'quick Line by Points should run line-between-selected when points are preselected and otherwise enter two-point draw mode');
-  assert.match(html, /function\s+runLineBetweenSelectedPoints\(\{ returnToSelectionTool = false \} = \{\}\)[\s\S]*if \(returnToSelectionTool\) setTool\("select"\);/, 'line-between-selected workflow should optionally return to selection tool after completion');
+  assert.match(html, /async\s+function\s+runLineBetweenSelectedPoints\(\{ returnToSelectionTool = false \} = \{\}\)[\s\S]*if \(returnToSelectionTool\) setTool\("select"\);/, 'line-between-selected workflow should optionally return to selection tool after completion');
   assert.match(html, /\$\("#quickSave"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#saveDrawingToProject"\)\.click\(\)\)/, 'quick Save should trigger the existing save drawing workflow');
   assert.match(html, /\$\("#quickExtend"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#extendToIntersect"\)\.click\(\)\)/, 'quick Extend should delegate to existing extend action');
   assert.match(html, /\$\("#quickTrimIntersect"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#trimToIntersect"\)\.click\(\)\)/, 'quick Trim\/Intersect should delegate to existing trim action');
@@ -45,7 +45,8 @@ test('VIEWPORT.HTML line-between-selected prompts for nearest non-connected orde
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+shouldSuggestNearestNonConnectedOrder\(pointIds\)/, 'line-between-selected should detect when sequential numbering creates longer hops than nearest selected non-connected neighbors');
-  assert.match(html, /window\.confirm\([\s\S]*nearest non-connected selected points[\s\S]*sequential selected-point order/, 'line-between-selected should prompt the user to choose nearest non-connected or sequential ordering');
+  assert.match(html, /id="connectLinesModal"[\s\S]*<b>Connect Lines<\/b>[\s\S]*Sequentially[\s\S]*By Distance/, 'line-between-selected should present a Connect Lines modal with Sequentially and By Distance actions');
+  assert.match(html, /function\s+askConnectLinesOrder\(\)\s*\{[\s\S]*cleanup\("sequential"\)[\s\S]*cleanup\("distance"\)/, 'line-between-selected should resolve ordering through modal button handlers instead of a browser confirm prompt');
   assert.match(html, /function\s+buildNearestNonConnectedOrder\(pointIds\)/, 'line-between-selected should build a nearest-neighbor order that prefers non-connected selected points');
   assert.match(html, /Created \$\{created\} line\(s\) using \$\{connectionLabel\}:/, 'line-between-selected status message should report which ordering mode was used');
 });
