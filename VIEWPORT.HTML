@@ -787,11 +787,11 @@
           </select>
         </label>
         <label>Map opacity
-          <input id="mapOpacity" type="range" min="0" max="100" step="1" value="10" />
-          <span class="mini" id="mapOpacityValue">10%</span>
+          <input id="mapOpacity" type="range" min="0" max="100" step="1" value="66" />
+          <span class="mini" id="mapOpacityValue">66%</span>
         </label>
       </div>
-      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching. Map layer starts off and defaults to 10% opacity when enabled.</div>
+      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching. Map layer defaults to 66% opacity when enabled.</div>
     </div>
 
     <div class="section">
@@ -1508,7 +1508,7 @@
   const mapLayerState = {
     enabled: false,
     tileType: "satellite",
-    opacity: 0.1
+    opacity: 0.66
   };
 
   const FEET_TO_METERS = 0.3048006096012192;
@@ -3271,6 +3271,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       }
       importCsvText(payload.csv, "PointForge import");
       const aligned = syncViewToGeoreference(payload);
+      setMapLayerEnabled(true);
       if (aligned && mapLayerState.enabled) {
         syncMapToView(true);
       }
@@ -4741,8 +4742,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     window.addEventListener("resize", resize);
     mapEnabledInput.checked = false;
     mapTileTypeInput.value = "satellite";
-    mapOpacityInput.value = "10";
-    mapLayerState.opacity = 0.1;
+    mapOpacityInput.value = "66";
+    mapLayerState.opacity = 0.66;
     applyMapOpacity();
     setMapLayerEnabled(false);
     setTool("select");
