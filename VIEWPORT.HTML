@@ -1454,6 +1454,8 @@
     fromPoint: null,
     awaitingSelection: false
   };
+  let lastUnlockedEntity = null; // { type: "point"|"line", id }
+  let pendingEscapeLockEntity = null;
 
   // Construction
   let tool = "select";
@@ -2809,6 +2811,43 @@
     setStatus("Selection cleared.", "");
   }
 
+  function rememberLastUnlockedEntity(type, id, isUnlocked) {
+    if (isUnlocked) {
+      lastUnlockedEntity = { type, id };
+      return;
+    }
+    if (lastUnlockedEntity?.type === type && lastUnlockedEntity?.id === id) {
+      lastUnlockedEntity = null;
+      pendingEscapeLockEntity = null;
+    }
+  }
+
+  function lockLastUnlockedEntityFromEscape() {
+    if (!lastUnlockedEntity) return false;
+    const { type, id } = lastUnlockedEntity;
+
+    if (type === "point") {
+      const p = points.get(id);
+      if (!p || !isMovable(p.movable)) return false;
+      history.push("lock point by escape");
+      p.movable = false;
+      setStatus(`Locked point ${p.num} via Escape.`, "ok");
+    } else if (type === "line") {
+      const ln = lines.get(id);
+      if (!ln || !isMovable(ln.movable)) return false;
+      history.push("lock line by escape");
+      ln.movable = false;
+      setStatus(`Locked line ${ln.id} via Escape.`, "ok");
+    } else {
+      return false;
+    }
+
+    lastUnlockedEntity = null;
+    pendingEscapeLockEntity = null;
+    schedulePointsTableRender();
+    return true;
+  }
+
   function hasSelection() {
     return selectedPointIds.length > 0 || selectedLines.length > 0;
   }
@@ -2838,10 +2877,33 @@
     return canceled;
   }
 
-  function runCanvasCancelOrClearAction() {
+  function runCanvasCancelOrClearAction({ trigger = "generic" } = {}) {
     if (modalIsOpen()) return;
-    if (cancelActiveCanvasCommand()) return;
-    if (hasSelection()) clearSelection();
+    if (cancelActiveCanvasCommand()) {
+      pendingEscapeLockEntity = null;
+      return;
+    }
+    if (hasSelection()) {
+      clearSelection();
+      pendingEscapeLockEntity = null;
+      return;
+    }
+
+    if (trigger === "escape" && lastUnlockedEntity) {
+      const sameEntityPending = pendingEscapeLockEntity
+        && pendingEscapeLockEntity.type === lastUnlockedEntity.type
+        && pendingEscapeLockEntity.id === lastUnlockedEntity.id;
+
+      if (sameEntityPending) {
+        lockLastUnlockedEntityFromEscape();
+      } else {
+        pendingEscapeLockEntity = { ...lastUnlockedEntity };
+        setStatus("Press Escape again to lock the last unlocked point/line.", "warn");
+      }
+      return;
+    }
+
+    pendingEscapeLockEntity = null;
   }
 
   function doDeleteSelected() {
@@ -4142,7 +4204,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     if (!typing && e.key === "Escape") {
       e.preventDefault();
-      runCanvasCancelOrClearAction();
+      runCanvasCancelOrClearAction({ trigger: "escape" });
     }
 
     if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey) {
@@ -4172,6 +4234,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       history.push("toggle point movable");
       const p = points.get(pid);
       p.movable = !isMovable(p.movable);
+      rememberLastUnlockedEntity("point", pid, isMovable(p.movable));
       setStatus(`Point ${p.num} is now ${isMovable(p.movable) ? "MOVABLE (drag enabled)" : "LOCKED (drag disabled)"}.`, "ok");
       schedulePointsTableRender();
       return;
@@ -4180,6 +4243,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       history.push("toggle line movable");
       const ln = lines.get(lpick.lineId);
       ln.movable = !isMovable(ln.movable);
+      rememberLastUnlockedEntity("line", lpick.lineId, isMovable(ln.movable));
       setStatus(`Line ${ln.id} is now ${isMovable(ln.movable) ? "MOVABLE (drag enabled)" : "LOCKED (drag disabled)"}.`, "ok");
       schedulePointsTableRender();
       return;
