@@ -968,6 +968,7 @@
     const PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeProjectBrowserImport";
     const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
     const POINTFORGE_POINT_SET_STORAGE_PREFIX = "pointforgePointSet";
+    const PROJECT_LAST_POINT_SET_PREFIX = "surveyfoundryLastPointforgePointSet";
 
     let latestOutputText = "";
     let latestTransformed = null;
@@ -1073,6 +1074,34 @@
 
     function pointSetStorageKey(setId){
       return `${POINTFORGE_POINT_SET_STORAGE_PREFIX}:${setId}`;
+    }
+
+    function projectLastPointSetKey(projectId){
+      return `${PROJECT_LAST_POINT_SET_PREFIX}:${projectId}`;
+    }
+
+    function saveLastOpenedProjectPointSet(projectId, storageKey){
+      if (!projectId || !storageKey) return;
+      localStorage.setItem(projectLastPointSetKey(projectId), storageKey);
+    }
+
+    function loadLastOpenedProjectPointSet(projectId){
+      if (!projectId) return "";
+      return String(localStorage.getItem(projectLastPointSetKey(projectId)) || "").trim();
+    }
+
+    function loadStoredPointSet(storageKey){
+      if (!storageKey) return null;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return null;
+        if (!String(parsed.text || "").trim()) return null;
+        return parsed;
+      } catch {
+        return null;
+      }
     }
 
     function getProjectContext(){
@@ -1232,7 +1261,35 @@
 
       projectFile.generatedAt = isoTimestamp;
       saveProjectFileSnapshot(projectContext.projectId, projectFile);
+      if (kind === "import") saveLastOpenedProjectPointSet(projectContext.projectId, storageKey);
       return storageKey;
+    }
+
+    function tryRestoreLastOpenedProjectPointSet(){
+      const params = new URLSearchParams(window.location.search || "");
+      if (params.get("source")) return false;
+
+      const projectContext = getProjectContext();
+      if (!projectContext.projectId) return false;
+
+      const storageKey = loadLastOpenedProjectPointSet(projectContext.projectId);
+      if (!storageKey) return false;
+
+      const pointSet = loadStoredPointSet(storageKey);
+      if (!pointSet) return false;
+
+      const title = normalizeBaseName(pointSet.fileName, "Last Opened Point Set");
+      currentImportContext = {
+        sourceType: "last-opened",
+        sourceLabel: title,
+        baseName: title,
+        extension: normalizeExtension(pointSet.fileName, ".txt"),
+      };
+      elIn.value = String(pointSet.text);
+      processNow();
+      refreshPointEditorTables();
+      elMapHint.innerHTML = `<span class="ok">Opened last point file for this active project: ${escapeHtml(title)}.</span>`;
+      return true;
     }
 
     function initMap(){
@@ -1648,6 +1705,7 @@
     });
     tryImportRosPayload();
     tryImportProjectBrowserPayload();
+    tryRestoreLastOpenedProjectPointSet();
   </script>
 </body>
 </html>
