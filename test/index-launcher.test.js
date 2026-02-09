@@ -56,6 +56,7 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /<h1>SurveyFoundry App Launcher<\/h1>/);
   assert.match(launcherHtml, /id="activeProjectHeader" class="header-meta" aria-live="polite"/, 'header should include active project status region');
   assert.match(launcherHtml, /<a href="\/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<img src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon" \/>/);
+  assert.match(launcherHtml, /<header>[\s\S]*<a href="\/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<\/a>[\s\S]*<h1>SurveyFoundry App Launcher<\/h1>/, 'header should place launcher icon link before app title text on the left');
   assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;[\s\S]*background:\s*linear-gradient\(135deg, #facc15, #f97316\);[\s\S]*border-radius:\s*999px;/i, 'header active project should render as a standout pill');
   assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
   assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
