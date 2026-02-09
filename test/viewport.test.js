@@ -243,7 +243,7 @@ test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate 
   assert.match(html, /if \(activeTool === "lineDB"\) \{[\s\S]*Select start point[\s\S]*Enter distance \+ bearing[\s\S]*Click Create Point \+ Line/, 'line distance-bearing tool should publish select-input-submit guidance in toast steps');
   assert.match(html, /if \(activeTool === "pointOnLine"\) \{[\s\S]*Select line[\s\S]*Enter station \+ offset[\s\S]*Click Create Point/, 'point-on-line tool should publish select-input-submit guidance in toast steps');
   assert.match(html, /const\s+lineIntersectionCommandSession\s*=\s*\{[\s\S]*active:\s*false,[\s\S]*mode:\s*""[\s\S]*\};/, 'extend/trim intersection workflows should track an explicit staged command session state');
-  assert.match(html, /function\s+syncLineIntersectionCommandToast\(\)\s*\{[\s\S]*Extend to Intersect Workflow[\s\S]*Trim to Intersect Workflow[\s\S]*Select first line[\s\S]*Select second line/, 'extend/trim should show workflow toast guidance while gathering two selected lines');
+  assert.match(html, /function\s+syncLineIntersectionCommandToast\(\)\s*\{[\s\S]*const\s+firstStep\s*=\s*isTrim\s*\?\s*"Select trim boundary line"\s*:\s*"Select first line";[\s\S]*const\s+secondStep\s*=\s*isTrim\s*\?\s*"Select line to trim \(click desired side\)"\s*:\s*"Select second line";/, 'extend/trim should show workflow toast guidance while gathering two selected lines, including trim-first boundary and trim-side targeting guidance');
   assert.match(html, /function\s+startLineIntersectionCommand\(mode\)[\s\S]*setTool\("select"\);[\s\S]*Line \$\{mode\}: select two lines to continue\./, 'starting extend/trim without selected lines should switch to select mode and prompt the user');
   assert.match(html, /function\s+syncToolWorkflowToast\(\) \{[\s\S]*if \(lineIntersectionCommandSession\.active\) return;[\s\S]*if \(rotateSelectionSession\.active\) return;[\s\S]*showWorkflowToast\(payload\);/, 'tool workflow sync should defer while line-intersection command guidance is active');
   assert.match(html, /const\s+rotateWorkflowSteps\s*=\s*\[[\s\S]*Select items to rotate[\s\S]*Select a point to rotate around[\s\S]*Select a basis of rotation[\s\S]*Select a target rotation[\s\S]*\]/, 'rotate flow should publish step-by-step guidance labels');
@@ -263,6 +263,15 @@ test('VIEWPORT.HTML right-click cancels active command before clearing selection
   assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*runCanvasCancelOrClearAction\(\);/, 'context-menu right-click should run the shared cancel-or-clear workflow');
   assert.match(html, /function\s+runCanvasCancelOrClearAction\(\{ trigger = "generic" \} = \{\}\)\s*\{[\s\S]*if \(trigger === "escape" && lastUnlockedEntity\) \{[\s\S]*lockLastUnlockedEntityFromEscape\(\);[\s\S]*Press Escape again to lock the last unlocked point\/line\./, 'Escape cancel routine should support double-escape locking of the last unlocked point/line when nothing is selected');
   assert.match(html, /window\.addEventListener\("keydown", \(e\) => \{[\s\S]*if \(!typing && e\.key === "Escape"\) \{[\s\S]*runCanvasCancelOrClearAction\(\{ trigger: "escape" \}\);/, 'Escape should call cancel-or-clear with escape trigger metadata for double-escape lock behavior');
+});
+
+
+test('VIEWPORT.HTML trim-to-intersect resolves trim side from click side on second selected line', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+trimGripFromClickSide\(activeSelection, hitParam\)\s*\{[\s\S]*return activeSelection\.t < hitParam \? "a" : "b";/, 'trim should derive endpoint grip from whether second-line click happened before or after the intersection along that line');
+  assert.match(html, /\$\("#trimToIntersect"\)\.addEventListener\("click", \(\) => \{[\s\S]*const\s+hitT\s*=\s*pointOnLineParam\(\{x:hit\.x, y:hit\.y\}, A, B\);[\s\S]*const\s+trimGrip\s*=\s*trimGripFromClickSide\(active, hitT\);[\s\S]*active\.grip\s*=\s*trimGrip;/, 'trim command should recompute active grip using second-line click side before moving endpoint to the intersection');
+  assert.match(html, /setStatus\(`Trimmed active line \(grip \$\{trimGrip\.toUpperCase\(\)\}\) to intersection at \(\$\{fmt\(hit\.x\)\}, \$\{fmt\(hit\.y\)\}\)\.`, "ok"\);/, 'trim status should report the side-derived grip endpoint that was trimmed');
 });
 
 
