@@ -77,6 +77,22 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .launcher-back-chevron {
+      display: none;
+      font-size: 2rem;
+      line-height: 1;
+      color: var(--text);
+      filter: drop-shadow(0 3px 8px rgba(15, 23, 42, 0.6));
+    }
+
+    .launcher-home-link.app-open .launcher-back-chevron {
+      display: inline-block;
     }
 
     .launcher-icon {
@@ -393,10 +409,11 @@
 </head>
 <body>
   <header>
-    <a href="/" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">
-      <img src="/assets/icons/SurveyFoundry.png" alt="SurveyFoundry app icon" class="launcher-icon" />
+    <a href="/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">
+      <span id="launcherBackChevron" class="launcher-back-chevron" aria-hidden="true">‹</span>
+      <img id="launcherHeaderIcon" src="/assets/icons/SurveyFoundry.png" alt="SurveyFoundry app icon" class="launcher-icon" />
     </a>
-    <h1>SurveyFoundry App Launcher</h1>
+    <h1 id="launcherHeaderTitle">SurveyFoundry App Launcher</h1>
     <span id="activeProjectHeader" class="header-meta" aria-live="polite"></span>
   </header>
 
@@ -464,6 +481,13 @@
     const activeProjectSummary = document.getElementById('activeProjectSummary');
     const activeProjectHeader = document.getElementById('activeProjectHeader');
     const footerLogoWrap = document.querySelector('.footer-logo-wrap');
+    const launcherHomeLink = document.getElementById('launcherHomeLink');
+    const launcherHeaderIcon = document.getElementById('launcherHeaderIcon');
+    const launcherHeaderTitle = document.getElementById('launcherHeaderTitle');
+
+    const LAUNCHER_HOME_ICON = '/assets/icons/SurveyFoundry.png';
+    const LAUNCHER_HOME_ICON_ALT = 'SurveyFoundry app icon';
+    const LAUNCHER_HOME_TITLE = 'SurveyFoundry App Launcher';
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
     const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
@@ -801,6 +825,28 @@
       footerLogoWrap?.classList.remove('hidden');
       currentApp = null;
       appFrame.removeAttribute('src');
+      launcherHomeLink.classList.remove('app-open');
+      launcherHomeLink.setAttribute('aria-label', 'Go to SurveyFoundry launcher home page');
+      launcherHeaderIcon.src = LAUNCHER_HOME_ICON;
+      launcherHeaderIcon.alt = LAUNCHER_HOME_ICON_ALT;
+      launcherHeaderTitle.textContent = LAUNCHER_HOME_TITLE;
+    }
+
+    function getAppByEntryFile(file) {
+      const [entryFile] = String(file || '').split('?');
+      const normalizedEntryFile = (entryFile || '').replace(/^\//, '');
+      return apps.find((app) => app.entryHtml === normalizedEntryFile) || null;
+    }
+
+    function updateHeaderForApp(file) {
+      const app = getAppByEntryFile(file);
+      const appName = app?.name || 'Opened app';
+      const appIconPath = app?.iconPath || LAUNCHER_HOME_ICON;
+      launcherHeaderIcon.src = appIconPath;
+      launcherHeaderIcon.alt = `${appName} app icon`;
+      launcherHeaderTitle.textContent = appName;
+      launcherHomeLink.classList.add('app-open');
+      launcherHomeLink.setAttribute('aria-label', `Return to SurveyFoundry home from ${appName}`);
     }
 
     function openApp(file) {
@@ -810,6 +856,7 @@
       homeView.classList.add('hidden');
       viewerView.classList.remove('hidden');
       footerLogoWrap?.classList.add('hidden');
+      updateHeaderForApp(file);
     }
 
     function createAppCard(app) {
@@ -871,6 +918,11 @@
     createProjectButton.addEventListener('click', createProject);
     openProjectManagerButton.addEventListener('click', openProjectManager);
     closeProjectManagerButton.addEventListener('click', closeProjectManager);
+    launcherHomeLink.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (!currentApp) return;
+      showHome();
+    });
     projectModalBackdrop.addEventListener('click', (event) => {
       if (event.target === projectModalBackdrop) {
         closeProjectManager();
