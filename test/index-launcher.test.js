@@ -52,14 +52,19 @@ test('launcher supports in-iframe app handoff navigation messages', async () => 
 
 
 
-test('launcher prompts for save/discard/cancel when leaving app with unsaved LineSmith changes', async () => {
+test('launcher uses a save/discard/cancel modal when leaving app with unsaved LineSmith changes', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
   assert.match(launcherHtml, /function\s+requestAppFrameMessage\(messageType, extraPayload = \{\}\)/, 'launcher should expose iframe request/response helper for navigation guards');
   assert.match(launcherHtml, /messageType\}:response/, 'launcher should expect typed response channels for iframe requests');
   assert.match(launcherHtml, /function\s+confirmNavigateHomeFromApp\(\)/, 'launcher should gate home navigation through unsaved-change confirmation helper');
   assert.match(launcherHtml, /survey-cad:request-unsaved-state/, 'launcher should ask active iframe app for unsaved-change state before leaving');
-  assert.match(launcherHtml, /Type "save" to save before leaving, "discard" to leave without saving, or "cancel" to stay on this page\./, 'launcher prompt should present save/discard/cancel choices');
+  assert.match(launcherHtml, /id="leaveLineSmithModalBackdrop"/, 'launcher should render a dedicated leave-LineSmith modal');
+  assert.match(launcherHtml, /function\s+promptLeaveLineSmithChoice\(\)/, 'launcher should request a modal-based choice instead of prompt text entry');
+  assert.match(launcherHtml, /id="leaveLineSmithSaveButton"/, 'launcher modal should expose save-and-leave action');
+  assert.match(launcherHtml, /id="leaveLineSmithDiscardButton"/, 'launcher modal should expose discard action');
+  assert.match(launcherHtml, /id="leaveLineSmithCancelButton"/, 'launcher modal should expose cancel action');
+  assert.doesNotMatch(launcherHtml, /Type "save" to save before leaving, "discard" to leave without saving, or "cancel" to stay on this page\./, 'launcher should no longer use prompt text input for leave confirmation');
   assert.match(launcherHtml, /survey-cad:request-save-before-navigate/, 'launcher should request in-app save when save option is selected');
   assert.match(launcherHtml, /LineSmith could not save your latest changes\. You are still on the page\./, 'launcher should keep user in app when save attempt fails');
   assert.match(launcherHtml, /launcherHomeLink\.addEventListener\('click', async \(event\) => \{[\s\S]*const canNavigateHome = await confirmNavigateHomeFromApp\(\);[\s\S]*if \(!canNavigateHome\) return;[\s\S]*showHome\(\);/, 'back-chevron click should stay on app when user cancels or save fails');

@@ -228,6 +228,21 @@
       border-bottom: 1px solid rgba(148, 163, 184, 0.2);
     }
 
+    .leave-linesmith-body {
+      margin: 0;
+      padding: 1rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .leave-linesmith-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.45rem;
+      padding: 0 1rem 1rem;
+    }
+
     .project-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -455,6 +470,19 @@
           </div>
         </div>
       </div>
+      <div id="leaveLineSmithModalBackdrop" class="project-modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="Unsaved LineSmith changes dialog">
+        <div class="project-modal" style="width:min(480px, 100%);max-height:none">
+          <div class="project-modal-header">
+            <strong>Leave LineSmith?</strong>
+          </div>
+          <p class="leave-linesmith-body">You have unsaved LineSmith changes. Save before leaving, discard your edits, or cancel and stay in LineSmith.</p>
+          <div class="leave-linesmith-actions">
+            <button id="leaveLineSmithCancelButton" type="button">Cancel</button>
+            <button id="leaveLineSmithDiscardButton" type="button" class="danger-button">Discard changes</button>
+            <button id="leaveLineSmithSaveButton" type="button">Save and leave</button>
+          </div>
+        </div>
+      </div>
       <div class="app-sections" id="appSections"></div>
     </section>
 
@@ -485,6 +513,10 @@
     const openProjectManagerButton = document.getElementById('openProjectManagerButton');
     const closeProjectManagerButton = document.getElementById('closeProjectManagerButton');
     const projectModalBackdrop = document.getElementById('projectModalBackdrop');
+    const leaveLineSmithModalBackdrop = document.getElementById('leaveLineSmithModalBackdrop');
+    const leaveLineSmithSaveButton = document.getElementById('leaveLineSmithSaveButton');
+    const leaveLineSmithDiscardButton = document.getElementById('leaveLineSmithDiscardButton');
+    const leaveLineSmithCancelButton = document.getElementById('leaveLineSmithCancelButton');
     const activeProjectSummary = document.getElementById('activeProjectSummary');
     const activeProjectHeader = document.getElementById('activeProjectHeader');
     const footerLogoWrap = document.querySelector('.footer-logo-wrap');
@@ -522,6 +554,7 @@
     let backgroundRequestToken = 0;
     let localStorageSyncSnapshot = '';
     let localStorageSyncLock = false;
+    let resolveLeaveLineSmithChoice = null;
 
     function requestAppFrameMessage(messageType, extraPayload = {}) {
       if (!currentApp || !appFrame.contentWindow) return Promise.resolve(null);
@@ -547,19 +580,28 @@
       });
     }
 
+    function closeLeaveLineSmithModal(choice = 'cancel') {
+      leaveLineSmithModalBackdrop.classList.add('hidden');
+      if (!resolveLeaveLineSmithChoice) return;
+      const resolveChoice = resolveLeaveLineSmithChoice;
+      resolveLeaveLineSmithChoice = null;
+      resolveChoice(choice);
+    }
+
+    function promptLeaveLineSmithChoice() {
+      leaveLineSmithModalBackdrop.classList.remove('hidden');
+      return new Promise((resolve) => {
+        resolveLeaveLineSmithChoice = resolve;
+      });
+    }
+
     async function confirmNavigateHomeFromApp() {
       const unsavedState = await requestAppFrameMessage('survey-cad:request-unsaved-state');
       if (!unsavedState?.hasUnsavedChanges) return true;
 
-      const choice = window.prompt(
-        'You have unsaved LineSmith changes. Type "save" to save before leaving, "discard" to leave without saving, or "cancel" to stay on this page.',
-        'cancel'
-      );
-      if (choice === null) return false;
-
-      const normalized = choice.trim().toLowerCase();
-      if (normalized === 'discard' || normalized === 'd') return true;
-      if (normalized === 'save' || normalized === 's') {
+      const choice = await promptLeaveLineSmithChoice();
+      if (choice === 'discard') return true;
+      if (choice === 'save') {
         const saveResult = await requestAppFrameMessage('survey-cad:request-save-before-navigate');
         if (saveResult?.saved) return true;
         window.alert('LineSmith could not save your latest changes. You are still on the page.');
@@ -567,6 +609,7 @@
       }
       return false;
     }
+
 
     function setLauncherBackground(mapUrl = '') {
       if (mapUrl) {
@@ -1059,6 +1102,15 @@
       renderApps();
     }
 
+    leaveLineSmithSaveButton.addEventListener('click', () => closeLeaveLineSmithModal('save'));
+    leaveLineSmithDiscardButton.addEventListener('click', () => closeLeaveLineSmithModal('discard'));
+    leaveLineSmithCancelButton.addEventListener('click', () => closeLeaveLineSmithModal('cancel'));
+    leaveLineSmithModalBackdrop.addEventListener('click', (event) => {
+      if (event.target === leaveLineSmithModalBackdrop) {
+        closeLeaveLineSmithModal('cancel');
+      }
+    });
+
     createProjectButton.addEventListener('click', createProject);
     openProjectManagerButton.addEventListener('click', openProjectManager);
     closeProjectManagerButton.addEventListener('click', closeProjectManager);
@@ -1074,6 +1126,13 @@
         closeProjectManager();
       }
     });
+    window.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (!leaveLineSmithModalBackdrop.classList.contains('hidden')) {
+        closeLeaveLineSmithModal('cancel');
+      }
+    });
+
     window.addEventListener('message', (event) => {
       if (event.origin !== window.location.origin) return;
 
