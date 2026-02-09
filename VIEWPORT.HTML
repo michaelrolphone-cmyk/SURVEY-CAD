@@ -2837,6 +2837,12 @@
     return canceled;
   }
 
+  function runCanvasCancelOrClearAction() {
+    if (modalIsOpen()) return;
+    if (cancelActiveCanvasCommand()) return;
+    if (hasSelection()) clearSelection();
+  }
+
   function doDeleteSelected() {
     const hasPts = selectedPointIds.length > 0;
     const hasLns = selectedLines.length > 0;
@@ -4132,9 +4138,9 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       doDeleteSelected();
     }
 
-    if (!typing && e.key === "Escape" && rotateSelectionSession.active) {
+    if (!typing && e.key === "Escape") {
       e.preventDefault();
-      cancelRotateSelectionSession(false);
+      runCanvasCancelOrClearAction();
     }
 
     if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey) {
@@ -4356,12 +4362,9 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   });
 
   canvas.addEventListener("contextmenu", (e) => {
-    if (modalIsOpen()) return;
     e.preventDefault();
     updateMouseFromEvent(e);
-
-    if (cancelActiveCanvasCommand()) return;
-    if (hasSelection()) clearSelection();
+    runCanvasCancelOrClearAction();
   });
 
   canvas.addEventListener("pointerdown", (e) => {
