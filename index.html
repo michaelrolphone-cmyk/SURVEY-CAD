@@ -1140,15 +1140,13 @@
     createProjectButton.addEventListener('click', createProject);
     openProjectManagerButton.addEventListener('click', openProjectManager);
     closeProjectManagerButton.addEventListener('click', closeProjectManager);
-    launcherHomeLink.addEventListener('click', async (event) => {
+    launcherHomeLink.addEventListener('click', (event) => {
       event.preventDefault();
       if (!currentApp) return;
-      const canNavigateHome = await confirmNavigateHomeFromApp();
-      if (!canNavigateHome) return;
       showHome();
     });
 
-    window.addEventListener('popstate', async (event) => {
+    window.addEventListener('popstate', (event) => {
       const state = event.state;
       if (state?.[LAUNCHER_HISTORY_STATE_KEY] === 'app' && state.app) {
         openApp(state.app, { historyMode: 'none' });
@@ -1157,12 +1155,6 @@
 
       if (!currentApp) {
         showHome({ historyMode: 'none' });
-        return;
-      }
-
-      const canNavigateHome = await confirmNavigateHomeFromApp();
-      if (!canNavigateHome) {
-        writeHistoryState(buildAppHistoryState(currentApp), 'push');
         return;
       }
 

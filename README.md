@@ -182,6 +182,7 @@ curl -X POST "http://localhost:3000/extract?maxPages=3&dpi=400&allowSlow=1" \
 ```
 
 `/` defaults to `index.html` (the SurveyFoundry app launcher). The launcher now loads its app tiles from `/api/apps` at runtime, renders each app's `iconPath` SVG icon, and displays app names only on launcher tiles (not raw HTML filenames). `ROS_OCR.html` posts to `/extract`, which is now served by the main `npm start` web server (same behavior as the standalone ROS OCR app).
+When an app is open in the launcher iframe (including LineSmith), clicking the header back chevron now always returns directly to the SurveyFoundry App Launcher home screen without unsaved-change guard prompts.
 
 `VIEWPORT.HTML` drag locking behavior: points and lines are locked by default and can only be drag-moved after you double-click to toggle them to movable. Persisted/imported movable flags now only unlock dragging when the value is strict boolean `true`.
 When no command is active and nothing is selected, `VIEWPORT.HTML` now treats a double right-click the same as double Escape for lock recovery: the first press prompts and the second locks the last unlocked point/line.
