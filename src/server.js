@@ -6,6 +6,7 @@ import SurveyCadClient from './survey-api.js';
 import { createRosOcrApp } from './ros-ocr-api.js';
 import { listApps } from './app-catalog.js';
 import { buildProjectArchivePlan, createProjectFile } from './project-file.js';
+import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -183,6 +184,7 @@ export function createSurveyServer({
   staticDir = DEFAULT_STATIC_DIR,
   rosOcrHandler,
   staticMapFetcher = fetch,
+  localStorageSyncStore = new LocalStorageSyncStore(),
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
@@ -205,6 +207,27 @@ export function createSurveyServer({
         }
         const app = await rosOcrHandlerPromise;
         app(req, res);
+        return;
+      }
+
+
+      if (urlObj.pathname === '/api/localstorage-sync') {
+        if (req.method === 'GET') {
+          sendJson(res, 200, localStorageSyncStore.getState());
+          return;
+        }
+
+        if (req.method === 'POST') {
+          const body = await readJsonBody(req);
+          const result = localStorageSyncStore.syncIncoming({
+            version: body.version,
+            snapshot: body.snapshot,
+          });
+          sendJson(res, 200, result);
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Only GET and POST are supported.' });
         return;
       }
 
