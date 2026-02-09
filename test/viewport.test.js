@@ -176,7 +176,7 @@ test('VIEWPORT.HTML auto-enables map layer when bootstrapping PointForge imports
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'LineSmith should include PointForge launch bootstrap');
-  assert.match(html, /if \(params\.get\("source"\) !== "pointforge"\) return false;/, 'PointForge bootstrap should only trigger from the pointforge source query param');
+  assert.match(html, /if \(launchSource !== "pointforge"\) return false;/, 'PointForge bootstrap should only trigger from the pointforge source query param');
   assert.match(html, /importCsvText\(payload\.csv, "PointForge import"\);[\s\S]*setMapLayerEnabled\(true\);/, 'PointForge imports should default the map layer to enabled after loading points');
 });
 test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out drawer controls', async () => {
@@ -349,7 +349,17 @@ test('VIEWPORT.HTML restores the last project drawing when launched directly wit
   assert.match(html, /saveLastOpenedProjectDrawing\(activeProjectId, storageKey\);/, 'LineSmith should update last-opened drawing state when a project drawing is saved or opened');
   assert.match(html, /function\s+tryRestoreLastOpenedProjectDrawing\(\)/, 'LineSmith should define a direct-launch restore helper for last-opened drawings');
   assert.match(html, /if \(queryParams\.get\("source"\)\) return false;/, 'LineSmith should only restore last-opened drawings for direct launches without source');
-  assert.match(html, /const\s+restoredLastDrawing\s*=\s*tryRestoreLastOpenedProjectDrawing\(\);[\s\S]*if \(restoredLastDrawing\) return;/, 'LineSmith boot should restore last-opened drawing before showing default ready state');
+  assert.match(html, /const\s+restoredLastDrawing\s*=\s*tryRestoreLastOpenedProjectDrawing\(\);[\s\S]*if \(restoredLastDrawing\) \{[\s\S]*connectCollaboration\(\);[\s\S]*return;[\s\S]*\}/, 'LineSmith boot should restore last-opened drawing and then connect collaboration before showing default ready state');
+});
+
+test('VIEWPORT.HTML keeps PointForge imports from being overwritten by prior collaboration room state', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+launchSource\s*=\s*queryParams\.get\("source"\)\s*\|\|\s*"";/, 'LineSmith should cache launch source for import-aware boot decisions');
+  assert.match(html, /function\s+connectCollaboration\(\{\s*skipInitialStateHydration\s*=\s*false,\s*syncLocalStateOnConnect\s*=\s*false\s*\}\s*=\s*\{\}\)\s*\{/, 'collaboration boot should accept options for initial-state hydration and local-state push');
+  assert.match(html, /if \(message\.state && !skipInitialStateHydration\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'PointForge imports should be able to skip applying stale welcome state from collaboration room');
+  assert.match(html, /if \(syncLocalStateOnConnect\) \{[\s\S]*sendCollabMessage\(\{ type: "state", state: serializeState\(\{ includeView: false \}\) \}\);/, 'PointForge imports should publish freshly imported geometry once collaboration connects');
+  assert.match(html, /const\s+importedFromPointforge\s*=\s*tryImportPointforgePayload\(\);[\s\S]*if \(importedFromPointforge\) \{[\s\S]*connectCollaboration\(\{ skipInitialStateHydration: true, syncLocalStateOnConnect: true \}\);[\s\S]*return;[\s\S]*\}/, 'boot should connect collaboration after PointForge import using import-safe options');
 });
 
 test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch cursor movement', async () => {

@@ -1073,6 +1073,7 @@
   const $ = (q)=>document.querySelector(q);
 
   const queryParams = new URLSearchParams(window.location.search);
+  const launchSource = queryParams.get("source") || "";
   const activeProjectId = queryParams.get("activeProjectId") || "";
   const activeProjectName = queryParams.get("activeProjectName") || "";
   const collabRoomParam = queryParams.get("drawingId") || queryParams.get("collabRoom") || "";
@@ -2005,7 +2006,7 @@
     }, 120);
   }
 
-  function connectCollaboration() {
+  function connectCollaboration({ skipInitialStateHydration = false, syncLocalStateOnConnect = false } = {}) {
     const roomId = resolveCollabRoomId();
     if (!roomId) return;
     collab.roomId = roomId;
@@ -2019,6 +2020,9 @@
 
     socket.addEventListener("open", () => {
       setCollabStatus(`connected (${roomId})`);
+      if (syncLocalStateOnConnect) {
+        sendCollabMessage({ type: "state", state: serializeState({ includeView: false }) });
+      }
     });
 
     socket.addEventListener("close", () => {
@@ -2042,7 +2046,7 @@
         for (const peer of (message.peers || [])) {
           collab.peers.set(peer.clientId, { color: peer.color || "#ffffff" });
         }
-        if (message.state) {
+        if (message.state && !skipInitialStateHydration) {
           collab.applyingRemoteState = true;
           restoreState(message.state, { skipSync: true, applyView: false });
           collab.applyingRemoteState = false;
@@ -3705,8 +3709,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   }
 
   function tryImportPointforgePayload() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("source") !== "pointforge") return false;
+    if (launchSource !== "pointforge") return false;
 
     const raw = localStorage.getItem(POINTFORGE_IMPORT_STORAGE_KEY);
     if (!raw) {
@@ -5437,14 +5440,24 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     }
 
     const openedFromProjectBrowser = tryImportProjectBrowserDrawingPayload();
-    connectCollaboration();
-    if (openedFromProjectBrowser) return;
+    if (openedFromProjectBrowser) {
+      connectCollaboration();
+      return;
+    }
 
     const importedFromPointforge = tryImportPointforgePayload();
-    if (importedFromPointforge) return;
+    if (importedFromPointforge) {
+      connectCollaboration({ skipInitialStateHydration: true, syncLocalStateOnConnect: true });
+      return;
+    }
 
     const restoredLastDrawing = tryRestoreLastOpenedProjectDrawing();
-    if (restoredLastDrawing) return;
+    if (restoredLastDrawing) {
+      connectCollaboration();
+      return;
+    }
+
+    connectCollaboration();
 
     setStatus(
       "Ready.\n" +
