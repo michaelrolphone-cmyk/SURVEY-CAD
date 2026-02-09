@@ -2762,10 +2762,16 @@
   $("#quickSave")?.addEventListener("click", () => $("#saveDrawingToProject").click());
   $("#quickSelect")?.addEventListener("click", () => setTool("select"));
   $("#quickAddPoint")?.addEventListener("click", () => setTool("addPoint"));
-  $("#quickLineByPoints")?.addEventListener("click", () => {
+  function startLineByPointsFromToolbar() {
+    if (selectedPointIds.length >= 2) {
+      runLineBetweenSelectedPoints({ returnToSelectionTool: true });
+      return;
+    }
     construction.startPointId = null;
     setTool("line2pt");
-  });
+  }
+
+  $("#quickLineByPoints")?.addEventListener("click", () => startLineByPointsFromToolbar());
   $("#quickUndo")?.addEventListener("click", () => history.undoAction());
   $("#quickRedo")?.addEventListener("click", () => history.redoAction());
   $("#quickZoomExtents")?.addEventListener("click", () => zoomExtents());
@@ -3776,7 +3782,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     setStatus(`Created point ${points.get(pid2).num} and line from ${sp.num}.\nAz: ${azimuthRadToQuadrantString(az)}  Dist: ${d}`, "ok");
   });
 
-  $("#lineBetweenSelected").addEventListener("click", () => {
+  function runLineBetweenSelectedPoints({ returnToSelectionTool = false } = {}) {
     if (selectedPointIds.length < 2) {
       setStatus("Select at least two points (Shift-click to multi-select, or window-drag).", "warn");
       return;
@@ -3804,6 +3810,11 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     const nums = ids.map(id => points.get(id)?.num ?? "?");
     setStatus(`Created ${created} line(s) using point selection order:\n${nums.join(" → ")}`, "ok");
+    if (returnToSelectionTool) setTool("select");
+  }
+
+  $("#lineBetweenSelected").addEventListener("click", () => {
+    runLineBetweenSelectedPoints();
   });
 
   function getTwoSelectedLines() {
