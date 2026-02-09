@@ -46,6 +46,29 @@ git push heroku <your-branch>:main
 heroku open
 ```
 
+
+## CLI Commands
+
+```bash
+npm run cli -- --help
+npm run ros:cli -- --help
+npm run icons:generate
+```
+
+## RecordQuarry Launch Params
+
+`RecordQuarry.html` supports launcher query params for auto-loading and cached restore behavior:
+
+- `address` / `activeAddress`: pre-fills the address input.
+- `autostart=1`: automatically runs lookup on open (and reuses cached per-address results when available).
+- `projectId` / `activeProjectId`, `projectName` / `activeProjectName`, `client` / `activeClient`: enables project-context restore/save snapshots.
+
+Example:
+
+```bash
+open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise&autostart=1"
+```
+
 ## API
 
 Module: `src/survey-api.js`

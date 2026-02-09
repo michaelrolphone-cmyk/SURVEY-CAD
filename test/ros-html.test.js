@@ -185,6 +185,9 @@ test('RecordQuarry.html restores and saves project lookup snapshots when launche
   assert.match(html, /if\s*\(projectAddressSnapshot\?\.lookup\)\s*\{[\s\S]*log\(`Restoring cached results for project address/, 'project boot flow should prefer cached per-address data before project snapshot restore');
   assert.match(html, /\} else if \(projectSnapshot\?\.lookup\) \{[\s\S]*log\(`Restoring saved project results from/, 'project boot flow should fallback to project snapshot when no per-address cache is available');
   assert.match(html, /\} else if \(projectSnapshot\?\.lookup && state\.projectContext\.autostart\)/, 'project autostart without a project address should continue restoring project snapshots only when requested');
+  assert.match(html, /const\s+hasLaunchAddress\s*=\s*Boolean\(normalizeAddressStorageKey\(state\.projectContext\.address\)\);/, 'standalone boot flow should honor launch-provided address params even without a project id');
+  assert.match(html, /const\s+launchAddressSnapshot\s*=\s*hasLaunchAddress\s*\?\s*loadAddressLookupSnapshot\(state\.projectContext\.address\)\s*:\s*null;/, 'standalone boot flow should try loading cache for launch-provided address params');
+  assert.match(html, /if\s*\(hasLaunchAddress\)\s*\{[\s\S]*if\s*\(state\.projectContext\.autostart\)\s*\{[\s\S]*doLookup\(\{ lookupPayload:\s*launchAddressSnapshot\?\.lookup\s*\|\|\s*null, selectionSnapshot:\s*launchAddressSnapshot\?\.selection\s*\|\|\s*null \}\)/, 'launch autostart should execute lookup for address params and reuse per-address cache when available');
   assert.match(html, /const\s+snapshot\s*=\s*loadMostRecentAddressLookupSnapshot\(\);/, 'standalone boot flow should attempt loading the most recent cached address lookup');
 });
 
