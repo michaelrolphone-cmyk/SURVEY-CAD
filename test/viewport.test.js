@@ -230,6 +230,14 @@ test('VIEWPORT.HTML starts desktop marquee selection on primary-button blank-can
   assert.match(html, /if \(e\.button === 0\) \{\s*beginDrag\(\{type:"marquee", x0: mouse\.x, y0: mouse\.y, x1: mouse\.x, y1: mouse\.y, additive\}\);/, 'left-clicking blank canvas should always start marquee drag, with additive selection honored when Shift is held');
 });
 
+test('VIEWPORT.HTML line intersection guided workflow auto-builds two-line selection without requiring Shift', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const guidedLineSelection = lineIntersectionCommandSession\.active;/, 'guided extend/trim workflow should detect active line-intersection command state');
+  assert.match(html, /if \(guidedLineSelection\) \{[\s\S]*if \(idx >= 0\) selectedLines\[idx\] = \{ lineId: lpick\.lineId, grip: lpick\.grip, t: lpick\.t \};[\s\S]*else selectedLines\.push\(\{ lineId: lpick\.lineId, grip: lpick\.grip, t: lpick\.t \}\);/, 'guided extend/trim line picks should append or replace in-place without using additive Shift state');
+  assert.match(html, /\(\$\{selectedCount === 0 \? "click line" : "click next line"\}; Shift-click still supports normal multi-select\)\./, 'guided extend/trim toast should describe click-only staged line picks while preserving Shift multi-select hint');
+});
+
 
 test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate steps', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
