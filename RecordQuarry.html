@@ -424,7 +424,9 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
   const ADA_CPF_PDF_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/";
   const POINTFORGE_ROS_IMPORT_STORAGE_KEY = "pointforgeRosImport";
   const PROJECT_LOOKUP_STORAGE_PREFIX = "surveyfoundryProjectLookup";
+  const ADDRESS_LOOKUP_STORAGE_PREFIX = "surveyfoundryAddressLookup";
   const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
+  const LAST_LOOKUP_ADDRESS_STORAGE_KEY = "surveyfoundryLastLookupAddress";
 
   // pdf.js worker
   if (!window.pdfjsLib) {
@@ -478,6 +480,14 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     return `${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`;
   }
 
+  function normalizeAddressStorageKey(address) {
+    return String(address || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function addressLookupStorageKey(address) {
+    return `${ADDRESS_LOOKUP_STORAGE_PREFIX}:${normalizeAddressStorageKey(address)}`;
+  }
+
   function loadProjectLookupSnapshot(projectId) {
     if (!projectId) return null;
     try {
@@ -494,6 +504,82 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
   function saveProjectLookupSnapshot(projectId, snapshot) {
     if (!projectId || !snapshot) return;
     localStorage.setItem(projectLookupStorageKey(projectId), JSON.stringify(snapshot));
+  }
+
+  function loadAddressLookupSnapshot(address) {
+    const normalized = normalizeAddressStorageKey(address);
+    if (!normalized) return null;
+    try {
+      const raw = localStorage.getItem(addressLookupStorageKey(normalized));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !parsed.lookup) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveAddressLookupSnapshot(address, snapshot) {
+    const normalized = normalizeAddressStorageKey(address);
+    if (!normalized || !snapshot) return;
+    localStorage.setItem(addressLookupStorageKey(normalized), JSON.stringify(snapshot));
+    localStorage.setItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY, normalized);
+  }
+
+  function loadMostRecentAddressLookupSnapshot() {
+    const recentAddress = normalizeAddressStorageKey(localStorage.getItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY));
+    if (!recentAddress) return null;
+    return loadAddressLookupSnapshot(recentAddress);
+  }
+
+  function readSelectionSnapshot() {
+    const allAliquotKeys = buildAllSelectedAliquotKeys(state.aliquotFeatures);
+    const selectedAliquotKeys = [...state.selectedAliquotKeys];
+    const deselectedAliquotKeys = [...allAliquotKeys].filter((key) => !state.selectedAliquotKeys.has(key));
+    return {
+      selectedParcel: Boolean(state.selectedParcel),
+      selectedAliquotKeys,
+      deselectedAliquotKeys,
+    };
+  }
+
+  function applySelectionSnapshot(selection = null) {
+    const selectedParcel = selection?.selectedParcel;
+    setParcelSelected(selectedParcel == null ? true : Boolean(selectedParcel));
+    state.selectedAliquotKeys.clear();
+    const allAliquotKeys = buildAllSelectedAliquotKeys(state.aliquotFeatures);
+    const selectedKeys = Array.isArray(selection?.selectedAliquotKeys)
+      ? selection.selectedAliquotKeys
+      : null;
+    const deselectedKeys = Array.isArray(selection?.deselectedAliquotKeys)
+      ? new Set(selection.deselectedAliquotKeys)
+      : null;
+    if (selectedKeys && selectedKeys.length) {
+      for (const key of selectedKeys) {
+        if (allAliquotKeys.has(key)) state.selectedAliquotKeys.add(key);
+      }
+      return;
+    }
+    if (!deselectedKeys) return;
+    for (const key of allAliquotKeys) {
+      if (!deselectedKeys.has(key)) state.selectedAliquotKeys.add(key);
+    }
+  }
+
+  function saveLookupSnapshotsForCurrentState(address) {
+    const normalizedAddress = normalizeAddressStorageKey(address);
+    if (!normalizedAddress || !state.lastLookupPayload) return;
+    const snapshot = {
+      savedAt: new Date().toISOString(),
+      address: normalizedAddress,
+      lookup: state.lastLookupPayload,
+      selection: readSelectionSnapshot(),
+    };
+    saveAddressLookupSnapshot(normalizedAddress, snapshot);
+    if (state.projectContext.projectId) {
+      saveProjectLookupSnapshot(state.projectContext.projectId, snapshot);
+    }
   }
 
   function slugify(value, fallback = 'resource') {
@@ -1069,6 +1155,9 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     document.querySelectorAll(`[data-aliquot-select-key="${key}"]`).forEach((node) => {
       node.checked = selected;
     });
+    if (state.lastLookupPayload) {
+      saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
+    }
   }
 
   function setParcelSelected(selected) {
@@ -1076,6 +1165,9 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     document.querySelectorAll('[data-parcel-include-export]').forEach((node) => {
       node.checked = state.selectedParcel;
     });
+    if (state.lastLookupPayload) {
+      saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
+    }
   }
 
   function buildParcelStyle() {
@@ -1315,6 +1407,8 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     selectedParcel: true,
     selectedAliquot: null,
     selectedAliquotKeys: new Set(),
+    lastLookupPayload: null,
+    lastLookupAddress: '',
     exportGeoJSON: null,
     lastLonLat: null,
     projectContext: getProjectContext()
@@ -1903,9 +1997,16 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       log("Lookup started.");
       invalidateMapSoon("lookup start");
 
-      const lookup = options.lookupPayload || await lookupByAddress(rawAddr);
+      const cachedAddressSnapshot = (!options.lookupPayload && !options.disableAddressCache)
+        ? loadAddressLookupSnapshot(rawAddr)
+        : null;
+      const lookup = options.lookupPayload || cachedAddressSnapshot?.lookup || await lookupByAddress(rawAddr);
+      state.lastLookupPayload = lookup;
+      state.lastLookupAddress = rawAddr;
       if (options.lookupPayload) {
         log("Loaded saved project results from local storage.");
+      } else if (cachedAddressSnapshot?.lookup) {
+        log(`Loaded saved address results from ${cachedAddressSnapshot.savedAt || 'local storage'}.`);
       }
       const addrF = lookup.addressFeature || null;
       const candidates = addrF ? [addrF] : [];
@@ -1967,7 +2068,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       try {
         state.aliquotFeatures = await fetchAliquotsAtPoint(lon, lat, 4326);
         state.aliquotFeatures2243 = await fetchAliquotsAtPoint(lon, lat, EXPORT_OUT_SR);
-        state.selectedAliquotKeys.clear();
+        applySelectionSnapshot(options.selectionSnapshot || cachedAddressSnapshot?.selection || null);
         drawAliquots(state.aliquotFeatures, section);
         log(`Aliquots loaded: ${state.aliquotFeatures.length}`);
       } catch (e) {
@@ -2146,12 +2247,8 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
         log(`Parcel/subdivision/aliquot export geometry fetch failed: ${e.message || e}`, "warn");
       }
 
+      saveLookupSnapshotsForCurrentState(rawAddr);
       if (state.projectContext.projectId) {
-        saveProjectLookupSnapshot(state.projectContext.projectId, {
-          savedAt: new Date().toISOString(),
-          address: rawAddr,
-          lookup,
-        });
         log(`Saved lookup results to project ${state.projectContext.projectName || state.projectContext.projectId}.`);
       }
 
@@ -2174,6 +2271,8 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
 
   $("btnClear").addEventListener("click", () => {
     $("addr").value = "";
+    state.lastLookupPayload = null;
+    state.lastLookupAddress = '';
     clearLog();
     clearMapLayers();
     setSummaryCards([]);
@@ -2343,7 +2442,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     const snapshot = loadProjectLookupSnapshot(state.projectContext.projectId);
     if (snapshot && state.projectContext.autostart) {
       log(`Restoring saved project results from ${snapshot.savedAt || "unknown time"}.`);
-      doLookup({ lookupPayload: snapshot.lookup }).catch((err) => {
+      doLookup({ lookupPayload: snapshot.lookup, selectionSnapshot: snapshot.selection }).catch((err) => {
         log(`Saved result restore failed, running live lookup: ${err.message || err}`, "warn");
         doLookup().catch((liveErr) => {
           log(`Lookup failed: ${liveErr.message || liveErr}`, "bad");
@@ -2354,6 +2453,17 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       doLookup().catch((err) => {
         log(`Lookup failed: ${err.message || err}`, "bad");
         console.error(err);
+      });
+    }
+  } else {
+    const snapshot = loadMostRecentAddressLookupSnapshot();
+    if (snapshot?.lookup && !$("addr").value) {
+      $("addr").value = snapshot.address || '';
+    }
+    if (snapshot?.lookup) {
+      log(`Restoring last lookup for ${snapshot.address || 'saved address'} from ${snapshot.savedAt || 'unknown time'}.`);
+      doLookup({ lookupPayload: snapshot.lookup, selectionSnapshot: snapshot.selection }).catch((err) => {
+        log(`Saved result restore failed: ${err.message || err}`, "warn");
       });
     }
   }
