@@ -146,5 +146,6 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /function\s+saveDrawingToProject\(\)/, 'LineSmith should define drawing save handler');
   assert.match(html, /versions\.push\(\{[\s\S]*diffFromPrevious:/, 'subsequent saves should append differential revisions');
   assert.match(html, /function\s+promptRestoreDrawingVersion\(\)/, 'LineSmith should expose saved version restore workflow');
+  assert.ok(html.includes('.join("\\n")'), 'restore workflow should join version choices with escaped newline separators');
   assert.match(html, /tryImportProjectBrowserDrawingPayload\(\)/, 'LineSmith should support opening saved drawing payloads launched from Project Browser');
 });

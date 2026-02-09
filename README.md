@@ -152,6 +152,7 @@ curl -X POST "http://localhost:3000/extract?maxPages=3&dpi=400&allowSlow=1" \
 When the map layer is enabled and drawing points are present, LineSmith now auto-zooms/centers the canvas to the point extents (without adding an undo history entry) so the basemap view aligns with the same coordinates shown in the drawing.
 `VIEWPORT.HTML` now draws line **bearing + distance** labels when zoom/line length allows the text to fit beside the segment and when the computed label bounds do not overlap existing point text labels. The Selection section also includes an inspector card that reports bearing + distance for either the actively selected line or exactly two selected points.
 The Selection section now also includes a point inspector card that shows selected point fields and parses CP&F instrument references from point notes (`CPNFS:` with `...` delimiters), with one-click links to open each CP&F PDF by instrument number.
+The drawing version restore prompt now renders each saved revision on its own line, preventing script parse errors when opening project-linked drawing history.
 
 
 ### ROS standalone tool command
