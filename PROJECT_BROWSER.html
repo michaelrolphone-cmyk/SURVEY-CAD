@@ -396,16 +396,18 @@
   <meta charset="UTF-8" />
   <title>CP&amp;F Print Preview</title>
   <style>
-    body { font-family: Inter, system-ui, sans-serif; margin: 1rem; color: #0f172a; }
+    :root { color-scheme: light; }
+    body { font-family: Inter, system-ui, sans-serif; margin: 1rem; color: #0f172a; background: #fff; }
     .toolbar { position: sticky; top: 0; background: #fff; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; }
     .print-button { font: inherit; padding: 0.45rem 0.8rem; border-radius: 6px; border: 1px solid #334155; background: #fff; cursor: pointer; }
-    .page-block { margin: 0 0 1rem; }
-    .pdf-frame { width: 100%; height: 98vh; border: 1px solid #94a3b8; border-radius: 8px; display: block; }
+    .page-block { margin: 0 0 1rem; display: flex; justify-content: center; background: #fff; }
+    .pdf-frame { width: min(100%, 8.5in); height: 98vh; border: 1px solid #94a3b8; border-radius: 8px; display: block; margin: 0 auto; background: #fff; }
     @media print {
+      @page { margin: 0; }
       .toolbar { display: none; }
-      body { margin: 0; }
-      .page-block { margin: 0; break-inside: avoid; page-break-inside: avoid; }
-      .pdf-frame { border: none; border-radius: 0; height: 100vh; }
+      body { margin: 0; background: #fff; }
+      .page-block { margin: 0; break-inside: avoid; page-break-inside: avoid; display: flex; justify-content: center; background: #fff; }
+      .pdf-frame { width: 100%; border: none; border-radius: 0; height: 100vh; background: #fff; }
     }
   </style>
 </head>
