@@ -527,6 +527,7 @@
     const LAUNCHER_HOME_ICON = '/assets/icons/SurveyFoundry.png';
     const LAUNCHER_HOME_ICON_ALT = 'SurveyFoundry app icon';
     const LAUNCHER_HOME_TITLE = 'SurveyFoundry App Launcher';
+    const LAUNCHER_HISTORY_STATE_KEY = 'survey-cad-launcher-view';
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
     const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
@@ -993,7 +994,30 @@
       projectDescriptionInput.value = '';
     }
 
-    function showHome() {
+    function writeHistoryState(nextState, mode = 'push') {
+      if (mode === 'none') return;
+      const serializedState = JSON.stringify(nextState);
+      const currentSerializedState = JSON.stringify(window.history.state || null);
+      if (serializedState === currentSerializedState) return;
+      if (mode === 'replace') {
+        window.history.replaceState(nextState, '');
+      } else {
+        window.history.pushState(nextState, '');
+      }
+    }
+
+    function buildHomeHistoryState() {
+      return { [LAUNCHER_HISTORY_STATE_KEY]: 'home' };
+    }
+
+    function buildAppHistoryState(file) {
+      return {
+        [LAUNCHER_HISTORY_STATE_KEY]: 'app',
+        app: String(file || ''),
+      };
+    }
+
+    function showHome({ historyMode = 'push' } = {}) {
       homeView.classList.remove('hidden');
       viewerView.classList.add('hidden');
       footerLogoWrap?.classList.remove('hidden');
@@ -1004,6 +1028,7 @@
       launcherHeaderIcon.src = LAUNCHER_HOME_ICON;
       launcherHeaderIcon.alt = LAUNCHER_HOME_ICON_ALT;
       launcherHeaderTitle.textContent = LAUNCHER_HOME_TITLE;
+      writeHistoryState(buildHomeHistoryState(), historyMode);
     }
 
     function getAppByEntryFile(file) {
@@ -1023,7 +1048,7 @@
       launcherHomeLink.setAttribute('aria-label', `Return to SurveyFoundry home from ${appName}`);
     }
 
-    function openApp(file) {
+    function openApp(file, { historyMode = 'push' } = {}) {
       const resolvedFile = withActiveProject(file);
       currentApp = resolvedFile;
       appFrame.src = resolvedFile;
@@ -1031,6 +1056,7 @@
       viewerView.classList.remove('hidden');
       footerLogoWrap?.classList.add('hidden');
       updateHeaderForApp(file);
+      writeHistoryState(buildAppHistoryState(file), historyMode);
     }
 
     function createAppCard(app) {
@@ -1121,6 +1147,27 @@
       if (!canNavigateHome) return;
       showHome();
     });
+
+    window.addEventListener('popstate', async (event) => {
+      const state = event.state;
+      if (state?.[LAUNCHER_HISTORY_STATE_KEY] === 'app' && state.app) {
+        openApp(state.app, { historyMode: 'none' });
+        return;
+      }
+
+      if (!currentApp) {
+        showHome({ historyMode: 'none' });
+        return;
+      }
+
+      const canNavigateHome = await confirmNavigateHomeFromApp();
+      if (!canNavigateHome) {
+        writeHistoryState(buildAppHistoryState(currentApp), 'push');
+        return;
+      }
+
+      showHome({ historyMode: 'none' });
+    });
     projectModalBackdrop.addEventListener('click', (event) => {
       if (event.target === projectModalBackdrop) {
         closeProjectManager();
@@ -1163,6 +1210,9 @@
 
     loadApps().then(() => {
       restoreLauncherViewState();
+      if (!window.history.state?.[LAUNCHER_HISTORY_STATE_KEY]) {
+        writeHistoryState(buildHomeHistoryState(), 'replace');
+      }
       syncLocalStorageWithServer().catch((err) => {
         console.warn('initial localStorage sync failed', err);
       });
