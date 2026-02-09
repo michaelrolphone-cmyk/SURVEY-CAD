@@ -3989,26 +3989,117 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     const ids = selectedPointIds.filter(id => points.has(id));
     if (ids.length < 2) { setStatus("Selected points are invalid.", "warn"); return; }
 
-    history.push("line between points");
+    function pointComparatorByNumber(aId, bId) {
+      const a = points.get(aId);
+      const b = points.get(bId);
+      const aNumRaw = Number.parseFloat(String(a?.num ?? ""));
+      const bNumRaw = Number.parseFloat(String(b?.num ?? ""));
+      const aFinite = Number.isFinite(aNumRaw);
+      const bFinite = Number.isFinite(bNumRaw);
+      if (aFinite && bFinite && aNumRaw !== bNumRaw) return aNumRaw - bNumRaw;
+      if (aFinite !== bFinite) return aFinite ? -1 : 1;
+      return String(a?.num ?? "").localeCompare(String(b?.num ?? ""), undefined, { numeric: true, sensitivity: "base" });
+    }
 
-    let created = 0;
-    let lastLine = null;
+    function arePointsDirectlyConnected(aId, bId) {
+      for (const ln of lines.values()) {
+        if ((ln.a === aId && ln.b === bId) || (ln.a === bId && ln.b === aId)) return true;
+      }
+      return false;
+    }
 
-    if (ids.length === 2) {
-      lastLine = addLine(ids[0], ids[1], false);
-      created = 1;
-    } else {
-      for (let i=0; i<ids.length-1; i++) {
-        lastLine = addLine(ids[i], ids[i+1], false);
-        created++;
+    function getDistanceBetweenPoints(aId, bId) {
+      const a = points.get(aId);
+      const b = points.get(bId);
+      if (!a || !b) return Number.POSITIVE_INFINITY;
+      return dist(a.x, a.y, b.x, b.y);
+    }
+
+    function shouldSuggestNearestNonConnectedOrder(pointIds) {
+      if (pointIds.length <= 2) return false;
+      const sequentialIds = [...pointIds].sort(pointComparatorByNumber);
+      for (let i = 0; i < sequentialIds.length - 1; i += 1) {
+        const currentId = sequentialIds[i];
+        const sequentialId = sequentialIds[i + 1];
+        const sequentialDistance = getDistanceBetweenPoints(currentId, sequentialId);
+        let nearestNonConnectedDistance = Number.POSITIVE_INFINITY;
+        for (const candidateId of sequentialIds) {
+          if (candidateId === currentId || arePointsDirectlyConnected(currentId, candidateId)) continue;
+          const candidateDistance = getDistanceBetweenPoints(currentId, candidateId);
+          if (candidateDistance < nearestNonConnectedDistance) nearestNonConnectedDistance = candidateDistance;
+        }
+        if (Number.isFinite(nearestNonConnectedDistance) && nearestNonConnectedDistance + EPS < sequentialDistance) return true;
+      }
+      return false;
+    }
+
+    function buildNearestNonConnectedOrder(pointIds) {
+      if (pointIds.length <= 2) return [...pointIds];
+      const order = [pointIds[0]];
+      const remaining = new Set(pointIds.slice(1));
+      while (remaining.size) {
+        const currentId = order[order.length - 1];
+        const candidates = [...remaining];
+        let bestId = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (const candidateId of candidates) {
+          if (arePointsDirectlyConnected(currentId, candidateId)) continue;
+          const candidateDistance = getDistanceBetweenPoints(currentId, candidateId);
+          if (candidateDistance < bestDistance) {
+            bestDistance = candidateDistance;
+            bestId = candidateId;
+          }
+        }
+        if (bestId == null) {
+          for (const candidateId of candidates) {
+            const candidateDistance = getDistanceBetweenPoints(currentId, candidateId);
+            if (candidateDistance < bestDistance) {
+              bestDistance = candidateDistance;
+              bestId = candidateId;
+            }
+          }
+        }
+        order.push(bestId);
+        remaining.delete(bestId);
+      }
+      return order;
+    }
+
+    function createLinesFromOrderedPoints(orderedIds) {
+      let created = 0;
+      let lastLine = null;
+      if (orderedIds.length === 2) {
+        lastLine = addLine(orderedIds[0], orderedIds[1], false);
+        created = 1;
+      } else {
+        for (let i = 0; i < orderedIds.length - 1; i += 1) {
+          lastLine = addLine(orderedIds[i], orderedIds[i + 1], false);
+          created += 1;
+        }
+      }
+      return { created, lastLine };
+    }
+
+    let connectIds = ids;
+    let connectionLabel = "selection order";
+    if (shouldSuggestNearestNonConnectedOrder(ids)) {
+      const useNearestOrder = window.confirm(
+        "Some selected points are closer to a different non-connected selected point than to their sequential point number.\n\nClick OK to connect by nearest non-connected selected points, or Cancel to keep sequential selected-point order."
+      );
+      if (useNearestOrder) {
+        connectIds = buildNearestNonConnectedOrder(ids);
+        connectionLabel = "nearest non-connected selected points";
       }
     }
+
+    history.push("line between points");
+    const { created, lastLine } = createLinesFromOrderedPoints(connectIds);
 
     selectedLines = lastLine ? [{ lineId: lastLine, grip:"b", t: 1 }] : [];
     lastSelectedLineId = lastLine;
 
-    const nums = ids.map(id => points.get(id)?.num ?? "?");
-    setStatus(`Created ${created} line(s) using point selection order:\n${nums.join(" → ")}`, "ok");
+    const nums = connectIds.map(id => points.get(id)?.num ?? "?");
+    setStatus(`Created ${created} line(s) using ${connectionLabel}:\n${nums.join(" → ")}`, "ok");
     if (returnToSelectionTool) setTool("select");
   }
 
