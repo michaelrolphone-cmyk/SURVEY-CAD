@@ -164,6 +164,19 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
 });
 
 
+
+
+test('VIEWPORT.HTML includes desktop drawer collapse and edge expand affordances for Point Forge inspector controls', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /\.app\.panelCollapsed\{[\s\S]*grid-template-columns:\s*1fr\s+0;/, 'desktop layout should allow fully collapsing the controls panel width');
+  assert.match(html, /id="panelCollapseHandle"\s+class="panelCollapseHandle"/, 'controls panel should include a right-edge collapse handle');
+  assert.match(html, /id="drawerEdgeExpand"\s+class="drawerEdgeExpand"/, 'canvas area should include a right-edge expand control when drawer is collapsed');
+  assert.match(html, /function\s+setPanelCollapsed\(collapsed\)/, 'LineSmith should centralize panel collapse state updates in a helper');
+  assert.match(html, /panelCollapseHandle\.addEventListener\("click", \(\) => setPanelCollapsed\(true\)\);/, 'collapse handle should collapse the panel on click');
+  assert.match(html, /drawerEdgeExpand\.addEventListener\("click", \(\) => setPanelCollapsed\(false\)\);/, 'edge expand control should reopen the panel on click');
+});
+
 test('VIEWPORT.HTML starts desktop marquee selection on primary-button blank-canvas drag', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
@@ -184,6 +197,13 @@ test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate 
   assert.match(html, /setTool\("select"\);[\s\S]*Select items to rotate with a window or click selection/, 'rotate workflow should prompt user to window/click select items when none are selected');
   assert.match(html, /if \(rotateSelectionSession\.active && !rotateSelectionSession\.awaitingSelection\) \{[\s\S]*handleRotateSelectionCanvasPick\(mouse\.x, mouse\.y\);/, 'rotate pick interception should allow marquee selection while waiting for rotation selection');
   assert.match(html, /if \(rotateSelectionSession\.active\) \{[\s\S]*rotateSelectionSession\.awaitingSelection && rotateIds\.length[\s\S]*syncRotateWorkflowToast\(\);[\s\S]*\}/, 'marquee selection should advance rotate workflow and refresh toast guidance');
+test('VIEWPORT.HTML right-click cancels active command before clearing selection', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+hasSelection\(\)\s*\{[\s\S]*selectedPointIds\.length > 0 \|\| selectedLines\.length > 0;/, 'LineSmith should provide a helper to detect whether point or line selection exists');
+  assert.match(html, /function\s+cancelActiveCanvasCommand\(\)\s*\{[\s\S]*if \(rotateSelectionSession\.active\) \{[\s\S]*cancelRotateSelectionSession\(true\);[\s\S]*if \(construction\.startPointId !== null\) \{[\s\S]*construction\.startPointId = null;[\s\S]*if \(tool !== "select" && tool !== "pan"\) \{[\s\S]*setTool\("select"\);/, 'right-click command cancellation should stop rotate sessions, clear in-progress construction starts, and return to select mode for drawing tools');
+  assert.match(html, /canvas\.addEventListener\("mousedown", \(e\) => \{[\s\S]*if \(e\.button !== 0\) return;/, 'canvas mousedown workflows should only execute on primary button to reserve right-click for command cancellation/selection clear');
+  assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*if \(cancelActiveCanvasCommand\(\)\) return;[\s\S]*if \(hasSelection\(\)\) clearSelection\(\);/, 'context-menu right-click should first cancel active commands and only clear selection when no command is active');
 });
 
 

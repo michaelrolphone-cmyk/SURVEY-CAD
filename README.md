@@ -197,6 +197,7 @@ LineSmith now also supports reference-angle rotation for selected geometry: clic
 LineSmith rotate workflow now also has a quick-toolbar rotate button and a reusable top-right workflow toast that guides step-by-step (select items to rotate, select a point to rotate around, select a basis of rotation, select a target rotation); when rotate starts with nothing selected, you can window-select first and then continue the rotation picks.
 During the rotate pick flow, LineSmith now draws live on-canvas guide rays from the base point to your cursor, then keeps the locked reference-bearing ray visible while adding a second base-to-cursor target-bearing ray so the intended rotation is easy to visualize before finalizing.
 LineSmith now includes a canvas command line for quick operations: `line <point1> <point2>` draws by point number, `move <dx> <dy>` translates current selection, `rotate` starts the reference rotate pick flow, and `inverse <point1> <point2>` reports distance + bearing between two points.
+LineSmith canvas right-click now follows CAD-style cancel behavior: if a command is active (draw/rotate/etc.), right-click cancels the command but keeps selection; a subsequent right-click with no active command clears the current selection.
 Project Browser drawing rows in `PROJECT_BROWSER.html` now include **Open in LineSmith**, launching `VIEWPORT.HTML?source=project-browser-drawing` and auto-loading the latest saved drawing version from project storage.
 PointForge now also includes a **Renumber start** control (default `1`) with a **Renumber Output** action button; standard Process behavior remains unchanged, and sequential repacking is only applied when the renumber button is pressed (for example, start at `1000` to move the set into a new range).
 
@@ -324,7 +325,7 @@ open "http://localhost:3000/VIEWPORT.HTML?source=project-browser-drawing&activeP
 Current apps in the catalog:
 
 - **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
-- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select), plus long-press add-point placement when the Add Point tool is active, with a slide-out tools drawer. Desktop blank-canvas left-drag marquee selection remains enabled (Shift adds to selection).
+- **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select), plus long-press add-point placement when the Add Point tool is active, with a slide-out tools drawer. Desktop blank-canvas left-drag marquee selection remains enabled (Shift adds to selection). On desktop, the inspector/controls drawer now has a right-edge collapse tab and a right-screen cutout expand tab for quick hide/show toggling.
 
 Mobile launch command:
 

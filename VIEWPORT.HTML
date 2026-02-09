@@ -49,12 +49,63 @@
     }
     .panel{
       grid-area:panel;
+      position:relative;
       background:linear-gradient(180deg,var(--panel),var(--panel2));
       border-left:1px solid var(--border);
       padding:12px 12px 10px;
       overflow:auto;
       z-index:5;
     }
+    .app.panelCollapsed{
+      grid-template-columns: 1fr 0;
+    }
+    .app.panelCollapsed .panel{
+      border-left:none;
+      padding:0;
+      overflow:hidden;
+      pointer-events:none;
+    }
+    .panelCollapseHandle{
+      position:absolute;
+      top:50%;
+      right:-14px;
+      transform:translateY(-50%);
+      width:28px;
+      height:64px;
+      border:1px solid var(--border);
+      border-left:none;
+      border-radius:0 12px 12px 0;
+      background:#101010;
+      color:var(--text);
+      font-size:18px;
+      line-height:1;
+      z-index:8;
+      padding:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .drawerEdgeExpand{
+      position:absolute;
+      top:50%;
+      right:0;
+      transform:translateY(-50%);
+      width:30px;
+      height:72px;
+      border:1px solid var(--border);
+      border-right:none;
+      border-radius:12px 0 0 12px;
+      background:#101010;
+      color:var(--text);
+      font-size:18px;
+      line-height:1;
+      z-index:7;
+      padding:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+    }
+    .app.panelCollapsed .drawerEdgeExpand{ display:flex; }
     .panel h1{
       font-size:14px;
       margin:0 0 10px;
@@ -540,6 +591,14 @@
         transition:transform .2s ease;
         box-shadow:-18px 0 50px rgba(0,0,0,.45);
       }
+      .app.panelCollapsed{
+        grid-template-columns:1fr;
+      }
+      .app.panelCollapsed .panel{
+        padding:12px 12px 10px;
+      }
+      .panelCollapseHandle,
+      .drawerEdgeExpand{ display:none !important; }
       .app.drawerOpen .panel{ transform:translateX(0); }
       .drawerToggle{ display:block; }
       .quickTools{ max-width:calc(100% - 20px); }
@@ -556,6 +615,7 @@
 <body>
 <div class="app" id="appShell">
   <div class="panel">
+    <button id="panelCollapseHandle" class="panelCollapseHandle" aria-label="Collapse controls drawer" title="Collapse controls drawer">←</button>
     <h1>LineSmith — Points & Bearings</h1>
 
     <div class="section">
@@ -846,6 +906,7 @@
   </div>
 
   <div class="canvasWrap">
+    <button id="drawerEdgeExpand" class="drawerEdgeExpand" aria-label="Expand controls drawer" title="Expand controls drawer">←</button>
     <button id="drawerToggle" class="drawerToggle">Tools</button>
     <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
       <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
@@ -1337,6 +1398,8 @@
   const ctx = canvas.getContext("2d");
   const appShell = $("#appShell");
   const drawerToggle = $("#drawerToggle");
+  const panelCollapseHandle = $("#panelCollapseHandle");
+  const drawerEdgeExpand = $("#drawerEdgeExpand");
   const mapBackdrop = $("#mapBackdrop");
   const mapEnabledInput = $("#mapLayerEnabled");
   const mapTileTypeInput = $("#mapTileType");
@@ -2681,9 +2744,16 @@
       setDrawerOpen(!isOpen);
     });
   }
+  if (panelCollapseHandle) {
+    panelCollapseHandle.addEventListener("click", () => setPanelCollapsed(true));
+  }
+  if (drawerEdgeExpand) {
+    drawerEdgeExpand.addEventListener("click", () => setPanelCollapsed(false));
+  }
 
   window.addEventListener("resize", () => {
     if (!isMobileViewport()) setDrawerOpen(false);
+    setPanelCollapsed(false);
   });
 
   $("#undoBtn").addEventListener("click", ()=>history.undoAction());
@@ -2730,6 +2800,35 @@
     updatePointEditorFromSelection();
     schedulePointsTableRender();
     setStatus("Selection cleared.", "");
+  }
+
+  function hasSelection() {
+    return selectedPointIds.length > 0 || selectedLines.length > 0;
+  }
+
+  function cancelActiveCanvasCommand() {
+    let canceled = false;
+
+    if (rotateSelectionSession.active) {
+      cancelRotateSelectionSession(true);
+      canceled = true;
+    }
+
+    if (construction.startPointId !== null) {
+      construction.startPointId = null;
+      canceled = true;
+    }
+
+    if (tool !== "select" && tool !== "pan") {
+      setTool("select");
+      canceled = true;
+    }
+
+    if (canceled) {
+      setStatus("Command canceled. Selection kept (right-click again to clear selection).", "warn");
+    }
+
+    return canceled;
   }
 
   function doDeleteSelected() {
@@ -3965,6 +4064,12 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     if (drawerToggle) drawerToggle.textContent = open ? "Close" : "Tools";
   }
 
+  function setPanelCollapsed(collapsed) {
+    if (!appShell) return;
+    const shouldCollapse = !isMobileViewport() && !!collapsed;
+    appShell.classList.toggle("panelCollapsed", shouldCollapse);
+  }
+
   function isMobileViewport() {
     return window.matchMedia("(max-width: 960px)").matches;
   }
@@ -4075,6 +4180,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       return;
     }
 
+    if (e.button !== 0) return;
+
     const pid = pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
@@ -4145,7 +4252,6 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
         return;
       }
 
-      if (!additive) clearSelection();
       return;
     }
 
@@ -4236,6 +4342,15 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       setStatus("Select a line (click near it).", "warn");
       return;
     }
+  });
+
+  canvas.addEventListener("contextmenu", (e) => {
+    if (modalIsOpen()) return;
+    e.preventDefault();
+    updateMouseFromEvent(e);
+
+    if (cancelActiveCanvasCommand()) return;
+    if (hasSelection()) clearSelection();
   });
 
   canvas.addEventListener("pointerdown", (e) => {
