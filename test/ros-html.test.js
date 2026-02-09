@@ -204,3 +204,14 @@ test('RecordQuarry.html omits internal service/layer label pills beneath the add
   assert.doesNotMatch(html, /Parcel:\s*layer\s*24/, 'address controls should not show parcel layer label pill copy');
   assert.doesNotMatch(html, /Address:\s*layer\s*16/, 'address controls should not show address layer label pill copy');
 });
+
+
+test('RecordQuarry.html creates project-file folders with Drawings before RoS', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(
+    html,
+    /folders:\s*\[[\s\S]*createProjectFileFolder\('drawings',\s*'Drawings'[\s\S]*createProjectFileFolder\('ros',\s*'RoS'/,
+    'Drawings should be listed before RoS in project-file folder defaults',
+  );
+});
