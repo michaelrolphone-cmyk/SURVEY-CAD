@@ -57,13 +57,19 @@
 
     .header-meta {
       margin-left: auto;
-      color: var(--muted);
+      color: #0f172a;
       font-size: 0.84rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: min(48vw, 430px);
       text-align: right;
+      background: linear-gradient(135deg, #facc15, #f97316);
+      border: 1px solid rgba(251, 191, 36, 0.75);
+      border-radius: 999px;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.38);
+      font-weight: 700;
+      padding: 0.3rem 0.78rem;
     }
 
     .launcher-home-link {
@@ -696,7 +702,7 @@
       activeProjectSummary.textContent = activeProject
         ? `Active project: ${activeProject.name}`
         : 'No active project selected.';
-      activeProjectHeader.textContent = activeProject ? `Active project: ${activeProject.name}` : '';
+      activeProjectHeader.textContent = activeProject ? `${activeProject.name}` : '';
       syncActiveProjectBackground();
 
       projectList.innerHTML = '';
