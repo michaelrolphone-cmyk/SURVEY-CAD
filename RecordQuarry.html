@@ -398,7 +398,7 @@
 
 <script type="module">
 import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
-import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport } from "./src/ros-export.js";
+import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport } from "./src/ros-export.js";
 
 (() => {
   // -----------------------------
@@ -1069,6 +1069,38 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     });
   }
 
+  function setParcelSelected(selected) {
+    state.selectedParcel = Boolean(selected);
+    document.querySelectorAll('[data-parcel-include-export]').forEach((node) => {
+      node.checked = state.selectedParcel;
+    });
+  }
+
+  function buildParcelStyle() {
+    return {
+      color: state.selectedParcel ? '#24d18f' : '#4a7c66',
+      weight: state.selectedParcel ? 3 : 2,
+      fillOpacity: state.selectedParcel ? 0.08 : 0.03,
+      dashArray: state.selectedParcel ? null : '4 4',
+      pane: 'selectablePolygons',
+    };
+  }
+
+  function drawParcel() {
+    layers.parcel.clearLayers();
+    if (!state.parcelFeature) return;
+    const layer = drawPolygonFeature(state.parcelFeature, layers.parcel, { pane: 'selectablePolygons', style: () => buildParcelStyle() }, 'Parcel');
+    layer.eachLayer((polygonLayer) => {
+      polygonLayer.on('click', () => {
+        const nextSelected = !state.selectedParcel;
+        setParcelSelected(nextSelected);
+        drawParcel();
+        drawCornerMarkers(buildCornerMarkerEntries());
+        log(`${nextSelected ? 'Included' : 'Excluded'} parcel in export.`);
+      });
+    });
+  }
+
   function drawAliquots(aliquotFeatures, sectionFeature) {
     layers.aliquots.clearLayers();
     for (const [index, feature] of (aliquotFeatures || []).entries()) {
@@ -1077,6 +1109,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       const popupHtml = buildAliquotPopupHtml(feature, label);
       const selected = isAliquotSelected(feature, index);
       const layer = L.geoJSON(gj, {
+        pane: 'selectablePolygons',
         style: {
           color: selected ? '#6aa9ff' : '#4b5f8a',
           weight: selected ? 1.8 : 1.3,
@@ -1091,6 +1124,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
           const nextSelected = !isAliquotSelected(feature, index);
           setAliquotSelected(feature, index, nextSelected);
           drawAliquots(state.aliquotFeatures, sectionFeature);
+          drawCornerMarkers(buildCornerMarkerEntries());
           log(`${nextSelected ? 'Included' : 'Excluded'} aliquot in export: ${label}`);
         });
       });
@@ -1124,23 +1158,45 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     return points;
   }
 
+  function buildCornerMarkerEntries() {
+    return [
+      { role: 'parcel', features: state.parcelFeature ? [state.parcelFeature] : [], color: '#24d18f' },
+      { role: 'subdivision', features: state.subdivisionFeature ? [state.subdivisionFeature] : [], color: '#9ab0ff' },
+      { role: 'aliquot', features: state.aliquotFeatures || [], color: '#6aa9ff' },
+    ];
+  }
+
   function drawCornerMarkers(featuresByRole = []) {
     layers.cornerMarkers.clearLayers();
     for (const entry of featuresByRole) {
       const role = entry.role;
       const featureList = entry.features || [];
-      for (const feature of featureList) {
+      for (const [featureIndex, feature] of featureList.entries()) {
         const corners = getPolygonCornerMarkers(feature, role, entry);
+        const aliquotSelected = role === 'aliquot' ? isAliquotSelected(feature, featureIndex) : null;
+        const roleSelected = role === 'aliquot' ? aliquotSelected : role === 'parcel' ? state.selectedParcel : true;
         for (const corner of corners) {
           const marker = L.circleMarker([corner.north, corner.east], {
-            radius: 3,
-            weight: 1,
-            color: '#101834',
+            radius: roleSelected ? 5 : 3,
+            weight: roleSelected ? 2 : 1,
+            color: roleSelected ? '#ffcc66' : '#101834',
             fillColor: corner.color,
-            fillOpacity: 0.95,
+            fillOpacity: roleSelected ? 1 : 0.95,
           });
           marker.bindPopup(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px">Loading CP&amp;F records…</div>`);
           marker.on('click', async () => {
+            if (role === 'aliquot') {
+              const nextSelected = !isAliquotSelected(feature, featureIndex);
+              setAliquotSelected(feature, featureIndex, nextSelected);
+              drawAliquots(state.aliquotFeatures, state.sectionFeature);
+              log(`${nextSelected ? 'Included' : 'Excluded'} aliquot in export via corner: ${normalizedAliquotLabel(feature, state.sectionFeature)}`);
+            } else if (role === 'parcel') {
+              const nextSelected = !state.selectedParcel;
+              setParcelSelected(nextSelected);
+              drawParcel();
+              log(`${nextSelected ? 'Included' : 'Excluded'} parcel in export via corner selection.`);
+            }
+            drawCornerMarkers(featuresByRole);
             marker.setPopupContent(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px">Loading CP&amp;F records…</div>`);
             try {
               const cpfRecords = await queryCpfRecordsNearCorner(corner.north, corner.east);
@@ -1202,6 +1258,11 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
   }).addTo(map);
   map.setView([43.615, -116.202], 12);
 
+  map.createPane('contextPolygons');
+  map.getPane('contextPolygons').style.zIndex = '320';
+  map.createPane('selectablePolygons');
+  map.getPane('selectablePolygons').style.zIndex = '430';
+
   const layers = {
     address: L.layerGroup().addTo(map),
     parcel: L.layerGroup().addTo(map),
@@ -1247,6 +1308,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     townshipFeature: null,
     rosFeatures: [],
     aliquotFeatures: [],
+    selectedParcel: true,
     selectedAliquot: null,
     selectedAliquotKeys: new Set(),
     exportGeoJSON: null,
@@ -1500,7 +1562,9 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
 
   function drawPolygonFeature(f, group, geojsonOptions, label) {
     const gj = arcPolygonToGeoJSON(f.geometry);
-    const layer = L.geoJSON(gj, geojsonOptions);
+    const options = geojsonOptions || {};
+    if (!options.pane) options.pane = 'contextPolygons';
+    const layer = L.geoJSON(gj, options);
     layer.bindPopup(`<b>${escapeHtml(label)}</b>`);
     group.addLayer(layer);
     return layer;
@@ -1820,6 +1884,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     state.aliquotFeatures = [];
     state.sectionFeature2243 = null;
     state.aliquotFeatures2243 = [];
+    state.selectedParcel = true;
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
     setSummaryCards([]);
@@ -1873,9 +1938,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       }
       state.parcelFeature = parcel;
 
-      drawPolygonFeature(parcel, layers.parcel, {
-        style: () => ({ color: "#24d18f", weight: 3, fillOpacity: 0.08 })
-      }, "Parcel");
+      drawParcel();
 
       const ext = arcExtentFromPolygon(parcel.geometry);
       if (ext) {
@@ -1910,13 +1973,9 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
 
       if (subdiv) drawPolygonFeature(subdiv, layers.subdivision, { style: () => ({ color:"#9ab0ff", weight:2, fillOpacity:0.04 }) }, "Subdivision");
       if (section) drawPolygonFeature(section, layers.section, { style: () => ({ color:"#ffcc66", weight:2, fillOpacity:0.03, dashArray:"6 6" }) }, "Section");
-      if (township) drawPolygonFeature(township, layers.township, { style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02, dashArray:"3 8" }) }, "Township");
+      if (township) drawPolygonFeature(township, layers.township, { interactive: false, style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02, dashArray:"3 8" }) }, "Township");
 
-      drawCornerMarkers([
-        { role: "parcel", features: parcel ? [parcel] : [], color: "#24d18f" },
-        { role: "subdivision", features: subdiv ? [subdiv] : [], color: "#9ab0ff" },
-        { role: "aliquot", features: state.aliquotFeatures || [], color: "#6aa9ff" },
-      ]);
+      drawCornerMarkers(buildCornerMarkerEntries());
 
       const rosFromLookup = normalizeRosFeatures(lookup.ros || []);
       const ros = filterRosFeaturesForSection(rosFromLookup, section);
@@ -1975,7 +2034,23 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
           ["Attrs", `${Object.keys(pAttrs).length} fields`],
           ["Export", `Unique parcel/subdivision/aliquots CSV in P,N,E,Z,D (EPSG:${EXPORT_OUT_SR}, ID West ftUS)`],
         ],
-        []
+        [
+          `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-parcel-include-export ${state.selectedParcel ? 'checked' : ''}/> Include in export</label>`
+        ],
+        {
+          onSelect: () => centerMapOnFeature(parcel, layers.parcel, 'Parcel'),
+          onRender: (cardEl) => {
+            const checkbox = cardEl.querySelector('[data-parcel-include-export]');
+            if (!checkbox) return;
+            checkbox.addEventListener('click', (evt) => evt.stopPropagation());
+            checkbox.addEventListener('change', () => {
+              setParcelSelected(checkbox.checked);
+              drawParcel();
+              drawCornerMarkers(buildCornerMarkerEntries());
+              log(`${checkbox.checked ? 'Included' : 'Excluded'} parcel in export.`);
+            });
+          },
+        }
       ));
 
       cards.push(card(
@@ -2011,6 +2086,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
                 checkbox.addEventListener('change', () => {
                   setAliquotSelected(f, idx, checkbox.checked);
                   drawAliquots(state.aliquotFeatures, section);
+                  drawCornerMarkers(buildCornerMarkerEntries());
                   log(`${checkbox.checked ? 'Included' : 'Excluded'} aliquot in export: ${title}`);
                 });
               },
@@ -2103,6 +2179,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     state.aliquotFeatures = [];
     state.sectionFeature2243 = null;
     state.aliquotFeatures2243 = [];
+    state.selectedParcel = true;
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
     state.lastLonLat = null;
@@ -2124,7 +2201,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       }
       const selectedAliquotFeatures2243 = filterAliquotFeaturesForExport(state.aliquotFeatures2243, state.selectedAliquotKeys);
       const baseExport = buildRosBoundaryCsvRowsPNEZD({
-        parcelFeature2243: state.parcelFeature2243,
+        parcelFeature2243: filterParcelFeatureForExport(state.parcelFeature2243, state.selectedParcel),
         subdivisionFeature2243: state.subdivisionFeature2243,
         sectionFeature2243: state.sectionFeature2243,
         aliquotFeatures2243: selectedAliquotFeatures2243,
@@ -2140,7 +2217,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       const notesByCoordinate = await buildCpfNotesByCoordinate(plssPoints);
 
       const finalExport = buildRosBoundaryCsvRowsPNEZD({
-        parcelFeature2243: state.parcelFeature2243,
+        parcelFeature2243: filterParcelFeatureForExport(state.parcelFeature2243, state.selectedParcel),
         subdivisionFeature2243: state.subdivisionFeature2243,
         sectionFeature2243: state.sectionFeature2243,
         aliquotFeatures2243: selectedAliquotFeatures2243,
@@ -2166,7 +2243,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
 
       const selectedAliquotFeatures2243 = filterAliquotFeaturesForExport(state.aliquotFeatures2243, state.selectedAliquotKeys);
       const baseExport = buildRosBoundaryCsvRowsPNEZD({
-        parcelFeature2243: state.parcelFeature2243,
+        parcelFeature2243: filterParcelFeatureForExport(state.parcelFeature2243, state.selectedParcel),
         subdivisionFeature2243: state.subdivisionFeature2243,
         sectionFeature2243: state.sectionFeature2243,
         aliquotFeatures2243: selectedAliquotFeatures2243,
@@ -2182,7 +2259,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       const notesByCoordinate = await buildCpfNotesByCoordinate(plssPoints);
 
       const uniquePart = buildRosBoundaryCsvRowsPNEZD({
-        parcelFeature2243: state.parcelFeature2243,
+        parcelFeature2243: filterParcelFeatureForExport(state.parcelFeature2243, state.selectedParcel),
         subdivisionFeature2243: state.subdivisionFeature2243,
         sectionFeature2243: state.sectionFeature2243,
         aliquotFeatures2243: selectedAliquotFeatures2243,
