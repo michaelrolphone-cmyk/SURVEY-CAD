@@ -74,7 +74,7 @@ test('VIEWPORT.HTML supports reference-angle rotation of selected geometry from 
   assert.match(html, /history\.push\("rotate selection \(reference\)"\)/, 'reference-angle rotate should create an undo entry');
   assert.match(html, /Math\.atan2\(fromPoint\.y - basePoint\.y, fromPoint\.x - basePoint\.x\)/, 'rotate should compute source angle from base and reference points');
   assert.match(html, /Math\.atan2\(toPoint\.y - basePoint\.y, toPoint\.x - basePoint\.x\)/, 'rotate should compute target angle from base and destination points');
-  assert.match(html, /if \(!typing && e\.key === "Escape" && rotateSelectionSession\.active\)/, 'Esc should cancel active reference-angle rotation session');
+  assert.match(html, /if \(!typing && e\.key === "Escape"\) \{[\s\S]*runCanvasCancelOrClearAction\(\);/, 'Esc should route through the shared canvas cancel-or-clear workflow');
   assert.match(html, /function\s+drawRotateSelectionPreview\(\)/, 'rotate workflow should draw on-canvas preview guides while picking reference and target angles');
   assert.match(html, /ctx\.lineTo\(cursor\.x, cursor\.y\)/, 'rotate preview should draw a live line from base point to current cursor');
   assert.match(html, /rotateSelectionSession\.step >= 2 && rotateSelectionSession\.fromPoint/, 'rotate preview should retain reference-bearing guide after reference point is set');
@@ -215,7 +215,9 @@ test('VIEWPORT.HTML right-click cancels active command before clearing selection
   assert.match(html, /function\s+hasSelection\(\)\s*\{[\s\S]*selectedPointIds\.length > 0 \|\| selectedLines\.length > 0;/, 'LineSmith should provide a helper to detect whether point or line selection exists');
   assert.match(html, /function\s+cancelActiveCanvasCommand\(\)\s*\{[\s\S]*if \(rotateSelectionSession\.active\) \{[\s\S]*cancelRotateSelectionSession\(true\);[\s\S]*if \(construction\.startPointId !== null\) \{[\s\S]*construction\.startPointId = null;[\s\S]*if \(tool !== "select" && tool !== "pan"\) \{[\s\S]*setTool\("select"\);/, 'right-click command cancellation should stop rotate sessions, clear in-progress construction starts, and return to select mode for drawing tools');
   assert.match(html, /canvas\.addEventListener\("mousedown", \(e\) => \{[\s\S]*if \(e\.button !== 0\) return;/, 'canvas mousedown workflows should only execute on primary button to reserve right-click for command cancellation/selection clear');
-  assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*if \(cancelActiveCanvasCommand\(\)\) return;[\s\S]*if \(hasSelection\(\)\) clearSelection\(\);/, 'context-menu right-click should first cancel active commands and only clear selection when no command is active');
+  assert.match(html, /function\s+runCanvasCancelOrClearAction\(\)\s*\{[\s\S]*if \(modalIsOpen\(\)\) return;[\s\S]*if \(cancelActiveCanvasCommand\(\)\) return;[\s\S]*if \(hasSelection\(\)\) clearSelection\(\);[\s\S]*\}/, 'LineSmith should share a reusable canvas cancel-or-clear routine for pointer and keyboard shortcuts');
+  assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*runCanvasCancelOrClearAction\(\);/, 'context-menu right-click should run the shared cancel-or-clear workflow');
+  assert.match(html, /window\.addEventListener\("keydown", \(e\) => \{[\s\S]*if \(!typing && e\.key === "Escape"\) \{[\s\S]*runCanvasCancelOrClearAction\(\);/, 'Escape should run the same cancel-or-clear workflow used by right-click when not typing');
 });
 
 
