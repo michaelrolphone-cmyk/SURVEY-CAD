@@ -9,12 +9,13 @@ test('RecordQuarry.html includes RecordQuarry branding in the document title and
   assert.match(html, /<div class="title">RecordQuarry — Ada County Survey Context Lookup \(Standalone\)<\/div>/, 'RecordQuarry should show branded app header title');
 });
 
-test('RecordQuarry.html defines buildExportGeoJSON used by lookup/export flow', async () => {
+test('RecordQuarry.html still builds export GeoJSON internally for lookup payload composition', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+buildExportGeoJSON\s*\(/, 'buildExportGeoJSON should be defined');
-  assert.match(html, /state\.exportGeoJSON\s*=\s*buildExportGeoJSON\(\)/, 'lookup should assign export data');
-  assert.match(html, /downloadJson\(state\.exportGeoJSON,\s*"ada_lookup\.geojson"\)/, 'export button should download generated GeoJSON');
+  assert.match(html, /state\.exportGeoJSON\s*=\s*buildExportGeoJSON\(\)/, 'lookup should assign export data for internal state');
+  assert.doesNotMatch(html, /id="btnExportGeo"/, 'GeoJSON export button should be removed from UI');
+  assert.doesNotMatch(html, /downloadJson\(state\.exportGeoJSON,\s*"ada_lookup\.geojson"\)/, 'GeoJSON download click handler should be removed');
 });
 
 test('RecordQuarry.html routes ROS PDF links through API server and exports unique parcel/subdivision/aliquot CSV points', async () => {
@@ -27,6 +28,7 @@ test('RecordQuarry.html routes ROS PDF links through API server and exports uniq
   assert.match(html, /drawCornerMarkers\(/, 'corner markers should be drawn on the map');
   assert.match(html, /buildRosBoundaryCsvRowsPNEZD\(/, 'CSV export should use ROS-specific simplified point-code export builder');
   assert.match(html, /id="btnExportParcelCSV"[^>]*>Export CSV<\/button>/, 'CSV export button label should be simplified to Export CSV');
+  assert.match(html, /<!-- LEFT -->[\s\S]*id="btnExportParcelCSV"[\s\S]*<!-- RIGHT -->/, 'CSV export button should live in the left panel controls');
   assert.match(html, /parcel_subdivision_aliquots_unique_points_idw_ft_pnezd\.csv/, 'CSV filename should reflect unique parcel/subdivision/aliquot points');
   assert.match(html, /state\.sectionFeature2243\s*=\s*await\s*fetchSectionGeometry2243FromPoint\(lon, lat\)/, 'export lookup should fetch containing section geometry in export SR');
 });
@@ -131,6 +133,8 @@ test('RecordQuarry.html renders Summary in the left control panel between PDF up
   assert.ok(leftPanel.indexOf('<div class="h">Summary</div>') < leftPanel.indexOf('<div class="h">Diagnostics</div>'), 'Summary should appear above Diagnostics section');
 
   assert.doesNotMatch(html, /class="summaryPanel"/, 'right map panel should no longer include a separate summary panel block');
+  assert.doesNotMatch(html, /<div class="h">Map \+ Results<\/div>/, 'right panel header bar should be removed to maximize map area');
+  assert.doesNotMatch(html, /id="btnExportGeo"/, 'Map panel should not include GeoJSON export control');
 });
 
 test('RecordQuarry.html does not render internal CORS/map-fix commentary text', async () => {
@@ -141,13 +145,13 @@ test('RecordQuarry.html does not render internal CORS/map-fix commentary text', 
   assert.doesNotMatch(html, /PDFs require upload \(CORS\)/, 'ROS should not show old CORS warning pill copy');
 });
 
-test('RecordQuarry.html includes mobile layout rules so map and export controls stay visible', async () => {
+test('RecordQuarry.html includes mobile layout rules so map and controls stay visible', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /html,body\{height:100%;min-height:100dvh;/, 'mobile viewport should use dynamic viewport height to keep map panel visible');
   assert.match(html, /\.app\{[\s\S]*min-height:100dvh;/, 'app shell should fill dynamic viewport height on mobile browsers');
-  assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.panel \.phead \.row\{[\s\S]*flex-wrap:wrap;/, 'mobile panel header controls should wrap to avoid clipping export controls');
-  assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.panel \.phead \.row button\{[\s\S]*flex:1 1 140px;/, 'mobile export buttons should expand and remain tappable');
+  assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.panel \.phead \.row\{[\s\S]*flex-wrap:wrap;/, 'mobile panel header controls should wrap to avoid clipping controls');
+  assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.panel \.phead \.row button\{[\s\S]*flex:1 1 140px;/, 'mobile panel buttons should expand and remain tappable');
   assert.match(html, /@media \(max-width: 760px\)\{[\s\S]*\.main\{[\s\S]*grid-template-rows:minmax\(460px, auto\) minmax\(420px, 1fr\);/, 'mobile grid rows should reserve explicit space for map/results panel');
 });
 

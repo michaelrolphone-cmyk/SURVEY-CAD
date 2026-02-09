@@ -222,7 +222,7 @@ The CP&F print preview now renders each PDF in an iframe with PDF open parameter
 
 RecordQuarry.html now applies mobile-first layout guards so the Leaflet map retains a real viewport height and export controls wrap instead of clipping on narrow screens.
 
-`RecordQuarry.html` supports GeoJSON export for the current lookup (parcel, subdivision, section, township, ROS, aliquots, and selected address point).
+`RecordQuarry.html` now keeps map space focused on the Leaflet canvas by removing the right-side "Map + Results" header bar; **Export CSV** lives with the left-panel Lookup controls and **Export GeoJSON** is no longer exposed as a UI action.
 `RecordQuarry.html` now keeps ROS and aliquot results scoped to the lookup address context (containing section and related lookup records), and ROS map popups include both description text and PDF links routed through `/api/ros-pdf`.
 
 `RecordQuarry.html` Summary cards for ROS and aliquots are now interactive: selecting a summary item centers/zooms the map to that feature and opens the related popup when possible.

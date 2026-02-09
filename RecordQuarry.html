@@ -321,8 +321,6 @@
     </div>
     <div class="row">
       <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends unique parcel, subdivision, and aliquot vertices to PointForge">Export to PointForge</button>
-      <span class="pill good"><span class="dot"></span>ArcGIS JSONP</span>
-      <span class="pill warn"><span class="dot"></span>PDF scan uses local uploads</span>
     </div>
   </header>
 
@@ -334,6 +332,7 @@
         <div class="row">
           <button id="btnLookup">Lookup</button>
           <button id="btnClear" class="secondary">Clear</button>
+          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports unique parcel, subdivision, and aliquot vertices as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export CSV</button>
         </div>
       </div>
       <div class="pbody">
@@ -379,14 +378,6 @@
 
     <!-- RIGHT -->
     <div class="panel">
-      <div class="phead">
-        <div class="h">Map + Results</div>
-        <div class="row">
-          <button id="btnExportGeo" class="secondary" disabled>Export GeoJSON</button>
-          <button id="btnExportParcelCSV" class="secondary" disabled title="Exports unique parcel, subdivision, and aliquot vertices as P,N,E,Z,D in EPSG:2243 (ID West ftUS)">Export CSV</button>
-        </div>
-      </div>
-
       <div class="pbody rightBody">
         <div class="mapWrap">
           <div id="map"></div>
@@ -1891,7 +1882,6 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     lookupButton.disabled = true;
     setBusyModalOpen(true, 'Loading RecordQuarry data…', 'Querying address, parcel, subdivision, section, township, ROS, and aliquot records.');
     clearLog();
-    $("btnExportGeo").disabled = true;
     $("btnExportParcelCSV").disabled = true;
     $("btnExportPointForge").disabled = true;
     state.exportGeoJSON = null;
@@ -2138,7 +2128,6 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       }
 
       state.exportGeoJSON = buildExportGeoJSON();
-      $("btnExportGeo").disabled = false;
 
       try {
         log(`Fetching parcel/subdivision/aliquot export geometry in EPSG:${EXPORT_OUT_SR}...`);
@@ -2188,7 +2177,6 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     clearLog();
     clearMapLayers();
     setSummaryCards([]);
-    $("btnExportGeo").disabled = true;
     $("btnExportParcelCSV").disabled = true;
     $("btnExportPointForge").disabled = true;
     state.exportGeoJSON = null;
@@ -2206,11 +2194,6 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     $("pdfFindings").textContent = "";
     log("Cleared.");
     invalidateMapSoon("clear");
-  });
-
-  $("btnExportGeo").addEventListener("click", () => {
-    if (!state.exportGeoJSON) return;
-    downloadJson(state.exportGeoJSON, "ada_lookup.geojson");
   });
 
   $("btnExportParcelCSV").addEventListener("click", async () => {
