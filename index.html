@@ -346,13 +346,6 @@
       display: none;
     }
 
-    .toolbar {
-      display: flex;
-      gap: 0.6rem;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
     button {
       background: var(--panel);
       color: var(--text);
@@ -387,10 +380,6 @@
       .viewer {
         padding: 0;
         gap: 0;
-      }
-
-      .toolbar {
-        padding: 0.8rem 1rem;
       }
 
       iframe {
@@ -446,9 +435,6 @@
     </section>
 
     <section class="viewer hidden" id="viewerView" aria-label="Embedded app viewer">
-      <div class="toolbar">
-        <button id="reloadButton" type="button">↻ Reload app</button>
-      </div>
       <iframe id="appFrame" title="Standalone app"></iframe>
     </section>
   </main>
@@ -464,7 +450,6 @@
     const viewerView = document.getElementById('viewerView');
     const appSections = document.getElementById('appSections');
     const appFrame = document.getElementById('appFrame');
-    const reloadButton = document.getElementById('reloadButton');
     const projectNameInput = document.getElementById('projectName');
     const projectClientInput = document.getElementById('projectClient');
     const projectClientContactInput = document.getElementById('projectClientContact');
@@ -891,11 +876,6 @@
         closeProjectManager();
       }
     });
-    reloadButton.addEventListener('click', () => {
-      if (!currentApp) return;
-      appFrame.src = currentApp;
-    });
-
     window.addEventListener('message', (event) => {
       if (event.origin !== window.location.origin) return;
 
