@@ -2448,10 +2448,10 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
 
   // initial log
   clearLog();
+  if (state.projectContext.address) {
+    $("addr").value = state.projectContext.address;
+  }
   if (state.projectContext.projectId) {
-    if (state.projectContext.address) {
-      $("addr").value = state.projectContext.address;
-    }
     log(`Project loaded: ${state.projectContext.projectName || state.projectContext.projectId} (${state.projectContext.client || "no client"}).`);
 
     const hasProjectAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
@@ -2494,11 +2494,26 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       });
     }
   } else {
+    const hasLaunchAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
+    const launchAddressSnapshot = hasLaunchAddress
+      ? loadAddressLookupSnapshot(state.projectContext.address)
+      : null;
     const snapshot = loadMostRecentAddressLookupSnapshot();
-    if (snapshot?.lookup && !$("addr").value) {
-      $("addr").value = snapshot.address || '';
-    }
-    if (snapshot?.lookup) {
+
+    if (hasLaunchAddress) {
+      if (launchAddressSnapshot?.lookup) {
+        log(`Restoring cached results for launch address from ${launchAddressSnapshot.savedAt || 'unknown time'}.`);
+      }
+      if (state.projectContext.autostart) {
+        doLookup({ lookupPayload: launchAddressSnapshot?.lookup || null, selectionSnapshot: launchAddressSnapshot?.selection || null }).catch((err) => {
+          log(`Lookup failed: ${err.message || err}`, "bad");
+          console.error(err);
+        });
+      }
+    } else if (snapshot?.lookup) {
+      if (!$("addr").value) {
+        $("addr").value = snapshot.address || '';
+      }
       log(`Restoring last lookup for ${snapshot.address || 'saved address'} from ${snapshot.savedAt || 'unknown time'}.`);
       doLookup({ lookupPayload: snapshot.lookup, selectionSnapshot: snapshot.selection }).catch((err) => {
         log(`Saved result restore failed: ${err.message || err}`, "warn");
