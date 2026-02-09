@@ -788,11 +788,11 @@
           </select>
         </label>
         <label>Map opacity
-          <input id="mapOpacity" type="range" min="0" max="100" step="1" value="10" />
-          <span class="mini" id="mapOpacityValue">10%</span>
+          <input id="mapOpacity" type="range" min="0" max="100" step="1" value="66" />
+          <span class="mini" id="mapOpacityValue">66%</span>
         </label>
       </div>
-      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching. Map layer starts off and defaults to 10% opacity when enabled.</div>
+      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching. Map layer defaults to 66% opacity when enabled.</div>
     </div>
 
     <div class="section">
@@ -1509,7 +1509,7 @@
   const mapLayerState = {
     enabled: false,
     tileType: "satellite",
-    opacity: 0.1
+    opacity: 0.66
   };
 
   const FEET_TO_METERS = 0.3048006096012192;
@@ -2763,10 +2763,16 @@
   $("#quickSave")?.addEventListener("click", () => $("#saveDrawingToProject").click());
   $("#quickSelect")?.addEventListener("click", () => setTool("select"));
   $("#quickAddPoint")?.addEventListener("click", () => setTool("addPoint"));
-  $("#quickLineByPoints")?.addEventListener("click", () => {
+  function startLineByPointsFromToolbar() {
+    if (selectedPointIds.length >= 2) {
+      runLineBetweenSelectedPoints({ returnToSelectionTool: true });
+      return;
+    }
     construction.startPointId = null;
     setTool("line2pt");
-  });
+  }
+
+  $("#quickLineByPoints")?.addEventListener("click", () => startLineByPointsFromToolbar());
   $("#quickUndo")?.addEventListener("click", () => history.undoAction());
   $("#quickRedo")?.addEventListener("click", () => history.redoAction());
   $("#quickZoomExtents")?.addEventListener("click", () => zoomExtents());
@@ -2830,6 +2836,12 @@
     }
 
     return canceled;
+  }
+
+  function runCanvasCancelOrClearAction() {
+    if (modalIsOpen()) return;
+    if (cancelActiveCanvasCommand()) return;
+    if (hasSelection()) clearSelection();
   }
 
   function doDeleteSelected() {
@@ -3266,6 +3278,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       }
       importCsvText(payload.csv, "PointForge import");
       const aligned = syncViewToGeoreference(payload);
+      setMapLayerEnabled(true);
       if (aligned && mapLayerState.enabled) {
         syncMapToView(true);
       }
@@ -3777,7 +3790,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     setStatus(`Created point ${points.get(pid2).num} and line from ${sp.num}.\nAz: ${azimuthRadToQuadrantString(az)}  Dist: ${d}`, "ok");
   });
 
-  $("#lineBetweenSelected").addEventListener("click", () => {
+  function runLineBetweenSelectedPoints({ returnToSelectionTool = false } = {}) {
     if (selectedPointIds.length < 2) {
       setStatus("Select at least two points (Shift-click to multi-select, or window-drag).", "warn");
       return;
@@ -3805,6 +3818,11 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     const nums = ids.map(id => points.get(id)?.num ?? "?");
     setStatus(`Created ${created} line(s) using point selection order:\n${nums.join(" → ")}`, "ok");
+    if (returnToSelectionTool) setTool("select");
+  }
+
+  $("#lineBetweenSelected").addEventListener("click", () => {
+    runLineBetweenSelectedPoints();
   });
 
   function getTwoSelectedLines() {
@@ -4122,9 +4140,9 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       doDeleteSelected();
     }
 
-    if (!typing && e.key === "Escape" && rotateSelectionSession.active) {
+    if (!typing && e.key === "Escape") {
       e.preventDefault();
-      cancelRotateSelectionSession(false);
+      runCanvasCancelOrClearAction();
     }
 
     if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey) {
@@ -4346,12 +4364,9 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   });
 
   canvas.addEventListener("contextmenu", (e) => {
-    if (modalIsOpen()) return;
     e.preventDefault();
     updateMouseFromEvent(e);
-
-    if (cancelActiveCanvasCommand()) return;
-    if (hasSelection()) clearSelection();
+    runCanvasCancelOrClearAction();
   });
 
   canvas.addEventListener("pointerdown", (e) => {
@@ -4731,8 +4746,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     window.addEventListener("resize", resize);
     mapEnabledInput.checked = false;
     mapTileTypeInput.value = "satellite";
-    mapOpacityInput.value = "10";
-    mapLayerState.opacity = 0.1;
+    mapOpacityInput.value = "66";
+    mapLayerState.opacity = 0.66;
     applyMapOpacity();
     setMapLayerEnabled(false);
     setTool("select");

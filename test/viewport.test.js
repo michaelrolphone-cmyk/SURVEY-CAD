@@ -28,6 +28,8 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickTrimIntersect"[\s\S]*fa-scissors/, 'quick toolbar should include Trim\/Intersect icon shortcut');
   assert.match(html, /id="quickRotateSelection"[\s\S]*fa-rotate/, 'quick toolbar should include Rotate Selection icon shortcut');
   assert.match(html, /id="quickPointManager"[\s\S]*fa-list/, 'quick toolbar should include Point Manager icon shortcut');
+  assert.match(html, /function\s+startLineByPointsFromToolbar\(\)\s*\{[\s\S]*if \(selectedPointIds\.length >= 2\) \{[\s\S]*runLineBetweenSelectedPoints\(\{ returnToSelectionTool: true \}\);[\s\S]*setTool\("line2pt"\);/, 'quick Line by Points should run line-between-selected when points are preselected and otherwise enter two-point draw mode');
+  assert.match(html, /function\s+runLineBetweenSelectedPoints\(\{ returnToSelectionTool = false \} = \{\}\)[\s\S]*if \(returnToSelectionTool\) setTool\("select"\);/, 'line-between-selected workflow should optionally return to selection tool after completion');
   assert.match(html, /\$\("#quickSave"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#saveDrawingToProject"\)\.click\(\)\)/, 'quick Save should trigger the existing save drawing workflow');
   assert.match(html, /\$\("#quickExtend"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#extendToIntersect"\)\.click\(\)\)/, 'quick Extend should delegate to existing extend action');
   assert.match(html, /\$\("#quickTrimIntersect"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#trimToIntersect"\)\.click\(\)\)/, 'quick Trim\/Intersect should delegate to existing trim action');
@@ -72,7 +74,7 @@ test('VIEWPORT.HTML supports reference-angle rotation of selected geometry from 
   assert.match(html, /history\.push\("rotate selection \(reference\)"\)/, 'reference-angle rotate should create an undo entry');
   assert.match(html, /Math\.atan2\(fromPoint\.y - basePoint\.y, fromPoint\.x - basePoint\.x\)/, 'rotate should compute source angle from base and reference points');
   assert.match(html, /Math\.atan2\(toPoint\.y - basePoint\.y, toPoint\.x - basePoint\.x\)/, 'rotate should compute target angle from base and destination points');
-  assert.match(html, /if \(!typing && e\.key === "Escape" && rotateSelectionSession\.active\)/, 'Esc should cancel active reference-angle rotation session');
+  assert.match(html, /if \(!typing && e\.key === "Escape"\) \{[\s\S]*runCanvasCancelOrClearAction\(\);/, 'Esc should route through the shared canvas cancel-or-clear workflow');
   assert.match(html, /function\s+drawRotateSelectionPreview\(\)/, 'rotate workflow should draw on-canvas preview guides while picking reference and target angles');
   assert.match(html, /ctx\.lineTo\(cursor\.x, cursor\.y\)/, 'rotate preview should draw a live line from base point to current cursor');
   assert.match(html, /rotateSelectionSession\.step >= 2 && rotateSelectionSession\.fromPoint/, 'rotate preview should retain reference-bearing guide after reference point is set');
@@ -123,8 +125,8 @@ test('VIEWPORT.HTML exposes map backdrop controls with expected defaults and wir
 
   assert.match(html, /id="mapLayerEnabled"\s+type="checkbox"/, 'display section should include a map enable toggle');
   assert.match(html, /id="mapTileType"[\s\S]*value="satellite"\s+selected/, 'map tile selector should default to satellite');
-  assert.match(html, /id="mapOpacity"\s+type="range"\s+min="0"\s+max="100"[\s\S]*value="10"/, 'map opacity slider should default to 10 percent');
-  assert.match(html, /const\s+mapLayerState\s*=\s*\{[\s\S]*enabled:\s*false,[\s\S]*tileType:\s*"satellite",[\s\S]*opacity:\s*0\.1/, 'map state should initialize disabled with satellite and 10 percent opacity');
+  assert.match(html, /id="mapOpacity"\s+type="range"\s+min="0"\s+max="100"[\s\S]*value="66"/, 'map opacity slider should default to 66 percent');
+  assert.match(html, /const\s+mapLayerState\s*=\s*\{[\s\S]*enabled:\s*false,[\s\S]*tileType:\s*"satellite",[\s\S]*opacity:\s*0\.66/, 'map state should initialize disabled with satellite and 66 percent opacity');
   assert.match(html, /id="mapBackdrop"\s+class="mapBackdrop"/, 'canvas area should include a dedicated map backdrop container behind the drawing canvas');
   assert.match(html, /mapEnabledInput\.addEventListener\("change",\s*\(\)\s*=>\s*\{[\s\S]*setMapLayerEnabled\(mapEnabledInput\.checked\)/, 'map toggle should be wired to set enabled state');
   assert.match(html, /quickMapEnabledInput\?\.addEventListener\("change",\s*\(\)\s*=>\s*\{[\s\S]*setMapLayerEnabled\(quickMapEnabledInput\.checked\)/, 'quick toolbar map toggle should be wired to set enabled state');
@@ -150,6 +152,15 @@ test('VIEWPORT.HTML maps Idaho state plane coordinates to Leaflet lat/lon via ge
 });
 
 
+
+
+test('VIEWPORT.HTML auto-enables map layer when bootstrapping PointForge imports', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'LineSmith should include PointForge launch bootstrap');
+  assert.match(html, /if \(params\.get\("source"\) !== "pointforge"\) return false;/, 'PointForge bootstrap should only trigger from the pointforge source query param');
+  assert.match(html, /importCsvText\(payload\.csv, "PointForge import"\);[\s\S]*setMapLayerEnabled\(true\);/, 'PointForge imports should default the map layer to enabled after loading points');
+});
 test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out drawer controls', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
@@ -213,7 +224,9 @@ test('VIEWPORT.HTML right-click cancels active command before clearing selection
   assert.match(html, /function\s+hasSelection\(\)\s*\{[\s\S]*selectedPointIds\.length > 0 \|\| selectedLines\.length > 0;/, 'LineSmith should provide a helper to detect whether point or line selection exists');
   assert.match(html, /function\s+cancelActiveCanvasCommand\(\)\s*\{[\s\S]*if \(rotateSelectionSession\.active\) \{[\s\S]*cancelRotateSelectionSession\(true\);[\s\S]*if \(construction\.startPointId !== null\) \{[\s\S]*construction\.startPointId = null;[\s\S]*if \(tool !== "select" && tool !== "pan"\) \{[\s\S]*setTool\("select"\);/, 'right-click command cancellation should stop rotate sessions, clear in-progress construction starts, and return to select mode for drawing tools');
   assert.match(html, /canvas\.addEventListener\("mousedown", \(e\) => \{[\s\S]*if \(e\.button !== 0\) return;/, 'canvas mousedown workflows should only execute on primary button to reserve right-click for command cancellation/selection clear');
-  assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*if \(cancelActiveCanvasCommand\(\)\) return;[\s\S]*if \(hasSelection\(\)\) clearSelection\(\);/, 'context-menu right-click should first cancel active commands and only clear selection when no command is active');
+  assert.match(html, /function\s+runCanvasCancelOrClearAction\(\)\s*\{[\s\S]*if \(modalIsOpen\(\)\) return;[\s\S]*if \(cancelActiveCanvasCommand\(\)\) return;[\s\S]*if \(hasSelection\(\)\) clearSelection\(\);[\s\S]*\}/, 'LineSmith should share a reusable canvas cancel-or-clear routine for pointer and keyboard shortcuts');
+  assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*runCanvasCancelOrClearAction\(\);/, 'context-menu right-click should run the shared cancel-or-clear workflow');
+  assert.match(html, /window\.addEventListener\("keydown", \(e\) => \{[\s\S]*if \(!typing && e\.key === "Escape"\) \{[\s\S]*runCanvasCancelOrClearAction\(\);/, 'Escape should run the same cancel-or-clear workflow used by right-click when not typing');
 });
 
 
