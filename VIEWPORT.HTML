@@ -294,6 +294,23 @@
       pointer-events:none;
     }
     .hud .pill{ pointer-events:none; }
+    .commandBar{
+      position:absolute;
+      left:10px;
+      right:10px;
+      bottom:52px;
+      z-index:2;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:8px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:rgba(10,10,10,0.9);
+      backdrop-filter:blur(4px);
+    }
+    .commandBar input{ flex:1; min-width:220px; background:#070707; }
+    .commandBar .hintText{ color:var(--muted); font-size:11px; white-space:nowrap; }
 
     .kbd{
       display:grid;
@@ -492,6 +509,13 @@
       .app.drawerOpen .panel{ transform:translateX(0); }
       .drawerToggle{ display:block; }
       .quickTools{ max-width:calc(100% - 20px); }
+      .commandBar{
+        left:8px;
+        right:8px;
+        bottom:58px;
+        flex-wrap:wrap;
+      }
+      .commandBar .hintText{ white-space:normal; }
     }
   </style>
 </head>
@@ -818,6 +842,11 @@
     </div>
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>
+    <div class="commandBar" aria-label="LineSmith command line">
+      <input id="commandInput" type="text" placeholder="Command (line, move, rotate, inverse). Example: line 101 205" aria-label="LineSmith command line input" />
+      <button id="runCommand" class="primary">Run</button>
+      <span class="hintText">LINE p1 p2 · MOVE dx dy · ROTATE · INVERSE p1 p2</span>
+    </div>
     <div class="hud">
       <span class="pill"><b>Tool</b> <span id="hudTool">Select/Move</span></span>
       <span class="pill"><b>Mouse</b> <span id="hudMouse">x: 0, y: 0</span></span>
@@ -1235,6 +1264,8 @@
   const lineInspector = $("#lineInspector");
   const pointInspector = $("#pointInspector");
   const toolHint = $("#toolHint");
+  const commandInput = $("#commandInput");
+  const runCommandBtn = $("#runCommand");
 
   const pointsCount = $("#pointsCount");
   const modal = $("#pointsModal");
@@ -1718,6 +1749,27 @@
     const reqInt = Math.max(1, Math.floor(requested));
     if (!pointNumberExists(String(reqInt))) return reqInt;
     return nextOpenPointNumber(reqInt);
+  }
+
+  function findPointIdByNumber(pointNumber) {
+    const desired = String(pointNumber ?? "").trim();
+    if (!desired) return null;
+    for (const p of points.values()) {
+      if (String(p.num) === desired) return p.id;
+    }
+    return null;
+  }
+
+  function moveSelectionByDelta(dx, dy) {
+    const ids = getRotatablePointIdsFromSelection();
+    if (!ids.length) return 0;
+    for (const pid of ids) {
+      const p = points.get(pid);
+      if (!p) continue;
+      p.x += dx;
+      p.y += dy;
+    }
+    return ids.length;
   }
 
   function addPoint({num, x, y, z=0, code="", notes="", movable=false}) {
@@ -2270,6 +2322,116 @@
 
     setStatus(`Tool: ${label}`, "");
   }
+
+  function runCommandLine(rawCommand) {
+    const normalized = String(rawCommand ?? "").trim();
+    if (!normalized) {
+      setStatus("Enter a command. Try: line 101 205", "warn");
+      return false;
+    }
+
+    const parts = normalized.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+
+    if (cmd === "line") {
+      if (parts.length < 3) {
+        setStatus("Usage: line <point1> <point2>", "warn");
+        return false;
+      }
+      const aId = findPointIdByNumber(parts[1]);
+      const bId = findPointIdByNumber(parts[2]);
+      if (!aId || !bId) {
+        setStatus("LINE failed: one or both point numbers were not found.", "warn");
+        return false;
+      }
+      if (aId === bId) {
+        setStatus("LINE failed: choose two different points.", "warn");
+        return false;
+      }
+      history.push("command: line");
+      const lid = addLine(aId, bId, false);
+      selectedPointIds = [aId, bId];
+      selectedPointId = bId;
+      selectedLines = [{ lineId: lid, grip: "b", t: 1 }];
+      lastSelectedLineId = lid;
+      updatePointEditorFromSelection();
+      setStatus(`Command LINE: created line ${lid} from ${parts[1]} to ${parts[2]}.`, "ok");
+      return true;
+    }
+
+    if (cmd === "move") {
+      if (parts.length < 3) {
+        setStatus("Usage: move <dx> <dy> (acts on selected points/lines)", "warn");
+        return false;
+      }
+      const dx = Number(parts[1]);
+      const dy = Number(parts[2]);
+      if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+        setStatus("MOVE failed: dx/dy must be numeric.", "warn");
+        return false;
+      }
+      const affectedPreview = getRotatablePointIdsFromSelection();
+      if (!affectedPreview.length) {
+        setStatus("MOVE failed: select at least one point or line first.", "warn");
+        return false;
+      }
+      history.push("command: move");
+      const moved = moveSelectionByDelta(dx, dy);
+      setStatus(`Command MOVE: shifted ${moved} point(s) by Δx=${fmt(dx)}, Δy=${fmt(dy)}.`, "ok");
+      return true;
+    }
+
+    if (cmd === "rotate") {
+      startRotateSelectionSession();
+      return true;
+    }
+
+    if (cmd === "inverse") {
+      if (parts.length < 3) {
+        setStatus("Usage: inverse <point1> <point2>", "warn");
+        return false;
+      }
+      const aId = findPointIdByNumber(parts[1]);
+      const bId = findPointIdByNumber(parts[2]);
+      if (!aId || !bId) {
+        setStatus("INVERSE failed: one or both point numbers were not found.", "warn");
+        return false;
+      }
+      if (aId === bId) {
+        setStatus("INVERSE failed: choose two different points.", "warn");
+        return false;
+      }
+      const a = points.get(aId);
+      const b = points.get(bId);
+      const measure = lineMeasurement(a, b);
+      if (!measure) {
+        setStatus("INVERSE failed: unable to compute bearing/distance.", "warn");
+        return false;
+      }
+      selectedPointIds = [aId, bId];
+      selectedPointId = bId;
+      selectedLines = [];
+      lastSelectedLineId = null;
+      setStatus(`Command INVERSE ${parts[1]}→${parts[2]}: Dist ${measure.distance.toFixed(3)}  Bearing ${measure.bearing}`, "ok");
+      return true;
+    }
+
+    setStatus(`Unknown command: ${parts[0]}. Supported: line, move, rotate, inverse.`, "warn");
+    return false;
+  }
+
+  runCommandBtn?.addEventListener("click", () => {
+    if (runCommandLine(commandInput?.value || "")) {
+      if (commandInput) commandInput.value = "";
+    }
+  });
+  commandInput?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (runCommandLine(commandInput.value || "")) {
+      commandInput.value = "";
+    }
+  });
 
   $("#toolSelect").addEventListener("click", ()=>setTool("select"));
   $("#toolAddPoint").addEventListener("click", ()=>setTool("addPoint"));
