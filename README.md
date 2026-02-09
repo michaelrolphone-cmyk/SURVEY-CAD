@@ -148,7 +148,7 @@ curl -X POST "http://localhost:3000/extract?maxPages=3&dpi=400&allowSlow=1" \
 
 `VIEWPORT.HTML` drag locking behavior: points and lines are locked by default and can only be drag-moved after you double-click to toggle them to movable. Persisted/imported movable flags now only unlock dragging when the value is strict boolean `true`.
 `VIEWPORT.HTML` also includes **Display** toggles so you can independently hide/show drawn point **codes** and **notes** while keeping point numbers visible.
-`VIEWPORT.HTML` now supports an optional map backdrop layer behind the drawing canvas (off by default) with a tile selector (default **Satellite**, with OpenStreetMap alternatives) and an opacity slider (default **10%**) so sketches can be visually aligned to map context without changing point/line drawing behavior.
+`VIEWPORT.HTML` now supports an optional map backdrop layer behind the drawing canvas (off by default) with a tile selector (default **Satellite**, with OpenStreetMap alternatives) and an opacity slider (default **66%**) so sketches can be visually aligned to map context without changing point/line drawing behavior.
 When the map layer is enabled and drawing points are present, LineSmith now auto-zooms/centers the canvas to the point extents (without adding an undo history entry) so the basemap view aligns with the same coordinates shown in the drawing.
 `VIEWPORT.HTML` now draws line **bearing + distance** labels when zoom/line length allows the text to fit beside the segment and when the computed label bounds do not overlap existing point text labels. The Selection section also includes an inspector card that reports bearing + distance for either the actively selected line or exactly two selected points.
 The Selection section now also includes a point inspector card that shows selected point fields and parses CP&F instrument references from point notes (`CPNFS:` with `...` delimiters), with one-click links to open each CP&F PDF by instrument number.
@@ -171,7 +171,7 @@ npm start
 open http://localhost:3000/POINT_TRANSFORMER.HTML
 ```
 
-In PointForge, click **Open in LineSmith** from the **upper-right header workflow button** after processing points; this navigates to `VIEWPORT.HTML?source=pointforge` (inside the launcher iframe when embedded, or current tab when standalone) and auto-imports the transformed points via browser local storage.
+In PointForge, click **Open in LineSmith** from the **upper-right header workflow button** after processing points; this navigates to `VIEWPORT.HTML?source=pointforge` (inside the launcher iframe when embedded, or current tab when standalone) and auto-imports the transformed points via browser local storage, with the map layer defaulted on for the imported handoff view.
 PointForge handoff uses `number,x,y,z,code,notes` ordering (code immediately after z, notes immediately after code), and now writes the exact state-plane drawing coordinates expected by LineSmith with no additional normalization at import handoff.
 PointForge handoff payloads now also include georeference metadata (`zone`, `swapXY`, and sampled WGS84 lat/lon pairs) so LineSmith can align map zoom/centering to imported state-plane coordinates instead of treating feet values as degrees.
 LineSmith now solves a best-fit affine transform from Idaho State Plane West (US-ft) `x/y` to WGS84 `lat/lon` using the sampled PointForge georeference points, then syncs map center + zoom from the drawing extents so panning/zooming tracks imported state-plane geometry correctly on the basemap.
