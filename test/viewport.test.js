@@ -211,6 +211,11 @@ test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate 
   assert.match(html, /function\s+renderWorkflowToast\(\)/, 'workflow toast should render from reusable helper function');
   assert.match(html, /function\s+showWorkflowToast\(\{\s*title, message, steps, currentStepIndex\s*\}\)/, 'workflow toast should expose reusable show API for multi-step tools');
   assert.match(html, /function\s+hideWorkflowToast\(\)/, 'workflow toast should expose reusable hide API');
+  assert.match(html, /function\s+getToolWorkflowToastPayload\(activeTool = tool\)/, 'workflow toast should expose reusable payload helper for toolbar tools');
+  assert.match(html, /if \(activeTool === "line2pt"\) \{[\s\S]*Pick line start point[\s\S]*Pick line end point[\s\S]*currentStepIndex: hasStart \? 1 : 0/, 'line-by-2-points tool should publish stage-aware toast steps for first and second clicks');
+  assert.match(html, /if \(activeTool === "lineDB"\) \{[\s\S]*Select start point[\s\S]*Enter distance \+ bearing[\s\S]*Click Create Point \+ Line/, 'line distance-bearing tool should publish select-input-submit guidance in toast steps');
+  assert.match(html, /if \(activeTool === "pointOnLine"\) \{[\s\S]*Select line[\s\S]*Enter station \+ offset[\s\S]*Click Create Point/, 'point-on-line tool should publish select-input-submit guidance in toast steps');
+  assert.match(html, /function\s+syncToolWorkflowToast\(\) \{[\s\S]*if \(rotateSelectionSession\.active\) return;[\s\S]*showWorkflowToast\(payload\);/, 'tool workflow sync should show non-rotate toast guidance and defer when rotate flow is active');
   assert.match(html, /const\s+rotateWorkflowSteps\s*=\s*\[[\s\S]*Select items to rotate[\s\S]*Select a point to rotate around[\s\S]*Select a basis of rotation[\s\S]*Select a target rotation[\s\S]*\]/, 'rotate flow should publish step-by-step guidance labels');
   assert.match(html, /rotateSelectionSession\.awaitingSelection\s*=\s*!rotateIds\.length;/, 'rotate workflow should enter selection-capture mode when started without a selection');
   assert.match(html, /setTool\("select"\);[\s\S]*Select items to rotate with a window or click selection/, 'rotate workflow should prompt user to window/click select items when none are selected');
