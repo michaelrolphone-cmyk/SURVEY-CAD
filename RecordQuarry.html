@@ -471,10 +471,10 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
 
   function getProjectContext() {
     const params = new URLSearchParams(window.location.search || "");
-    const projectId = params.get("projectId") || "";
-    const address = params.get("address") || "";
-    const projectName = params.get("projectName") || "";
-    const client = params.get("client") || "";
+    const projectId = params.get("projectId") || params.get("activeProjectId") || "";
+    const address = params.get("address") || params.get("activeAddress") || "";
+    const projectName = params.get("projectName") || params.get("activeProjectName") || "";
+    const client = params.get("client") || params.get("activeClient") || "";
     const autostart = params.get("autostart") === "1";
     return { projectId, address, projectName, client, autostart };
   }

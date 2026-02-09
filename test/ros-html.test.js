@@ -157,6 +157,9 @@ test('RecordQuarry.html restores and saves project lookup snapshots when launche
 
   assert.match(html, /const\s+PROJECT_LOOKUP_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectLookup"/, 'RecordQuarry should use a stable localStorage prefix for project lookup snapshots');
   assert.match(html, /function\s+getProjectContext\(\)/, 'RecordQuarry should parse launcher-provided project context from URL params');
+  assert.match(html, /params\.get\(\"projectId\"\)\s*\|\|\s*params\.get\(\"activeProjectId\"\)/, 'RecordQuarry should accept activeProjectId launcher param aliases');
+  assert.match(html, /params\.get\(\"projectName\"\)\s*\|\|\s*params\.get\(\"activeProjectName\"\)/, 'RecordQuarry should accept activeProjectName launcher param aliases');
+  assert.match(html, /params\.get\(\"client\"\)\s*\|\|\s*params\.get\(\"activeClient\"\)/, 'RecordQuarry should accept activeClient launcher param aliases');
   assert.match(html, /function\s+loadProjectLookupSnapshot\(projectId\)/, 'RecordQuarry should load saved project lookup snapshots');
   assert.match(html, /function\s+saveProjectLookupSnapshot\(projectId, snapshot\)/, 'RecordQuarry should persist lookup snapshots back to project storage');
   assert.match(html, /const\s+lookup\s*=\s*options\.lookupPayload\s*\|\|\s*await\s*lookupByAddress\(rawAddr\)/, 'lookup flow should support restoring cached project lookup payloads');
