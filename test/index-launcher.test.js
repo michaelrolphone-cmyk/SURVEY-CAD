@@ -50,6 +50,21 @@ test('launcher supports in-iframe app handoff navigation messages', async () => 
 });
 
 
+
+
+test('launcher prompts for save/discard/cancel when leaving app with unsaved LineSmith changes', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /function\s+requestAppFrameMessage\(messageType, extraPayload = \{\}\)/, 'launcher should expose iframe request/response helper for navigation guards');
+  assert.match(launcherHtml, /messageType\}:response/, 'launcher should expect typed response channels for iframe requests');
+  assert.match(launcherHtml, /function\s+confirmNavigateHomeFromApp\(\)/, 'launcher should gate home navigation through unsaved-change confirmation helper');
+  assert.match(launcherHtml, /survey-cad:request-unsaved-state/, 'launcher should ask active iframe app for unsaved-change state before leaving');
+  assert.match(launcherHtml, /Type "save" to save before leaving, "discard" to leave without saving, or "cancel" to stay on this page\./, 'launcher prompt should present save/discard/cancel choices');
+  assert.match(launcherHtml, /survey-cad:request-save-before-navigate/, 'launcher should request in-app save when save option is selected');
+  assert.match(launcherHtml, /LineSmith could not save your latest changes\. You are still on the page\./, 'launcher should keep user in app when save attempt fails');
+  assert.match(launcherHtml, /launcherHomeLink\.addEventListener\('click', async \(event\) => \{[\s\S]*const canNavigateHome = await confirmNavigateHomeFromApp\(\);[\s\S]*if \(!canNavigateHome\) return;[\s\S]*showHome\(\);/, 'back-chevron click should stay on app when user cancels or save fails');
+});
+
 test('launcher includes SurveyFoundry branding in title and header', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
@@ -81,7 +96,7 @@ test('launcher header switches to opened app icon/title and shows back chevron a
   assert.match(launcherHtml, /const\s+LAUNCHER_HOME_TITLE\s*=\s*'SurveyFoundry App Launcher';/, 'launcher should define default home title constant');
   assert.match(launcherHtml, /function\s+updateHeaderForApp\(file\)\s*\{[\s\S]*launcherHeaderIcon\.src\s*=\s*appIconPath;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*appName;[\s\S]*launcherHomeLink\.classList\.add\('app-open'\);/, 'opening an app should update header title/icon and show back chevron state');
   assert.match(launcherHtml, /function\s+showHome\(\)\s*\{[\s\S]*launcherHomeLink\.classList\.remove\('app-open'\);[\s\S]*launcherHeaderIcon\.src\s*=\s*LAUNCHER_HOME_ICON;[\s\S]*launcherHeaderTitle\.textContent\s*=\s*LAUNCHER_HOME_TITLE;/, 'returning home should restore SurveyFoundry title and icon');
-  assert.match(launcherHtml, /launcherHomeLink\.addEventListener\('click',\s*\(event\)\s*=>\s*\{[\s\S]*event\.preventDefault\(\);[\s\S]*if \(!currentApp\) return;[\s\S]*showHome\(\);/, 'clicking header icon/chevron should return to home when an app is open');
+  assert.match(launcherHtml, /launcherHomeLink\.addEventListener\('click',\s*async\s*\(event\)\s*=>\s*\{[\s\S]*event\.preventDefault\(\);[\s\S]*if \(!currentApp\) return;[\s\S]*const canNavigateHome = await confirmNavigateHomeFromApp\(\);[\s\S]*if \(!canNavigateHome\) return;[\s\S]*showHome\(\);/, 'clicking header icon/chevron should return to home when an app is open unless unsaved-change prompt cancels navigation');
 });
 
 test('launcher fetches and applies static map background for active project address', async () => {
