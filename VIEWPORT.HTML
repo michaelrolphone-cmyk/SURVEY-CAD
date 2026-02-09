@@ -3670,12 +3670,20 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
           drawingName,
           versionCount,
           latestVersionId,
+          latestSavedAt: new Date().toISOString(),
           latestMapGeoreference,
         },
       },
     };
     if (existing) Object.assign(existing, next);
     else drawingsFolder.index.push(next);
+    drawingsFolder.index.sort((a, b) => {
+      const aSaved = Date.parse(a?.reference?.metadata?.latestSavedAt || a?.reference?.metadata?.savedAt || "");
+      const bSaved = Date.parse(b?.reference?.metadata?.latestSavedAt || b?.reference?.metadata?.savedAt || "");
+      const aValue = Number.isFinite(aSaved) ? aSaved : Number.NEGATIVE_INFINITY;
+      const bValue = Number.isFinite(bSaved) ? bSaved : Number.NEGATIVE_INFINITY;
+      return bValue - aValue;
+    });
     localStorage.setItem(key, JSON.stringify(projectFile));
   }
 

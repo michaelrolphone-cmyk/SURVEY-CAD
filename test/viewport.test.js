@@ -319,6 +319,8 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /record\.latestMapGeoreference\s*=\s*sanitizeMapGeoreference\(currentState\.mapGeoreference\);/, 'saving should persist a latest georeference fallback alongside differential versions');
   assert.match(html, /const\s+fallbackGeoreference\s*=\s*sanitizeMapGeoreference\(record\.latestMapGeoreference\);[\s\S]*state\.mapGeoreference\s*=\s*fallbackGeoreference;/, 'version materialization should restore latest georeference when differential history omitted that field');
   assert.match(html, /latestMapGeoreference,/, 'project browser metadata should carry the latest georeference snapshot');
+  assert.match(html, /latestSavedAt:\s*new Date\(\)\.toISOString\(\),/, 'project browser metadata should carry the latest drawing save timestamp');
+  assert.match(html, /drawingsFolder\.index\.sort\(\(a, b\) => \{[\s\S]*latestSavedAt[\s\S]*return bValue - aValue;[\s\S]*\}\);/, 'project drawing resources should be sorted by latest saved timestamp descending');
   assert.match(html, /if \(mapLayerState\.enabled\) syncMapToView\(true\);/, 'restoring a drawing should resync map view after georeference hydration');
   assert.match(html, /let\s+lastSavedDrawingSnapshot\s*=\s*"";/, 'LineSmith should track a saved-state snapshot for unsaved-change prompts');
   assert.match(html, /function\s+markDrawingAsSaved\(\)/, 'LineSmith should expose helper to refresh saved snapshot baseline');
