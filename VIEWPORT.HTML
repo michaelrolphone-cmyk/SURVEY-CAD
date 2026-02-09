@@ -1595,6 +1595,10 @@
       },
       construction: {...construction},
       view: {...view},
+      mapGeoreference: mapGeoreference ? {
+        lat: { ...mapGeoreference.lat },
+        lng: { ...mapGeoreference.lng }
+      } : null,
       modal: { open: !modal.classList.contains("hidden"), left: modalWindow.style.left, top: modalWindow.style.top, w: modalWindow.style.width, h: modalWindow.style.height }
     });
   }
@@ -1622,6 +1626,27 @@
       view.panY = s.view.panY ?? view.panY;
     }
 
+    mapGeoreference = s.mapGeoreference &&
+      Number.isFinite(Number(s.mapGeoreference?.lat?.ax)) &&
+      Number.isFinite(Number(s.mapGeoreference?.lat?.by)) &&
+      Number.isFinite(Number(s.mapGeoreference?.lat?.c)) &&
+      Number.isFinite(Number(s.mapGeoreference?.lng?.ax)) &&
+      Number.isFinite(Number(s.mapGeoreference?.lng?.by)) &&
+      Number.isFinite(Number(s.mapGeoreference?.lng?.c))
+      ? {
+        lat: {
+          ax: Number(s.mapGeoreference.lat.ax),
+          by: Number(s.mapGeoreference.lat.by),
+          c: Number(s.mapGeoreference.lat.c)
+        },
+        lng: {
+          ax: Number(s.mapGeoreference.lng.ax),
+          by: Number(s.mapGeoreference.lng.by),
+          c: Number(s.mapGeoreference.lng.c)
+        }
+      }
+      : null;
+
     updatePointEditorFromSelection();
     schedulePointsTableRender();
     updateUndoRedoHUD();
@@ -1634,6 +1659,8 @@
       if (s.modal.w) modalWindow.style.width = s.modal.w;
       if (s.modal.h) modalWindow.style.height = s.modal.h;
     }
+
+    if (mapLayerState.enabled) syncMapToView(true);
   }
 
   function updateUndoRedoHUD() {

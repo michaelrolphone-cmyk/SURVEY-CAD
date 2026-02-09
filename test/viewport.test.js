@@ -177,4 +177,7 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /function\s+promptRestoreDrawingVersion\(\)/, 'LineSmith should expose saved version restore workflow');
   assert.ok(html.includes('.join("\\n")'), 'restore workflow should join version choices with escaped newline separators');
   assert.match(html, /tryImportProjectBrowserDrawingPayload\(\)/, 'LineSmith should support opening saved drawing payloads launched from Project Browser');
+  assert.match(html, /mapGeoreference:\s*mapGeoreference\s*\?\s*\{/, 'saved drawing snapshots should persist georeference transform data');
+  assert.match(html, /mapGeoreference\s*=\s*s\.mapGeoreference\s*&&/, 'restored drawing snapshots should hydrate georeference transform data');
+  assert.match(html, /if \(mapLayerState\.enabled\) syncMapToView\(true\);/, 'restoring a drawing should resync map view after georeference hydration');
 });
