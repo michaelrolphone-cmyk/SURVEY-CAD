@@ -57,6 +57,7 @@ import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
 import { createGuardedSensorHandler, safeSocketSend, toErrorMessage } from "./src/arrowhead-sensor-guard.js";
 import { computeForwardDistanceMeters, computeObserverElevationFeet, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
+
 (() => {
   const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = 'surveyfoundryLastLineSmithDrawing';
@@ -763,7 +764,8 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     const east = dLon * 6378137 * Math.cos(meanLat);
     return { east, north };
   }
-function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
+
+  function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
     if (!Number.isFinite(state.userLat) || !Number.isFinite(state.userLon)) return null;
 
     const { east, north } = latLonDeltaMeters(state.userLat, state.userLon, pointLat, pointLon);
@@ -774,10 +776,7 @@ function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
 
     const w = canvas.width;
     const h = canvas.height;
-
-    // Realistic vertical FOV for most mobile rear cameras (tune if needed: 60-72°)
-    const verticalFov = 65 * Math.PI / 180;
-
+    const verticalFov = 68 * Math.PI / 180;
     const projection = projectEnuPointToScreen({
       eastMeters: east,
       northMeters: north,
@@ -789,9 +788,7 @@ function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
       viewportHeightPx: h,
       verticalFovRad: verticalFov,
       nearClipMeters: 0.5,
-      rollCompensationGain: 0.8,  // Lower if roll causes flying; try 0.5-1.0
     });
-
     if (!projection) return null;
 
     return {
@@ -959,6 +956,7 @@ function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
       ctx.fillStyle = 'rgba(34,197,94,0.98)';
       ctx.font = `${Math.max(16, 14 * window.devicePixelRatio)}px Inter, system-ui, sans-serif`;
       ctx.fillText(onTargetLabel, onTargetPoint.x + ringRadius + 10, onTargetPoint.y + 6);
+
     }
 
     const headingSource = state.useGyroscopeHeading ? 'Gyro' : 'Mag';
