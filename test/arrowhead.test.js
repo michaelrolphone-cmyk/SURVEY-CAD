@@ -15,10 +15,14 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /window\.addEventListener\('deviceorientation'/, 'ArrowHead should subscribe to orientation sensor updates');
   assert.match(html, /window\.addEventListener\('devicemotion'/, 'ArrowHead should subscribe to motion sensor updates');
   assert.match(html, /resolvePointElevationFeet\(p\.z, state\.userAltFeet\)/, 'ArrowHead should replace missing or zero point elevations with current phone elevation');
-  assert.match(html, /import\s+\{\s*deriveDevicePoseRadians,\s*normalizeRadians\s*\}\s+from\s+"\.\/src\/arrowhead-math\.js";/, 'ArrowHead should use shared orientation math helpers');
+  assert.match(html, /import\s+\{\s*deriveDevicePoseRadians,\s*integrateGyroscopeHeadingRadians,\s*normalizeRadians\s*\}\s+from\s+"\.\/src\/arrowhead-math\.js";/, 'ArrowHead should use shared orientation math helpers, including gyroscope heading integration');
   assert.match(html, /import\s+\{\s*computeForwardDistanceMeters,\s*computeRelativeBearingRad,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
   assert.match(html, /import\s+\{\s*latLngToWorldAffine,\s*worldToLatLngAffine\s*\}\s+from\s+"\.\/src\/georeference-transform\.js";/, 'ArrowHead should use shared georeference helpers for bidirectional coordinate projection');
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
+  assert.match(html, /<button id="useGyro">Use Gyroscope Heading: Off<\/button>/, 'ArrowHead should expose a gyroscope heading mode toggle button');
+  assert.match(html, /if \(!state\.useGyroscopeHeading && Number\.isFinite\(pose\.headingRad\)\) state\.headingRad = pose\.headingRad;/, 'ArrowHead should default to magnetometer heading updates unless gyroscope mode is enabled');
+  assert.match(html, /state\.gyroHeadingRawRad = integrateGyroscopeHeadingRadians\(state\.gyroHeadingRawRad, rotationRateAlpha, dtMs\);/, 'ArrowHead should integrate gyroscope rotationRate alpha into heading when gyroscope mode is enabled');
+  assert.match(html, /state\.gyroHeadingOffsetRad = normalizeRadians\(-state\.gyroHeadingRawRad\);/, 'ArrowHead should support center calibration for gyroscope heading mode');
   assert.match(html, /const\s+socket\s*=\s*new\s+WebSocket\(wsUrl\);/, 'ArrowHead should join the LineSmith collaboration websocket room');
   assert.match(html, /function\s+refreshPayloadFromStorage\(options\s*=\s*\{\}\)/, 'ArrowHead should support refreshing LineSmith payload updates while running');
   assert.match(html, /window\.addEventListener\('storage',\s*\(event\)\s*=>\s*\{[\s\S]*event\.key\s*!==\s*ARROWHEAD_IMPORT_STORAGE_KEY/, 'ArrowHead should watch localStorage events for live LineSmith geometry updates');

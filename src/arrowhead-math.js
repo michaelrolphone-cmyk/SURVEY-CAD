@@ -58,3 +58,15 @@ export function shouldApplyOrientationEvent(eventType, orientationEvent, hasAbso
   if (!hasAbsoluteLock) return true;
   return isAbsoluteEvent;
 }
+
+export function integrateGyroscopeHeadingRadians(previousHeadingRad, rotationRateAlphaDegPerSec, deltaTimeMs) {
+  const prior = Number(previousHeadingRad);
+  const safePrior = Number.isFinite(prior) ? prior : 0;
+  const rotationRateDegPerSec = Number(rotationRateAlphaDegPerSec);
+  const dtMs = Number(deltaTimeMs);
+  if (!Number.isFinite(rotationRateDegPerSec) || !Number.isFinite(dtMs) || dtMs <= 0) {
+    return normalizeRadians(safePrior);
+  }
+  const deltaRad = -(rotationRateDegPerSec * Math.PI / 180) * (dtMs / 1000);
+  return normalizeRadians(safePrior + deltaRad);
+}

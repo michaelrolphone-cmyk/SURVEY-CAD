@@ -24,13 +24,14 @@
     <div class="hud">
       <div class="row">
         <button id="startSensors">Start AR Sensors</button>
-        <button id="recenter">Recenter</button>
+        <button id="useGyro">Use Gyroscope Heading: Off</button>
+        <button id="recenter">Center</button>
       </div>
       <div id="status" class="status">Ready. Open from LineSmith to load overlay geometry.</div>
     </div>
   </div>
 <script type="module">
-import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.js";
+import { deriveDevicePoseRadians, integrateGyroscopeHeadingRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
 import { computeForwardDistanceMeters, computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
@@ -64,6 +65,10 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     hasAbsoluteHeadingLock: false,
     lastPayloadRaw: '',
     payloadSyncIntervalId: 0,
+    useGyroscopeHeading: false,
+    gyroHeadingRawRad: 0,
+    gyroHeadingOffsetRad: 0,
+    lastGyroMotionMs: 0,
   };
 
   function setStatus(message, warn = false) {
@@ -236,7 +241,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
         || Number.isFinite(Number(event.webkitCompassHeading));
       if (isAbsoluteEvent) state.hasAbsoluteHeadingLock = true;
       const pose = deriveDevicePoseRadians(event, currentScreenAngle(), state.headingOffsetRad);
-      if (Number.isFinite(pose.headingRad)) state.headingRad = pose.headingRad;
+      if (!state.useGyroscopeHeading && Number.isFinite(pose.headingRad)) state.headingRad = pose.headingRad;
       state.pitchRad = pose.pitchRad;
       state.rollRad = pose.rollRad;
       sendArPresence();
@@ -244,8 +249,20 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
     window.addEventListener('deviceorientationabsolute', applyOrientationEvent, true);
     window.addEventListener('deviceorientation', applyOrientationEvent, true);
-    window.addEventListener('devicemotion', () => {
+    window.addEventListener('devicemotion', (event) => {
       // Subscribe so accelerometer/gyroscope streams are explicitly used by the app.
+      if (!state.useGyroscopeHeading) return;
+      const now = Date.now();
+      if (!state.lastGyroMotionMs) {
+        state.lastGyroMotionMs = now;
+        return;
+      }
+      const dtMs = now - state.lastGyroMotionMs;
+      state.lastGyroMotionMs = now;
+      const rotationRateAlpha = Number(event && event.rotationRate && event.rotationRate.alpha);
+      state.gyroHeadingRawRad = integrateGyroscopeHeadingRadians(state.gyroHeadingRawRad, rotationRateAlpha, dtMs);
+      state.headingRad = normalizeRadians(state.gyroHeadingRawRad + state.gyroHeadingOffsetRad);
+      sendArPresence();
     });
   }
 
@@ -405,7 +422,8 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
     }
 
-    setStatus(`AR live. Points: ${projected.length}/${state.payload.points.length}. Heading ${(state.headingRad * 180 / Math.PI).toFixed(1)}°`);
+    const headingSource = state.useGyroscopeHeading ? 'Gyro' : 'Mag';
+    setStatus(`AR live (${headingSource}). Points: ${projected.length}/${state.payload.points.length}. Heading ${(state.headingRad * 180 / Math.PI).toFixed(1)}°`);
   }
 
   function startPayloadSyncWatchers() {
@@ -452,7 +470,27 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   }
 
   document.getElementById('startSensors').addEventListener('click', start);
+  const gyroButton = document.getElementById('useGyro');
+  gyroButton.addEventListener('click', () => {
+    state.useGyroscopeHeading = !state.useGyroscopeHeading;
+    state.lastGyroMotionMs = 0;
+    if (state.useGyroscopeHeading) {
+      state.gyroHeadingRawRad = Number.isFinite(state.headingRad) ? state.headingRad : 0;
+      state.gyroHeadingOffsetRad = 0;
+      gyroButton.textContent = 'Use Gyroscope Heading: On';
+      setStatus('Gyroscope heading enabled. Tap Center while level and facing due north to calibrate heading.');
+      return;
+    }
+    gyroButton.textContent = 'Use Gyroscope Heading: Off';
+    setStatus('Magnetometer heading enabled.');
+  });
   document.getElementById('recenter').addEventListener('click', () => {
+    if (state.useGyroscopeHeading) {
+      state.gyroHeadingOffsetRad = normalizeRadians(-state.gyroHeadingRawRad);
+      state.headingRad = normalizeRadians(state.gyroHeadingRawRad + state.gyroHeadingOffsetRad);
+      setStatus('Gyroscope centered. Keep phone level and face due north while calibrating.');
+      return;
+    }
     state.headingOffsetRad = normalizeRadians(-state.headingRad);
     setStatus('Recentered current heading as forward.');
   });
