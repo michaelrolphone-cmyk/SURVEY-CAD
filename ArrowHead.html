@@ -278,25 +278,43 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     return false;
   }
 
+  function getCameraRequestor() {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      return (constraints) => navigator.mediaDevices.getUserMedia(constraints);
+    }
+
+    const legacyOwner =
+      (typeof navigator.getUserMedia === 'function' && navigator) ||
+      (typeof navigator.webkitGetUserMedia === 'function' && navigator) ||
+      (typeof navigator.mozGetUserMedia === 'function' && navigator) ||
+      (typeof navigator.msGetUserMedia === 'function' && navigator) ||
+      (navigator.mediaDevices && typeof navigator.mediaDevices.webkitGetUserMedia === 'function' && navigator.mediaDevices) ||
+      (navigator.mediaDevices && typeof navigator.mediaDevices.mozGetUserMedia === 'function' && navigator.mediaDevices);
+
+    const legacyGetUserMedia = legacyOwner && (
+      legacyOwner.getUserMedia ||
+      legacyOwner.webkitGetUserMedia ||
+      legacyOwner.mozGetUserMedia ||
+      legacyOwner.msGetUserMedia
+    );
+
+    if (typeof legacyGetUserMedia !== 'function') return null;
+
+    return (constraints) => new Promise((resolve, reject) => {
+      legacyGetUserMedia.call(legacyOwner, constraints, resolve, reject);
+    });
+  }
+
   function hasCameraApi() {
-    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') return true;
-    if (typeof navigator.getUserMedia === 'function') return true;
-    if (typeof navigator.webkitGetUserMedia === 'function') return true;
-    if (typeof navigator.mozGetUserMedia === 'function') return true;
-    return false;
+    return typeof getCameraRequestor() === 'function';
   }
 
   function requestCameraStream(constraints) {
-    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-      return navigator.mediaDevices.getUserMedia(constraints);
-    }
-    const legacyGetUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-    if (typeof legacyGetUserMedia !== 'function') {
+    const requestCamera = getCameraRequestor();
+    if (typeof requestCamera !== 'function') {
       return Promise.reject(new Error('Camera API unavailable on this device/browser.'));
     }
-    return new Promise((resolve, reject) => {
-      legacyGetUserMedia.call(navigator, constraints, resolve, reject);
-    });
+    return requestCamera(constraints);
   }
 
   async function startCamera() {
@@ -663,10 +681,6 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   async function start() {
     if (state.started) return;
-    if (!hasCameraApi()) {
-      setStatus('Camera API unavailable on this device/browser.', true);
-      return;
-    }
     if (!('geolocation' in navigator)) {
       setStatus('Geolocation API unavailable on this device/browser.', true);
       return;
@@ -684,6 +698,10 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       setStatus('Sensors enabled. Move your phone to align geometry with the field view.');
     } catch (error) {
       const errorMessage = error && error.message ? error.message : 'Could not start ArrowHead AR.';
+      if (/getUserMedia|camera/i.test(String(errorMessage)) && !hasCameraApi()) {
+        setStatus('Camera API unavailable on this device/browser.', true);
+        return;
+      }
       setStatus(String(errorMessage), true);
     }
   }
