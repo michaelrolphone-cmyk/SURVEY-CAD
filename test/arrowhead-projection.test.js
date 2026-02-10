@@ -57,7 +57,7 @@ test('projectEnuPointToScreen culls points behind camera after pitch crosses hor
   assert.equal(behindAfterCrossing, null);
 });
 
-test('projectEnuPointToScreen applies roll with the same handedness as device roll', () => {
+test('projectEnuPointToScreen applies roll so overlays rotate with the camera feed', () => {
   const noRoll = projectEnuPointToScreen({
     eastMeters: 8,
     northMeters: 20,
@@ -84,7 +84,7 @@ test('projectEnuPointToScreen applies roll with the same handedness as device ro
   });
 
   assert.ok(noRoll && rollLeft);
-  assert.ok(rollLeft.y > noRoll.y, 'a right-side point should move lower on screen when phone rolls left');
+  assert.ok(rollLeft.y < noRoll.y, 'a right-side point should move higher on screen when phone rolls left so overlays follow camera roll');
 });
 
 

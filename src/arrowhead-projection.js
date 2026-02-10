@@ -45,7 +45,9 @@ export function projectEnuPointToScreen(options) {
   const clipDistance = Number.isFinite(nearClip) && nearClip > 0 ? nearClip : 0.5;
   const safeHeading = Number.isFinite(heading) ? heading : 0;
   const safePitch = Number.isFinite(pitch) ? pitch : 0;
-  const safeRoll = Number.isFinite(roll) ? roll : 0;
+  // Device roll must be inverted when rotating world coordinates into camera space,
+  // otherwise overlays visually counter-rotate against the camera feed.
+  const safeRoll = Number.isFinite(roll) ? -roll : 0;
 
   const cosHeading = Math.cos(safeHeading);
   const sinHeading = Math.sin(safeHeading);
