@@ -80,7 +80,8 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead now prefers iOS Safari `webkitCompassHeading` (with `deviceorientationabsolute` fallback) and remaps pitch/roll by current screen orientation so overlays track correctly as you turn/tilt the phone instead of sticking to screen center.
 - ArrowHead avoids modern-only JavaScript syntax (optional chaining/object spread) so iOS 13 Safari/WebKit can parse and run the AR overlay without reducing AR feature behavior.
 - GPS + device orientation/motion sensors are used to place features in real space.
-- Point elevations with `z=0` are rendered using the phone-reported elevation at runtime.
+- Point elevations with missing/invalid `z` values (including `z=0`) are rendered using the phone-reported elevation at runtime so horizontal spacing is not distorted by zero-altitude assumptions.
+- AR horizontal bearing projection uses heading-minus-target handedness so overlays move in the expected direction when panning left/right.
 - XY-to-lat/lon conversion reuses the same LineSmith georeference transform used by LineSmith map alignment (`lat=ax*x+by*y+c`, `lng=ax*x+by*y+c`).
 
 Direct open command (after a LineSmith handoff payload exists):
