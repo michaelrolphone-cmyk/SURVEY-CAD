@@ -691,7 +691,6 @@
     function applyServerSnapshot(snapshot = {}) {
       localStorageSyncLock = true;
       const entries = Object.entries(snapshot || {});
-      localStorage.clear();
       entries.forEach(([key, value]) => {
         localStorage.setItem(key, String(value));
       });

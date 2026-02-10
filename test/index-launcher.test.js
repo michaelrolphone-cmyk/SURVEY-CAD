@@ -214,7 +214,8 @@ test('launcher syncs localStorage to server with versioning and stale refresh ha
   assert.match(launcherHtml, /fetch\('\/api\/localstorage-sync',\s*\{[\s\S]*method:\s*'POST'/, 'launcher should post localStorage snapshots to the sync API');
   assert.match(launcherHtml, /if \(payload\?\.status === 'client-stale' && payload\?\.state\?\.snapshot\)/, 'launcher should detect stale local state from sync response');
   assert.match(launcherHtml, /const\s+serverSnapshotSerialized\s*=\s*JSON\.stringify\(payload\.state\.snapshot\);/, 'launcher should compare stale server snapshots before replacing local data');
-  assert.match(launcherHtml, /localStorage\.clear\(\);[\s\S]*localStorage\.setItem\(key, String\(value\)\);/, 'launcher should replace stale localStorage with server snapshot');
+  assert.match(launcherHtml, /entries\.forEach\(\(\[key, value\]\) => \{[\s\S]*localStorage\.setItem\(key, String\(value\)\);/, 'launcher should merge stale server snapshots into localStorage keys without clearing unrelated data');
+  assert.doesNotMatch(launcherHtml, /function\s+applyServerSnapshot\([\s\S]*localStorage\.clear\(/, 'launcher should not clear all localStorage when applying stale sync snapshots');
   assert.doesNotMatch(launcherHtml, /function\s+refreshOpenApp\(/, 'launcher should not force iframe refreshes when stale snapshots are applied');
   assert.match(launcherHtml, /setInterval\(\(\) => \{[\s\S]*syncLocalStorageWithServer\(\)/, 'launcher should continuously sync localStorage updates');
 });
