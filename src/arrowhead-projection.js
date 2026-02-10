@@ -65,8 +65,8 @@ export function projectEnuPointToScreen(options) {
 
   const cosRoll = Math.cos(safeRoll);
   const sinRoll = Math.sin(safeRoll);
-  const xCamera = xYaw * cosRoll - yPitch * sinRoll;
-  const yCamera = xYaw * sinRoll + yPitch * cosRoll;
+  const xCamera = xYaw * sinRoll - yPitch * sinRoll;
+  const yCamera = xYaw * cosRoll + yPitch * cosRoll;
   const zCamera = zPitch;
 
   if (!(zCamera > clipDistance)) return null;
