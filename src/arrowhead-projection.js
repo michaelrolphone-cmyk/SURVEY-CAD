@@ -56,7 +56,7 @@ export function projectEnuPointToScreen(options) {
   const sinHeading = Math.sin(safeHeading);
   const xYaw = east * cosHeading - north * sinHeading;
   const zYaw = east * sinHeading + north * cosHeading;
-  const yYaw = up;
+  const yYaw = up * 0.5;
 
   const cosPitch = Math.cos(safePitch);
   const sinPitch = Math.sin(safePitch);
