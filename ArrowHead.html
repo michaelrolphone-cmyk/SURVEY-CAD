@@ -278,8 +278,29 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     return false;
   }
 
+  function hasCameraApi() {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') return true;
+    if (typeof navigator.getUserMedia === 'function') return true;
+    if (typeof navigator.webkitGetUserMedia === 'function') return true;
+    if (typeof navigator.mozGetUserMedia === 'function') return true;
+    return false;
+  }
+
+  function requestCameraStream(constraints) {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      return navigator.mediaDevices.getUserMedia(constraints);
+    }
+    const legacyGetUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+    if (typeof legacyGetUserMedia !== 'function') {
+      return Promise.reject(new Error('Camera API unavailable on this device/browser.'));
+    }
+    return new Promise((resolve, reject) => {
+      legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+    });
+  }
+
   async function startCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    const stream = await requestCameraStream({ video: { facingMode: { ideal: 'environment' } }, audio: false });
     video.srcObject = stream;
   }
 
@@ -642,7 +663,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   async function start() {
     if (state.started) return;
-    if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
+    if (!hasCameraApi()) {
       setStatus('Camera API unavailable on this device/browser.', true);
       return;
     }
