@@ -79,6 +79,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead now projects points from ENU deltas to camera screen space using relative bearing/elevation (plus roll compensation) so on-screen direction matches both the device heading and source survey geometry.
 - ArrowHead now prefers iOS Safari `webkitCompassHeading` (with `deviceorientationabsolute` fallback) and remaps pitch/roll by current screen orientation so overlays track correctly as you turn/tilt the phone instead of sticking to screen center.
 - ArrowHead avoids modern-only JavaScript syntax (optional chaining/object spread) so iOS 13 Safari/WebKit can parse and run the AR overlay without reducing AR feature behavior.
+- ArrowHead now marks points as **On target** when they land inside the center 10% of the camera feed, drawing a green circle around the point and overlaying live distance-to-point guidance in meters and feet.
 - GPS + device orientation/motion sensors are used to place features in real space.
 - Point elevations with missing/invalid `z` values (including `z=0`) are rendered using the phone-reported elevation at runtime so horizontal spacing is not distorted by zero-altitude assumptions.
 - AR horizontal bearing projection uses heading-minus-target handedness so overlays move in the expected direction when panning left/right.

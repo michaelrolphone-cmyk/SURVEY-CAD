@@ -38,6 +38,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
   const FEET_TO_METERS = 0.3048006096012192;
   const METERS_TO_FEET = 1 / FEET_TO_METERS;
+  const ON_TARGET_CENTER_FRACTION = 0.1;
 
   const video = document.getElementById('camera');
   const canvas = document.getElementById('overlay');
@@ -349,6 +350,34 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       ctx.closePath();
       ctx.fill();
       ctx.fillText(`AR ${String(clientId || '').slice(0, 6)}`, scr.x + 10, scr.y - 12);
+    }
+    const centerX = canvas.width * 0.5;
+    const centerY = canvas.height * 0.5;
+    const centerHalfWidth = canvas.width * ON_TARGET_CENTER_FRACTION * 0.5;
+    const centerHalfHeight = canvas.height * ON_TARGET_CENTER_FRACTION * 0.5;
+    let onTargetPoint = null;
+    for (const p of projected) {
+      const inCenterX = Math.abs(p.x - centerX) <= centerHalfWidth;
+      const inCenterY = Math.abs(p.y - centerY) <= centerHalfHeight;
+      if (!inCenterX || !inCenterY) continue;
+      if (!onTargetPoint || p.distanceM < onTargetPoint.distanceM) {
+        onTargetPoint = p;
+      }
+    }
+
+    if (onTargetPoint) {
+      const ringRadius = Math.max(28, window.devicePixelRatio * 18);
+      const distanceFeet = onTargetPoint.distanceM * METERS_TO_FEET;
+      const onTargetLabel = `On target • ${onTargetPoint.distanceM.toFixed(1)} m (${distanceFeet.toFixed(1)} ft)`;
+      ctx.lineWidth = Math.max(3, window.devicePixelRatio * 2.4);
+      ctx.strokeStyle = 'rgba(34,197,94,0.95)';
+      ctx.beginPath();
+      ctx.arc(onTargetPoint.x, onTargetPoint.y, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(34,197,94,0.98)';
+      ctx.font = `${Math.max(16, 14 * window.devicePixelRatio)}px Inter, system-ui, sans-serif`;
+      ctx.fillText(onTargetLabel, onTargetPoint.x + ringRadius + 10, onTargetPoint.y + 6);
+
     }
 
     setStatus(`AR live. Points: ${projected.length}/${state.payload.points.length}. Heading ${(state.headingRad * 180 / Math.PI).toFixed(1)}°`);

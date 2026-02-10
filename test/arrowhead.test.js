@@ -30,4 +30,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /const\s+xFromBearing\s*=\s*\(Math\.tan\(relativeBearingRad\) \/ Math\.tan\(horizontalFov \* 0\.5\)\)/, 'ArrowHead should project horizontal screen offset from bearing');
   assert.match(html, /const\s+yFromElevation\s*=\s*\(Math\.tan\(relativeElevationRad\) \/ Math\.tan\(verticalFov \* 0\.5\)\)/, 'ArrowHead should project vertical screen offset from elevation angle');
   assert.match(html, /const\s+xRotated\s*=\s*xFromBearing\s*\*\s*cosRoll\s*-\s*yFromElevation\s*\*\s*sinRoll;/, 'ArrowHead should apply roll compensation to screen coordinates');
+  assert.match(html, /const\s+ON_TARGET_CENTER_FRACTION\s*=\s*0\.1;/, 'ArrowHead should define a center-target fraction matching the middle 10% of the feed');
+  assert.match(html, /const\s+centerHalfWidth\s*=\s*canvas\.width\s*\*\s*ON_TARGET_CENTER_FRACTION\s*\*\s*0\.5;/, 'ArrowHead should compute horizontal center-zone bounds');
+  assert.match(html, /const\s+centerHalfHeight\s*=\s*canvas\.height\s*\*\s*ON_TARGET_CENTER_FRACTION\s*\*\s*0\.5;/, 'ArrowHead should compute vertical center-zone bounds');
+  assert.match(html, /ctx\.arc\(onTargetPoint\.x, onTargetPoint\.y, ringRadius, 0, Math\.PI \* 2\);/, 'ArrowHead should draw an on-target circle around the centered point');
+  assert.match(html, /On target • \$\{onTargetPoint\.distanceM\.toFixed\(1\)\} m \(\$\{distanceFeet\.toFixed\(1\)\} ft\)/, 'ArrowHead should overlay on-target distance guidance text');
 });
