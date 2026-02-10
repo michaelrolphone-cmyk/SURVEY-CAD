@@ -62,6 +62,8 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     remotePresence: new Map(),
     ownWorld: null,
     hasAbsoluteHeadingLock: false,
+    lastPayloadRaw: '',
+    payloadSyncIntervalId: 0,
   };
 
   function setStatus(message, warn = false) {
@@ -78,17 +80,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     return worldToLatLngAffine(x, y, georef);
   }
 
-  function loadPayload() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('source') !== 'linesmith') {
-      setStatus('Launch ArrowHead from LineSmith to import points and lines.', true);
-      return false;
-    }
-    const raw = localStorage.getItem(ARROWHEAD_IMPORT_STORAGE_KEY);
-    if (!raw) {
-      setStatus('LineSmith payload missing in local storage.', true);
-      return false;
-    }
+  function parsePayloadRaw(raw) {
     try {
       const payload = JSON.parse(raw);
       const points = payload && Array.isArray(payload.points) ? payload.points : [];
@@ -96,17 +88,42 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       const georef = payload ? payload.georeference : null;
       const roomId = payload ? payload.collabRoomId : "";
       const hasGeoref = georef && georef.lat && georef.lng;
-      if (!points.length || !hasGeoref) {
-        setStatus('LineSmith payload missing points or georeference.', true);
-        return false;
-      }
-      state.payload = { points, lines, georef };
-      state.collabRoomId = String(roomId || "").trim();
-      return true;
+      if (!points.length || !hasGeoref) return null;
+      return {
+        payload: { points, lines, georef },
+        roomId: String(roomId || "").trim()
+      };
     } catch {
-      setStatus('Could not parse LineSmith payload.', true);
+      return null;
+    }
+  }
+
+  function refreshPayloadFromStorage(options = {}) {
+    const raw = typeof options.raw === 'string' ? options.raw : localStorage.getItem(ARROWHEAD_IMPORT_STORAGE_KEY);
+    if (!raw) {
+      if (!state.payload) setStatus('LineSmith payload missing in local storage.', true);
       return false;
     }
+    if (raw === state.lastPayloadRaw) return false;
+    const parsed = parsePayloadRaw(raw);
+    if (!parsed) {
+      if (!state.payload) setStatus('LineSmith payload missing points or georeference.', true);
+      return false;
+    }
+    state.payload = parsed.payload;
+    state.collabRoomId = parsed.roomId;
+    state.lastPayloadRaw = raw;
+    return true;
+  }
+
+  function loadPayload() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('source') !== 'linesmith') {
+      setStatus('Launch ArrowHead from LineSmith to import points and lines.', true);
+      return false;
+    }
+    if (!refreshPayloadFromStorage()) return false;
+    return true;
   }
 
   async function startCamera() {
@@ -391,6 +408,17 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     setStatus(`AR live. Points: ${projected.length}/${state.payload.points.length}. Heading ${(state.headingRad * 180 / Math.PI).toFixed(1)}°`);
   }
 
+  function startPayloadSyncWatchers() {
+    if (state.payloadSyncIntervalId) window.clearInterval(state.payloadSyncIntervalId);
+    window.addEventListener('storage', (event) => {
+      if (event.key !== ARROWHEAD_IMPORT_STORAGE_KEY) return;
+      refreshPayloadFromStorage({ raw: event.newValue });
+    });
+    state.payloadSyncIntervalId = window.setInterval(() => {
+      refreshPayloadFromStorage();
+    }, 1000);
+  }
+
   function renderLoop() {
     draw();
     requestAnimationFrame(renderLoop);
@@ -407,6 +435,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       return;
     }
     if (!loadPayload()) return;
+    startPayloadSyncWatchers();
 
     try {
       await requestOrientationPermissionIfNeeded();

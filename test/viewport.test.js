@@ -402,8 +402,17 @@ test('VIEWPORT.HTML provides ArrowHead AR launch handoff with LineSmith geometry
   assert.match(html, /id="openArrowHead"[^>]*>Open ArrowHead AR<\/button>/, 'LineSmith UI should provide an Open ArrowHead AR action');
   assert.match(html, /function\s+buildArrowHeadPayload\(\)/, 'LineSmith should build a payload containing points, lines, and georeference data');
   assert.match(html, /collabRoomId:\s*resolveCollabRoomId\(\)/, 'LineSmith should include the collaboration room in ArrowHead handoff payload so both apps join the same websocket room');
-  assert.match(html, /localStorage\.setItem\(ARROWHEAD_IMPORT_STORAGE_KEY,\s*JSON\.stringify\(payload\)\)/, 'LineSmith should persist ArrowHead handoff payload before navigation');
+  assert.match(html, /localStorage\.setItem\(ARROWHEAD_IMPORT_STORAGE_KEY,\s*payloadJson\)/, 'LineSmith should persist ArrowHead handoff payload before navigation');
   assert.match(html, /const\s+targetPath\s*=\s*`\/ArrowHead\.html\?\$\{targetParams\.toString\(\)\}`;/, 'LineSmith should launch ArrowHead with launcher-aware query parameters');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app",[\s\S]*path:\s*targetPath/, 'LineSmith should use launcher postMessage navigation when embedded');
 });
 
+
+test('VIEWPORT.HTML continuously syncs ArrowHead handoff payload while LineSmith geometry changes', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+ARROWHEAD_SYNC_INTERVAL_MS\s*=\s*1000;/, 'LineSmith should throttle ArrowHead payload sync frequency while drawing');
+  assert.match(html, /function\s+syncArrowHeadPayloadToStorage\(options\s*=\s*\{\}\)/, 'LineSmith should expose a helper to sync current points\/lines to ArrowHead storage');
+  assert.match(html, /syncArrowHeadPayloadToStorage\(\{\s*force:\s*true\s*\}\);/, 'opening ArrowHead should force-sync the latest geometry before navigation');
+  assert.match(html, /updateUndoRedoHUD\(\);[\s\S]*syncArrowHeadPayloadToStorage\(\);[\s\S]*requestAnimationFrame\(draw\);/, 'draw loop should keep syncing ArrowHead payload so point\/line edits appear in AR without reopening');
+});
