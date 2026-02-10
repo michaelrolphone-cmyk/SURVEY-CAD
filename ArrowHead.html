@@ -657,25 +657,30 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   function attachOrientationSensors() {
     const applyOrientationEvent = (event) => {
       const now = Date.now();
-      if (!shouldApplyOrientationEvent(
+      const shouldApplyHeadingUpdate = shouldApplyOrientationEvent(
         event.type,
         event,
         state.hasAbsoluteHeadingLock,
         state.lastAbsoluteOrientationEventMs,
         now,
-      )) return;
+      );
       const isAbsoluteEvent =
         String(event.type || '').toLowerCase() === 'deviceorientationabsolute'
         || event.absolute === true
         || Number.isFinite(Number(event.webkitCompassHeading));
-      if (isAbsoluteEvent) {
+      if (isAbsoluteEvent && shouldApplyHeadingUpdate) {
         state.hasAbsoluteHeadingLock = true;
         state.lastAbsoluteOrientationEventMs = now;
       }
       const pose = deriveDevicePoseRadians(event, currentScreenAngle(), state.headingOffsetRad);
-      if (!state.useGyroscopeHeading && Number.isFinite(pose.headingRad)) state.headingRad = pose.headingRad;
-      state.pitchRad = pose.pitchRad;
-      state.rollRad = pose.rollRad;
+      if (!state.useGyroscopeHeading && shouldApplyHeadingUpdate && Number.isFinite(pose.headingRad)) {
+        state.headingRad = pose.headingRad;
+      }
+      const isAbsoluteOnlyEvent = String(event.type || '').toLowerCase() === 'deviceorientationabsolute';
+      if (!isAbsoluteOnlyEvent || !state.hasAbsoluteHeadingLock) {
+        state.pitchRad = pose.pitchRad;
+        state.rollRad = pose.rollRad;
+      }
       sendArPresence();
     };
 
