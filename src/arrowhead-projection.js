@@ -46,38 +46,50 @@ export function projectEnuPointToScreen(options) {
   const clipDistance = Number.isFinite(nearClip) && nearClip > 0 ? nearClip : 0.5;
   const safeHeading = Number.isFinite(heading) ? heading : 0;
   const safePitch = Number.isFinite(pitch) ? pitch : 0;
-  // Device roll is inverted when rotating world coordinates into camera space.
-  // Apply a conservative gain to avoid over-rotating overlays on hardware where
-  // DeviceOrientation roll reports are more aggressive than the live camera image.
-  const safeRollGain = Number.isFinite(rollCompensationGain) ? rollCompensationGain : 0.7;
-  const safeRoll = (Number.isFinite(roll) ? -(roll * safeRollGain) : 0) * -0.5;
+  const safeRollGain = Number.isFinite(rollCompensationGain) ? rollCompensationGain : 1.0;
+  const safeRoll = Number.isFinite(roll) ? -roll * safeRollGain : 0;
 
-  const cosHeading = Math.cos(safeHeading);
-  const sinHeading = Math.sin(safeHeading);
-  const xYaw = east * cosHeading - north * sinHeading;
-  const zYaw = east * sinHeading + north * cosHeading;
-  const yYaw = up * 0.5;
+  // Rotation matrix: Yaw (Z) → Pitch (X') → Roll (Y'') order
+  // This matches the typical DeviceOrientation convention
+  const ch = Math.cos(safeHeading);
+  const sh = Math.sin(safeHeading);
+  const cp = Math.cos(safePitch);
+  const sp = Math.sin(safePitch);
+  const cr = Math.cos(safeRoll);
+  const sr = Math.sin(safeRoll);
 
-  const cosPitch = Math.cos(safePitch);
-  const sinPitch = Math.sin(safePitch);
-  const yPitch = yYaw * cosPitch - zYaw * sinPitch;
-  const zPitch = yYaw * sinPitch + zYaw * cosPitch;
+  // Matrix elements (world → camera)
+  const m11 = ch * cr + sh * sp * sr;
+  const m12 = sh * cp;
+  const m13 = ch * sr - sh * sp * cr;
+  const m21 = -sh * cr + ch * sp * sr;
+  const m22 = ch * cp;
+  const m23 = -sh * sr - ch * sp * cr;
+  const m31 = -cp * sr;
+  const m32 = sp;
+  const m33 = cp * cr;
 
-  const cosRoll = Math.cos(safeRoll);
-  const sinRoll = Math.sin(safeRoll);
-  const xCamera = xYaw * cosRoll - yPitch * sinRoll;
-  const yCamera = xYaw * sinRoll + yPitch * cosRoll;
-  const zCamera = zPitch;
+  // Transform ENU point to camera space
+  const xCamera = east * m11 + north * m12 + up * m13;
+  const yCamera = east * m21 + north * m22 + up * m23;
+  const zCamera = east * m31 + north * m32 + up * m33;
 
   if (!(zCamera > clipDistance)) return null;
 
-  const horizontalFov = 2 * Math.atan((width / height) * Math.tan(verticalFov * 0.5));
-  const xFromCenter = (xCamera / zCamera) * ((width * 0.5) / Math.tan(horizontalFov * 0.5));
-  const yFromCenter = (yCamera / zCamera) * ((height * 0.5) / Math.tan(verticalFov * 0.5));
+  // Projection using correct aspect ratio handling
+  const aspect = width / height;
+  const halfVFovTan = Math.tan(verticalFov * 0.5);
+  const halfHFovTan = aspect * halfVFovTan;
+
+  const xNdc = xCamera / zCamera;
+  const yNdc = yCamera / zCamera;
+
+  const xPx = (width / 2) * (1 + xNdc / halfHFovTan);
+  const yPx = (height / 2) * (1 - yNdc / halfVFovTan);  // Y inverted for screen
 
   return {
-    x: (width * 0.5) + xFromCenter,
-    y: (height * 0.5) - yFromCenter,
+    x: xPx,
+    y: yPx,
     forwardMeters: zCamera,
   };
 }
