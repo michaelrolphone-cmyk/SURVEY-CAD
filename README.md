@@ -84,6 +84,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead collaborator locations are now drawn directly on the LineSmith canvas (with heading cone) even when the LineSmith map layer is turned off.
 - ArrowHead now projects points from ENU deltas to camera screen space using relative bearing/elevation (plus roll compensation) so on-screen direction matches both the device heading and source survey geometry.
 - ArrowHead now projects points through a shared camera-space yaw/pitch/roll transform (`projectEnuPointToScreen`) with near-plane clipping so horizon-crossing tilt does not invert overlays and roll stays matched to handset roll direction.
+- ArrowHead now inverts device roll when converting ENU points into camera space so AR overlays roll with the live camera image instead of counter-rotating against the horizon.
 - ArrowHead now computes relative bearing with target-minus-heading handedness so world points rotate opposite your body turns (staying anchored in space), matching an around-the-user sphere projection model.
 - ArrowHead now normalizes pitch against the horizon across portrait/landscape orientations (instead of raw beta/gamma tilt) so points render near eye level when you hold the phone upright.
 - ArrowHead now prefers iOS Safari `webkitCompassHeading` (with `deviceorientationabsolute` fallback) and remaps pitch/roll by current screen orientation so overlays track correctly as you turn/tilt the phone instead of sticking to screen center.
