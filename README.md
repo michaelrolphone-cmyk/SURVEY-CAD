@@ -200,6 +200,8 @@ When requesting projected output (`outSR`, e.g. `2243`) from `/api/parcel` and `
 
 `/api/localstorage-sync` provides an in-memory localStorage mirror for the current Node.js server process. The launcher sends the full localStorage snapshot plus a numeric `version` (`surveyfoundryLocalStorageVersion`) whenever browser storage changes. If the browser posts an older version than the server has, the API responds with `status: "client-stale"` and the newer server snapshot so the launcher can replace stale browser storage and refresh the currently open iframe app without changing the app route/view.
 
+`/api/localstorage-sync` traffic is now change-driven in the launcher: the app skips POST requests when the local snapshot is unchanged, and stale snapshot application updates in-memory storage without forcing iframe reloads. This prevents AR and viewport sessions from being reset by background sync churn while still propagating updated geometry/state data.
+
 ### Browser helper module for static HTML tools
 
 The static HTML tools use `src/browser-survey-client.js` so network calls flow through shared server endpoints backed by `SurveyCadClient`:

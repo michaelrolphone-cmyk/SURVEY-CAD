@@ -699,27 +699,17 @@
       localStorageSyncLock = false;
     }
 
-    function refreshOpenApp() {
-      if (!currentApp) {
-        loadProjects();
-        loadActiveProject();
-        renderProjects();
-        return;
-      }
-      sessionStorage.setItem(LAUNCHER_VIEW_STATE_KEY, JSON.stringify({ currentApp }));
-      appFrame.src = currentApp;
-    }
-
     async function syncLocalStorageWithServer() {
       if (localStorageSyncLock) return;
 
       const currentSnapshot = buildLocalStorageSnapshot();
       const serializedSnapshot = JSON.stringify(currentSnapshot);
-
-      if (serializedSnapshot !== localStorageSyncSnapshot) {
-        const nextVersion = Date.now();
-        localStorage.setItem(LOCAL_STORAGE_SYNC_VERSION_KEY, String(nextVersion));
+      if (serializedSnapshot === localStorageSyncSnapshot) {
+        return;
       }
+
+      const nextVersion = Date.now();
+      localStorage.setItem(LOCAL_STORAGE_SYNC_VERSION_KEY, String(nextVersion));
 
       const snapshot = buildLocalStorageSnapshot();
       const version = getLocalStorageVersion();
@@ -739,8 +729,13 @@
       localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
 
       if (payload?.status === 'client-stale' && payload?.state?.snapshot) {
-        applyServerSnapshot(payload.state.snapshot);
-        refreshOpenApp();
+        const serverSnapshotSerialized = JSON.stringify(payload.state.snapshot);
+        if (serverSnapshotSerialized !== localStorageSyncSnapshot) {
+          applyServerSnapshot(payload.state.snapshot);
+          loadProjects();
+          loadActiveProject();
+          renderProjects();
+        }
       }
     }
 
