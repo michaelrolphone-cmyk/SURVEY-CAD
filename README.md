@@ -89,6 +89,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead avoids modern-only JavaScript syntax (optional chaining/object spread) so iOS 13 Safari/WebKit can parse and run the AR overlay without reducing AR feature behavior.
 - ArrowHead camera startup now resolves camera access through modern `navigator.mediaDevices.getUserMedia` plus legacy/prefixed fallbacks (`navigator.getUserMedia`, `navigator.webkitGetUserMedia`, `navigator.mozGetUserMedia`, `navigator.msGetUserMedia`, and older `navigator.mediaDevices.webkitGetUserMedia`/`mozGetUserMedia` variants), preventing false "Camera API unavailable" errors on iOS 13.6 Safari/WebKit shells that expose nonstandard camera entry points.
 - ArrowHead now starts the camera before motion/orientation permission prompts and separately requests both `DeviceOrientationEvent.requestPermission()` and `DeviceMotionEvent.requestPermission()` when required by iOS; if sensor permission is denied, camera+GPS continue and ArrowHead auto-enables mouse-look fallback instead of aborting startup.
+- ArrowHead startup now explicitly calls `navigator.geolocation.getCurrentPosition(...)` before attaching `watchPosition(...)` updates, and camera startup now retries with `{ video: true }` when `facingMode` constraints fail, so iOS 13 devices consistently show both location and camera permission prompts when capabilities are available.
 - ArrowHead now marks points as **On target** when they land inside the center 10% of the camera feed, drawing a green circle around the point and overlaying live distance-to-point guidance in meters and feet.
 - GPS + device orientation/motion sensors are used to place features in real space.
 - Point elevations with missing/invalid `z` values (including `z=0`) are rendered using the phone-reported elevation at runtime so horizontal spacing is not distorted by zero-altitude assumptions.
@@ -577,3 +578,5 @@ CLI prints the same JSON payload returned by `/extract`.
 - Subdivision boundary and parcel/subdivision/aliquot corner markers are drawn on the map.
 - Parcel CSV export from `RecordQuarry.html` now emits unique boundary points only (parcel + subdivision + aliquot corners), deduplicated to one row per coordinate in P,N,E,Z,D format (EPSG:2243); section-only corners that are not drawn are excluded.
 - `PROJECT_BROWSER.html` print previews now center CP&F PDF pages within the preview window and force a white background, reducing dark margins and unnecessary ink usage when printing.
+
+No API endpoints or CLI commands changed in this iOS 13 permission-prompt compatibility fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
