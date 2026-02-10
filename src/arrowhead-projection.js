@@ -50,7 +50,7 @@ export function projectEnuPointToScreen(options) {
   // Apply a conservative gain to avoid over-rotating overlays on hardware where
   // DeviceOrientation roll reports are more aggressive than the live camera image.
   const safeRollGain = Number.isFinite(rollCompensationGain) ? rollCompensationGain : 0.7;
-  const safeRoll = Number.isFinite(roll) ? -(roll * safeRollGain) : 0;
+  const safeRoll = (Number.isFinite(roll) ? -(roll * safeRollGain) : 0) * -1;
 
   const cosHeading = Math.cos(safeHeading);
   const sinHeading = Math.sin(safeHeading);
