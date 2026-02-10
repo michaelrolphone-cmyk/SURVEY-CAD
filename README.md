@@ -83,6 +83,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead now prefers iOS Safari `webkitCompassHeading` (with `deviceorientationabsolute` fallback) and remaps pitch/roll by current screen orientation so overlays track correctly as you turn/tilt the phone instead of sticking to screen center.
 - ArrowHead now locks onto absolute heading streams (compass/`deviceorientationabsolute`) once detected so fallback relative-orientation events cannot overwrite heading with north-locked values when you turn your body.
 - ArrowHead now defaults to magnetometer heading but includes a **Use Gyroscope Heading** toggle; when enabled, heading is integrated from gyroscope `rotationRate.alpha` and can be calibrated to true north with the **Center** button while the phone is level and facing north.
+- ArrowHead now includes a **Use Mouse Look** toggle for desktop/laptop workflows without orientation sensors; drag on the viewport to yaw/pitch around your current location sphere, and ArrowHead auto-enables this mode when orientation events are unavailable.
 - ArrowHead avoids modern-only JavaScript syntax (optional chaining/object spread) so iOS 13 Safari/WebKit can parse and run the AR overlay without reducing AR feature behavior.
 - ArrowHead now marks points as **On target** when they land inside the center 10% of the camera feed, drawing a green circle around the point and overlaying live distance-to-point guidance in meters and feet.
 - GPS + device orientation/motion sensors are used to place features in real space.
@@ -102,6 +103,7 @@ AR heading controls after launch:
 - Tap **Use Gyroscope Heading** only when magnetometer heading is unreliable.
 - Keep the phone level, face due north, then tap **Center** to calibrate gyro heading.
 - Leave **Use Gyroscope Heading** off to always use magnetometer-based heading.
+- On desktop without orientation sensors, use **Use Mouse Look** and drag anywhere on the viewport to look around; tap **Center** to reset pitch after manual mouse look adjustments.
 
 ## API
 

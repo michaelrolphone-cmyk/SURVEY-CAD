@@ -20,9 +20,15 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /import\s+\{\s*latLngToWorldAffine,\s*worldToLatLngAffine\s*\}\s+from\s+"\.\/src\/georeference-transform\.js";/, 'ArrowHead should use shared georeference helpers for bidirectional coordinate projection');
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
   assert.match(html, /<button id="useGyro">Use Gyroscope Heading: Off<\/button>/, 'ArrowHead should expose a gyroscope heading mode toggle button');
+  assert.match(html, /<button id="useMouseLook">Use Mouse Look: Off<\/button>/, 'ArrowHead should expose a mouse-look toggle for desktop browsers without orientation sensors');
   assert.match(html, /if \(!state\.useGyroscopeHeading && Number\.isFinite\(pose\.headingRad\)\) state\.headingRad = pose\.headingRad;/, 'ArrowHead should default to magnetometer heading updates unless gyroscope mode is enabled');
   assert.match(html, /state\.gyroHeadingRawRad = integrateGyroscopeHeadingRadians\(state\.gyroHeadingRawRad, rotationRateAlpha, dtMs\);/, 'ArrowHead should integrate gyroscope rotationRate alpha into heading when gyroscope mode is enabled');
   assert.match(html, /state\.gyroHeadingOffsetRad = normalizeRadians\(-state\.gyroHeadingRawRad\);/, 'ArrowHead should support center calibration for gyroscope heading mode');
+  assert.match(html, /function\s+attachMouseLookControls\(\)/, 'ArrowHead should register pointer-driven mouse-look controls');
+  assert.match(html, /state\.headingRad = normalizeRadians\(state\.headingRad - \(dx \* state\.mouseLookSensitivity\)\);/, 'ArrowHead mouse look should update heading from horizontal drag distance');
+  assert.match(html, /state\.pitchRad = clamp\(state\.pitchRad \+ \(dy \* state\.mouseLookSensitivity\), -pitchLimit, pitchLimit\);/, 'ArrowHead mouse look should update and clamp pitch from vertical drag distance');
+  assert.match(html, /function\s+autoEnableMouseLookWhenSensorsUnavailable\(\)/, 'ArrowHead should automatically enable mouse look when orientation sensors are unavailable');
+  assert.match(html, /setStatus\('Device orientation unavailable\. Mouse look enabled; drag to look around\.'/, 'ArrowHead should show a desktop fallback status message when enabling mouse look automatically');
   assert.match(html, /const\s+socket\s*=\s*new\s+WebSocket\(wsUrl\);/, 'ArrowHead should join the LineSmith collaboration websocket room');
   assert.match(html, /function\s+refreshPayloadFromStorage\(options\s*=\s*\{\}\)/, 'ArrowHead should support refreshing LineSmith payload updates while running');
   assert.match(html, /window\.addEventListener\('storage',\s*\(event\)\s*=>\s*\{[\s\S]*event\.key\s*!==\s*ARROWHEAD_IMPORT_STORAGE_KEY/, 'ArrowHead should watch localStorage events for live LineSmith geometry updates');
