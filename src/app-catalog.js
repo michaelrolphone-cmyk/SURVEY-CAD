@@ -40,6 +40,16 @@ export const APP_CATALOG = [
     glyph: 'PB',
   },
   {
+    id: 'arrowhead-ar',
+    name: 'ArrowHead',
+    description: 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.',
+    entryHtml: 'ArrowHead.html',
+    iconPath: '/assets/icons/arrowhead-ar.svg',
+    color: '#0F766E',
+    accent: '#CCFBF1',
+    glyph: 'AR',
+  },
+  {
     id: 'project-browser',
     name: 'Project Browser',
     description: 'Browse the symbolic project-file folder structure as a standalone app.',

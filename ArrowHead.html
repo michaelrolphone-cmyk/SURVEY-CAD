@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ArrowHead — Mobile AR Overlay</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #020617; color: #e2e8f0; font-family: Inter, system-ui, sans-serif; }
+    .app { position: fixed; inset: 0; overflow: hidden; }
+    video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    canvas { pointer-events: none; }
+    .hud { position: absolute; left: 0; right: 0; top: 0; padding: 0.7rem; display: grid; gap: 0.45rem; background: linear-gradient(180deg, rgba(2,6,23,.84), rgba(2,6,23,.2)); }
+    .row { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+    button { border: 1px solid rgba(148,163,184,.45); border-radius: 10px; background: rgba(15,23,42,.9); color: #e2e8f0; padding: 0.45rem 0.65rem; font-weight: 600; }
+    .status { font-size: 0.82rem; color: #cbd5e1; text-shadow: 0 1px 2px #000; }
+    .warn { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <video id="camera" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="hud">
+      <div class="row">
+        <button id="startSensors">Start AR Sensors</button>
+        <button id="recenter">Recenter</button>
+      </div>
+      <div id="status" class="status">Ready. Open from LineSmith to load overlay geometry.</div>
+    </div>
+  </div>
+<script>
+(() => {
+  const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
+  const FEET_TO_METERS = 0.3048006096012192;
+  const METERS_TO_FEET = 1 / FEET_TO_METERS;
+
+  const video = document.getElementById('camera');
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('status');
+
+  const state = {
+    payload: null,
+    userLat: NaN,
+    userLon: NaN,
+    userAltFeet: 0,
+    headingRad: 0,
+    pitchRad: 0,
+    rollRad: 0,
+    headingOffsetRad: 0,
+    started: false,
+  };
+
+  function setStatus(message, warn = false) {
+    statusEl.textContent = message;
+    statusEl.classList.toggle('warn', warn);
+  }
+
+  function resize() {
+    canvas.width = Math.max(1, Math.floor(window.innerWidth * window.devicePixelRatio));
+    canvas.height = Math.max(1, Math.floor(window.innerHeight * window.devicePixelRatio));
+  }
+
+  function normalizeRadians(v) {
+    let value = v;
+    while (value > Math.PI) value -= Math.PI * 2;
+    while (value < -Math.PI) value += Math.PI * 2;
+    return value;
+  }
+
+  function worldToLatLng(x, y, georef) {
+    if (!georef) return null;
+    const lat = georef.lat.ax * x + georef.lat.by * y + georef.lat.c;
+    const lng = georef.lng.ax * x + georef.lng.by * y + georef.lng.c;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }
+
+  function loadPayload() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('source') !== 'linesmith') {
+      setStatus('Launch ArrowHead from LineSmith to import points and lines.', true);
+      return false;
+    }
+    const raw = localStorage.getItem(ARROWHEAD_IMPORT_STORAGE_KEY);
+    if (!raw) {
+      setStatus('LineSmith payload missing in local storage.', true);
+      return false;
+    }
+    try {
+      const payload = JSON.parse(raw);
+      const points = Array.isArray(payload?.points) ? payload.points : [];
+      const lines = Array.isArray(payload?.lines) ? payload.lines : [];
+      const georef = payload?.georeference;
+      if (!points.length || !georef?.lat || !georef?.lng) {
+        setStatus('LineSmith payload missing points or georeference.', true);
+        return false;
+      }
+      state.payload = { points, lines, georef };
+      return true;
+    } catch {
+      setStatus('Could not parse LineSmith payload.', true);
+      return false;
+    }
+  }
+
+  async function startCamera() {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    video.srcObject = stream;
+  }
+
+  async function requestOrientationPermissionIfNeeded() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const result = await DeviceOrientationEvent.requestPermission();
+      if (result !== 'granted') throw new Error('Device orientation permission denied.');
+    }
+  }
+
+  function watchGeolocation() {
+    navigator.geolocation.watchPosition((pos) => {
+      state.userLat = pos.coords.latitude;
+      state.userLon = pos.coords.longitude;
+      const altitudeMeters = Number(pos.coords.altitude);
+      if (Number.isFinite(altitudeMeters)) {
+        state.userAltFeet = altitudeMeters * METERS_TO_FEET;
+      }
+    }, () => {
+      setStatus('GPS unavailable. Enable location for AR placement.', true);
+    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 1000 });
+  }
+
+  function attachOrientationSensors() {
+    window.addEventListener('deviceorientation', (event) => {
+      const alpha = Number(event.alpha);
+      const beta = Number(event.beta);
+      const gamma = Number(event.gamma);
+      if (Number.isFinite(alpha)) state.headingRad = normalizeRadians(((360 - alpha) * Math.PI / 180) + state.headingOffsetRad);
+      if (Number.isFinite(beta)) state.pitchRad = (beta * Math.PI) / 180;
+      if (Number.isFinite(gamma)) state.rollRad = (gamma * Math.PI) / 180;
+    });
+    window.addEventListener('devicemotion', () => {
+      // Subscribe so accelerometer/gyroscope streams are explicitly used by the app.
+    });
+  }
+
+  function latLonDeltaMeters(lat0, lon0, lat1, lon1) {
+    const dLat = (lat1 - lat0) * Math.PI / 180;
+    const dLon = (lon1 - lon0) * Math.PI / 180;
+    const meanLat = ((lat0 + lat1) * 0.5) * Math.PI / 180;
+    const north = dLat * 6378137;
+    const east = dLon * 6378137 * Math.cos(meanLat);
+    return { east, north };
+  }
+
+  function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
+    if (!Number.isFinite(state.userLat) || !Number.isFinite(state.userLon)) return null;
+
+    const { east, north } = latLonDeltaMeters(state.userLat, state.userLon, pointLat, pointLon);
+    const up = (pointZFeet - state.userAltFeet) * FEET_TO_METERS;
+
+    const yaw = state.headingRad;
+    const pitch = state.pitchRad;
+
+    const x1 = east * Math.cos(yaw) - north * Math.sin(yaw);
+    const z1 = east * Math.sin(yaw) + north * Math.cos(yaw);
+    const y2 = up * Math.cos(pitch) - z1 * Math.sin(pitch);
+    const z2 = up * Math.sin(pitch) + z1 * Math.cos(pitch);
+
+    if (z2 <= 0.5) return null;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const fov = 68 * Math.PI / 180;
+    const focal = (h * 0.5) / Math.tan(fov * 0.5);
+
+    return {
+      x: (w * 0.5) + (x1 * focal) / z2,
+      y: (h * 0.5) - (y2 * focal) / z2,
+      distanceM: Math.hypot(east, north, up),
+    };
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!state.payload) return;
+
+    const byId = new Map();
+    const projected = [];
+    for (const p of state.payload.points) {
+      const ll = worldToLatLng(Number(p.x), Number(p.y), state.payload.georef);
+      if (!ll) continue;
+      const zFeet = Number(p.z) === 0 ? state.userAltFeet : Number(p.z);
+      const scr = projectWorldToScreen(ll.lat, ll.lng, zFeet);
+      if (!scr) continue;
+      byId.set(p.id, scr);
+      projected.push({ ...scr, num: String(p.num ?? '') });
+    }
+
+    ctx.lineWidth = Math.max(2, window.devicePixelRatio * 1.8);
+    ctx.strokeStyle = 'rgba(56,189,248,0.9)';
+    for (const line of state.payload.lines) {
+      const a = byId.get(line.a);
+      const b = byId.get(line.b);
+      if (!a || !b) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    for (const p of projected) {
+      ctx.fillStyle = 'rgba(248,250,252,0.95)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(4, window.devicePixelRatio * 3), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(14,165,233,0.98)';
+      ctx.font = `${Math.max(15, 13 * window.devicePixelRatio)}px Inter, system-ui, sans-serif`;
+      ctx.fillText(`#${p.num}`, p.x + 10, p.y - 10);
+    }
+
+    setStatus(`AR live. Points: ${projected.length}/${state.payload.points.length}. Heading ${(state.headingRad * 180 / Math.PI).toFixed(1)}°`);
+  }
+
+  function renderLoop() {
+    draw();
+    requestAnimationFrame(renderLoop);
+  }
+
+  async function start() {
+    if (state.started) return;
+    if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
+      setStatus('Camera API unavailable on this device/browser.', true);
+      return;
+    }
+    if (!('geolocation' in navigator)) {
+      setStatus('Geolocation API unavailable on this device/browser.', true);
+      return;
+    }
+    if (!loadPayload()) return;
+
+    try {
+      await requestOrientationPermissionIfNeeded();
+      await startCamera();
+      watchGeolocation();
+      attachOrientationSensors();
+      state.started = true;
+      setStatus('Sensors enabled. Move your phone to align geometry with the field view.');
+    } catch (error) {
+      setStatus(String(error?.message || 'Could not start ArrowHead AR.'), true);
+    }
+  }
+
+  document.getElementById('startSensors').addEventListener('click', start);
+  document.getElementById('recenter').addEventListener('click', () => {
+    state.headingOffsetRad = normalizeRadians(-state.headingRad);
+    setStatus('Recentered current heading as forward.');
+  });
+
+  window.addEventListener('resize', resize);
+  resize();
+  renderLoop();
+})();
+</script>
+</body>
+</html>

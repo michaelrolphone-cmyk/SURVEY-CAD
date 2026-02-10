@@ -386,3 +386,15 @@ test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch 
   assert.match(html, /sendCollabMessage\(\{ type: "state", state: serializeState\(\{ includeView: false \}\) \}\);/, 'collaboration state sync should exclude local view pan and zoom from websocket payloads');
   assert.match(html, /if \(message\.type === "state" && message\.state\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'remote collaboration state restores should not overwrite local user view pan/zoom');
 });
+
+test('VIEWPORT.HTML provides ArrowHead AR launch handoff with LineSmith geometry payload', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+ARROWHEAD_IMPORT_STORAGE_KEY\s*=\s*"lineSmithArrowHeadImport"/, 'LineSmith should define a stable localStorage key for ArrowHead handoff payloads');
+  assert.match(html, /id="openArrowHead"[^>]*>Open ArrowHead AR<\/button>/, 'LineSmith UI should provide an Open ArrowHead AR action');
+  assert.match(html, /function\s+buildArrowHeadPayload\(\)/, 'LineSmith should build a payload containing points, lines, and georeference data');
+  assert.match(html, /localStorage\.setItem\(ARROWHEAD_IMPORT_STORAGE_KEY,\s*JSON\.stringify\(payload\)\)/, 'LineSmith should persist ArrowHead handoff payload before navigation');
+  assert.match(html, /const\s+targetPath\s*=\s*`\/ArrowHead\.html\?\$\{targetParams\.toString\(\)\}`;/, 'LineSmith should launch ArrowHead with launcher-aware query parameters');
+  assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app",[\s\S]*path:\s*targetPath/, 'LineSmith should use launcher postMessage navigation when embedded');
+});
+
