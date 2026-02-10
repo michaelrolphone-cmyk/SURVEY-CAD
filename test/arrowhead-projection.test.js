@@ -87,6 +87,37 @@ test('projectEnuPointToScreen applies roll so overlays rotate with the camera fe
   assert.ok(rollLeft.y < noRoll.y, 'a right-side point should move higher on screen when phone rolls left so overlays follow camera roll');
 });
 
+test('projectEnuPointToScreen tempers roll compensation gain to avoid over-rotation', () => {
+  const fullRollGain = projectEnuPointToScreen({
+    eastMeters: 8,
+    northMeters: 20,
+    upMeters: 0,
+    headingRad: 0,
+    pitchRad: 0,
+    rollRad: -Math.PI / 6,
+    rollCompensationGain: 1,
+    viewportWidthPx: 1000,
+    viewportHeightPx: 500,
+    verticalFovRad: 68 * Math.PI / 180,
+    nearClipMeters: 0.5,
+  });
+  const defaultRollGain = projectEnuPointToScreen({
+    eastMeters: 8,
+    northMeters: 20,
+    upMeters: 0,
+    headingRad: 0,
+    pitchRad: 0,
+    rollRad: -Math.PI / 6,
+    viewportWidthPx: 1000,
+    viewportHeightPx: 500,
+    verticalFovRad: 68 * Math.PI / 180,
+    nearClipMeters: 0.5,
+  });
+
+  assert.ok(fullRollGain && defaultRollGain);
+  assert.ok(defaultRollGain.y > fullRollGain.y, 'default roll gain should rotate less than full-strength roll compensation');
+});
+
 
 test('resolvePointElevationFeet falls back when point elevation is missing or zero', () => {
   assert.equal(resolvePointElevationFeet(0, 123.4), 123.4);
