@@ -6,6 +6,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   const html = await readFile(new URL('../ArrowHead.html', import.meta.url), 'utf8');
 
   assert.match(html, /const\s+ARROWHEAD_IMPORT_STORAGE_KEY\s*=\s*'lineSmithArrowHeadImport'/, 'ArrowHead should consume the LineSmith handoff storage key');
+
+  assert.doesNotMatch(html, /\?\./, 'ArrowHead should avoid optional chaining so older Safari/iOS engines can parse the script');
+  assert.doesNotMatch(html, /\.\.\./, 'ArrowHead should avoid object spread syntax for broader iOS Safari compatibility');
   assert.match(html, /navigator\.mediaDevices\.getUserMedia\(/, 'ArrowHead should request camera access for AR video feed');
   assert.match(html, /navigator\.geolocation\.watchPosition\(/, 'ArrowHead should watch GPS updates for world alignment');
   assert.match(html, /window\.addEventListener\('deviceorientation'/, 'ArrowHead should subscribe to orientation sensor updates');
