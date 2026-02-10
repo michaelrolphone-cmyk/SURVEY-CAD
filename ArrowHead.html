@@ -327,19 +327,51 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     return requestCamera(constraints);
   }
 
+  function describeError(error, fallbackMessage) {
+    const fallback = String(fallbackMessage || 'Unknown error');
+    if (!error) return fallback;
+    const name = error && error.name ? String(error.name) : '';
+    const message = error && error.message ? String(error.message) : '';
+    if (name && message) return `${name}: ${message}`;
+    if (message) return message;
+    if (name) return name;
+    return fallback;
+  }
+
+  function alertCameraStartError(error, contextMessage) {
+    const base = describeError(error, contextMessage || 'Could not start camera.');
+    const detail = contextMessage ? `${contextMessage}\n${base}` : base;
+    const alertText = `ArrowHead camera start failed.\n${detail}`;
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(alertText);
+    }
+    return alertText;
+  }
+
   async function startCamera() {
     let stream;
+    let primaryError = null;
     try {
       stream = await requestCameraStream({ video: { facingMode: { ideal: 'environment' } }, audio: false });
     } catch (error) {
+      primaryError = error;
       const errorName = String(error && error.name ? error.name : '');
       const needsFallback =
         errorName === 'OverconstrainedError' ||
         errorName === 'ConstraintNotSatisfiedError' ||
         errorName === 'NotFoundError' ||
         errorName === 'TypeError';
-      if (!needsFallback) throw error;
-      stream = await requestCameraStream({ video: true, audio: false });
+      if (!needsFallback) {
+        alertCameraStartError(error);
+        throw error;
+      }
+      try {
+        stream = await requestCameraStream({ video: true, audio: false });
+      } catch (fallbackError) {
+        const context = `Primary request failed (${describeError(primaryError, 'Camera constraint error')}). Fallback request failed.`;
+        alertCameraStartError(fallbackError, context);
+        throw fallbackError;
+      }
     }
     video.srcObject = stream;
   }
@@ -770,7 +802,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       }
       setStatus('Sensors enabled. Move your phone to align geometry with the field view.');
     } catch (error) {
-      const errorMessage = error && error.message ? error.message : 'Could not start ArrowHead AR.';
+      const errorMessage = describeError(error, 'Could not start ArrowHead AR.');
       if (/getUserMedia|camera/i.test(String(errorMessage)) && !hasCameraApi()) {
         setStatus('Camera API unavailable on this device/browser.', true);
         return;
