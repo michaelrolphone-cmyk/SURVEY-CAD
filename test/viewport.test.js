@@ -26,6 +26,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickCenter"[\s\S]*fa-crosshairs/, 'quick toolbar should include Center icon shortcut');
   assert.match(html, /id="quickExtend"[\s\S]*fa-up-right-and-down-left-from-center/, 'quick toolbar should include Extend icon shortcut');
   assert.match(html, /id="quickTrimIntersect"[\s\S]*fa-scissors/, 'quick toolbar should include Trim\/Intersect icon shortcut');
+  assert.match(html, /id="quickOffsetLine"[\s\S]*fa-arrows-left-right/, 'quick toolbar should include Offset Selected Line icon shortcut');
   assert.match(html, /id="quickRotateSelection"[\s\S]*fa-rotate/, 'quick toolbar should include Rotate Selection icon shortcut');
   assert.match(html, /id="quickPointManager"[\s\S]*fa-list/, 'quick toolbar should include Point Manager icon shortcut');
   assert.match(html, /function\s+startLineByPointsFromToolbar\(\)\s*\{[\s\S]*if \(selectedPointIds\.length >= 2\) \{[\s\S]*runLineBetweenSelectedPoints\(\{ returnToSelectionTool: true \}\);[\s\S]*setTool\("line2pt"\);/, 'quick Line by Points should run line-between-selected when points are preselected and otherwise enter two-point draw mode');
@@ -33,6 +34,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /\$\("#quickSave"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#saveDrawingToProject"\)\.click\(\)\)/, 'quick Save should trigger the existing save drawing workflow');
   assert.match(html, /\$\("#quickExtend"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#extendToIntersect"\)\.click\(\)\)/, 'quick Extend should delegate to existing extend action');
   assert.match(html, /\$\("#quickTrimIntersect"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#trimToIntersect"\)\.click\(\)\)/, 'quick Trim\/Intersect should delegate to existing trim action');
+  assert.match(html, /\$\("#quickOffsetLine"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#offsetSelectedLine"\)\?\.click\(\)\)/, 'quick Offset should delegate to existing offset selected line action');
   assert.match(html, /\$\("#quickRotateSelection"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*startRotateSelectionSession\(\)\)/, 'quick Rotate should start reference rotate workflow');
 });
 
@@ -40,6 +42,17 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
 
 
 
+
+
+
+test('VIEWPORT.HTML line ops includes offset-selected-line controls and action wiring', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /<label>Offset distance[\s\S]*<input id="lineOffsetDistance"/, 'line ops should include offset distance input in the toolbar section');
+  assert.match(html, /<button id="offsetSelectedLine" class="ok">Offset Selected Line<\/button>/, 'line ops should include an offset selected line action button');
+  assert.match(html, /function\s+offsetSelectedLineByDistance\(rawDistance\)\s*\{[\s\S]*history\.push\("offset selected line"\)[\s\S]*addLine\(aId, bId, false\)/, 'line offset action should create two offset points and a new line in history');
+  assert.match(html, /\$\("#offsetSelectedLine"\)\.addEventListener\("click",\s*\(\)\s*=>\s*\{[\s\S]*offsetSelectedLineByDistance\(\$\("#lineOffsetDistance"\)\.value\)/, 'offset selected line button should read the toolbar distance input and run offset creation');
+});
 
 test('VIEWPORT.HTML line-between-selected prompts for nearest non-connected ordering when sequential point gaps are longer', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
