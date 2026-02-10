@@ -31,6 +31,7 @@
   </div>
 <script type="module">
 import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.js";
+import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 
 (() => {
   const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
@@ -170,7 +171,7 @@ import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.
     if (horizontalDistance < 0.01) return null;
 
     const targetBearingRad = Math.atan2(east, north);
-    const relativeBearingRad = normalizeRadians(targetBearingRad - state.headingRad);
+    const relativeBearingRad = computeRelativeBearingRad(targetBearingRad, state.headingRad);
     const targetElevationRad = Math.atan2(up, horizontalDistance);
     const relativeElevationRad = targetElevationRad - state.pitchRad;
 
@@ -205,7 +206,7 @@ import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.
     for (const p of state.payload.points) {
       const ll = worldToLatLng(Number(p.x), Number(p.y), state.payload.georef);
       if (!ll) continue;
-      const zFeet = Number(p.z) === 0 ? state.userAltFeet : Number(p.z);
+      const zFeet = resolvePointElevationFeet(p.z, state.userAltFeet);
       const scr = projectWorldToScreen(ll.lat, ll.lng, zFeet);
       if (!scr) continue;
       byId.set(p.id, scr);
