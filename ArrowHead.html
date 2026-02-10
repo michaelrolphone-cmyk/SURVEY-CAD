@@ -61,7 +61,8 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   const FEET_TO_METERS = 0.3048006096012192;
   const METERS_TO_FEET = 1 / FEET_TO_METERS;
   const ON_TARGET_CENTER_FRACTION = 0.1;
-  const GEOLOCATION_OPTIONS = { enableHighAccuracy: true, timeout: 8000, maximumAge: 1000 };
+  const GEOLOCATION_OPTIONS = { enableHighAccuracy: true, timeout: 30000, maximumAge: 1000 };
+  const GEOLOCATION_RELAXED_OPTIONS = { enableHighAccuracy: false, maximumAge: 15000 };
 
   function isPotentiallyTrustworthyLocalHost(hostname) {
     return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
@@ -426,11 +427,18 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   }
 
   function watchGeolocation() {
-    navigator.geolocation.watchPosition((pos) => {
+    let hasFreshFix = false;
+    const startWatch = (options) => navigator.geolocation.watchPosition((pos) => {
+      hasFreshFix = true;
       applyGeolocationPosition(pos);
-    }, () => {
+    }, (error) => {
+      if (error && error.code === error.TIMEOUT && !hasFreshFix && options === GEOLOCATION_OPTIONS) {
+        startWatch(GEOLOCATION_RELAXED_OPTIONS);
+        return;
+      }
       setStatus('GPS unavailable. Enable location for AR placement.', true);
-    }, GEOLOCATION_OPTIONS);
+    }, options);
+    startWatch(GEOLOCATION_OPTIONS);
   }
 
   function connectCollaboration() {
@@ -613,7 +621,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     const targetElevationRad = Math.atan2(up, horizontalDistance);
     const relativeElevationRad = targetElevationRad - state.pitchRad;
 
-    const forwardDistance = computeForwardDistanceMeters(horizontalDistance, relativeBearingRad) * Math.cos(relativeElevationRad);
+    const forwardDistance = computeForwardDistanceMeters(horizontalDistance, relativeBearingRad);
     if (forwardDistance <= 0.5) return null;
 
     const w = canvas.width;

@@ -94,6 +94,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead now validates secure-context requirements before startup (`https://` or localhost) so iOS Safari explains why no permission prompt appears when launched from insecure origins.
 - ArrowHead now kicks off camera, geolocation, orientation, and motion permission requests directly from the **Start Sensors** tap so iOS 13.6 preserves the user-gesture chain required to display permission prompts; if sensor permission is denied, camera+GPS continue and ArrowHead auto-enables mouse-look fallback instead of aborting startup.
 - ArrowHead startup now explicitly calls `navigator.geolocation.getCurrentPosition(...)` before attaching `watchPosition(...)` updates, and camera startup now retries with `{ video: true }` when `facingMode` constraints fail, so iOS 13 devices consistently show both location and camera permission prompts when capabilities are available.
+- ArrowHead geolocation acquisition now uses a longer high-accuracy timeout plus an automatic relaxed watch fallback so iOS 13.6 devices can keep streaming GPS fixes (and LineSmith AR presence) even when the initial precise watch times out before a first fix.
 - ArrowHead now marks points as **On target** when they land inside the center 10% of the camera feed, drawing a green circle around the point and overlaying live distance-to-point guidance in meters and feet.
 - GPS + device orientation/motion sensors are used to place features in real space.
 - Point elevations with missing/invalid `z` values (including `z=0`) are rendered using the phone-reported elevation at runtime so horizontal spacing is not distorted by zero-altitude assumptions.
@@ -584,3 +585,5 @@ CLI prints the same JSON payload returned by `/extract`.
 - `PROJECT_BROWSER.html` print previews now center CP&F PDF pages within the preview window and force a white background, reducing dark margins and unnecessary ink usage when printing.
 
 No API endpoints or CLI commands changed in this iOS 13 permission-prompt compatibility fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed in this iOS geolocation/rendering reliability fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).

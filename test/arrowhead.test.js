@@ -29,6 +29,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /if \(\/getUserMedia\|camera\/i\.test\(String\(errorMessage\)\) && !hasCameraApi\(\)\) \{[\s\S]*Camera API unavailable on this device\/browser\./, 'ArrowHead should classify camera-unavailable status from startup failures only after evaluating all camera API variants');
   assert.match(html, /navigator\.geolocation\.watchPosition\(/, 'ArrowHead should watch GPS updates for world alignment');
   assert.match(html, /navigator\.geolocation\.getCurrentPosition\(/, 'ArrowHead should explicitly invoke getCurrentPosition during startup so iOS prompts for location permission before the watch stream begins');
+  assert.match(html, /const\s+GEOLOCATION_OPTIONS\s*=\s*\{\s*enableHighAccuracy:\s*true,\s*timeout:\s*30000,\s*maximumAge:\s*1000\s*\};/, 'ArrowHead should allow extra time for iOS geolocation permission/fix acquisition before timing out');
+  assert.match(html, /const\s+GEOLOCATION_RELAXED_OPTIONS\s*=\s*\{\s*enableHighAccuracy:\s*false,\s*maximumAge:\s*15000\s*\};/, 'ArrowHead should define a relaxed geolocation fallback profile for older devices');
+  assert.match(html, /if \(error && error\.code === error\.TIMEOUT && !hasFreshFix && options === GEOLOCATION_OPTIONS\) \{[\s\S]*startWatch\(GEOLOCATION_RELAXED_OPTIONS\);/, 'ArrowHead should retry geolocation watches with relaxed options after initial timeout without a fix');
   assert.match(html, /const\s+geolocationPermissionPromise\s*=\s*requestInitialGeolocationPermissionIfNeeded\(\);[\s\S]*const\s+geolocationPermissionGranted\s*=\s*await\s+geolocationPermissionPromise;/, 'ArrowHead startup should request geolocation permission before attaching ongoing GPS watches');
   assert.match(html, /window\.addEventListener\('deviceorientationabsolute'/, 'ArrowHead should subscribe to absolute orientation updates when available');
   assert.match(html, /window\.addEventListener\('deviceorientation'/, 'ArrowHead should subscribe to orientation sensor updates');
@@ -65,7 +68,7 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /const\s+targetBearingRad\s*=\s*Math\.atan2\(east, north\);/, 'ArrowHead should compute per-point bearing from ENU deltas');
   assert.match(html, /const\s+relativeBearingRad\s*=\s*computeRelativeBearingRad\(targetBearingRad, state\.headingRad\);/, 'ArrowHead should align point bearing with camera heading using shared projection math');
   assert.match(html, /const\s+targetElevationRad\s*=\s*Math\.atan2\(up, horizontalDistance\);/, 'ArrowHead should compute vertical angle from phone to point');
-  assert.match(html, /const\s+forwardDistance\s*=\s*computeForwardDistanceMeters\(horizontalDistance, relativeBearingRad\) \* Math\.cos\(relativeElevationRad\);/, 'ArrowHead should use heading-aware forward distance so behind-camera points are culled');
+  assert.match(html, /const\s+forwardDistance\s*=\s*computeForwardDistanceMeters\(horizontalDistance, relativeBearingRad\);/, 'ArrowHead should cull points behind the user based on heading without pitch-related false negatives');
   assert.match(html, /const\s+xFromBearing\s*=\s*\(Math\.tan\(relativeBearingRad\) \/ Math\.tan\(horizontalFov \* 0\.5\)\)/, 'ArrowHead should project horizontal screen offset from bearing');
   assert.match(html, /const\s+yFromElevation\s*=\s*\(Math\.tan\(relativeElevationRad\) \/ Math\.tan\(verticalFov \* 0\.5\)\)/, 'ArrowHead should project vertical screen offset from elevation angle');
   assert.match(html, /const\s+xRotated\s*=\s*xFromBearing\s*\*\s*cosRoll\s*-\s*yFromElevation\s*\*\s*sinRoll;/, 'ArrowHead should apply roll compensation to screen coordinates');
