@@ -51,14 +51,12 @@
       <pre id="debugInfo" class="debug">Debug info will appear after sensors start.</pre>
     </div>
   </div>
-
 <script type="module">
 import { deriveDevicePoseRadians, integrateGyroscopeHeadingRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
 import { createGuardedSensorHandler, safeSocketSend, toErrorMessage } from "./src/arrowhead-sensor-guard.js";
 import { computeForwardDistanceMeters, computeObserverElevationFeet, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
-
 (() => {
   const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = 'surveyfoundryLastLineSmithDrawing';
@@ -765,8 +763,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     const east = dLon * 6378137 * Math.cos(meanLat);
     return { east, north };
   }
-
-  function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
+function projectWorldToScreen(pointLat, pointLon, pointZFeet) {
     if (!Number.isFinite(state.userLat) || !Number.isFinite(state.userLon)) return null;
 
     const { east, north } = latLonDeltaMeters(state.userLat, state.userLon, pointLat, pointLon);
@@ -778,9 +775,8 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     const w = canvas.width;
     const h = canvas.height;
 
-    // Updated vertical FOV – this is a common realistic value for mobile rear cameras
-    // You can try 58–72° depending on your device
-    const verticalFov = 62 * Math.PI / 180;
+    // Realistic vertical FOV for most mobile rear cameras (tune if needed: 60-72°)
+    const verticalFov = 65 * Math.PI / 180;
 
     const projection = projectEnuPointToScreen({
       eastMeters: east,
@@ -793,7 +789,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       viewportHeightPx: h,
       verticalFovRad: verticalFov,
       nearClipMeters: 0.5,
-      // rollCompensationGain: 0.8,   // Uncomment and adjust (0.5–1.0) if roll feels too strong
+      rollCompensationGain: 0.8,  // Lower if roll causes flying; try 0.5-1.0
     });
 
     if (!projection) return null;
