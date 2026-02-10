@@ -63,6 +63,15 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   const ON_TARGET_CENTER_FRACTION = 0.1;
   const GEOLOCATION_OPTIONS = { enableHighAccuracy: true, timeout: 8000, maximumAge: 1000 };
 
+  function isPotentiallyTrustworthyLocalHost(hostname) {
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  }
+
+  function isSecureContextForDevicePermissions() {
+    if (window.isSecureContext) return true;
+    return isPotentiallyTrustworthyLocalHost(String(window.location.hostname || '').toLowerCase());
+  }
+
   const video = document.getElementById('camera');
   const canvas = document.getElementById('overlay');
   const appEl = document.querySelector('.app');
@@ -759,6 +768,10 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   async function start() {
     if (state.started) return;
+    if (!isSecureContextForDevicePermissions()) {
+      setStatus('ArrowHead sensor, location, and camera permissions require HTTPS on iOS Safari. Re-open this page over https:// (or localhost during development).', true);
+      return;
+    }
     if (!('geolocation' in navigator)) {
       setStatus('Geolocation API unavailable on this device/browser.', true);
       return;
@@ -767,10 +780,14 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     startPayloadSyncWatchers();
 
     try {
-      await startCamera();
-      const geolocationPermissionGranted = await requestInitialGeolocationPermissionIfNeeded();
-      const orientationPermissionGranted = await requestOrientationPermissionIfNeeded();
-      const motionPermissionGranted = await requestMotionPermissionIfNeeded();
+      const cameraStartPromise = startCamera();
+      const geolocationPermissionPromise = requestInitialGeolocationPermissionIfNeeded();
+      const orientationPermissionPromise = requestOrientationPermissionIfNeeded();
+      const motionPermissionPromise = requestMotionPermissionIfNeeded();
+      await cameraStartPromise;
+      const geolocationPermissionGranted = await geolocationPermissionPromise;
+      const orientationPermissionGranted = await orientationPermissionPromise;
+      const motionPermissionGranted = await motionPermissionPromise;
       watchGeolocation();
       attachOrientationSensors();
       connectCollaboration();
