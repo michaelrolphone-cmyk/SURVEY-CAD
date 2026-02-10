@@ -75,7 +75,9 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 `ArrowHead.html` is a mobile-first augmented-reality viewer that is launched from LineSmith.
 
 - LineSmith writes handoff geometry into localStorage key `lineSmithArrowHeadImport`.
+- LineSmith exposes **Open ArrowHead AR** from both the Project Drawing panel and the top quick-toolbar (`quickOpenArrowHead`) so ArrowHead can be launched as a second live viewport.
 - ArrowHead reads this payload and overlays LineSmith points/linework on a live camera feed.
+- If the active canvas is empty when launching ArrowHead, LineSmith attempts to restore the last-opened project drawing first; if a collaboration websocket is already connected, ArrowHead launch is also allowed so the shared room state can hydrate as live geometry arrives.
 - While both apps are open, LineSmith now re-syncs that handoff payload every second (and whenever ArrowHead is opened), and ArrowHead listens for storage updates plus a 1s fallback poll so moved points/edited lines update live in AR without a relaunch.
 - ArrowHead now projects points from ENU deltas to camera screen space using relative bearing/elevation (plus roll compensation) so on-screen direction matches both the device heading and source survey geometry.
 - ArrowHead now prefers iOS Safari `webkitCompassHeading` (with `deviceorientationabsolute` fallback) and remaps pitch/roll by current screen orientation so overlays track correctly as you turn/tilt the phone instead of sticking to screen center.

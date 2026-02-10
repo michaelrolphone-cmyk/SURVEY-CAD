@@ -944,6 +944,7 @@
     <button id="drawerToggle" class="drawerToggle">Tools</button>
     <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
       <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
+      <button id="quickOpenArrowHead" class="quickToolBtn" title="Open ArrowHead AR" aria-label="Open ArrowHead AR"><i class="fa-solid fa-vr-cardboard"></i></button>
       <label class="quickToolField" title="Show map layer behind canvas"><input id="quickMapLayerEnabled" type="checkbox" /> Map</label>
       <div class="quickToolField" title="Map tiles">
         <select id="quickMapTileType" aria-label="Quick Map Tile Type">
@@ -3220,6 +3221,7 @@
   $("#redoBtn").addEventListener("click", ()=>history.redoAction());
 
   $("#quickSave")?.addEventListener("click", () => $("#saveDrawingToProject").click());
+  $("#quickOpenArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
   $("#quickSelect")?.addEventListener("click", () => setTool("select"));
   $("#quickAddPoint")?.addEventListener("click", () => setTool("addPoint"));
   function startLineByPointsFromToolbar() {
@@ -4185,8 +4187,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
   }
 
   function openArrowHeadFromLineSmith() {
-    if (!points.size) {
-      setStatus("Add or import points before opening ArrowHead.", "warn");
+    if (!ensureArrowHeadLaunchDrawing()) {
+      setStatus("Open a project drawing or connect collaboration before opening ArrowHead.", "warn");
       return;
     }
     syncArrowHeadPayloadToStorage({ force: true });
@@ -4211,6 +4213,29 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     } catch (_error) {
       window.location.assign(targetPath);
     }
+  }
+
+  function isCollabSocketConnected() {
+    return Boolean(collab.enabled && collab.socket && collab.socket.readyState === WebSocket.OPEN);
+  }
+
+  function ensureArrowHeadLaunchDrawing() {
+    if (points.size) return true;
+    if (activeDrawingStorageKey) {
+      const restoredActiveDrawing = restoreDrawingVersion(activeDrawingStorageKey, -1);
+      if (restoredActiveDrawing && points.size) return true;
+    }
+    if (activeProjectId) {
+      const lastDrawingStorageKey = loadLastOpenedProjectDrawing(activeProjectId);
+      if (lastDrawingStorageKey) {
+        const restoredLastDrawing = restoreDrawingVersion(lastDrawingStorageKey, -1);
+        if (restoredLastDrawing && points.size) {
+          activeDrawingStorageKey = lastDrawingStorageKey;
+          return true;
+        }
+      }
+    }
+    return isCollabSocketConnected();
   }
 
   $("#exportCsv").addEventListener("click", () => {
