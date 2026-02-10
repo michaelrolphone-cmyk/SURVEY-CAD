@@ -25,6 +25,7 @@
       <div class="row">
         <button id="startSensors">Start AR Sensors</button>
         <button id="useGyro">Use Gyroscope Heading: Off</button>
+        <button id="useMouseLook">Use Mouse Look: Off</button>
         <button id="recenter">Center</button>
       </div>
       <div id="status" class="status">Ready. Open from LineSmith to load overlay geometry.</div>
@@ -44,6 +45,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   const video = document.getElementById('camera');
   const canvas = document.getElementById('overlay');
+  const appEl = document.querySelector('.app');
   const ctx = canvas.getContext('2d');
   const statusEl = document.getElementById('status');
 
@@ -69,7 +71,17 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     gyroHeadingRawRad: 0,
     gyroHeadingOffsetRad: 0,
     lastGyroMotionMs: 0,
+    useMouseLook: false,
+    mouseLookActive: false,
+    mouseLookPointerId: null,
+    mouseLookLastX: 0,
+    mouseLookLastY: 0,
+    mouseLookSensitivity: 0.003,
   };
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
 
   function setStatus(message, warn = false) {
     statusEl.textContent = message;
@@ -264,6 +276,57 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       state.headingRad = normalizeRadians(state.gyroHeadingRawRad + state.gyroHeadingOffsetRad);
       sendArPresence();
     });
+  }
+
+  function attachMouseLookControls() {
+    if (!appEl) return;
+    appEl.addEventListener('pointerdown', (event) => {
+      if (!state.useMouseLook) return;
+      state.mouseLookActive = true;
+      state.mouseLookPointerId = event.pointerId;
+      state.mouseLookLastX = Number(event.clientX);
+      state.mouseLookLastY = Number(event.clientY);
+      if (typeof appEl.setPointerCapture === 'function') {
+        appEl.setPointerCapture(event.pointerId);
+      }
+    });
+
+    appEl.addEventListener('pointermove', (event) => {
+      if (!state.useMouseLook || !state.mouseLookActive) return;
+      if (state.mouseLookPointerId !== event.pointerId) return;
+      const x = Number(event.clientX);
+      const y = Number(event.clientY);
+      const dx = x - state.mouseLookLastX;
+      const dy = y - state.mouseLookLastY;
+      state.mouseLookLastX = x;
+      state.mouseLookLastY = y;
+
+      state.headingRad = normalizeRadians(state.headingRad - (dx * state.mouseLookSensitivity));
+      const pitchLimit = 80 * Math.PI / 180;
+      state.pitchRad = clamp(state.pitchRad + (dy * state.mouseLookSensitivity), -pitchLimit, pitchLimit);
+      sendArPresence();
+    });
+
+    const endMouseLook = (event) => {
+      if (state.mouseLookPointerId !== event.pointerId) return;
+      state.mouseLookActive = false;
+      state.mouseLookPointerId = null;
+      if (typeof appEl.releasePointerCapture === 'function') {
+        appEl.releasePointerCapture(event.pointerId);
+      }
+    };
+
+    appEl.addEventListener('pointerup', endMouseLook);
+    appEl.addEventListener('pointercancel', endMouseLook);
+  }
+
+  function autoEnableMouseLookWhenSensorsUnavailable() {
+    const hasOrientationEvents = 'ondeviceorientation' in window || 'ondeviceorientationabsolute' in window;
+    if (hasOrientationEvents) return;
+    state.useMouseLook = true;
+    const mouseLookButton = document.getElementById('useMouseLook');
+    if (mouseLookButton) mouseLookButton.textContent = 'Use Mouse Look: On';
+    setStatus('Device orientation unavailable. Mouse look enabled; drag to look around.');
   }
 
   function latLonDeltaMeters(lat0, lon0, lat1, lon1) {
@@ -471,6 +534,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   document.getElementById('startSensors').addEventListener('click', start);
   const gyroButton = document.getElementById('useGyro');
+  const mouseLookButton = document.getElementById('useMouseLook');
   gyroButton.addEventListener('click', () => {
     state.useGyroscopeHeading = !state.useGyroscopeHeading;
     state.lastGyroMotionMs = 0;
@@ -484,6 +548,18 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     gyroButton.textContent = 'Use Gyroscope Heading: Off';
     setStatus('Magnetometer heading enabled.');
   });
+  mouseLookButton.addEventListener('click', () => {
+    state.useMouseLook = !state.useMouseLook;
+    state.mouseLookActive = false;
+    state.mouseLookPointerId = null;
+    if (state.useMouseLook) {
+      mouseLookButton.textContent = 'Use Mouse Look: On';
+      setStatus('Mouse look enabled. Drag anywhere on the view to look around the sphere.');
+      return;
+    }
+    mouseLookButton.textContent = 'Use Mouse Look: Off';
+    setStatus('Mouse look disabled.');
+  });
   document.getElementById('recenter').addEventListener('click', () => {
     if (state.useGyroscopeHeading) {
       state.gyroHeadingOffsetRad = normalizeRadians(-state.gyroHeadingRawRad);
@@ -491,11 +567,16 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       setStatus('Gyroscope centered. Keep phone level and face due north while calibrating.');
       return;
     }
+    if (state.useMouseLook) {
+      state.pitchRad = 0;
+    }
     state.headingOffsetRad = normalizeRadians(-state.headingRad);
     setStatus('Recentered current heading as forward.');
   });
 
   window.addEventListener('resize', resize);
+  attachMouseLookControls();
+  autoEnableMouseLookWhenSensorsUnavailable();
   resize();
   renderLoop();
 })();
