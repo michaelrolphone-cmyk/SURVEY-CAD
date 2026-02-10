@@ -32,6 +32,7 @@
     .row { display: flex; gap: 0.45rem; flex-wrap: wrap; }
     button { border: 1px solid rgba(148,163,184,.45); border-radius: 10px; background: rgba(15,23,42,.9); color: #e2e8f0; padding: 0.45rem 0.65rem; font-weight: 600; }
     .status { font-size: 0.82rem; color: #cbd5e1; text-shadow: 0 1px 2px #000; }
+    .debug { margin: 0; font-size: 0.74rem; line-height: 1.35; color: #93c5fd; text-shadow: 0 1px 2px #000; white-space: pre-wrap; }
     .warn { color: #fbbf24; }
   </style>
 </head>
@@ -47,6 +48,7 @@
         <button id="recenter">Center</button>
       </div>
       <div id="status" class="status">Ready. Open from LineSmith to load overlay geometry.</div>
+      <pre id="debugInfo" class="debug">Debug info will appear after sensors start.</pre>
     </div>
   </div>
 <script type="module">
@@ -78,6 +80,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   const appEl = document.querySelector('.app');
   const ctx = canvas.getContext('2d');
   const statusEl = document.getElementById('status');
+  const debugEl = document.getElementById('debugInfo');
 
   const state = {
     payload: null,
@@ -116,6 +119,52 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   function setStatus(message, warn = false) {
     statusEl.textContent = message;
     statusEl.classList.toggle('warn', warn);
+  }
+
+  function formatSigned(value, digits = 6) {
+    if (!Number.isFinite(value)) return 'n/a';
+    const abs = Math.abs(value).toFixed(digits);
+    return value >= 0 ? `+${abs}` : `-${abs}`;
+  }
+
+  function formatDeg(rad) {
+    if (!Number.isFinite(rad)) return 'n/a';
+    return `${(rad * 180 / Math.PI).toFixed(1)}°`;
+  }
+
+  function formatMeters(value) {
+    if (!Number.isFinite(value)) return 'n/a';
+    return `${value.toFixed(2)} m`;
+  }
+
+  function updateDebugInfo(stats = null) {
+    const lines = [];
+    lines.push(`GPS lat/lon/alt(ft): ${formatSigned(state.userLat)} / ${formatSigned(state.userLon)} / ${Number.isFinite(state.userAltFeet) ? state.userAltFeet.toFixed(2) : 'n/a'}`);
+    lines.push(`Pose heading/pitch/roll: ${formatDeg(state.headingRad)} / ${formatDeg(state.pitchRad)} / ${formatDeg(state.rollRad)}`);
+
+    if (!state.payload) {
+      lines.push('Payload: missing');
+      debugEl.textContent = lines.join('\n');
+      return;
+    }
+
+    const pointsTotal = state.payload.points.length;
+    const linesTotal = state.payload.lines.length;
+    lines.push(`Payload points/lines: ${pointsTotal} / ${linesTotal}`);
+
+    if (stats) {
+      lines.push(`Projection projected/total: ${stats.projectedCount}/${pointsTotal}`);
+      lines.push(`Projection drops (bad geo | too close | behind): ${stats.dropBadGeoref} | ${stats.dropTooClose} | ${stats.dropBehind}`);
+      if (stats.nearestPoint) {
+        lines.push(`Nearest point #${stats.nearestPoint.num} (${stats.nearestPoint.id})`);
+        lines.push(`Nearest distance (horizontal/3D): ${formatMeters(stats.nearestPoint.horizontalDistanceM)} / ${formatMeters(stats.nearestPoint.distanceM)}`);
+        lines.push(`Nearest bearing abs/relative: ${formatDeg(stats.nearestPoint.absoluteBearingRad)} / ${formatDeg(stats.nearestPoint.relativeBearingRad)}`);
+      } else {
+        lines.push('Nearest point: unavailable (GPS or georef not ready)');
+      }
+    }
+
+    debugEl.textContent = lines.join('\n');
   }
 
   function resize() {
@@ -645,19 +694,69 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!state.payload) return;
+    if (!state.payload) {
+      updateDebugInfo(null);
+      return;
+    }
 
     const byId = new Map();
     const projected = [];
+    const drawStats = {
+      projectedCount: 0,
+      dropBadGeoref: 0,
+      dropTooClose: 0,
+      dropBehind: 0,
+      nearestPoint: null,
+    };
+    const hasUserLocation = Number.isFinite(state.userLat) && Number.isFinite(state.userLon);
+
     for (const p of state.payload.points) {
       const ll = worldToLatLng(Number(p.x), Number(p.y), state.payload.georef);
-      if (!ll) continue;
+      if (!ll) {
+        drawStats.dropBadGeoref += 1;
+        continue;
+      }
       const zFeet = resolvePointElevationFeet(p.z, state.userAltFeet);
+
+      if (hasUserLocation) {
+        const delta = latLonDeltaMeters(state.userLat, state.userLon, ll.lat, ll.lng);
+        const upMeters = (zFeet - state.userAltFeet) * FEET_TO_METERS;
+        const horizontalDistanceM = Math.hypot(delta.east, delta.north);
+        const absoluteBearingRad = Math.atan2(delta.east, delta.north);
+        const relativeBearingRad = computeRelativeBearingRad(absoluteBearingRad, state.headingRad);
+        const distanceM = Math.hypot(delta.east, delta.north, upMeters);
+        if (!drawStats.nearestPoint || horizontalDistanceM < drawStats.nearestPoint.horizontalDistanceM) {
+          const pointNum = p && p.num != null ? p.num : '';
+          drawStats.nearestPoint = {
+            id: String(p.id || ''),
+            num: String(pointNum),
+            horizontalDistanceM,
+            distanceM,
+            absoluteBearingRad,
+            relativeBearingRad,
+          };
+        }
+      }
+
       const scr = projectWorldToScreen(ll.lat, ll.lng, zFeet);
-      if (!scr) continue;
+      if (!scr) {
+        if (hasUserLocation) {
+          const delta = latLonDeltaMeters(state.userLat, state.userLon, ll.lat, ll.lng);
+          const horizontalDistanceM = Math.hypot(delta.east, delta.north);
+          if (horizontalDistanceM < 0.01) drawStats.dropTooClose += 1;
+          else {
+            const targetBearingRad = Math.atan2(delta.east, delta.north);
+            const relativeBearingRad = computeRelativeBearingRad(targetBearingRad, state.headingRad);
+            const forwardDistance = computeForwardDistanceMeters(horizontalDistanceM, relativeBearingRad);
+            if (forwardDistance <= 0.5) drawStats.dropBehind += 1;
+          }
+        }
+        continue;
+      }
       byId.set(p.id, scr);
       const pointNum = p && p.num != null ? p.num : '';
       projected.push({ x: scr.x, y: scr.y, distanceM: scr.distanceM, num: String(pointNum) });
+      drawStats.projectedCount += 1;
     }
 
     ctx.lineWidth = Math.max(2, window.devicePixelRatio * 1.8);
@@ -755,6 +854,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     }
 
     const headingSource = state.useGyroscopeHeading ? 'Gyro' : 'Mag';
+    updateDebugInfo(drawStats);
     setStatus(`AR live (${headingSource}). Points: ${projected.length}/${state.payload.points.length}. Heading ${(state.headingRad * 180 / Math.PI).toFixed(1)}°`);
   }
 
