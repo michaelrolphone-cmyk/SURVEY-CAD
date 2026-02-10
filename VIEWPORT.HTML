@@ -864,9 +864,16 @@
         <button id="pointAtIntersection" class="ok">Create Point @ Intersection</button>
         <button id="trimOverlap">Trim Overlap (colinear)</button>
       </div>
+      <div class="grid2" style="margin-top:8px;">
+        <label>Offset distance
+          <input id="lineOffsetDistance" placeholder="10.00" />
+        </label>
+        <button id="offsetSelectedLine" class="ok">Offset Selected Line</button>
+      </div>
       <div class="hint">
         • <b>Extend → Intersect</b> creates a <b>new point</b> at the intersection and re-ends the active line there (original endpoint point does not move).
         <br>• <b>Trim</b> uses the selected line’s grip (nearest endpoint where you clicked) and shortens by moving that endpoint.
+        <br>• <b>Offset Selected Line</b> creates a parallel line by the entered distance (+left, −right from A→B).
       </div>
     </div>
 
@@ -957,6 +964,7 @@
       <span class="quickToolDivider" aria-hidden="true"></span>
       <button id="quickExtend" class="quickToolBtn" title="Extend to Intersect" aria-label="Extend"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
       <button id="quickTrimIntersect" class="quickToolBtn" title="Trim to Intersect" aria-label="Trim / Intersect"><i class="fa-solid fa-scissors"></i></button>
+      <button id="quickOffsetLine" class="quickToolBtn" title="Offset Selected Line" aria-label="Offset Selected Line"><i class="fa-solid fa-arrows-left-right"></i></button>
       <button id="quickRotateSelection" class="quickToolBtn" title="Rotate Selection (Reference)" aria-label="Rotate Selection"><i class="fa-solid fa-rotate"></i></button>
       <button id="quickPointManager" class="quickToolBtn" title="Open Points Manager" aria-label="Point Manager"><i class="fa-solid fa-list"></i></button>
     </div>
@@ -3130,6 +3138,7 @@
   $("#quickCenter")?.addEventListener("click", () => $("#zoomAllAndCenter").click());
   $("#quickExtend")?.addEventListener("click", () => $("#extendToIntersect").click());
   $("#quickTrimIntersect")?.addEventListener("click", () => $("#trimToIntersect").click());
+  $("#quickOffsetLine")?.addEventListener("click", () => $("#offsetSelectedLine")?.click());
   $("#quickRotateSelection")?.addEventListener("click", () => startRotateSelectionSession());
   $("#quickPointManager")?.addEventListener("click", () => openPointsManagerBtn?.click());
 
@@ -4444,6 +4453,59 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     return activeSelection.t < hitParam ? "a" : "b";
   }
 
+  function offsetSelectedLineByDistance(rawDistance) {
+    if (!lastSelectedLineId || !lines.has(lastSelectedLineId)) {
+      setStatus("Select a line first.", "warn");
+      return false;
+    }
+    const distance = parseNum(rawDistance, NaN);
+    if (!Number.isFinite(distance)) {
+      setStatus("Offset distance must be a number.", "warn");
+      return false;
+    }
+
+    const ln = lines.get(lastSelectedLineId);
+    const a = points.get(ln.a);
+    const b = points.get(ln.b);
+    if (!a || !b) return false;
+
+    const vx = b.x - a.x;
+    const vy = b.y - a.y;
+    const len = Math.hypot(vx, vy);
+    if (len < EPS) {
+      setStatus("Cannot offset a zero-length line.", "warn");
+      return false;
+    }
+
+    history.push("offset selected line");
+
+    const nx = -vy / len;
+    const ny = vx / len;
+    const dx = nx * distance;
+    const dy = ny * distance;
+
+    const defaultZ = parseNum($("#ptZ").value, 0);
+    const defaultCode = String($("#ptCode").value || "").trim();
+    const defaultNotes = String($("#ptNotes").value || "").trim();
+
+    const aNum = nextOpenPointNumber();
+    const aId = addPoint({ num: aNum, x: a.x + dx, y: a.y + dy, z: defaultZ, code: defaultCode, notes: defaultNotes, movable:false });
+    const bNum = nextOpenPointNumber();
+    const bId = addPoint({ num: bNum, x: b.x + dx, y: b.y + dy, z: defaultZ, code: defaultCode, notes: defaultNotes, movable:false });
+    const newLineId = addLine(aId, bId, false);
+
+    selectedPointIds = [aId, bId];
+    selectedPointId = bId;
+    selectedLines = [{ lineId: newLineId, grip: "b", t: 1 }];
+    lastSelectedLineId = newLineId;
+    updatePointEditorFromSelection();
+    schedulePointsTableRender();
+
+    const sideLabel = distance >= 0 ? "left" : "right";
+    setStatus(`Offset line created at ${fmt(Math.abs(distance))} ${sideLabel} of selected line.`, "ok");
+    return true;
+  }
+
   $("#extendToIntersect").addEventListener("click", () => {
     const s = getTwoSelectedLines();
     if (!s) {
@@ -4583,6 +4645,10 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
     schedulePointsTableRender();
     setStatus("Trimmed overlap on active line at overlap boundary.", "ok");
+  });
+
+  $("#offsetSelectedLine").addEventListener("click", () => {
+    offsetSelectedLineByDistance($("#lineOffsetDistance").value);
   });
 
   // -------------------------
