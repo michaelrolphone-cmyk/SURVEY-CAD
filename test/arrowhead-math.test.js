@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveDevicePoseRadians, normalizeRadians, shouldApplyOrientationEvent } from '../src/arrowhead-math.js';
+import { deriveDevicePoseRadians, integrateGyroscopeHeadingRadians, normalizeRadians, shouldApplyOrientationEvent } from '../src/arrowhead-math.js';
 
 test('normalizeRadians wraps values into [-PI, PI]', () => {
   assert.equal(normalizeRadians(Math.PI * 3), Math.PI);
@@ -39,4 +39,20 @@ test('shouldApplyOrientationEvent prefers absolute heading updates after absolut
   assert.equal(shouldApplyOrientationEvent('deviceorientation', { alpha: 130, absolute: false }, true), false);
   assert.equal(shouldApplyOrientationEvent('deviceorientationabsolute', { alpha: 130, absolute: true }, true), true);
   assert.equal(shouldApplyOrientationEvent('deviceorientation', { webkitCompassHeading: 270 }, true), true);
+});
+
+test('integrateGyroscopeHeadingRadians accumulates alpha rotation over time', () => {
+  const quarterTurnPerSecond = 90;
+  const updated = integrateGyroscopeHeadingRadians(0, quarterTurnPerSecond, 1000);
+  assert.ok(Math.abs(updated - (-Math.PI / 2)) < 1e-10);
+
+  const wrapped = integrateGyroscopeHeadingRadians(Math.PI * 0.9, -quarterTurnPerSecond, 2000);
+  assert.ok(Number.isFinite(wrapped));
+  assert.ok(wrapped <= Math.PI && wrapped >= -Math.PI);
+});
+
+test('integrateGyroscopeHeadingRadians ignores invalid samples', () => {
+  assert.equal(integrateGyroscopeHeadingRadians(0.3, NaN, 10), normalizeRadians(0.3));
+  assert.equal(integrateGyroscopeHeadingRadians(0.3, 15, 0), normalizeRadians(0.3));
+  assert.equal(integrateGyroscopeHeadingRadians(NaN, 15, -1), 0);
 });
