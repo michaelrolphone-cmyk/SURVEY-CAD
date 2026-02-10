@@ -698,12 +698,12 @@
       localStorageSyncLock = false;
     }
 
-    async function syncLocalStorageWithServer() {
+    async function syncLocalStorageWithServer({ force = false } = {}) {
       if (localStorageSyncLock) return;
 
       const currentSnapshot = buildLocalStorageSnapshot();
       const serializedSnapshot = JSON.stringify(currentSnapshot);
-      if (serializedSnapshot === localStorageSyncSnapshot) {
+      if (!force && serializedSnapshot === localStorageSyncSnapshot) {
         return;
       }
 
@@ -1187,7 +1187,6 @@
     loadActiveProject();
     renderProjects();
 
-    localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
     setInterval(() => {
       syncLocalStorageWithServer().catch((err) => {
         console.warn('localStorage sync unavailable', err);
@@ -1199,7 +1198,7 @@
       if (!window.history.state?.[LAUNCHER_HISTORY_STATE_KEY]) {
         writeHistoryState(buildHomeHistoryState(), 'replace');
       }
-      syncLocalStorageWithServer().catch((err) => {
+      syncLocalStorageWithServer({ force: true }).catch((err) => {
         console.warn('initial localStorage sync failed', err);
       });
     }).catch((err) => {
