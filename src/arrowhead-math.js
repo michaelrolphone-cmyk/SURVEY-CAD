@@ -68,14 +68,34 @@ export function deriveDevicePoseRadians(orientationEvent, screenOrientationAngle
   };
 }
 
-export function shouldApplyOrientationEvent(eventType, orientationEvent, hasAbsoluteLock = false) {
+export function shouldApplyOrientationEvent(
+  eventType,
+  orientationEvent,
+  hasAbsoluteLock = false,
+  lastAbsoluteEventAtMs = 0,
+  nowMs = Date.now(),
+  absoluteLockWindowMs = 1500,
+) {
   const explicitAbsoluteType = String(eventType || '').toLowerCase() === 'deviceorientationabsolute';
   const absoluteFlag = orientationEvent && orientationEvent.absolute === true;
   const webkitCompassHeading = Number(orientationEvent && orientationEvent.webkitCompassHeading);
   const hasCompassHeading = Number.isFinite(webkitCompassHeading);
   const isAbsoluteEvent = explicitAbsoluteType || absoluteFlag || hasCompassHeading;
   if (!hasAbsoluteLock) return true;
-  return isAbsoluteEvent;
+  if (!isAbsoluteEvent) {
+    const lastAbsolute = Number(lastAbsoluteEventAtMs);
+    if (!Number.isFinite(lastAbsolute) || lastAbsolute <= 0) return false;
+    const now = Number(nowMs);
+    const lockWindow = Number(absoluteLockWindowMs);
+    const lockStillFresh =
+      Number.isFinite(now)
+      && Number.isFinite(lockWindow)
+      && lockWindow > 0
+      && (now - lastAbsolute) <= lockWindow;
+    if (lockStillFresh) return false;
+    return true;
+  }
+  return true;
 }
 
 export function integrateGyroscopeHeadingRadians(previousHeadingRad, rotationRateAlphaDegPerSec, deltaTimeMs) {
