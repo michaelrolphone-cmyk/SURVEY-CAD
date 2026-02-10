@@ -662,7 +662,6 @@
 
       <div class="grid2" style="margin-top:8px;">
         <button id="zoomExtents" class="ok">Zoom Extents</button>
-        <button id="zoomAllAndCenter">Center (0,0)</button>
       </div>
 
       <div class="hint">
@@ -798,7 +797,7 @@
       </div>
       <div class="inline">
         <label><input id="showPointCodes" type="checkbox" checked /> Draw point codes</label>
-        <label><input id="showPointNotes" type="checkbox" checked /> Draw point notes</label>
+        <label><input id="showPointNotes" type="checkbox" /> Draw point notes</label>
       </div>
       <div class="sep"></div>
       <div class="inline">
@@ -955,7 +954,7 @@
         </select>
       </div>
       <label class="quickToolField" title="Toggle point code labels"><input id="quickShowPointCodes" type="checkbox" checked /> Codes</label>
-      <label class="quickToolField" title="Toggle point notes labels"><input id="quickShowPointNotes" type="checkbox" checked /> Notes</label>
+      <label class="quickToolField" title="Toggle point notes labels"><input id="quickShowPointNotes" type="checkbox" /> Notes</label>
       <span class="quickToolDivider" aria-hidden="true"></span>
       <button id="quickSelect" class="quickToolBtn primary" title="Select / Move" aria-label="Select / Move"><i class="fa-solid fa-arrow-pointer"></i></button>
       <button id="quickAddPoint" class="quickToolBtn" title="Add Point" aria-label="Add Point"><i class="fa-solid fa-circle-plus"></i></button>
@@ -964,7 +963,6 @@
       <button id="quickUndo" class="quickToolBtn" title="Undo" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
       <button id="quickRedo" class="quickToolBtn" title="Redo" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
       <button id="quickZoomExtents" class="quickToolBtn" title="Zoom Extents" aria-label="Zoom Extents"><i class="fa-solid fa-expand"></i></button>
-      <button id="quickCenter" class="quickToolBtn" title="Center (0,0)" aria-label="Center"><i class="fa-solid fa-crosshairs"></i></button>
       <span class="quickToolDivider" aria-hidden="true"></span>
       <button id="quickExtend" class="quickToolBtn" title="Extend to Intersect" aria-label="Extend"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
       <button id="quickTrimIntersect" class="quickToolBtn" title="Trim to Intersect" aria-label="Trim / Intersect"><i class="fa-solid fa-scissors"></i></button>
@@ -1616,7 +1614,7 @@
 
   const labelVisibility = {
     codes: true,
-    notes: true
+    notes: false
   };
 
   const mapLayerState = {
@@ -2373,12 +2371,7 @@
 
   function getToolWorkflowToastPayload(activeTool = tool) {
     if (activeTool === "select") {
-      return {
-        title: "Select / Move Workflow",
-        message: "Click items to select, or drag a window to select multiple items.",
-        steps: ["Click item(s) or drag a selection window"],
-        currentStepIndex: 0
-      };
+      return null;
     }
 
     if (activeTool === "addPoint") {
@@ -3193,7 +3186,7 @@
   });
 
   setPointCodeVisibility(true);
-  setPointNotesVisibility(true);
+  setPointNotesVisibility(false);
   if (quickMapEnabledInput) quickMapEnabledInput.checked = mapEnabledInput.checked;
   if (quickMapTileTypeInput) quickMapTileTypeInput.value = mapTileTypeInput.value;
   $("#toolPointOnLine").addEventListener("click", ()=>setTool("pointOnLine"));
@@ -3237,7 +3230,6 @@
   $("#quickUndo")?.addEventListener("click", () => history.undoAction());
   $("#quickRedo")?.addEventListener("click", () => history.redoAction());
   $("#quickZoomExtents")?.addEventListener("click", () => zoomExtents());
-  $("#quickCenter")?.addEventListener("click", () => $("#zoomAllAndCenter").click());
   $("#quickExtend")?.addEventListener("click", () => $("#extendToIntersect").click());
   $("#quickTrimIntersect")?.addEventListener("click", () => $("#trimToIntersect").click());
   $("#quickOffsetLine")?.addEventListener("click", () => $("#offsetSelectedLine")?.click());
@@ -3245,13 +3237,6 @@
   $("#quickPointManager")?.addEventListener("click", () => openPointsManagerBtn?.click());
 
   $("#zoomExtents").addEventListener("click", () => zoomExtents());
-  $("#zoomAllAndCenter").addEventListener("click", () => {
-    history.push("center");
-    const rect = canvas.getBoundingClientRect();
-    view.panX = rect.width * 0.5;
-    view.panY = rect.height * 0.5;
-    setStatus("Centered view on (0,0).", "ok");
-  });
 
   $("#clearSelection").addEventListener("click", () => clearSelection());
   $("#rotateSelectionReference").addEventListener("click", () => startRotateSelectionSession());
