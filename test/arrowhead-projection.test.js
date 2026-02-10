@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeRelativeBearingRad, resolvePointElevationFeet } from '../src/arrowhead-projection.js';
+import { computeForwardDistanceMeters, computeRelativeBearingRad, resolvePointElevationFeet } from '../src/arrowhead-projection.js';
 
 test('resolvePointElevationFeet falls back to device elevation for zero, missing, and NaN values', () => {
   assert.equal(resolvePointElevationFeet(0, 5234.25), 5234.25);
@@ -17,4 +17,20 @@ test('computeRelativeBearingRad uses heading-target handedness so camera pan dir
 
   const wrapped = computeRelativeBearingRad(-Math.PI + 0.1, Math.PI - 0.1);
   assert.ok(Math.abs(Math.abs(wrapped) - 0.2) < 1e-10, 'relative bearing should normalize across +/-PI wraparound');
+});
+
+
+test('computeForwardDistanceMeters rejects targets behind the camera heading', () => {
+  const distance = 25;
+  assert.equal(computeForwardDistanceMeters(distance, 0), 25);
+  assert.equal(computeForwardDistanceMeters(distance, Math.PI), -25);
+
+  const headingNorth = 0;
+  const targetSouth = Math.PI;
+  const relativeSouth = computeRelativeBearingRad(targetSouth, headingNorth);
+  assert.ok(computeForwardDistanceMeters(distance, relativeSouth) < 0, 'south target should be behind while facing north');
+
+  const targetEast = Math.PI / 2;
+  const relativeEast = computeRelativeBearingRad(targetEast, headingNorth);
+  assert.ok(Math.abs(computeForwardDistanceMeters(distance, relativeEast)) < 1e-10, 'east target should be on the horizon edge while facing north');
 });

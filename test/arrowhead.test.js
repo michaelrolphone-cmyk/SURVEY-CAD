@@ -16,7 +16,7 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /window\.addEventListener\('devicemotion'/, 'ArrowHead should subscribe to motion sensor updates');
   assert.match(html, /resolvePointElevationFeet\(p\.z, state\.userAltFeet\)/, 'ArrowHead should replace missing or zero point elevations with current phone elevation');
   assert.match(html, /import\s+\{\s*deriveDevicePoseRadians,\s*normalizeRadians\s*\}\s+from\s+"\.\/src\/arrowhead-math\.js";/, 'ArrowHead should use shared orientation math helpers');
-  assert.match(html, /import\s+\{\s*computeRelativeBearingRad,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
+  assert.match(html, /import\s+\{\s*computeForwardDistanceMeters,\s*computeRelativeBearingRad,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
   assert.match(html, /import\s+\{\s*latLngToWorldAffine,\s*worldToLatLngAffine\s*\}\s+from\s+"\.\/src\/georeference-transform\.js";/, 'ArrowHead should use shared georeference helpers for bidirectional coordinate projection');
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
   assert.match(html, /const\s+socket\s*=\s*new\s+WebSocket\(wsUrl\);/, 'ArrowHead should join the LineSmith collaboration websocket room');
@@ -27,6 +27,7 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /const\s+targetBearingRad\s*=\s*Math\.atan2\(east, north\);/, 'ArrowHead should compute per-point bearing from ENU deltas');
   assert.match(html, /const\s+relativeBearingRad\s*=\s*computeRelativeBearingRad\(targetBearingRad, state\.headingRad\);/, 'ArrowHead should align point bearing with camera heading using shared projection math');
   assert.match(html, /const\s+targetElevationRad\s*=\s*Math\.atan2\(up, horizontalDistance\);/, 'ArrowHead should compute vertical angle from phone to point');
+  assert.match(html, /const\s+forwardDistance\s*=\s*computeForwardDistanceMeters\(horizontalDistance, relativeBearingRad\) \* Math\.cos\(relativeElevationRad\);/, 'ArrowHead should use heading-aware forward distance so behind-camera points are culled');
   assert.match(html, /const\s+xFromBearing\s*=\s*\(Math\.tan\(relativeBearingRad\) \/ Math\.tan\(horizontalFov \* 0\.5\)\)/, 'ArrowHead should project horizontal screen offset from bearing');
   assert.match(html, /const\s+yFromElevation\s*=\s*\(Math\.tan\(relativeElevationRad\) \/ Math\.tan\(verticalFov \* 0\.5\)\)/, 'ArrowHead should project vertical screen offset from elevation angle');
   assert.match(html, /const\s+xRotated\s*=\s*xFromBearing\s*\*\s*cosRoll\s*-\s*yFromElevation\s*\*\s*sinRoll;/, 'ArrowHead should apply roll compensation to screen coordinates');
