@@ -7,7 +7,7 @@ export function resolvePointElevationFeet(pointZFeet, deviceElevationFeet) {
 }
 
 export function computeRelativeBearingRad(targetBearingRad, headingRad) {
-  return normalizeRadians(headingRad - targetBearingRad);
+  return normalizeRadians(targetBearingRad - headingRad);
 }
 
 export function computeForwardDistanceMeters(horizontalDistanceMeters, relativeBearingRad) {
