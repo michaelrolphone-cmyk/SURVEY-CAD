@@ -696,6 +696,9 @@
         <button id="saveDrawingToProject" class="ok">Save Drawing to Project</button>
         <button id="restoreDrawingVersion">Restore Saved Version…</button>
       </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="openArrowHead" class="ok" style="flex:1;">Open ArrowHead AR</button>
+      </div>
       <div class="hint mini" id="drawingSaveHint">Open LineSmith from an active SurveyFoundry project to enable project-linked drawing saves.</div>
       <div class="hint mini" id="collabStatus">Collaboration: offline</div>
     </div>
@@ -1068,6 +1071,7 @@
   const PROJECT_DRAWING_STORAGE_PREFIX = "surveyfoundryLineSmithDrawing";
   const PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = "lineSmithProjectBrowserDrawingImport";
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = "surveyfoundryLastLineSmithDrawing";
+  const ARROWHEAD_IMPORT_STORAGE_KEY = "lineSmithArrowHeadImport";
 
   const parseNum = (s, def=0) => {
     const n = Number(String(s).trim());
@@ -4035,6 +4039,7 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
 
   $("#saveDrawingToProject").addEventListener("click", saveDrawingToProject);
   $("#restoreDrawingVersion").addEventListener("click", promptRestoreDrawingVersion);
+  $("#openArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
 
   $("#csvIn").addEventListener("change", async (e) => {
     const f = e.target.files?.[0];
@@ -4043,6 +4048,63 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     importCsvText(text);
     $("#csvIn").value = "";
   });
+
+
+
+  function buildArrowHeadPayload() {
+    return {
+      createdAt: new Date().toISOString(),
+      source: "linesmith",
+      points: Array.from(points.values()).map((p) => ({
+        id: p.id,
+        num: String(p.num ?? ""),
+        x: Number(p.x),
+        y: Number(p.y),
+        z: Number(p.z),
+        code: String(p.code ?? ""),
+        notes: String(p.notes ?? "")
+      })),
+      lines: Array.from(lines.values()).map((line) => ({
+        id: line.id,
+        a: line.a,
+        b: line.b
+      })),
+      georeference: mapGeoreference ? {
+        lat: { ...mapGeoreference.lat },
+        lng: { ...mapGeoreference.lng }
+      } : null
+    };
+  }
+
+  function openArrowHeadFromLineSmith() {
+    if (!points.size) {
+      setStatus("Add or import points before opening ArrowHead.", "warn");
+      return;
+    }
+    const payload = buildArrowHeadPayload();
+    localStorage.setItem(ARROWHEAD_IMPORT_STORAGE_KEY, JSON.stringify(payload));
+    const params = new URLSearchParams(window.location.search);
+    const activeProjectIdParam = params.get("activeProjectId");
+    const activeProjectNameParam = params.get("activeProjectName");
+    const targetParams = new URLSearchParams({ source: "linesmith" });
+    if (activeProjectIdParam) targetParams.set("activeProjectId", activeProjectIdParam);
+    if (activeProjectNameParam) targetParams.set("activeProjectName", activeProjectNameParam);
+    const targetPath = `/ArrowHead.html?${targetParams.toString()}`;
+
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: "survey-cad:navigate-app",
+          path: targetPath,
+        }, window.location.origin);
+      } else {
+        window.location.assign(targetPath);
+      }
+      setStatus("Opening ArrowHead AR with current LineSmith geometry…", "ok");
+    } catch (_error) {
+      window.location.assign(targetPath);
+    }
+  }
 
   $("#exportCsv").addEventListener("click", () => {
     const rows = [];

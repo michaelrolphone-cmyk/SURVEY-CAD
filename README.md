@@ -69,6 +69,23 @@ Example:
 open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise&autostart=1"
 ```
 
+
+## ArrowHead AR Launch
+
+`ArrowHead.html` is a mobile-first augmented-reality viewer that is launched from LineSmith.
+
+- LineSmith writes handoff geometry into localStorage key `lineSmithArrowHeadImport`.
+- ArrowHead reads this payload and overlays LineSmith points/linework on a live camera feed.
+- GPS + device orientation/motion sensors are used to place features in real space.
+- Point elevations with `z=0` are rendered using the phone-reported elevation at runtime.
+- XY-to-lat/lon conversion reuses the same LineSmith georeference transform used by LineSmith map alignment (`lat=ax*x+by*y+c`, `lng=ax*x+by*y+c`).
+
+Direct open command (after a LineSmith handoff payload exists):
+
+```bash
+open "http://localhost:3000/ArrowHead.html?source=linesmith"
+```
+
 ## API
 
 Module: `src/survey-api.js`

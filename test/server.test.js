@@ -145,7 +145,7 @@ test('server exposes survey APIs and static html', async () => {
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();
-    assert.equal(appsPayload.apps.length, 7);
+    assert.equal(appsPayload.apps.length, 8);
     assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/SurveyFoundry\.png$/i);
 
