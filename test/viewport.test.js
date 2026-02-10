@@ -15,7 +15,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /<div class="quickToolField" title="Map tiles">\s*<select id="quickMapTileType"/, 'quick toolbar should include unlabeled inline map tile type dropdown');
   assert.doesNotMatch(html, /title="Map tiles">\s*Tiles\s*</, 'quick toolbar map tile selector should not include a redundant Tiles text label');
   assert.match(html, /id="quickShowPointCodes"\s+type="checkbox"\s+checked/, 'quick toolbar should include point code visibility toggle');
-  assert.match(html, /id="quickShowPointNotes"\s+type="checkbox"\s+checked/, 'quick toolbar should include point notes visibility toggle');
+  assert.match(html, /id="quickShowPointNotes"\s+type="checkbox"(?!\s+checked)/, 'quick toolbar should include point notes visibility toggle defaulted off');
   assert.match(html, /\.quickToolField\{[\s\S]*display:inline-flex;[\s\S]*flex-direction:row;/, 'quick toolbar control labels should render inline with row direction');
   assert.doesNotMatch(html, /\.quickToolField input\[type="checkbox"\][\s\S]*accent-color:/, 'quick toolbar checkboxes should keep native accent color styling');
   assert.match(html, /id="quickSelect"[\s\S]*fa-arrow-pointer/, 'quick toolbar should include Select/Move icon shortcut');
@@ -24,7 +24,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickUndo"[\s\S]*fa-rotate-left/, 'quick toolbar should include Undo icon shortcut');
   assert.match(html, /id="quickRedo"[\s\S]*fa-rotate-right/, 'quick toolbar should include Redo icon shortcut');
   assert.match(html, /id="quickZoomExtents"[\s\S]*fa-expand/, 'quick toolbar should include Zoom Extents icon shortcut');
-  assert.match(html, /id="quickCenter"[\s\S]*fa-crosshairs/, 'quick toolbar should include Center icon shortcut');
+  assert.doesNotMatch(html, /id="quickCenter"/, 'quick toolbar should not include Center (0,0) shortcut');
   assert.match(html, /id="quickExtend"[\s\S]*fa-up-right-and-down-left-from-center/, 'quick toolbar should include Extend icon shortcut');
   assert.match(html, /id="quickTrimIntersect"[\s\S]*fa-scissors/, 'quick toolbar should include Trim\/Intersect icon shortcut');
   assert.match(html, /id="quickOffsetLine"[\s\S]*fa-arrows-left-right/, 'quick toolbar should include Offset Selected Line icon shortcut');
@@ -47,6 +47,18 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
 
 
 
+
+
+test('VIEWPORT.HTML defaults point notes off, hides Select/Move workflow toast, and removes center controls', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+labelVisibility\s*=\s*\{[\s\S]*notes:\s*false[\s\S]*\}/, 'point-note label visibility should default to off');
+  assert.match(html, /setPointNotesVisibility\(false\);/, 'initial point-note visibility sync should keep notes hidden by default');
+  assert.match(html, /if \(activeTool === "select"\) \{[\s\S]*return null;[\s\S]*\}/, 'select tool should not provide workflow-toast payload');
+  assert.doesNotMatch(html, /Select \/ Move Workflow/, 'select/move workflow toast copy should not be present');
+  assert.doesNotMatch(html, /id="zoomAllAndCenter"/, 'center (0,0) panel button should be removed');
+  assert.doesNotMatch(html, /id="quickCenter"/, 'center (0,0) quick-toolbar button should be removed');
+});
 test('VIEWPORT.HTML line ops includes offset-selected-line controls and action wiring', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
@@ -126,7 +138,7 @@ test('VIEWPORT.HTML provides toggles to hide/show point code and notes labels', 
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="showPointCodes"\s+type="checkbox"\s+checked/, 'display section should include a checked point code toggle');
-  assert.match(html, /id="showPointNotes"\s+type="checkbox"\s+checked/, 'display section should include a checked point notes toggle');
+  assert.match(html, /id="showPointNotes"\s+type="checkbox"(?!\s+checked)/, 'display section should include a point notes toggle defaulted off');
   assert.match(html, /if \(labelVisibility\.codes && p\.code\)/, 'code labels should render only when the code toggle is enabled');
   assert.match(html, /if \(labelVisibility\.notes && p\.notes\)/, 'notes labels should render only when the notes toggle is enabled');
   assert.match(html, /showPointCodesInput\?\.addEventListener\("change"/, 'code visibility toggle should be wired to change events');
