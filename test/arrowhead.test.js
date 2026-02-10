@@ -15,11 +15,15 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /window\.addEventListener\('deviceorientation'/, 'ArrowHead should subscribe to orientation sensor updates');
   assert.match(html, /window\.addEventListener\('devicemotion'/, 'ArrowHead should subscribe to motion sensor updates');
   assert.match(html, /resolvePointElevationFeet\(p\.z, state\.userAltFeet\)/, 'ArrowHead should replace missing or zero point elevations with current phone elevation');
-  assert.match(html, /const\s+lat\s*=\s*georef\.lat\.ax\s*\*\s*x\s*\+\s*georef\.lat\.by\s*\*\s*y\s*\+\s*georef\.lat\.c;/, 'ArrowHead should use LineSmith georeference translation for x\/y to lat\/lon conversion');
-
   assert.match(html, /import\s+\{\s*deriveDevicePoseRadians,\s*normalizeRadians\s*\}\s+from\s+"\.\/src\/arrowhead-math\.js";/, 'ArrowHead should use shared orientation math helpers');
   assert.match(html, /import\s+\{\s*computeRelativeBearingRad,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
+  assert.match(html, /import\s+\{\s*latLngToWorldAffine,\s*worldToLatLngAffine\s*\}\s+from\s+"\.\/src\/georeference-transform\.js";/, 'ArrowHead should use shared georeference helpers for bidirectional coordinate projection');
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
+  assert.match(html, /const\s+socket\s*=\s*new\s+WebSocket\(wsUrl\);/, 'ArrowHead should join the LineSmith collaboration websocket room');
+  assert.match(html, /type:\s*'ar-presence'/, 'ArrowHead should publish AR user position and orientation to websocket peers');
+  assert.match(html, /worldToLatLngAffine\(/, 'ArrowHead should project LineSmith world coordinates to lat\/lon for AR cursor overlays');
+  assert.match(html, /latLngToWorldAffine\(/, 'ArrowHead should convert GPS lat\/lon into state-plane coordinates before publishing presence');
+
   assert.match(html, /const\s+targetBearingRad\s*=\s*Math\.atan2\(east, north\);/, 'ArrowHead should compute per-point bearing from ENU deltas');
   assert.match(html, /const\s+relativeBearingRad\s*=\s*computeRelativeBearingRad\(targetBearingRad, state\.headingRad\);/, 'ArrowHead should align point bearing with camera heading using shared projection math');
   assert.match(html, /const\s+targetElevationRad\s*=\s*Math\.atan2\(up, horizontalDistance\);/, 'ArrowHead should compute vertical angle from phone to point');

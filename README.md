@@ -139,6 +139,21 @@ curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/apps"
 ```
 
+### Collaboration websocket endpoint
+
+LineSmith and ArrowHead share a realtime websocket room at `/ws/lineforge?room=<room-id>`.
+
+- LineSmith publishes cursor and drawing `state` sync events.
+- ArrowHead now joins the same room, renders live LineSmith cursor positions in AR, and publishes `ar-presence` updates containing state-plane `x/y`, GPS `lat/lon/altFeet`, and orientation (`headingRad`, `pitchRad`, `rollRad`).
+- LineSmith consumes `ar-presence` and draws ArrowHead users on the map layer with a directional triangle cone.
+
+Quick local run command:
+
+```bash
+npm start
+open "http://localhost:3000/VIEWPORT.HTML"
+```
+
 ### API endpoints
 
 ```bash
