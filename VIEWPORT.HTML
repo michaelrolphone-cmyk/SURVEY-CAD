@@ -1930,9 +1930,6 @@
     if (quickMapEnabledInput) quickMapEnabledInput.checked = mapLayerState.enabled;
     if (mapLayerState.enabled) {
       ensureMapLayer();
-      if (points.size > 0) {
-        zoomExtents({ skipHistory: true, silent: true });
-      }
     }
     mapBackdrop.classList.toggle("on", mapLayerState.enabled);
     if (mapLayerState.enabled) {
