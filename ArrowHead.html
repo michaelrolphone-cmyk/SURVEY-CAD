@@ -159,24 +159,32 @@
     const { east, north } = latLonDeltaMeters(state.userLat, state.userLon, pointLat, pointLon);
     const up = (pointZFeet - state.userAltFeet) * FEET_TO_METERS;
 
-    const yaw = state.headingRad;
-    const pitch = state.pitchRad;
+    const horizontalDistance = Math.hypot(east, north);
+    if (horizontalDistance < 0.01) return null;
 
-    const x1 = east * Math.cos(yaw) - north * Math.sin(yaw);
-    const z1 = east * Math.sin(yaw) + north * Math.cos(yaw);
-    const y2 = up * Math.cos(pitch) - z1 * Math.sin(pitch);
-    const z2 = up * Math.sin(pitch) + z1 * Math.cos(pitch);
+    const targetBearingRad = Math.atan2(east, north);
+    const relativeBearingRad = normalizeRadians(targetBearingRad - state.headingRad);
+    const targetElevationRad = Math.atan2(up, horizontalDistance);
+    const relativeElevationRad = targetElevationRad - state.pitchRad;
 
-    if (z2 <= 0.5) return null;
+    const forwardDistance = Math.cos(relativeElevationRad) * horizontalDistance;
+    if (forwardDistance <= 0.5) return null;
 
     const w = canvas.width;
     const h = canvas.height;
-    const fov = 68 * Math.PI / 180;
-    const focal = (h * 0.5) / Math.tan(fov * 0.5);
+    const verticalFov = 68 * Math.PI / 180;
+    const horizontalFov = 2 * Math.atan((w / h) * Math.tan(verticalFov * 0.5));
+    const xFromBearing = (Math.tan(relativeBearingRad) / Math.tan(horizontalFov * 0.5)) * (w * 0.5);
+    const yFromElevation = (Math.tan(relativeElevationRad) / Math.tan(verticalFov * 0.5)) * (h * 0.5);
+
+    const cosRoll = Math.cos(state.rollRad);
+    const sinRoll = Math.sin(state.rollRad);
+    const xRotated = xFromBearing * cosRoll - yFromElevation * sinRoll;
+    const yRotated = xFromBearing * sinRoll + yFromElevation * cosRoll;
 
     return {
-      x: (w * 0.5) + (x1 * focal) / z2,
-      y: (h * 0.5) - (y2 * focal) / z2,
+      x: (w * 0.5) + xRotated,
+      y: (h * 0.5) - yRotated,
       distanceM: Math.hypot(east, north, up),
     };
   }

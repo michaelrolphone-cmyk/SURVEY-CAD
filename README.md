@@ -76,6 +76,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 
 - LineSmith writes handoff geometry into localStorage key `lineSmithArrowHeadImport`.
 - ArrowHead reads this payload and overlays LineSmith points/linework on a live camera feed.
+- ArrowHead now projects points from ENU deltas to camera screen space using relative bearing/elevation (plus roll compensation) so on-screen direction matches both the device heading and source survey geometry.
 - GPS + device orientation/motion sensors are used to place features in real space.
 - Point elevations with `z=0` are rendered using the phone-reported elevation at runtime.
 - XY-to-lat/lon conversion reuses the same LineSmith georeference transform used by LineSmith map alignment (`lat=ax*x+by*y+c`, `lng=ax*x+by*y+c`).
