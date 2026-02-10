@@ -39,6 +39,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
 (() => {
   const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
+  const PROJECT_LAST_DRAWING_STORAGE_PREFIX = 'surveyfoundryLastLineSmithDrawing';
   const FEET_TO_METERS = 0.3048006096012192;
   const METERS_TO_FEET = 1 / FEET_TO_METERS;
   const ON_TARGET_CENTER_FRACTION = 0.1;
@@ -115,6 +116,122 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     }
   }
 
+  function projectLastDrawingStorageKey(projectId) {
+    return `${PROJECT_LAST_DRAWING_STORAGE_PREFIX}:${projectId}`;
+  }
+
+  function loadLastOpenedProjectDrawing(projectId) {
+    if (!projectId) return '';
+    return String(localStorage.getItem(projectLastDrawingStorageKey(projectId)) || '').trim();
+  }
+
+  function loadStoredDrawingRecord(storageKey) {
+    if (!storageKey) return null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed && parsed.versions)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function deepClone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function applyStateDiff(base, diff) {
+    if (diff === undefined) return deepClone(base);
+    if (Array.isArray(diff)) {
+      const source = Array.isArray(base) ? base : [];
+      return diff.map((part, index) => applyStateDiff(source[index], part));
+    }
+    if (isPlainObject(diff)) {
+      if (diff.__deleted) return undefined;
+      const source = isPlainObject(base) ? base : {};
+      const out = {};
+      const keys = new Set(Object.keys(source).concat(Object.keys(diff)));
+      for (const key of keys) {
+        if (!(key in diff)) {
+          out[key] = deepClone(source[key]);
+          continue;
+        }
+        const merged = applyStateDiff(source[key], diff[key]);
+        if (merged !== undefined) out[key] = merged;
+      }
+      return out;
+    }
+    return deepClone(diff);
+  }
+
+  function materializeDrawingVersion(record, versionIndex = -1) {
+    if (!record || !Array.isArray(record.versions) || !record.versions.length) return null;
+    const targetIndex = versionIndex >= 0 ? Math.min(versionIndex, record.versions.length - 1) : record.versions.length - 1;
+    let state = deepClone(record.versions[0] && record.versions[0].baseState);
+    if (!state) return null;
+    for (let i = 1; i <= targetIndex; i += 1) {
+      state = applyStateDiff(state, record.versions[i] && record.versions[i].diffFromPrevious);
+    }
+    if (!state.mapGeoreference && record.latestMapGeoreference) {
+      state.mapGeoreference = deepClone(record.latestMapGeoreference);
+    }
+    return state;
+  }
+
+  function parsePayloadFromDrawingRecord(storageKey) {
+    const record = loadStoredDrawingRecord(storageKey);
+    if (!record) return null;
+    const drawingState = materializeDrawingVersion(record, -1);
+    if (!drawingState) return null;
+    const points = Array.isArray(drawingState.points) ? drawingState.points : [];
+    const lines = Array.isArray(drawingState.lines) ? drawingState.lines : [];
+    const georef = drawingState.mapGeoreference;
+    const hasGeoref = georef && georef.lat && georef.lng;
+    if (!points.length || !hasGeoref) return null;
+    return {
+      createdAt: new Date().toISOString(),
+      source: 'linesmith-last-opened-drawing',
+      points: points.map((point) => ({
+        id: point.id,
+        num: String(point.num == null ? '' : point.num),
+        x: Number(point.x),
+        y: Number(point.y),
+        z: Number(point.z),
+        code: String(point.code == null ? '' : point.code),
+        notes: String(point.notes == null ? '' : point.notes)
+      })),
+      lines: lines.map((line) => ({
+        id: line.id,
+        a: line.a,
+        b: line.b
+      })),
+      georeference: {
+        lat: { ax: Number(georef.lat.ax), by: Number(georef.lat.by), c: Number(georef.lat.c) },
+        lng: { ax: Number(georef.lng.ax), by: Number(georef.lng.by), c: Number(georef.lng.c) }
+      },
+      collabRoomId: ''
+    };
+  }
+
+  function tryLoadPayloadFromLastOpenedDrawing() {
+    const params = new URLSearchParams(window.location.search);
+    const activeProjectId = String(params.get('activeProjectId') || '').trim();
+    if (!activeProjectId) return false;
+    const storageKey = loadLastOpenedProjectDrawing(activeProjectId);
+    if (!storageKey) return false;
+    const payload = parsePayloadFromDrawingRecord(storageKey);
+    if (!payload) return false;
+    const payloadRaw = JSON.stringify(payload);
+    localStorage.setItem(ARROWHEAD_IMPORT_STORAGE_KEY, payloadRaw);
+    return refreshPayloadFromStorage({ raw: payloadRaw });
+  }
+
   function refreshPayloadFromStorage(options = {}) {
     const raw = typeof options.raw === 'string' ? options.raw : localStorage.getItem(ARROWHEAD_IMPORT_STORAGE_KEY);
     if (!raw) {
@@ -134,13 +251,13 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   }
 
   function loadPayload() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('source') !== 'linesmith') {
-      setStatus('Launch ArrowHead from LineSmith to import points and lines.', true);
-      return false;
+    if (refreshPayloadFromStorage()) return true;
+    if (tryLoadPayloadFromLastOpenedDrawing()) {
+      setStatus('Loaded last-opened LineSmith drawing for this active project.');
+      return true;
     }
-    if (!refreshPayloadFromStorage()) return false;
-    return true;
+    setStatus('No LineSmith payload found. Open LineSmith or launch ArrowHead with an active project that has a saved drawing.', true);
+    return false;
   }
 
   async function startCamera() {

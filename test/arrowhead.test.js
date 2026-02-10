@@ -6,6 +6,7 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   const html = await readFile(new URL('../ArrowHead.html', import.meta.url), 'utf8');
 
   assert.match(html, /const\s+ARROWHEAD_IMPORT_STORAGE_KEY\s*=\s*'lineSmithArrowHeadImport'/, 'ArrowHead should consume the LineSmith handoff storage key');
+  assert.match(html, /const\s+PROJECT_LAST_DRAWING_STORAGE_PREFIX\s*=\s*'surveyfoundryLastLineSmithDrawing'/, 'ArrowHead should know where LineSmith tracks the last-opened drawing key per project');
 
   assert.doesNotMatch(html, /\?\./, 'ArrowHead should avoid optional chaining so older Safari/iOS engines can parse the script');
   assert.doesNotMatch(html, /\.\.\./, 'ArrowHead should avoid object spread syntax for broader iOS Safari compatibility');
@@ -31,6 +32,12 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /setStatus\('Device orientation unavailable\. Mouse look enabled; drag to look around\.'/, 'ArrowHead should show a desktop fallback status message when enabling mouse look automatically');
   assert.match(html, /const\s+socket\s*=\s*new\s+WebSocket\(wsUrl\);/, 'ArrowHead should join the LineSmith collaboration websocket room');
   assert.match(html, /function\s+refreshPayloadFromStorage\(options\s*=\s*\{\}\)/, 'ArrowHead should support refreshing LineSmith payload updates while running');
+  assert.match(html, /function\s+tryLoadPayloadFromLastOpenedDrawing\(\)/, 'ArrowHead should support bootstrapping payloads from the active project\'s last-opened LineSmith drawing');
+  assert.match(html, /const\s+storageKey\s*=\s*loadLastOpenedProjectDrawing\(activeProjectId\);/, 'ArrowHead should resolve the last-opened drawing key by active project');
+  assert.match(html, /const\s+payload\s*=\s*parsePayloadFromDrawingRecord\(storageKey\);/, 'ArrowHead should convert saved LineSmith drawing history into an ArrowHead payload');
+  assert.match(html, /localStorage\.setItem\(ARROWHEAD_IMPORT_STORAGE_KEY, payloadRaw\);/, 'ArrowHead should persist reconstructed payloads so refresh watchers remain in sync');
+  assert.match(html, /if \(refreshPayloadFromStorage\(\)\) return true;[\s\S]*if \(tryLoadPayloadFromLastOpenedDrawing\(\)\)/, 'ArrowHead should prioritize live LineSmith handoff payloads and fall back to last-opened project drawings');
+  assert.doesNotMatch(html, /params\.get\('source'\) !== 'linesmith'/, 'ArrowHead should no longer require a strict LineSmith source query parameter to load geometry');
   assert.match(html, /window\.addEventListener\('storage',\s*\(event\)\s*=>\s*\{[\s\S]*event\.key\s*!==\s*ARROWHEAD_IMPORT_STORAGE_KEY/, 'ArrowHead should watch localStorage events for live LineSmith geometry updates');
   assert.match(html, /state\.payloadSyncIntervalId\s*=\s*window\.setInterval\(\(\)\s*=>\s*\{[\s\S]*refreshPayloadFromStorage\(\);[\s\S]*\},\s*1000\);/, 'ArrowHead should poll localStorage to pick up payload changes when storage events are unavailable');
   assert.match(html, /type:\s*'ar-presence'/, 'ArrowHead should publish AR user position and orientation to websocket peers');
