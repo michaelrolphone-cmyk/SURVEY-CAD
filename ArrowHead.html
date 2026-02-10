@@ -54,6 +54,7 @@
 <script type="module">
 import { deriveDevicePoseRadians, integrateGyroscopeHeadingRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
+import { createGuardedSensorHandler, safeSocketSend, toErrorMessage } from "./src/arrowhead-sensor-guard.js";
 import { computeForwardDistanceMeters, computeObserverElevationFeet, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
 
@@ -116,6 +117,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     mouseLookSensitivity: 0.003,
     pointElevationFallbackFeetById: new Map(),
     elevationRequestSequence: 0,
+    sensorEventErrorCount: 0,
   };
 
   function clamp(value, min, max) {
@@ -561,9 +563,10 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   function watchGeolocation() {
     let hasFreshFix = false;
+    const guardedApplyGeolocationPosition = createGuardedSensorHandler(applyGeolocationPosition, handleSensorEventError);
     const startWatch = (options) => navigator.geolocation.watchPosition((pos) => {
       hasFreshFix = true;
-      applyGeolocationPosition(pos);
+      guardedApplyGeolocationPosition(pos);
     }, (error) => {
       if (error && error.code === error.TIMEOUT && !hasFreshFix && options === GEOLOCATION_OPTIONS) {
         startWatch(GEOLOCATION_RELAXED_OPTIONS);
@@ -620,8 +623,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   }
 
   function sendArPresence() {
-    if (!state.collabSocket || state.collabSocket.readyState !== WebSocket.OPEN) return;
-    state.collabSocket.send(JSON.stringify({
+    safeSocketSend(state.collabSocket, JSON.stringify({
       type: 'ar-presence',
       presence: {
         x: Number(state.ownWorld && state.ownWorld.x),
@@ -634,6 +636,12 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
         rollRad: Number(state.rollRad),
       },
     }));
+  }
+
+  function handleSensorEventError(error) {
+    state.sensorEventErrorCount += 1;
+    const detail = toErrorMessage(error, 'Unexpected sensor event error.');
+    setStatus(`Sensor event recovered (${state.sensorEventErrorCount}): ${detail}`, true);
   }
 
   function currentScreenAngle() {
@@ -671,9 +679,11 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       sendArPresence();
     };
 
-    window.addEventListener('deviceorientationabsolute', applyOrientationEvent, true);
-    window.addEventListener('deviceorientation', applyOrientationEvent, true);
-    window.addEventListener('devicemotion', (event) => {
+    const guardedApplyOrientationEvent = createGuardedSensorHandler(applyOrientationEvent, handleSensorEventError);
+
+    window.addEventListener('deviceorientationabsolute', guardedApplyOrientationEvent, true);
+    window.addEventListener('deviceorientation', guardedApplyOrientationEvent, true);
+    window.addEventListener('devicemotion', createGuardedSensorHandler((event) => {
       // Subscribe so accelerometer/gyroscope streams are explicitly used by the app.
       if (!state.useGyroscopeHeading) return;
       const now = Date.now();
@@ -687,7 +697,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       state.gyroHeadingRawRad = integrateGyroscopeHeadingRadians(state.gyroHeadingRawRad, rotationRateAlpha, dtMs);
       state.headingRad = normalizeRadians(state.gyroHeadingRawRad + state.gyroHeadingOffsetRad);
       sendArPresence();
-    });
+    }, handleSensorEventError));
   }
 
   function attachMouseLookControls() {

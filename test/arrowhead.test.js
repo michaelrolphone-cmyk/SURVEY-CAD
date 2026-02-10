@@ -69,6 +69,11 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /latLngToWorldAffine\(/, 'ArrowHead should convert GPS lat\/lon into state-plane coordinates before publishing presence');
 
   assert.match(html, /import \{ computeForwardDistanceMeters, computeObserverElevationFeet, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet \} from "\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should import camera-space projection helpers from shared module code');
+  assert.match(html, /import \{ createGuardedSensorHandler, safeSocketSend, toErrorMessage \} from "\.\/src\/arrowhead-sensor-guard\.js";/, 'ArrowHead should import sensor event guard utilities for resilient handler execution');
+  assert.match(html, /function\s+handleSensorEventError\(error\)\s*\{[\s\S]*state\.sensorEventErrorCount\s*\+=\s*1;[\s\S]*toErrorMessage/, 'ArrowHead should track and surface recovered sensor handler exceptions for debugging');
+  assert.match(html, /const\s+guardedApplyOrientationEvent\s*=\s*createGuardedSensorHandler\(applyOrientationEvent, handleSensorEventError\);/, 'ArrowHead should guard orientation callbacks against runtime event exceptions');
+  assert.match(html, /window\.addEventListener\('devicemotion',\s*createGuardedSensorHandler\(\(event\)\s*=>\s*\{/, 'ArrowHead should guard motion callbacks against runtime event exceptions');
+  assert.match(html, /safeSocketSend\(state\.collabSocket, JSON\.stringify\(\{[\s\S]*type:\s*'ar-presence'/, 'ArrowHead should avoid throwing from websocket presence publishes during sensor updates');
   assert.match(html, /const\s+DEFAULT_OBSERVER_HEIGHT_OFFSET_FEET\s*=\s*3;/, 'ArrowHead should default the observer altitude to 3 feet above point elevation');
   assert.match(html, /const\s+OPEN_ELEVATION_ENDPOINT\s*=\s*'https:\/\/api\.open-meteo\.com\/v1\/elevation';/, 'ArrowHead should use an open elevation dataset endpoint for zero-elevation points');
   assert.match(html, /async\s+function\s+requestOpenElevationMeters\(points\)\s*\{[\s\S]*OPEN_ELEVATION_ENDPOINT[\s\S]*payload\.elevation/, 'ArrowHead should request fallback point elevations from the open dataset API');
