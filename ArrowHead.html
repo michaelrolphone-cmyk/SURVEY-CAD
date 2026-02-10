@@ -51,6 +51,7 @@
       <pre id="debugInfo" class="debug">Debug info will appear after sensors start.</pre>
     </div>
   </div>
+
 <script type="module">
 import { deriveDevicePoseRadians, integrateGyroscopeHeadingRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
@@ -776,7 +777,11 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
     const w = canvas.width;
     const h = canvas.height;
-    const verticalFov = 68 * Math.PI / 180;
+
+    // Updated vertical FOV – this is a common realistic value for mobile rear cameras
+    // You can try 58–72° depending on your device
+    const verticalFov = 62 * Math.PI / 180;
+
     const projection = projectEnuPointToScreen({
       eastMeters: east,
       northMeters: north,
@@ -788,7 +793,9 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       viewportHeightPx: h,
       verticalFovRad: verticalFov,
       nearClipMeters: 0.5,
+      // rollCompensationGain: 0.8,   // Uncomment and adjust (0.5–1.0) if roll feels too strong
     });
+
     if (!projection) return null;
 
     return {
@@ -956,7 +963,6 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       ctx.fillStyle = 'rgba(34,197,94,0.98)';
       ctx.font = `${Math.max(16, 14 * window.devicePixelRatio)}px Inter, system-ui, sans-serif`;
       ctx.fillText(onTargetLabel, onTargetPoint.x + ringRadius + 10, onTargetPoint.y + 6);
-
     }
 
     const headingSource = state.useGyroscopeHeading ? 'Gyro' : 'Mag';
