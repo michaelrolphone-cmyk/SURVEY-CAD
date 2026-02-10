@@ -44,7 +44,7 @@ export const APP_CATALOG = [
     name: 'ArrowHead',
     description: 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.',
     entryHtml: 'ArrowHead.html',
-    iconPath: '/assets/icons/arrowhead-ar.svg',
+    iconPath: '/assets/icons/Arrowhead.png',
     color: '#0F766E',
     accent: '#CCFBF1',
     glyph: 'AR',
