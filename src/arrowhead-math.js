@@ -48,3 +48,13 @@ export function deriveDevicePoseRadians(orientationEvent, screenOrientationAngle
     rollRad: (rollDeg * Math.PI) / 180,
   };
 }
+
+export function shouldApplyOrientationEvent(eventType, orientationEvent, hasAbsoluteLock = false) {
+  const explicitAbsoluteType = String(eventType || '').toLowerCase() === 'deviceorientationabsolute';
+  const absoluteFlag = orientationEvent && orientationEvent.absolute === true;
+  const webkitCompassHeading = Number(orientationEvent && orientationEvent.webkitCompassHeading);
+  const hasCompassHeading = Number.isFinite(webkitCompassHeading);
+  const isAbsoluteEvent = explicitAbsoluteType || absoluteFlag || hasCompassHeading;
+  if (!hasAbsoluteLock) return true;
+  return isAbsoluteEvent;
+}
