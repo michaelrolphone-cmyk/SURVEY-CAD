@@ -29,7 +29,9 @@
       <div id="status" class="status">Ready. Open from LineSmith to load overlay geometry.</div>
     </div>
   </div>
-<script>
+<script type="module">
+import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.js";
+
 (() => {
   const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
   const FEET_TO_METERS = 0.3048006096012192;
@@ -60,13 +62,6 @@
   function resize() {
     canvas.width = Math.max(1, Math.floor(window.innerWidth * window.devicePixelRatio));
     canvas.height = Math.max(1, Math.floor(window.innerHeight * window.devicePixelRatio));
-  }
-
-  function normalizeRadians(v) {
-    let value = v;
-    while (value > Math.PI) value -= Math.PI * 2;
-    while (value < -Math.PI) value += Math.PI * 2;
-    return value;
   }
 
   function worldToLatLng(x, y, georef) {
@@ -131,15 +126,26 @@
     }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 1000 });
   }
 
+  function currentScreenAngle() {
+    if (screen.orientation && Number.isFinite(Number(screen.orientation.angle))) {
+      return Number(screen.orientation.angle);
+    }
+    if (Number.isFinite(Number(window.orientation))) {
+      return Number(window.orientation);
+    }
+    return 0;
+  }
+
   function attachOrientationSensors() {
-    window.addEventListener('deviceorientation', (event) => {
-      const alpha = Number(event.alpha);
-      const beta = Number(event.beta);
-      const gamma = Number(event.gamma);
-      if (Number.isFinite(alpha)) state.headingRad = normalizeRadians(((360 - alpha) * Math.PI / 180) + state.headingOffsetRad);
-      if (Number.isFinite(beta)) state.pitchRad = (beta * Math.PI) / 180;
-      if (Number.isFinite(gamma)) state.rollRad = (gamma * Math.PI) / 180;
-    });
+    const applyOrientationEvent = (event) => {
+      const pose = deriveDevicePoseRadians(event, currentScreenAngle(), state.headingOffsetRad);
+      if (Number.isFinite(pose.headingRad)) state.headingRad = pose.headingRad;
+      state.pitchRad = pose.pitchRad;
+      state.rollRad = pose.rollRad;
+    };
+
+    window.addEventListener('deviceorientationabsolute', applyOrientationEvent, true);
+    window.addEventListener('deviceorientation', applyOrientationEvent, true);
     window.addEventListener('devicemotion', () => {
       // Subscribe so accelerometer/gyroscope streams are explicitly used by the app.
     });

@@ -1,0 +1,50 @@
+export function normalizeRadians(v) {
+  let value = Number(v);
+  if (!Number.isFinite(value)) return 0;
+  while (value > Math.PI) value -= Math.PI * 2;
+  while (value < -Math.PI) value += Math.PI * 2;
+  return value;
+}
+
+function resolveScreenAngleDegrees(screenOrientationAngle) {
+  const angle = Number(screenOrientationAngle);
+  if (!Number.isFinite(angle)) return 0;
+  const wrapped = ((angle % 360) + 360) % 360;
+  if (wrapped === 90 || wrapped === 180 || wrapped === 270) return wrapped;
+  return 0;
+}
+
+function resolveHeadingDegrees(orientationEvent) {
+  const compassHeading = Number(orientationEvent && orientationEvent.webkitCompassHeading);
+  if (Number.isFinite(compassHeading)) return compassHeading;
+  const alpha = Number(orientationEvent && orientationEvent.alpha);
+  if (Number.isFinite(alpha)) return 360 - alpha;
+  return NaN;
+}
+
+function resolveTiltDegrees(orientationEvent, screenOrientationAngle) {
+  const beta = Number(orientationEvent && orientationEvent.beta);
+  const gamma = Number(orientationEvent && orientationEvent.gamma);
+  const safeBeta = Number.isFinite(beta) ? beta : 0;
+  const safeGamma = Number.isFinite(gamma) ? gamma : 0;
+  const angle = resolveScreenAngleDegrees(screenOrientationAngle);
+
+  if (angle === 90) return { pitchDeg: safeGamma, rollDeg: -safeBeta };
+  if (angle === 270) return { pitchDeg: -safeGamma, rollDeg: safeBeta };
+  if (angle === 180) return { pitchDeg: -safeBeta, rollDeg: -safeGamma };
+  return { pitchDeg: safeBeta, rollDeg: safeGamma };
+}
+
+export function deriveDevicePoseRadians(orientationEvent, screenOrientationAngle = 0, headingOffsetRad = 0) {
+  const headingDeg = resolveHeadingDegrees(orientationEvent);
+  const { pitchDeg, rollDeg } = resolveTiltDegrees(orientationEvent, screenOrientationAngle);
+  const headingRad = Number.isFinite(headingDeg)
+    ? normalizeRadians((headingDeg * Math.PI / 180) + headingOffsetRad)
+    : NaN;
+
+  return {
+    headingRad,
+    pitchRad: (pitchDeg * Math.PI) / 180,
+    rollRad: (rollDeg * Math.PI) / 180,
+  };
+}
