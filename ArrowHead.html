@@ -325,8 +325,26 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   async function requestOrientationPermissionIfNeeded() {
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
       const result = await DeviceOrientationEvent.requestPermission();
-      if (result !== 'granted') throw new Error('Device orientation permission denied.');
+      return result === 'granted';
     }
+    return true;
+  }
+
+  async function requestMotionPermissionIfNeeded() {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const result = await DeviceMotionEvent.requestPermission();
+      return result === 'granted';
+    }
+    return true;
+  }
+
+  function enableMouseLookFallback(message) {
+    state.useMouseLook = true;
+    state.mouseLookActive = false;
+    state.mouseLookPointerId = null;
+    const mouseLookButton = document.getElementById('useMouseLook');
+    if (mouseLookButton) mouseLookButton.textContent = 'Use Mouse Look: On';
+    setStatus(message);
   }
 
   function watchGeolocation() {
@@ -689,12 +707,17 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     startPayloadSyncWatchers();
 
     try {
-      await requestOrientationPermissionIfNeeded();
       await startCamera();
+      const orientationPermissionGranted = await requestOrientationPermissionIfNeeded();
+      const motionPermissionGranted = await requestMotionPermissionIfNeeded();
       watchGeolocation();
       attachOrientationSensors();
       connectCollaboration();
       state.started = true;
+      if (!orientationPermissionGranted || !motionPermissionGranted) {
+        enableMouseLookFallback('Camera + GPS enabled. iOS sensor access denied, so mouse look is enabled as a fallback.');
+        return;
+      }
       setStatus('Sensors enabled. Move your phone to align geometry with the field view.');
     } catch (error) {
       const errorMessage = error && error.message ? error.message : 'Could not start ArrowHead AR.';
