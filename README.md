@@ -78,6 +78,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead reads this payload and overlays LineSmith points/linework on a live camera feed.
 - ArrowHead now projects points from ENU deltas to camera screen space using relative bearing/elevation (plus roll compensation) so on-screen direction matches both the device heading and source survey geometry.
 - ArrowHead now prefers iOS Safari `webkitCompassHeading` (with `deviceorientationabsolute` fallback) and remaps pitch/roll by current screen orientation so overlays track correctly as you turn/tilt the phone instead of sticking to screen center.
+- ArrowHead now locks onto absolute heading streams (compass/`deviceorientationabsolute`) once detected so fallback relative-orientation events cannot overwrite heading with north-locked values when you turn your body.
 - ArrowHead avoids modern-only JavaScript syntax (optional chaining/object spread) so iOS 13 Safari/WebKit can parse and run the AR overlay without reducing AR feature behavior.
 - ArrowHead now marks points as **On target** when they land inside the center 10% of the camera feed, drawing a green circle around the point and overlaying live distance-to-point guidance in meters and feet.
 - GPS + device orientation/motion sensors are used to place features in real space.

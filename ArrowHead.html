@@ -31,6 +31,7 @@
   </div>
 <script type="module">
 import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.js";
+import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
 import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
 
@@ -60,6 +61,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     remoteCursors: new Map(),
     remotePresence: new Map(),
     ownWorld: null,
+    hasAbsoluteHeadingLock: false,
   };
 
   function setStatus(message, warn = false) {
@@ -210,6 +212,12 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   function attachOrientationSensors() {
     const applyOrientationEvent = (event) => {
+      if (!shouldApplyOrientationEvent(event.type, event, state.hasAbsoluteHeadingLock)) return;
+      const isAbsoluteEvent =
+        String(event.type || '').toLowerCase() === 'deviceorientationabsolute'
+        || event.absolute === true
+        || Number.isFinite(Number(event.webkitCompassHeading));
+      if (isAbsoluteEvent) state.hasAbsoluteHeadingLock = true;
       const pose = deriveDevicePoseRadians(event, currentScreenAngle(), state.headingOffsetRad);
       if (Number.isFinite(pose.headingRad)) state.headingRad = pose.headingRad;
       state.pitchRad = pose.pitchRad;
