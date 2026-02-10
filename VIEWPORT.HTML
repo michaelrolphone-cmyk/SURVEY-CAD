@@ -2199,7 +2199,49 @@
       if (now - presence.at > expiryMs) {
         collab.remoteArPresence.delete(clientId);
         removeMapArPresence(clientId);
+        continue;
       }
+
+      const x = Number(presence.x);
+      const y = Number(presence.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const sp = worldToScreen(x, y);
+      const headingRad = Number(presence.headingRad) || 0;
+      const coneLength = 28;
+      const halfAngle = 0.33;
+      const leftHeading = headingRad - halfAngle;
+      const rightHeading = headingRad + halfAngle;
+      const leftX = sp.x + Math.sin(leftHeading) * coneLength;
+      const leftY = sp.y - Math.cos(leftHeading) * coneLength;
+      const rightX = sp.x + Math.sin(rightHeading) * coneLength;
+      const rightY = sp.y - Math.cos(rightHeading) * coneLength;
+
+      ctx.save();
+      ctx.fillStyle = presence.color || "#f97316";
+      ctx.strokeStyle = presence.color || "#f97316";
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y);
+      ctx.lineTo(leftX, leftY);
+      ctx.lineTo(rightX, rightY);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y);
+      ctx.lineTo(leftX, leftY);
+      ctx.lineTo(rightX, rightY);
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(clientId.slice(0, 6), sp.x + 8, sp.y - 8);
+      ctx.restore();
     }
 
     if (!collab.remoteCursors.size) return;

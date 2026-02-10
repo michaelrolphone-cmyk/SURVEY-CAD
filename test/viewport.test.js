@@ -389,12 +389,13 @@ test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch 
   assert.match(html, /if \(message\.type === "state" && message\.state\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'remote collaboration state restores should not overwrite local user view pan/zoom');
 });
 
-test('VIEWPORT.HTML renders ArrowHead collaborator position on map with directional cone', async () => {
+test('VIEWPORT.HTML renders ArrowHead collaborator position on map and canvas with directional cone', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /if \(message\.type === "ar-presence" && message\.presence\) \{[\s\S]*upsertMapArPresence\(message\.clientId, presence\);/, 'LineSmith should ingest ArrowHead presence updates from collaboration websocket messages');
   assert.match(html, /const\s+cone\s*=\s*L\.polygon\(\[\],/, 'LineSmith map should create a polygon cone graphic for ArrowHead viewing direction');
   assert.match(html, /entry\.cone\.setLatLngs\(\[\[presence\.lat, presence\.lon\], \[leftLat, leftLon\], \[rightLat, rightLon\]\]\);/, 'LineSmith should update triangle cone geometry to visualize ArrowHead heading on map');
+  assert.match(html, /for \(const \[clientId, presence\] of collab\.remoteArPresence\.entries\(\)\) \{[\s\S]*const\s+sp\s*=\s*worldToScreen\(x, y\);[\s\S]*ctx\.beginPath\(\);[\s\S]*ctx\.arc\(sp\.x, sp\.y, 4, 0, Math\.PI \* 2\);/, 'LineSmith should draw ArrowHead collaborator markers on the LineSmith canvas even when map tiles are hidden');
 });
 
 test('VIEWPORT.HTML provides ArrowHead AR launch handoff with LineSmith geometry payload', async () => {
