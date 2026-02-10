@@ -6,6 +6,16 @@ export function resolvePointElevationFeet(pointZFeet, deviceElevationFeet) {
   return z;
 }
 
+export function computeObserverElevationFeet(deviceElevationFeet, baselinePointElevationFeet, offsetFeet = 3) {
+  const device = Number(deviceElevationFeet);
+  if (Number.isFinite(device)) return device + (Number(offsetFeet) || 0);
+
+  const baseline = Number(baselinePointElevationFeet);
+  if (Number.isFinite(baseline)) return baseline + (Number(offsetFeet) || 0);
+
+  return Number(offsetFeet) || 0;
+}
+
 export function computeRelativeBearingRad(targetBearingRad, headingRad) {
   return normalizeRadians(targetBearingRad - headingRad);
 }

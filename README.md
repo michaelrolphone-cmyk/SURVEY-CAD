@@ -103,7 +103,8 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead geolocation acquisition now uses a longer high-accuracy timeout plus an automatic relaxed watch fallback so iOS 13.6 devices can keep streaming GPS fixes (and LineSmith AR presence) even when the initial precise watch times out before a first fix.
 - ArrowHead now marks points as **On target** when they land inside the center 10% of the camera feed, drawing a green circle around the point and overlaying live distance-to-point guidance in meters and feet.
 - GPS + device orientation/motion sensors are used to place features in real space.
-- Point elevations with missing/invalid `z` values (including `z=0`) are rendered using the phone-reported elevation at runtime so horizontal spacing is not distorted by zero-altitude assumptions.
+- Point elevations with missing/invalid `z` values (including `z=0`) are now backfilled from the open dataset endpoint `https://api.open-meteo.com/v1/elevation`; if the fetch fails ArrowHead falls back to the current observer altitude.
+- Observer altitude now uses live GPS elevation in world space with a default +3.0 ft eye-height offset (`raw altitude + 3 ft`) so users can look down on points when standing above them.
 - AR horizontal bearing projection uses target-minus-heading handedness so overlays counter-rotate correctly as you pan left/right.
 - ArrowHead now derives forward visibility from the magnetometer-driven heading delta (`cos(relativeBearing)`), so points behind you (for example south while facing north) are culled instead of remaining centered in view.
 - XY-to-lat/lon conversion reuses the same LineSmith georeference transform used by LineSmith map alignment (`lat=ax*x+by*y+c`, `lng=ax*x+by*y+c`).
@@ -116,6 +117,9 @@ open "http://localhost:3000/ArrowHead.html?source=linesmith"
 
 # Launch directly with active project fallback to last-opened LineSmith drawing
 open "http://localhost:3000/ArrowHead.html?activeProjectId=project-123&activeProjectName=Demo%20Project"
+
+# Open elevation dataset call used for zero-elevation point fallback
+curl "https://api.open-meteo.com/v1/elevation?latitude=43.615&longitude=-116.202"
 ```
 
 AR heading controls after launch:

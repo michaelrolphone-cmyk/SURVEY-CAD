@@ -36,9 +36,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /window\.addEventListener\('deviceorientationabsolute'/, 'ArrowHead should subscribe to absolute orientation updates when available');
   assert.match(html, /window\.addEventListener\('deviceorientation'/, 'ArrowHead should subscribe to orientation sensor updates');
   assert.match(html, /window\.addEventListener\('devicemotion'/, 'ArrowHead should subscribe to motion sensor updates');
-  assert.match(html, /resolvePointElevationFeet\(p\.z, state\.userAltFeet\)/, 'ArrowHead should replace missing or zero point elevations with current phone elevation');
+  assert.match(html, /const\s+zFeet\s*=\s*resolvePayloadPointElevationFeet\(p\);/, 'ArrowHead should resolve point elevation through open-dataset fallback before rendering');
   assert.match(html, /import\s+\{\s*deriveDevicePoseRadians,\s*integrateGyroscopeHeadingRadians,\s*normalizeRadians\s*\}\s+from\s+"\.\/src\/arrowhead-math\.js";/, 'ArrowHead should use shared orientation math helpers, including gyroscope heading integration');
-  assert.match(html, /import\s+\{\s*computeForwardDistanceMeters,\s*computeRelativeBearingRad,\s*projectEnuPointToScreen,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
+  assert.match(html, /import\s+\{\s*computeForwardDistanceMeters,\s*computeObserverElevationFeet,\s*computeRelativeBearingRad,\s*projectEnuPointToScreen,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
   assert.match(html, /import\s+\{\s*latLngToWorldAffine,\s*worldToLatLngAffine\s*\}\s+from\s+"\.\/src\/georeference-transform\.js";/, 'ArrowHead should use shared georeference helpers for bidirectional coordinate projection');
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
   assert.match(html, /<button id="useGyro">Use Gyroscope Heading: Off<\/button>/, 'ArrowHead should expose a gyroscope heading mode toggle button');
@@ -68,7 +68,12 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /worldToLatLngAffine\(/, 'ArrowHead should project LineSmith world coordinates to lat\/lon for AR cursor overlays');
   assert.match(html, /latLngToWorldAffine\(/, 'ArrowHead should convert GPS lat\/lon into state-plane coordinates before publishing presence');
 
-  assert.match(html, /import \{ computeForwardDistanceMeters, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet \} from "\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should import camera-space projection helpers from shared module code');
+  assert.match(html, /import \{ computeForwardDistanceMeters, computeObserverElevationFeet, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet \} from "\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should import camera-space projection helpers from shared module code');
+  assert.match(html, /const\s+DEFAULT_OBSERVER_HEIGHT_OFFSET_FEET\s*=\s*3;/, 'ArrowHead should default the observer altitude to 3 feet above point elevation');
+  assert.match(html, /const\s+OPEN_ELEVATION_ENDPOINT\s*=\s*'https:\/\/api\.open-meteo\.com\/v1\/elevation';/, 'ArrowHead should use an open elevation dataset endpoint for zero-elevation points');
+  assert.match(html, /async\s+function\s+requestOpenElevationMeters\(points\)\s*\{[\s\S]*OPEN_ELEVATION_ENDPOINT[\s\S]*payload\.elevation/, 'ArrowHead should request fallback point elevations from the open dataset API');
+  assert.match(html, /function\s+resolvePayloadPointElevationFeet\(point\)\s*\{[\s\S]*state\.pointElevationFallbackFeetById[\s\S]*resolvePointElevationFeet/, 'ArrowHead should resolve zero-elevation points using fetched fallback elevations');
+  assert.match(html, /state\.userAltFeet\s*=\s*computeObserverElevationFeet\(state\.rawUserAltFeet, baselinePointElevationFeet, DEFAULT_OBSERVER_HEIGHT_OFFSET_FEET\);/, 'ArrowHead should place the observer in world space using GPS altitude plus the default 3-foot offset');
   assert.match(html, /const\s+projection\s*=\s*projectEnuPointToScreen\(\{[\s\S]*nearClipMeters:\s*0\.5,[\s\S]*\}\);/, 'ArrowHead should project ENU deltas through camera-space yaw/pitch/roll with near-plane clipping');
   assert.match(html, /if \(!projection\) return null;/, 'ArrowHead should cull points that land behind or too close to the camera after orientation transforms');
   assert.match(html, /const\s+ON_TARGET_CENTER_FRACTION\s*=\s*0\.1;/, 'ArrowHead should define a center-target fraction matching the middle 10% of the feed');
