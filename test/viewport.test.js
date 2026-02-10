@@ -10,6 +10,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/font-awesome\//, 'LineSmith should load a font icon set for quick toolbar buttons');
   assert.match(html, /id="quickTools"\s+class="quickTools"/, 'canvas should render a quick tools toolbar at the top of the drawing window');
   assert.match(html, /id="quickSave"[\s\S]*fa-floppy-disk/, 'quick toolbar should include Save icon shortcut');
+  assert.match(html, /id="quickOpenArrowHead"[\s\S]*fa-vr-cardboard/, 'quick toolbar should include Open ArrowHead shortcut');
   assert.match(html, /id="quickMapLayerEnabled"\s+type="checkbox"/, 'quick toolbar should include map layer toggle');
   assert.match(html, /<div class="quickToolField" title="Map tiles">\s*<select id="quickMapTileType"/, 'quick toolbar should include unlabeled inline map tile type dropdown');
   assert.doesNotMatch(html, /title="Map tiles">\s*Tiles\s*</, 'quick toolbar map tile selector should not include a redundant Tiles text label');
@@ -32,6 +33,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /function\s+startLineByPointsFromToolbar\(\)\s*\{[\s\S]*if \(selectedPointIds\.length >= 2\) \{[\s\S]*runLineBetweenSelectedPoints\(\{ returnToSelectionTool: true \}\);[\s\S]*setTool\("line2pt"\);/, 'quick Line by Points should run line-between-selected when points are preselected and otherwise enter two-point draw mode');
   assert.match(html, /async\s+function\s+runLineBetweenSelectedPoints\(\{ returnToSelectionTool = false \} = \{\}\)[\s\S]*if \(returnToSelectionTool\) setTool\("select"\);/, 'line-between-selected workflow should optionally return to selection tool after completion');
   assert.match(html, /\$\("#quickSave"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#saveDrawingToProject"\)\.click\(\)\)/, 'quick Save should trigger the existing save drawing workflow');
+  assert.match(html, /\$\("#quickOpenArrowHead"\)\?\.addEventListener\("click",\s*openArrowHeadFromLineSmith\)/, 'quick Open ArrowHead should trigger existing ArrowHead handoff workflow');
   assert.match(html, /\$\("#quickExtend"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#extendToIntersect"\)\.click\(\)\)/, 'quick Extend should delegate to existing extend action');
   assert.match(html, /\$\("#quickTrimIntersect"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#trimToIntersect"\)\.click\(\)\)/, 'quick Trim\/Intersect should delegate to existing trim action');
   assert.match(html, /\$\("#quickOffsetLine"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#offsetSelectedLine"\)\?\.click\(\)\)/, 'quick Offset should delegate to existing offset selected line action');
@@ -401,6 +403,9 @@ test('VIEWPORT.HTML provides ArrowHead AR launch handoff with LineSmith geometry
   assert.match(html, /const\s+ARROWHEAD_IMPORT_STORAGE_KEY\s*=\s*"lineSmithArrowHeadImport"/, 'LineSmith should define a stable localStorage key for ArrowHead handoff payloads');
   assert.match(html, /id="openArrowHead"[^>]*>Open ArrowHead AR<\/button>/, 'LineSmith UI should provide an Open ArrowHead AR action');
   assert.match(html, /function\s+buildArrowHeadPayload\(\)/, 'LineSmith should build a payload containing points, lines, and georeference data');
+  assert.match(html, /function\s+ensureArrowHeadLaunchDrawing\(\)/, 'LineSmith should resolve a launch drawing before opening ArrowHead');
+  assert.match(html, /if \(activeProjectId\) \{[\s\S]*loadLastOpenedProjectDrawing\(activeProjectId\)/, 'LineSmith should try opening the project last-opened drawing before launching ArrowHead');
+  assert.match(html, /return\s+isCollabSocketConnected\(\);/, 'LineSmith should allow ArrowHead launch when collaboration socket is connected as another live viewport');
   assert.match(html, /collabRoomId:\s*resolveCollabRoomId\(\)/, 'LineSmith should include the collaboration room in ArrowHead handoff payload so both apps join the same websocket room');
   assert.match(html, /localStorage\.setItem\(ARROWHEAD_IMPORT_STORAGE_KEY,\s*payloadJson\)/, 'LineSmith should persist ArrowHead handoff payload before navigation');
   assert.match(html, /const\s+targetPath\s*=\s*`\/ArrowHead\.html\?\$\{targetParams\.toString\(\)\}`;/, 'LineSmith should launch ArrowHead with launcher-aware query parameters');
