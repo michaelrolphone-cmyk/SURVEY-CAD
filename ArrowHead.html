@@ -54,7 +54,7 @@
 <script type="module">
 import { deriveDevicePoseRadians, integrateGyroscopeHeadingRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
-import { computeForwardDistanceMeters, computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
+import { computeForwardDistanceMeters, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
 
 (() => {
@@ -665,29 +665,26 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     const horizontalDistance = Math.hypot(east, north);
     if (horizontalDistance < 0.01) return null;
 
-    const targetBearingRad = Math.atan2(east, north);
-    const relativeBearingRad = computeRelativeBearingRad(targetBearingRad, state.headingRad);
-    const targetElevationRad = Math.atan2(up, horizontalDistance);
-    const relativeElevationRad = targetElevationRad - state.pitchRad;
-
-    const forwardDistance = computeForwardDistanceMeters(horizontalDistance, relativeBearingRad);
-    if (forwardDistance <= 0.5) return null;
-
     const w = canvas.width;
     const h = canvas.height;
     const verticalFov = 68 * Math.PI / 180;
-    const horizontalFov = 2 * Math.atan((w / h) * Math.tan(verticalFov * 0.5));
-    const xFromBearing = (Math.tan(relativeBearingRad) / Math.tan(horizontalFov * 0.5)) * (w * 0.5);
-    const yFromElevation = (Math.tan(relativeElevationRad) / Math.tan(verticalFov * 0.5)) * (h * 0.5);
-
-    const cosRoll = Math.cos(state.rollRad);
-    const sinRoll = Math.sin(state.rollRad);
-    const xRotated = xFromBearing * cosRoll - yFromElevation * sinRoll;
-    const yRotated = xFromBearing * sinRoll + yFromElevation * cosRoll;
+    const projection = projectEnuPointToScreen({
+      eastMeters: east,
+      northMeters: north,
+      upMeters: up,
+      headingRad: state.headingRad,
+      pitchRad: state.pitchRad,
+      rollRad: state.rollRad,
+      viewportWidthPx: w,
+      viewportHeightPx: h,
+      verticalFovRad: verticalFov,
+      nearClipMeters: 0.5,
+    });
+    if (!projection) return null;
 
     return {
-      x: (w * 0.5) + xRotated,
-      y: (h * 0.5) - yRotated,
+      x: projection.x,
+      y: projection.y,
       distanceM: Math.hypot(east, north, up),
     };
   }
