@@ -37,6 +37,7 @@ export function projectEnuPointToScreen(options) {
   const height = Number(options && options.viewportHeightPx);
   const verticalFov = Number(options && options.verticalFovRad);
   const nearClip = Number(options && options.nearClipMeters);
+  const rollCompensationGain = Number(options && options.rollCompensationGain);
 
   if (!Number.isFinite(east) || !Number.isFinite(north) || !Number.isFinite(up)) return null;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
@@ -45,9 +46,11 @@ export function projectEnuPointToScreen(options) {
   const clipDistance = Number.isFinite(nearClip) && nearClip > 0 ? nearClip : 0.5;
   const safeHeading = Number.isFinite(heading) ? heading : 0;
   const safePitch = Number.isFinite(pitch) ? pitch : 0;
-  // Device roll must be inverted when rotating world coordinates into camera space,
-  // otherwise overlays visually counter-rotate against the camera feed.
-  const safeRoll = Number.isFinite(roll) ? -roll : 0;
+  // Device roll is inverted when rotating world coordinates into camera space.
+  // Apply a conservative gain to avoid over-rotating overlays on hardware where
+  // DeviceOrientation roll reports are more aggressive than the live camera image.
+  const safeRollGain = Number.isFinite(rollCompensationGain) ? rollCompensationGain : 0.7;
+  const safeRoll = Number.isFinite(roll) ? -(roll * safeRollGain) : 0;
 
   const cosHeading = Math.cos(safeHeading);
   const sinHeading = Math.sin(safeHeading);
