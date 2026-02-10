@@ -82,6 +82,8 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - While both apps are open, LineSmith now re-syncs that handoff payload every second (and whenever ArrowHead is opened), and ArrowHead listens for storage updates plus a 1s fallback poll so moved points/edited lines update live in AR without a relaunch.
 - ArrowHead collaborator locations are now drawn directly on the LineSmith canvas (with heading cone) even when the LineSmith map layer is turned off.
 - ArrowHead now projects points from ENU deltas to camera screen space using relative bearing/elevation (plus roll compensation) so on-screen direction matches both the device heading and source survey geometry.
+- ArrowHead now computes relative bearing with target-minus-heading handedness so world points rotate opposite your body turns (staying anchored in space), matching an around-the-user sphere projection model.
+- ArrowHead now normalizes pitch against the horizon across portrait/landscape orientations (instead of raw beta/gamma tilt) so points render near eye level when you hold the phone upright.
 - ArrowHead now prefers iOS Safari `webkitCompassHeading` (with `deviceorientationabsolute` fallback) and remaps pitch/roll by current screen orientation so overlays track correctly as you turn/tilt the phone instead of sticking to screen center.
 - ArrowHead now locks onto absolute heading streams (compass/`deviceorientationabsolute`) once detected so fallback relative-orientation events cannot overwrite heading with north-locked values when you turn your body.
 - ArrowHead now defaults to magnetometer heading but includes a **Use Gyroscope Heading** toggle; when enabled, heading is integrated from gyroscope `rotationRate.alpha` and can be calibrated to true north with the **Center** button while the phone is level and facing north.
@@ -100,7 +102,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - ArrowHead now marks points as **On target** when they land inside the center 10% of the camera feed, drawing a green circle around the point and overlaying live distance-to-point guidance in meters and feet.
 - GPS + device orientation/motion sensors are used to place features in real space.
 - Point elevations with missing/invalid `z` values (including `z=0`) are rendered using the phone-reported elevation at runtime so horizontal spacing is not distorted by zero-altitude assumptions.
-- AR horizontal bearing projection uses heading-minus-target handedness so overlays move in the expected direction when panning left/right.
+- AR horizontal bearing projection uses target-minus-heading handedness so overlays counter-rotate correctly as you pan left/right.
 - ArrowHead now derives forward visibility from the magnetometer-driven heading delta (`cos(relativeBearing)`), so points behind you (for example south while facing north) are culled instead of remaining centered in view.
 - XY-to-lat/lon conversion reuses the same LineSmith georeference transform used by LineSmith map alignment (`lat=ax*x+by*y+c`, `lng=ax*x+by*y+c`).
 

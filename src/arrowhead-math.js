@@ -29,10 +29,29 @@ function resolveTiltDegrees(orientationEvent, screenOrientationAngle) {
   const safeGamma = Number.isFinite(gamma) ? gamma : 0;
   const angle = resolveScreenAngleDegrees(screenOrientationAngle);
 
-  if (angle === 90) return { pitchDeg: safeGamma, rollDeg: -safeBeta };
-  if (angle === 270) return { pitchDeg: -safeGamma, rollDeg: safeBeta };
-  if (angle === 180) return { pitchDeg: -safeBeta, rollDeg: -safeGamma };
-  return { pitchDeg: safeBeta, rollDeg: safeGamma };
+  const pitchLimitDeg = 89;
+  if (angle === 90) {
+    return {
+      pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, safeGamma + 90)),
+      rollDeg: -safeBeta,
+    };
+  }
+  if (angle === 270) {
+    return {
+      pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, 90 - safeGamma)),
+      rollDeg: safeBeta,
+    };
+  }
+  if (angle === 180) {
+    return {
+      pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, 90 - safeBeta)),
+      rollDeg: -safeGamma,
+    };
+  }
+  return {
+    pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, safeBeta - 90)),
+    rollDeg: safeGamma,
+  };
 }
 
 export function deriveDevicePoseRadians(orientationEvent, screenOrientationAngle = 0, headingOffsetRad = 0) {

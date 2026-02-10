@@ -9,11 +9,11 @@ test('resolvePointElevationFeet falls back to device elevation for zero, missing
   assert.equal(resolvePointElevationFeet(5198.5, 5234.25), 5198.5);
 });
 
-test('computeRelativeBearingRad uses heading-target handedness so camera pan direction is correct', () => {
+test('computeRelativeBearingRad uses target-heading handedness so world geometry rotates against head turns', () => {
   const headingNorth = 0;
   const targetEast = Math.PI / 2;
   const relative = computeRelativeBearingRad(targetEast, headingNorth);
-  assert.ok(relative < 0, 'east target should project left when user is facing north and has panned left');
+  assert.ok(relative > 0, 'east target should project to the right when user is facing north');
 
   const wrapped = computeRelativeBearingRad(-Math.PI + 0.1, Math.PI - 0.1);
   assert.ok(Math.abs(Math.abs(wrapped) - 0.2) < 1e-10, 'relative bearing should normalize across +/-PI wraparound');
