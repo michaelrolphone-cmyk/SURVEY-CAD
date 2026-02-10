@@ -14,17 +14,21 @@ function resolveScreenAngleDegrees(screenOrientationAngle) {
   return 0;
 }
 
+function readFiniteSensorNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : NaN;
+}
+
 function resolveHeadingDegrees(orientationEvent) {
-  const compassHeading = Number(orientationEvent && orientationEvent.webkitCompassHeading);
+  const compassHeading = readFiniteSensorNumber(orientationEvent && orientationEvent.webkitCompassHeading);
   if (Number.isFinite(compassHeading)) return compassHeading;
-  const alpha = Number(orientationEvent && orientationEvent.alpha);
+  const alpha = readFiniteSensorNumber(orientationEvent && orientationEvent.alpha);
   if (Number.isFinite(alpha)) return 360 - alpha;
   return NaN;
 }
 
 function resolveTiltDegrees(orientationEvent, screenOrientationAngle) {
-  const beta = Number(orientationEvent && orientationEvent.beta);
-  const gamma = Number(orientationEvent && orientationEvent.gamma);
+  const beta = readFiniteSensorNumber(orientationEvent && orientationEvent.beta);
+  const gamma = readFiniteSensorNumber(orientationEvent && orientationEvent.gamma);
   const safeBeta = Number.isFinite(beta) ? beta : 0;
   const safeGamma = Number.isFinite(gamma) ? gamma : 0;
   const angle = resolveScreenAngleDegrees(screenOrientationAngle);
@@ -78,7 +82,7 @@ export function shouldApplyOrientationEvent(
 ) {
   const explicitAbsoluteType = String(eventType || '').toLowerCase() === 'deviceorientationabsolute';
   const absoluteFlag = orientationEvent && orientationEvent.absolute === true;
-  const webkitCompassHeading = Number(orientationEvent && orientationEvent.webkitCompassHeading);
+  const webkitCompassHeading = readFiniteSensorNumber(orientationEvent && orientationEvent.webkitCompassHeading);
   const hasCompassHeading = Number.isFinite(webkitCompassHeading);
   const isAbsoluteEvent = explicitAbsoluteType || absoluteFlag || hasCompassHeading;
   if (!hasAbsoluteLock) return true;

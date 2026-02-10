@@ -42,6 +42,12 @@ test('deriveDevicePoseRadians returns NaN heading when heading data is unavailab
   assert.ok(Number.isNaN(pose.headingRad));
 });
 
+test('deriveDevicePoseRadians ignores null compass heading and uses alpha updates', () => {
+  const pose = deriveDevicePoseRadians({ webkitCompassHeading: null, alpha: 45, beta: 90, gamma: 0 }, 0, 0);
+  assert.ok(Number.isFinite(pose.headingRad));
+  assert.ok(Math.abs(pose.headingRad - normalizeRadians((360 - 45) * Math.PI / 180)) < 1e-10);
+});
+
 test('shouldApplyOrientationEvent prefers absolute heading updates after absolute lock', () => {
   assert.equal(shouldApplyOrientationEvent('deviceorientation', { alpha: 130, absolute: false }, false), true);
   assert.equal(shouldApplyOrientationEvent('deviceorientationabsolute', { alpha: 130, absolute: true }, false), true);
@@ -63,6 +69,18 @@ test('shouldApplyOrientationEvent falls back to relative events when absolute st
 
   assert.equal(
     shouldApplyOrientationEvent('deviceorientation', { alpha: 130, absolute: false }, true, lastAbsoluteEventAtMs, staleNowMs, 1_500),
+    true,
+  );
+});
+
+test('shouldApplyOrientationEvent does not treat null compass heading as absolute data', () => {
+  assert.equal(
+    shouldApplyOrientationEvent('deviceorientation', { webkitCompassHeading: null, absolute: false, alpha: 130 }, true, 1_000, 1_200, 1_500),
+    false,
+  );
+
+  assert.equal(
+    shouldApplyOrientationEvent('deviceorientation', { webkitCompassHeading: null, absolute: false, alpha: 130 }, true, 1_000, 3_000, 1_500),
     true,
   );
 });
