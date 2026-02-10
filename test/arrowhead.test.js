@@ -7,6 +7,8 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
 
   assert.match(html, /const\s+ARROWHEAD_IMPORT_STORAGE_KEY\s*=\s*'lineSmithArrowHeadImport'/, 'ArrowHead should consume the LineSmith handoff storage key');
   assert.match(html, /const\s+PROJECT_LAST_DRAWING_STORAGE_PREFIX\s*=\s*'surveyfoundryLastLineSmithDrawing'/, 'ArrowHead should know where LineSmith tracks the last-opened drawing key per project');
+  assert.match(html, /\.app\s*\{[\s\S]*position:\s*fixed;[\s\S]*top:\s*0;[\s\S]*right:\s*0;[\s\S]*bottom:\s*0;[\s\S]*left:\s*0;[\s\S]*inset:\s*0;/, 'ArrowHead should include top/right/bottom/left fallbacks alongside inset for older iOS Safari support');
+  assert.match(html, /video, canvas\s*\{[\s\S]*position:\s*absolute;[\s\S]*top:\s*0;[\s\S]*right:\s*0;[\s\S]*bottom:\s*0;[\s\S]*left:\s*0;[\s\S]*inset:\s*0;/, 'ArrowHead camera and overlay layers should include inset fallbacks for older iOS Safari support');
 
   assert.doesNotMatch(html, /\?\./, 'ArrowHead should avoid optional chaining so older Safari/iOS engines can parse the script');
   assert.doesNotMatch(html, /\.\.\./, 'ArrowHead should avoid object spread syntax for broader iOS Safari compatibility');
