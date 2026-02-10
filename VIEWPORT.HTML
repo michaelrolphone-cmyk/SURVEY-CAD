@@ -1072,6 +1072,9 @@
   const PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = "lineSmithProjectBrowserDrawingImport";
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = "surveyfoundryLastLineSmithDrawing";
   const ARROWHEAD_IMPORT_STORAGE_KEY = "lineSmithArrowHeadImport";
+  const ARROWHEAD_SYNC_INTERVAL_MS = 1000;
+  let lastArrowHeadPayloadJson = "";
+  let lastArrowHeadPayloadSyncAt = 0;
 
   const parseNum = (s, def=0) => {
     const n = Number(String(s).trim());
@@ -2959,6 +2962,8 @@
     updateSelectionHUD();
     updateUndoRedoHUD();
 
+    syncArrowHeadPayloadToStorage();
+
     requestAnimationFrame(draw);
   }
 
@@ -4168,13 +4173,23 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
     };
   }
 
+  function syncArrowHeadPayloadToStorage(options = {}) {
+    const force = options.force === true;
+    const now = Date.now();
+    if (!force && (now - lastArrowHeadPayloadSyncAt) < ARROWHEAD_SYNC_INTERVAL_MS) return;
+    lastArrowHeadPayloadSyncAt = now;
+    const payloadJson = JSON.stringify(buildArrowHeadPayload());
+    if (!force && payloadJson === lastArrowHeadPayloadJson) return;
+    lastArrowHeadPayloadJson = payloadJson;
+    localStorage.setItem(ARROWHEAD_IMPORT_STORAGE_KEY, payloadJson);
+  }
+
   function openArrowHeadFromLineSmith() {
     if (!points.size) {
       setStatus("Add or import points before opening ArrowHead.", "warn");
       return;
     }
-    const payload = buildArrowHeadPayload();
-    localStorage.setItem(ARROWHEAD_IMPORT_STORAGE_KEY, JSON.stringify(payload));
+    syncArrowHeadPayloadToStorage({ force: true });
     const params = new URLSearchParams(window.location.search);
     const activeProjectIdParam = params.get("activeProjectId");
     const activeProjectNameParam = params.get("activeProjectName");

@@ -20,6 +20,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /import\s+\{\s*latLngToWorldAffine,\s*worldToLatLngAffine\s*\}\s+from\s+"\.\/src\/georeference-transform\.js";/, 'ArrowHead should use shared georeference helpers for bidirectional coordinate projection');
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
   assert.match(html, /const\s+socket\s*=\s*new\s+WebSocket\(wsUrl\);/, 'ArrowHead should join the LineSmith collaboration websocket room');
+  assert.match(html, /function\s+refreshPayloadFromStorage\(options\s*=\s*\{\}\)/, 'ArrowHead should support refreshing LineSmith payload updates while running');
+  assert.match(html, /window\.addEventListener\('storage',\s*\(event\)\s*=>\s*\{[\s\S]*event\.key\s*!==\s*ARROWHEAD_IMPORT_STORAGE_KEY/, 'ArrowHead should watch localStorage events for live LineSmith geometry updates');
+  assert.match(html, /state\.payloadSyncIntervalId\s*=\s*window\.setInterval\(\(\)\s*=>\s*\{[\s\S]*refreshPayloadFromStorage\(\);[\s\S]*\},\s*1000\);/, 'ArrowHead should poll localStorage to pick up payload changes when storage events are unavailable');
   assert.match(html, /type:\s*'ar-presence'/, 'ArrowHead should publish AR user position and orientation to websocket peers');
   assert.match(html, /worldToLatLngAffine\(/, 'ArrowHead should project LineSmith world coordinates to lat\/lon for AR cursor overlays');
   assert.match(html, /latLngToWorldAffine\(/, 'ArrowHead should convert GPS lat\/lon into state-plane coordinates before publishing presence');
