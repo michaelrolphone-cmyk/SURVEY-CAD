@@ -13,9 +13,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.doesNotMatch(html, /\?\./, 'ArrowHead should avoid optional chaining so older Safari/iOS engines can parse the script');
   assert.doesNotMatch(html, /\.\.\./, 'ArrowHead should avoid object spread syntax for broader iOS Safari compatibility');
   assert.match(html, /navigator\.mediaDevices\.getUserMedia\(/, 'ArrowHead should request camera access for AR video feed');
-  assert.match(html, /function\s+hasCameraApi\(\)\s*\{[\s\S]*navigator\.webkitGetUserMedia[\s\S]*\}/, 'ArrowHead should treat legacy webkit getUserMedia APIs as camera-capable for older iOS Safari');
-  assert.match(html, /function\s+requestCameraStream\(constraints\)\s*\{[\s\S]*legacyGetUserMedia\.call\(navigator, constraints, resolve, reject\);[\s\S]*\}/, 'ArrowHead should request camera streams through both modern and legacy getUserMedia APIs');
-  assert.match(html, /if \(!hasCameraApi\(\)\) \{[\s\S]*Camera API unavailable on this device\/browser\./, 'ArrowHead should only show camera-unavailable status after checking both modern and legacy camera APIs');
+  assert.match(html, /function\s+getCameraRequestor\(\)\s*\{[\s\S]*navigator\.webkitGetUserMedia[\s\S]*navigator\.msGetUserMedia[\s\S]*navigator\.mediaDevices\.webkitGetUserMedia[\s\S]*\}/, 'ArrowHead should resolve camera requestors from modern and legacy navigator/mediaDevices APIs for older mobile Safari and embedded browsers');
+  assert.match(html, /function\s+requestCameraStream\(constraints\)\s*\{[\s\S]*const\s+requestCamera\s*=\s*getCameraRequestor\(\);[\s\S]*return\s+requestCamera\(constraints\);[\s\S]*\}/, 'ArrowHead should request camera streams through a unified camera-requestor resolver');
+  assert.match(html, /if \(\/getUserMedia\|camera\/i\.test\(String\(errorMessage\)\) && !hasCameraApi\(\)\) \{[\s\S]*Camera API unavailable on this device\/browser\./, 'ArrowHead should classify camera-unavailable status from startup failures only after evaluating all camera API variants');
   assert.match(html, /navigator\.geolocation\.watchPosition\(/, 'ArrowHead should watch GPS updates for world alignment');
   assert.match(html, /window\.addEventListener\('deviceorientationabsolute'/, 'ArrowHead should subscribe to absolute orientation updates when available');
   assert.match(html, /window\.addEventListener\('deviceorientation'/, 'ArrowHead should subscribe to orientation sensor updates');
