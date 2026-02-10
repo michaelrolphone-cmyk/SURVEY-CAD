@@ -38,7 +38,7 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /window\.addEventListener\('devicemotion'/, 'ArrowHead should subscribe to motion sensor updates');
   assert.match(html, /resolvePointElevationFeet\(p\.z, state\.userAltFeet\)/, 'ArrowHead should replace missing or zero point elevations with current phone elevation');
   assert.match(html, /import\s+\{\s*deriveDevicePoseRadians,\s*integrateGyroscopeHeadingRadians,\s*normalizeRadians\s*\}\s+from\s+"\.\/src\/arrowhead-math\.js";/, 'ArrowHead should use shared orientation math helpers, including gyroscope heading integration');
-  assert.match(html, /import\s+\{\s*computeForwardDistanceMeters,\s*computeRelativeBearingRad,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
+  assert.match(html, /import\s+\{\s*computeForwardDistanceMeters,\s*computeRelativeBearingRad,\s*projectEnuPointToScreen,\s*resolvePointElevationFeet\s*\}\s+from\s+"\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should use shared projection helpers');
   assert.match(html, /import\s+\{\s*latLngToWorldAffine,\s*worldToLatLngAffine\s*\}\s+from\s+"\.\/src\/georeference-transform\.js";/, 'ArrowHead should use shared georeference helpers for bidirectional coordinate projection');
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
   assert.match(html, /<button id="useGyro">Use Gyroscope Heading: Off<\/button>/, 'ArrowHead should expose a gyroscope heading mode toggle button');
@@ -68,13 +68,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /worldToLatLngAffine\(/, 'ArrowHead should project LineSmith world coordinates to lat\/lon for AR cursor overlays');
   assert.match(html, /latLngToWorldAffine\(/, 'ArrowHead should convert GPS lat\/lon into state-plane coordinates before publishing presence');
 
-  assert.match(html, /const\s+targetBearingRad\s*=\s*Math\.atan2\(east, north\);/, 'ArrowHead should compute per-point bearing from ENU deltas');
-  assert.match(html, /const\s+relativeBearingRad\s*=\s*computeRelativeBearingRad\(targetBearingRad, state\.headingRad\);/, 'ArrowHead should align point bearing with camera heading using shared projection math');
-  assert.match(html, /const\s+targetElevationRad\s*=\s*Math\.atan2\(up, horizontalDistance\);/, 'ArrowHead should compute vertical angle from phone to point');
-  assert.match(html, /const\s+forwardDistance\s*=\s*computeForwardDistanceMeters\(horizontalDistance, relativeBearingRad\);/, 'ArrowHead should cull points behind the user based on heading without pitch-related false negatives');
-  assert.match(html, /const\s+xFromBearing\s*=\s*\(Math\.tan\(relativeBearingRad\) \/ Math\.tan\(horizontalFov \* 0\.5\)\)/, 'ArrowHead should project horizontal screen offset from bearing');
-  assert.match(html, /const\s+yFromElevation\s*=\s*\(Math\.tan\(relativeElevationRad\) \/ Math\.tan\(verticalFov \* 0\.5\)\)/, 'ArrowHead should project vertical screen offset from elevation angle');
-  assert.match(html, /const\s+xRotated\s*=\s*xFromBearing\s*\*\s*cosRoll\s*-\s*yFromElevation\s*\*\s*sinRoll;/, 'ArrowHead should apply roll compensation to screen coordinates');
+  assert.match(html, /import \{ computeForwardDistanceMeters, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet \} from "\.\/src\/arrowhead-projection\.js";/, 'ArrowHead should import camera-space projection helpers from shared module code');
+  assert.match(html, /const\s+projection\s*=\s*projectEnuPointToScreen\(\{[\s\S]*nearClipMeters:\s*0\.5,[\s\S]*\}\);/, 'ArrowHead should project ENU deltas through camera-space yaw/pitch/roll with near-plane clipping');
+  assert.match(html, /if \(!projection\) return null;/, 'ArrowHead should cull points that land behind or too close to the camera after orientation transforms');
   assert.match(html, /const\s+ON_TARGET_CENTER_FRACTION\s*=\s*0\.1;/, 'ArrowHead should define a center-target fraction matching the middle 10% of the feed');
   assert.match(html, /const\s+centerHalfWidth\s*=\s*canvas\.width\s*\*\s*ON_TARGET_CENTER_FRACTION\s*\*\s*0\.5;/, 'ArrowHead should compute horizontal center-zone bounds');
   assert.match(html, /const\s+centerHalfHeight\s*=\s*canvas\.height\s*\*\s*ON_TARGET_CENTER_FRACTION\s*\*\s*0\.5;/, 'ArrowHead should compute vertical center-zone bounds');
