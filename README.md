@@ -433,6 +433,7 @@ SurveyFoundry now supports a **project file** manifest that symbolically represe
 - When an app is opened, the launcher header title/icon switch to that app, the header icon scales down to half-size (84px → 42px) to free app-view real estate, and a leading chevron appears before the icon to reinforce that clicking either the chevron area or icon returns to launcher home.
 - Launcher opens `RecordQuarry.html` with query parameters (`projectId`, `projectName`, `client`, `address`, `autostart=1`).
 - When a launcher active project is set, every app opened from the launcher receives `activeProjectId` and `activeProjectName` query parameters so tools can save/load project-scoped data.
+- `RecordQuarry.html` now defaults the lookup address field to the active project's stored address (`localStorage` key `surveyfoundryProjects`) whenever only `activeProjectId`/`activeProjectName` are provided at launch.
 - Launcher header now displays the active project name whenever a project is active, giving persistent context while moving between tools.
 - Leaving LineSmith with unsaved edits now opens a dedicated modal with **Save and leave**, **Discard changes**, and **Cancel** actions (replacing the old free-text browser prompt) to prevent accidental data loss.
 - Browser back/forward navigation now participates in launcher view history so pressing the app-launcher back button while LineSmith is open triggers the same unsaved-change guard and can return to launcher home when confirmed.

@@ -337,7 +337,7 @@
       </div>
       <div class="pbody">
         <label for="addr">Address (Ada County, ID)</label>
-        <input id="addr" type="text" placeholder="e.g. 5707 W Castle Dr, Boise ID" value="5707 W Castle Dr, Boise ID"/>
+        <input id="addr" type="text" placeholder="e.g. 5707 W Castle Dr, Boise ID" value=""/>
 
         <div class="hr"></div>
 
@@ -458,6 +458,21 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     const client = params.get("client") || params.get("activeClient") || "";
     const autostart = params.get("autostart") === "1";
     return { projectId, address, projectName, client, autostart };
+  }
+
+  function loadLaunchProjectAddress(projectId) {
+    const normalizedProjectId = String(projectId || '').trim();
+    if (!normalizedProjectId) return '';
+    try {
+      const raw = localStorage.getItem('surveyfoundryProjects');
+      if (!raw) return '';
+      const projects = JSON.parse(raw);
+      if (!Array.isArray(projects)) return '';
+      const project = projects.find((entry) => String(entry?.id || '') === normalizedProjectId);
+      return String(project?.address || '').trim();
+    } catch {
+      return '';
+    }
   }
 
   function projectLookupStorageKey(projectId) {
@@ -1406,6 +1421,14 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
   // -----------------------------
   // Results state
   // -----------------------------
+  const initialProjectContext = getProjectContext();
+  if (!normalizeAddressStorageKey(initialProjectContext.address) && initialProjectContext.projectId) {
+    const launchAddress = loadLaunchProjectAddress(initialProjectContext.projectId);
+    if (launchAddress) {
+      initialProjectContext.address = launchAddress;
+    }
+  }
+
   const state = {
     addressFeature: null,
     parcelFeature: null,        // displayed (outSR 4326)
@@ -1425,7 +1448,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     lastLookupAddress: '',
     exportGeoJSON: null,
     lastLonLat: null,
-    projectContext: getProjectContext()
+    projectContext: initialProjectContext
   };
 
   function setSummaryCards(cards) {
