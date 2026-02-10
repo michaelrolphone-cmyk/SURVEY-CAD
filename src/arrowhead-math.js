@@ -33,24 +33,24 @@ function resolveTiltDegrees(orientationEvent, screenOrientationAngle) {
   if (angle === 90) {
     return {
       pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, safeGamma + 90)),
-      rollDeg: -safeBeta,
+      rollDeg: safeBeta,
     };
   }
   if (angle === 270) {
     return {
       pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, 90 - safeGamma)),
-      rollDeg: safeBeta,
+      rollDeg: -safeBeta,
     };
   }
   if (angle === 180) {
     return {
       pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, 90 - safeBeta)),
-      rollDeg: -safeGamma,
+      rollDeg: safeGamma,
     };
   }
   return {
     pitchDeg: Math.max(-pitchLimitDeg, Math.min(pitchLimitDeg, safeBeta - 90)),
-    rollDeg: safeGamma,
+    rollDeg: -safeGamma,
   };
 }
 

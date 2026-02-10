@@ -17,14 +17,20 @@ test('deriveDevicePoseRadians prioritizes webkitCompassHeading and heading offse
   assert.ok(Number.isFinite(pose.headingRad));
   assert.ok(Math.abs(pose.headingRad - normalizeRadians((30 * Math.PI / 180) + (Math.PI / 2))) < 1e-10);
   assert.ok(Math.abs(pose.pitchRad - (-80 * Math.PI / 180)) < 1e-10);
-  assert.ok(Math.abs(pose.rollRad - (-15 * Math.PI / 180)) < 1e-10);
+  assert.ok(Math.abs(pose.rollRad - (15 * Math.PI / 180)) < 1e-10);
 });
 
 test('deriveDevicePoseRadians remaps tilt for landscape-right screens', () => {
   const pose = deriveDevicePoseRadians({ alpha: 120, beta: 40, gamma: 10 }, 90, 0);
   assert.ok(Math.abs(pose.pitchRad - (89 * Math.PI / 180)) < 1e-10);
-  assert.ok(Math.abs(pose.rollRad - (-40 * Math.PI / 180)) < 1e-10);
+  assert.ok(Math.abs(pose.rollRad - (40 * Math.PI / 180)) < 1e-10);
   assert.ok(Math.abs(pose.headingRad - normalizeRadians((360 - 120) * Math.PI / 180)) < 1e-10);
+});
+
+test('deriveDevicePoseRadians maps portrait gamma to opposite roll sign so right-tilt lowers right-side points', () => {
+  const pose = deriveDevicePoseRadians({ alpha: 200, beta: 90, gamma: 20 }, 0, 0);
+  assert.ok(Math.abs(pose.pitchRad) < 1e-10);
+  assert.ok(Math.abs(pose.rollRad - (-20 * Math.PI / 180)) < 1e-10);
 });
 
 
