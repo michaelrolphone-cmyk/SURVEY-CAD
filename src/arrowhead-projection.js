@@ -50,7 +50,7 @@ export function projectEnuPointToScreen(options) {
   // Apply roll compensation with a conservative gain (0.5 works well for most devices)
   // Negative sign accounts for the camera-space coordinate system
   const safeRollGain = Number.isFinite(rollCompensationGain) ? rollCompensationGain : 0.5;
-  const safeRoll = Number.isFinite(roll) ? -(roll * safeRollGain) : 0;
+  const safeRoll = (Number.isFinite(roll) ? -(roll * safeRollGain) : 0) -1;
 
   // 1. Apply heading rotation (yaw around vertical axis)
   const cosHeading = Math.cos(safeHeading);
