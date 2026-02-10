@@ -688,14 +688,40 @@
       return snapshot;
     }
 
-    function applyServerSnapshot(snapshot = {}) {
+    function applyServerSnapshot(snapshot = {}, version = 0) {
       localStorageSyncLock = true;
       const entries = Object.entries(snapshot || {});
       entries.forEach(([key, value]) => {
         localStorage.setItem(key, String(value));
       });
+      if (Number.isFinite(version) && version > 0) {
+        localStorage.setItem(LOCAL_STORAGE_SYNC_VERSION_KEY, String(Math.trunc(version)));
+      }
       localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
       localStorageSyncLock = false;
+    }
+
+    async function pullServerSnapshotIfNewer(localVersion) {
+      const response = await fetch('/api/localstorage-sync');
+      if (!response.ok) {
+        throw new Error(`localStorage sync fetch failed (${response.status})`);
+      }
+
+      const payload = await response.json();
+      const serverVersion = Number(payload?.version || 0);
+      if (!Number.isFinite(serverVersion) || serverVersion <= localVersion) {
+        return;
+      }
+
+      const serverSnapshot = payload?.snapshot || {};
+      const serverSnapshotSerialized = JSON.stringify(serverSnapshot);
+      const localSnapshotSerialized = JSON.stringify(buildLocalStorageSnapshot());
+      if (serverSnapshotSerialized !== localSnapshotSerialized) {
+        applyServerSnapshot(serverSnapshot, serverVersion);
+        loadProjects();
+        loadActiveProject();
+        renderProjects();
+      }
     }
 
     async function syncLocalStorageWithServer({ force = false } = {}) {
@@ -704,6 +730,7 @@
       const currentSnapshot = buildLocalStorageSnapshot();
       const serializedSnapshot = JSON.stringify(currentSnapshot);
       if (!force && serializedSnapshot === localStorageSyncSnapshot) {
+        await pullServerSnapshotIfNewer(getLocalStorageVersion());
         return;
       }
 
@@ -730,7 +757,7 @@
       if (payload?.status === 'client-stale' && payload?.state?.snapshot) {
         const serverSnapshotSerialized = JSON.stringify(payload.state.snapshot);
         if (serverSnapshotSerialized !== localStorageSyncSnapshot) {
-          applyServerSnapshot(payload.state.snapshot);
+          applyServerSnapshot(payload.state.snapshot, Number(payload?.state?.version || 0));
           loadProjects();
           loadActiveProject();
           renderProjects();
