@@ -32,7 +32,7 @@
 <script type="module">
 import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
-import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
+import { computeForwardDistanceMeters, computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
 
 (() => {
@@ -255,7 +255,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     const targetElevationRad = Math.atan2(up, horizontalDistance);
     const relativeElevationRad = targetElevationRad - state.pitchRad;
 
-    const forwardDistance = Math.cos(relativeElevationRad) * horizontalDistance;
+    const forwardDistance = computeForwardDistanceMeters(horizontalDistance, relativeBearingRad) * Math.cos(relativeElevationRad);
     if (forwardDistance <= 0.5) return null;
 
     const w = canvas.width;

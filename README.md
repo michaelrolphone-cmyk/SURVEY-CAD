@@ -84,6 +84,7 @@ open "http://localhost:3000/RecordQuarry.html?address=100%20Main%20St%2C%20Boise
 - GPS + device orientation/motion sensors are used to place features in real space.
 - Point elevations with missing/invalid `z` values (including `z=0`) are rendered using the phone-reported elevation at runtime so horizontal spacing is not distorted by zero-altitude assumptions.
 - AR horizontal bearing projection uses heading-minus-target handedness so overlays move in the expected direction when panning left/right.
+- ArrowHead now derives forward visibility from the magnetometer-driven heading delta (`cos(relativeBearing)`), so points behind you (for example south while facing north) are culled instead of remaining centered in view.
 - XY-to-lat/lon conversion reuses the same LineSmith georeference transform used by LineSmith map alignment (`lat=ax*x+by*y+c`, `lng=ax*x+by*y+c`).
 
 Direct open command (after a LineSmith handoff payload exists):
