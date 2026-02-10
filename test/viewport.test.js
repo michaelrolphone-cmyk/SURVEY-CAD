@@ -387,12 +387,21 @@ test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch 
   assert.match(html, /if \(message\.type === "state" && message\.state\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'remote collaboration state restores should not overwrite local user view pan/zoom');
 });
 
+test('VIEWPORT.HTML renders ArrowHead collaborator position on map with directional cone', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /if \(message\.type === "ar-presence" && message\.presence\) \{[\s\S]*upsertMapArPresence\(message\.clientId, presence\);/, 'LineSmith should ingest ArrowHead presence updates from collaboration websocket messages');
+  assert.match(html, /const\s+cone\s*=\s*L\.polygon\(\[\],/, 'LineSmith map should create a polygon cone graphic for ArrowHead viewing direction');
+  assert.match(html, /entry\.cone\.setLatLngs\(\[\[presence\.lat, presence\.lon\], \[leftLat, leftLon\], \[rightLat, rightLon\]\]\);/, 'LineSmith should update triangle cone geometry to visualize ArrowHead heading on map');
+});
+
 test('VIEWPORT.HTML provides ArrowHead AR launch handoff with LineSmith geometry payload', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /const\s+ARROWHEAD_IMPORT_STORAGE_KEY\s*=\s*"lineSmithArrowHeadImport"/, 'LineSmith should define a stable localStorage key for ArrowHead handoff payloads');
   assert.match(html, /id="openArrowHead"[^>]*>Open ArrowHead AR<\/button>/, 'LineSmith UI should provide an Open ArrowHead AR action');
   assert.match(html, /function\s+buildArrowHeadPayload\(\)/, 'LineSmith should build a payload containing points, lines, and georeference data');
+  assert.match(html, /collabRoomId:\s*resolveCollabRoomId\(\)/, 'LineSmith should include the collaboration room in ArrowHead handoff payload so both apps join the same websocket room');
   assert.match(html, /localStorage\.setItem\(ARROWHEAD_IMPORT_STORAGE_KEY,\s*JSON\.stringify\(payload\)\)/, 'LineSmith should persist ArrowHead handoff payload before navigation');
   assert.match(html, /const\s+targetPath\s*=\s*`\/ArrowHead\.html\?\$\{targetParams\.toString\(\)\}`;/, 'LineSmith should launch ArrowHead with launcher-aware query parameters');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app",[\s\S]*path:\s*targetPath/, 'LineSmith should use launcher postMessage navigation when embedded');

@@ -1099,6 +1099,7 @@
     color: "#ffffff",
     peers: new Map(),
     remoteCursors: new Map(),
+    remoteArPresence: new Map(),
     stateDebounce: null,
     applyingRemoteState: false,
     enabled: false
@@ -1658,6 +1659,8 @@
 
   let mapInstance = null;
   let mapTileLayer = null;
+  let mapArPresenceLayer = null;
+  const mapArPresenceGraphics = new Map();
 
   function isMovable(value) {
     return value === true;
@@ -1822,6 +1825,7 @@
       zoomDelta: 0.25
     });
     applyMapTileType();
+    mapArPresenceLayer = L.layerGroup().addTo(mapInstance);
     applyMapOpacity();
     syncMapToView(true);
   }
@@ -1857,6 +1861,65 @@
     const ll = worldToLatLng(center.x, center.y);
     const zoom = scaleToLeafletZoomForLat(view.scale, ll.lat);
     mapInstance.setView([ll.lat, ll.lng], zoom, { animate: false });
+  }
+
+  function upsertMapArPresence(clientId, presence) {
+    if (!mapInstance || !window.L || !Number.isFinite(presence.lat) || !Number.isFinite(presence.lon)) return;
+    let entry = mapArPresenceGraphics.get(clientId);
+    if (!entry) {
+      const marker = L.circleMarker([presence.lat, presence.lon], {
+        radius: 6,
+        color: presence.color || "#f97316",
+        weight: 2,
+        fillColor: presence.color || "#f97316",
+        fillOpacity: 0.95
+      });
+      const cone = L.polygon([], {
+        color: presence.color || "#f97316",
+        fillColor: presence.color || "#f97316",
+        fillOpacity: 0.18,
+        weight: 1.5
+      });
+      entry = { marker, cone };
+      mapArPresenceGraphics.set(clientId, entry);
+      if (mapArPresenceLayer) {
+        entry.marker.addTo(mapArPresenceLayer);
+        entry.cone.addTo(mapArPresenceLayer);
+      }
+    }
+    const headingRad = Number(presence.headingRad) || 0;
+    const coneLengthMeters = 24;
+    const halfAngle = 0.33;
+    const cosLat = Math.max(0.1, Math.cos((presence.lat * Math.PI) / 180));
+    const metersToLat = 1 / 111320;
+    const metersToLon = 1 / (111320 * cosLat);
+    const leftHeading = headingRad - halfAngle;
+    const rightHeading = headingRad + halfAngle;
+    const leftLat = presence.lat + (Math.cos(leftHeading) * coneLengthMeters * metersToLat);
+    const leftLon = presence.lon + (Math.sin(leftHeading) * coneLengthMeters * metersToLon);
+    const rightLat = presence.lat + (Math.cos(rightHeading) * coneLengthMeters * metersToLat);
+    const rightLon = presence.lon + (Math.sin(rightHeading) * coneLengthMeters * metersToLon);
+
+    entry.marker.setLatLng([presence.lat, presence.lon]);
+    entry.marker.setStyle({ color: presence.color || "#f97316", fillColor: presence.color || "#f97316" });
+    entry.cone.setLatLngs([[presence.lat, presence.lon], [leftLat, leftLon], [rightLat, rightLon]]);
+    entry.cone.setStyle({ color: presence.color || "#f97316", fillColor: presence.color || "#f97316" });
+  }
+
+  function removeMapArPresence(clientId) {
+    const entry = mapArPresenceGraphics.get(clientId);
+    if (!entry) return;
+    if (mapArPresenceLayer) {
+      mapArPresenceLayer.removeLayer(entry.marker);
+      mapArPresenceLayer.removeLayer(entry.cone);
+    }
+    mapArPresenceGraphics.delete(clientId);
+  }
+
+  function clearMapArPresence() {
+    for (const clientId of mapArPresenceGraphics.keys()) {
+      removeMapArPresence(clientId);
+    }
   }
 
   function setMapLayerEnabled(enabled) {
@@ -2040,7 +2103,9 @@
     socket.addEventListener("close", () => {
       setCollabStatus("offline");
       collab.remoteCursors.clear();
+      collab.remoteArPresence.clear();
       collab.peers.clear();
+      clearMapArPresence();
     });
 
     socket.addEventListener("message", (event) => {
@@ -2074,6 +2139,8 @@
       if (message.type === "peer-left") {
         collab.peers.delete(message.clientId);
         collab.remoteCursors.delete(message.clientId);
+        collab.remoteArPresence.delete(message.clientId);
+        removeMapArPresence(message.clientId);
         return;
       }
 
@@ -2087,6 +2154,21 @@
         return;
       }
 
+
+      if (message.type === "ar-presence" && message.presence) {
+        const presence = {
+          color: message.color || collab.peers.get(message.clientId)?.color || "#f97316",
+          x: Number(message.presence.x),
+          y: Number(message.presence.y),
+          lat: Number(message.presence.lat),
+          lon: Number(message.presence.lon),
+          headingRad: Number(message.presence.headingRad) || 0,
+          at: Number(message.at) || Date.now()
+        };
+        collab.remoteArPresence.set(message.clientId, presence);
+        upsertMapArPresence(message.clientId, presence);
+        return;
+      }
       if (message.type === "state" && message.state) {
         collab.applyingRemoteState = true;
         restoreState(message.state, { skipSync: true, applyView: false });
@@ -2106,9 +2188,17 @@
   }
 
   function drawRemoteCursors() {
-    if (!collab.remoteCursors.size) return;
     const expiryMs = 8000;
     const now = Date.now();
+
+    for (const [clientId, presence] of collab.remoteArPresence.entries()) {
+      if (now - presence.at > expiryMs) {
+        collab.remoteArPresence.delete(clientId);
+        removeMapArPresence(clientId);
+      }
+    }
+
+    if (!collab.remoteCursors.size) return;
     for (const [clientId, cursor] of collab.remoteCursors.entries()) {
       if (now - cursor.at > expiryMs) {
         collab.remoteCursors.delete(clientId);
@@ -2130,6 +2220,7 @@
       ctx.restore();
     }
   }
+
 
   function updateUndoRedoHUD() {
     hudUndo.textContent = String(history.undo.length);
@@ -4072,7 +4163,8 @@ Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
       georeference: mapGeoreference ? {
         lat: { ...mapGeoreference.lat },
         lng: { ...mapGeoreference.lng }
-      } : null
+      } : null,
+      collabRoomId: resolveCollabRoomId()
     };
   }
 

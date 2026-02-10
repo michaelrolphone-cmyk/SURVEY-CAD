@@ -32,6 +32,7 @@
 <script type="module">
 import { deriveDevicePoseRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
+import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
 
 (() => {
   const ARROWHEAD_IMPORT_STORAGE_KEY = 'lineSmithArrowHeadImport';
@@ -54,6 +55,11 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
     rollRad: 0,
     headingOffsetRad: 0,
     started: false,
+    collabRoomId: "",
+    collabSocket: null,
+    remoteCursors: new Map(),
+    remotePresence: new Map(),
+    ownWorld: null,
   };
 
   function setStatus(message, warn = false) {
@@ -67,11 +73,7 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
   }
 
   function worldToLatLng(x, y, georef) {
-    if (!georef) return null;
-    const lat = georef.lat.ax * x + georef.lat.by * y + georef.lat.c;
-    const lng = georef.lng.ax * x + georef.lng.by * y + georef.lng.c;
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
+    return worldToLatLngAffine(x, y, georef);
   }
 
   function loadPayload() {
@@ -90,12 +92,14 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
       const points = payload && Array.isArray(payload.points) ? payload.points : [];
       const lines = payload && Array.isArray(payload.lines) ? payload.lines : [];
       const georef = payload ? payload.georeference : null;
+      const roomId = payload ? payload.collabRoomId : "";
       const hasGeoref = georef && georef.lat && georef.lng;
       if (!points.length || !hasGeoref) {
         setStatus('LineSmith payload missing points or georeference.', true);
         return false;
       }
       state.payload = { points, lines, georef };
+      state.collabRoomId = String(roomId || "").trim();
       return true;
     } catch {
       setStatus('Could not parse LineSmith payload.', true);
@@ -123,9 +127,75 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
       if (Number.isFinite(altitudeMeters)) {
         state.userAltFeet = altitudeMeters * METERS_TO_FEET;
       }
+      if (state.payload && state.payload.georef) {
+        state.ownWorld = latLngToWorldAffine(state.userLat, state.userLon, state.payload.georef);
+      }
+      sendArPresence();
     }, () => {
       setStatus('GPS unavailable. Enable location for AR placement.', true);
     }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 1000 });
+  }
+
+  function connectCollaboration() {
+    if (!state.collabRoomId) return;
+    const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${scheme}://${window.location.host}/ws/lineforge?room=${encodeURIComponent(state.collabRoomId)}`;
+    const socket = new WebSocket(wsUrl);
+    state.collabSocket = socket;
+
+    socket.addEventListener('close', () => {
+      state.remoteCursors.clear();
+      state.remotePresence.clear();
+    });
+
+    socket.addEventListener('message', (event) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (message.type === 'cursor') {
+        state.remoteCursors.set(message.clientId, {
+          x: Number(message.cursor && message.cursor.x),
+          y: Number(message.cursor && message.cursor.y),
+          color: String(message.color || '#22d3ee'),
+          at: Number(message.at) || Date.now(),
+        });
+        return;
+      }
+      if (message.type === 'peer-left') {
+        state.remoteCursors.delete(message.clientId);
+        state.remotePresence.delete(message.clientId);
+        return;
+      }
+      if (message.type === 'ar-presence') {
+        state.remotePresence.set(message.clientId, {
+          x: Number(message.presence && message.presence.x),
+          y: Number(message.presence && message.presence.y),
+          headingRad: Number(message.presence && message.presence.headingRad),
+          color: String(message.color || '#f97316'),
+          at: Number(message.at) || Date.now(),
+        });
+      }
+    });
+  }
+
+  function sendArPresence() {
+    if (!state.collabSocket || state.collabSocket.readyState !== WebSocket.OPEN) return;
+    state.collabSocket.send(JSON.stringify({
+      type: 'ar-presence',
+      presence: {
+        x: Number(state.ownWorld && state.ownWorld.x),
+        y: Number(state.ownWorld && state.ownWorld.y),
+        lat: Number(state.userLat),
+        lon: Number(state.userLon),
+        altFeet: Number(state.userAltFeet),
+        headingRad: Number(state.headingRad),
+        pitchRad: Number(state.pitchRad),
+        rollRad: Number(state.rollRad),
+      },
+    }));
   }
 
   function currentScreenAngle() {
@@ -144,6 +214,7 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
       if (Number.isFinite(pose.headingRad)) state.headingRad = pose.headingRad;
       state.pitchRad = pose.pitchRad;
       state.rollRad = pose.rollRad;
+      sendArPresence();
     };
 
     window.addEventListener('deviceorientationabsolute', applyOrientationEvent, true);
@@ -237,6 +308,49 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
       ctx.fillText(`#${p.num}`, p.x + 10, p.y - 10);
     }
 
+    const staleCutoff = Date.now() - 10000;
+    for (const [clientId, cursor] of state.remoteCursors.entries()) {
+      if (cursor.at < staleCutoff) {
+        state.remoteCursors.delete(clientId);
+        continue;
+      }
+      const ll = worldToLatLng(cursor.x, cursor.y, state.payload.georef);
+      if (!ll) continue;
+      const scr = projectWorldToScreen(ll.lat, ll.lng, state.userAltFeet);
+      if (!scr) continue;
+      ctx.strokeStyle = cursor.color;
+      ctx.lineWidth = Math.max(2, window.devicePixelRatio * 2);
+      ctx.beginPath();
+      ctx.moveTo(scr.x - 8, scr.y);
+      ctx.lineTo(scr.x + 8, scr.y);
+      ctx.moveTo(scr.x, scr.y - 8);
+      ctx.lineTo(scr.x, scr.y + 8);
+      ctx.stroke();
+      ctx.fillStyle = cursor.color;
+      ctx.fillText(`LS ${String(clientId || '').slice(0, 6)}`, scr.x + 10, scr.y + 14);
+    }
+
+    for (const [clientId, peer] of state.remotePresence.entries()) {
+      if (peer.at < staleCutoff) {
+        state.remotePresence.delete(clientId);
+        continue;
+      }
+      if (!Number.isFinite(peer.x) || !Number.isFinite(peer.y)) continue;
+      const ll = worldToLatLng(peer.x, peer.y, state.payload.georef);
+      if (!ll) continue;
+      const scr = projectWorldToScreen(ll.lat, ll.lng, state.userAltFeet);
+      if (!scr) continue;
+      const headingDelta = Number.isFinite(peer.headingRad) ? normalizeRadians(peer.headingRad - state.headingRad) : 0;
+      const radius = Math.max(10, window.devicePixelRatio * 8);
+      ctx.fillStyle = peer.color;
+      ctx.beginPath();
+      ctx.moveTo(scr.x + Math.sin(headingDelta) * radius, scr.y - Math.cos(headingDelta) * radius);
+      ctx.lineTo(scr.x + Math.sin(headingDelta + 2.5) * radius * 0.7, scr.y - Math.cos(headingDelta + 2.5) * radius * 0.7);
+      ctx.lineTo(scr.x + Math.sin(headingDelta - 2.5) * radius * 0.7, scr.y - Math.cos(headingDelta - 2.5) * radius * 0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillText(`AR ${String(clientId || '').slice(0, 6)}`, scr.x + 10, scr.y - 12);
+    }
     const centerX = canvas.width * 0.5;
     const centerY = canvas.height * 0.5;
     const centerHalfWidth = canvas.width * ON_TARGET_CENTER_FRACTION * 0.5;
@@ -263,6 +377,7 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
       ctx.fillStyle = 'rgba(34,197,94,0.98)';
       ctx.font = `${Math.max(16, 14 * window.devicePixelRatio)}px Inter, system-ui, sans-serif`;
       ctx.fillText(onTargetLabel, onTargetPoint.x + ringRadius + 10, onTargetPoint.y + 6);
+
     }
 
     setStatus(`AR live. Points: ${projected.length}/${state.payload.points.length}. Heading ${(state.headingRad * 180 / Math.PI).toFixed(1)}°`);
@@ -290,6 +405,7 @@ import { computeRelativeBearingRad, resolvePointElevationFeet } from "./src/arro
       await startCamera();
       watchGeolocation();
       attachOrientationSensors();
+      connectCollaboration();
       state.started = true;
       setStatus('Sensors enabled. Move your phone to align geometry with the field view.');
     } catch (error) {

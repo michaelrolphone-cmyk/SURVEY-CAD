@@ -184,6 +184,36 @@ export function createLineforgeCollabService() {
           state: message.state,
           at: Date.now(),
         }, clientId);
+        return;
+      }
+
+      if (message?.type === 'ar-presence' && message.presence) {
+        const presence = message.presence;
+        const projected = {
+          type: 'ar-presence',
+          clientId,
+          color,
+          presence: {
+            x: Number(presence.x),
+            y: Number(presence.y),
+            lat: Number(presence.lat),
+            lon: Number(presence.lon),
+            altFeet: Number(presence.altFeet),
+            headingRad: Number(presence.headingRad),
+            pitchRad: Number(presence.pitchRad),
+            rollRad: Number(presence.rollRad),
+          },
+          at: Date.now(),
+        };
+        if (!Number.isFinite(projected.presence.x)) delete projected.presence.x;
+        if (!Number.isFinite(projected.presence.y)) delete projected.presence.y;
+        if (!Number.isFinite(projected.presence.lat)) delete projected.presence.lat;
+        if (!Number.isFinite(projected.presence.lon)) delete projected.presence.lon;
+        if (!Number.isFinite(projected.presence.altFeet)) delete projected.presence.altFeet;
+        if (!Number.isFinite(projected.presence.headingRad)) delete projected.presence.headingRad;
+        if (!Number.isFinite(projected.presence.pitchRad)) delete projected.presence.pitchRad;
+        if (!Number.isFinite(projected.presence.rollRad)) delete projected.presence.rollRad;
+        broadcast(room, projected, clientId);
       }
     });
 

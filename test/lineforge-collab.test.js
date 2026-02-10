@@ -89,6 +89,15 @@ test('lineforge websocket handshake and broadcast keeps state/cursor in-room', (
   assert.equal(cursorMsg.cursor.x, 7);
   assert.equal(cursorMsg.cursor.y, 9);
   assert.equal(cursorMsg.color, welcome1.color);
+
+  s1.emit('data', clientFrame({ type: 'ar-presence', presence: { x: 10, y: 20, lat: 43.61, lon: -116.2, headingRad: 1.2 } }));
+  const presenceMsg = parseServerTextMessage(s2);
+  assert.equal(presenceMsg.type, 'ar-presence');
+  assert.equal(presenceMsg.presence.x, 10);
+  assert.equal(presenceMsg.presence.y, 20);
+  assert.equal(presenceMsg.presence.lat, 43.61);
+  assert.equal(presenceMsg.presence.lon, -116.2);
+
 });
 
 test('lineforge websocket rejects non-collab upgrade path', () => {
