@@ -90,10 +90,11 @@
     }
     try {
       const payload = JSON.parse(raw);
-      const points = Array.isArray(payload?.points) ? payload.points : [];
-      const lines = Array.isArray(payload?.lines) ? payload.lines : [];
-      const georef = payload?.georeference;
-      if (!points.length || !georef?.lat || !georef?.lng) {
+      const points = payload && Array.isArray(payload.points) ? payload.points : [];
+      const lines = payload && Array.isArray(payload.lines) ? payload.lines : [];
+      const georef = payload ? payload.georeference : null;
+      const hasGeoref = georef && georef.lat && georef.lng;
+      if (!points.length || !hasGeoref) {
         setStatus('LineSmith payload missing points or georeference.', true);
         return false;
       }
@@ -202,7 +203,8 @@
       const scr = projectWorldToScreen(ll.lat, ll.lng, zFeet);
       if (!scr) continue;
       byId.set(p.id, scr);
-      projected.push({ ...scr, num: String(p.num ?? '') });
+      const pointNum = p && p.num != null ? p.num : '';
+      projected.push({ x: scr.x, y: scr.y, distanceM: scr.distanceM, num: String(pointNum) });
     }
 
     ctx.lineWidth = Math.max(2, window.devicePixelRatio * 1.8);
@@ -255,7 +257,8 @@
       state.started = true;
       setStatus('Sensors enabled. Move your phone to align geometry with the field view.');
     } catch (error) {
-      setStatus(String(error?.message || 'Could not start ArrowHead AR.'), true);
+      const errorMessage = error && error.message ? error.message : 'Could not start ArrowHead AR.';
+      setStatus(String(errorMessage), true);
     }
   }
 
