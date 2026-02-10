@@ -54,7 +54,7 @@
 <script type="module">
 import { deriveDevicePoseRadians, integrateGyroscopeHeadingRadians, normalizeRadians } from "./src/arrowhead-math.js";
 import { shouldApplyOrientationEvent } from "./src/arrowhead-math.js";
-import { computeForwardDistanceMeters, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
+import { computeForwardDistanceMeters, computeObserverElevationFeet, computeRelativeBearingRad, projectEnuPointToScreen, resolvePointElevationFeet } from "./src/arrowhead-projection.js";
 import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-transform.js";
 
 (() => {
@@ -62,6 +62,8 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = 'surveyfoundryLastLineSmithDrawing';
   const FEET_TO_METERS = 0.3048006096012192;
   const METERS_TO_FEET = 1 / FEET_TO_METERS;
+  const DEFAULT_OBSERVER_HEIGHT_OFFSET_FEET = 3;
+  const OPEN_ELEVATION_ENDPOINT = 'https://api.open-meteo.com/v1/elevation';
   const ON_TARGET_CENTER_FRACTION = 0.1;
   const GEOLOCATION_OPTIONS = { enableHighAccuracy: true, timeout: 30000, maximumAge: 1000 };
   const GEOLOCATION_RELAXED_OPTIONS = { enableHighAccuracy: false, maximumAge: 15000 };
@@ -87,6 +89,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     userLat: NaN,
     userLon: NaN,
     userAltFeet: 0,
+    rawUserAltFeet: NaN,
     headingRad: 0,
     pitchRad: 0,
     rollRad: 0,
@@ -110,6 +113,8 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     mouseLookLastX: 0,
     mouseLookLastY: 0,
     mouseLookSensitivity: 0.003,
+    pointElevationFallbackFeetById: new Map(),
+    elevationRequestSequence: 0,
   };
 
   function clamp(value, min, max) {
@@ -140,6 +145,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   function updateDebugInfo(stats = null) {
     const lines = [];
     lines.push(`GPS lat/lon/alt(ft): ${formatSigned(state.userLat)} / ${formatSigned(state.userLon)} / ${Number.isFinite(state.userAltFeet) ? state.userAltFeet.toFixed(2) : 'n/a'}`);
+    lines.push(`Altitude source (gps/raw+offset): ${Number.isFinite(state.rawUserAltFeet) ? state.rawUserAltFeet.toFixed(2) : 'n/a'} + ${DEFAULT_OBSERVER_HEIGHT_OFFSET_FEET.toFixed(1)} ft`);
     lines.push(`Pose heading/pitch/roll: ${formatDeg(state.headingRad)} / ${formatDeg(state.pitchRad)} / ${formatDeg(state.rollRad)}`);
 
     if (!state.payload) {
@@ -323,9 +329,83 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       return false;
     }
     state.payload = parsed.payload;
+    state.pointElevationFallbackFeetById.clear();
+    refreshObserverElevation();
+    refreshPointElevationsFromOpenDataset();
     state.collabRoomId = parsed.roomId;
     state.lastPayloadRaw = raw;
     return true;
+  }
+
+  function buildPointElevationRequestBatch() {
+    if (!state.payload || !state.payload.georef || !Array.isArray(state.payload.points)) return [];
+    const pending = [];
+    for (const point of state.payload.points) {
+      const pointId = String(point && point.id || '');
+      const zFeet = Number(point && point.z);
+      if (Math.abs(zFeet) >= 1e-9) continue;
+      if (!pointId || state.pointElevationFallbackFeetById.has(pointId)) continue;
+      const ll = worldToLatLng(Number(point.x), Number(point.y), state.payload.georef);
+      if (!ll) continue;
+      pending.push({ pointId, lat: Number(ll.lat), lon: Number(ll.lng) });
+    }
+    return pending;
+  }
+
+  async function requestOpenElevationMeters(points) {
+    if (!Array.isArray(points) || !points.length) return [];
+    const latitude = points.map((point) => point.lat.toFixed(6)).join(',');
+    const longitude = points.map((point) => point.lon.toFixed(6)).join(',');
+    const response = await fetch(`${OPEN_ELEVATION_ENDPOINT}?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}`);
+    if (!response.ok) {
+      throw new Error(`Open elevation request failed (${response.status})`);
+    }
+    const payload = await response.json();
+    if (!payload || !Array.isArray(payload.elevation)) {
+      throw new Error('Open elevation response missing elevation array.');
+    }
+    return payload.elevation;
+  }
+
+  function refreshObserverElevation() {
+    let baselinePointElevationFeet = NaN;
+    if (state.payload && Array.isArray(state.payload.points) && state.payload.points.length) {
+      const firstPoint = state.payload.points[0];
+      baselinePointElevationFeet = resolvePayloadPointElevationFeet(firstPoint);
+    }
+    state.userAltFeet = computeObserverElevationFeet(state.rawUserAltFeet, baselinePointElevationFeet, DEFAULT_OBSERVER_HEIGHT_OFFSET_FEET);
+  }
+
+  async function refreshPointElevationsFromOpenDataset() {
+    const pending = buildPointElevationRequestBatch();
+    if (!pending.length) return;
+
+    const sequence = state.elevationRequestSequence + 1;
+    state.elevationRequestSequence = sequence;
+
+    const chunkSize = 100;
+    try {
+      for (let i = 0; i < pending.length; i += chunkSize) {
+        const chunk = pending.slice(i, i + chunkSize);
+        const elevationsMeters = await requestOpenElevationMeters(chunk);
+        if (state.elevationRequestSequence !== sequence) return;
+        for (let j = 0; j < chunk.length; j += 1) {
+          const elevationMeters = Number(elevationsMeters[j]);
+          if (!Number.isFinite(elevationMeters)) continue;
+          state.pointElevationFallbackFeetById.set(chunk[j].pointId, elevationMeters * METERS_TO_FEET);
+        }
+      }
+      refreshObserverElevation();
+    } catch {
+      setStatus('Unable to load open elevation data for zero-elevation points; using device altitude fallback.', true);
+    }
+  }
+
+  function resolvePayloadPointElevationFeet(point) {
+    const pointId = String(point && point.id || '');
+    const fallbackElevationFeet = pointId ? Number(state.pointElevationFallbackFeetById.get(pointId)) : NaN;
+    const defaultElevationFeet = Number.isFinite(fallbackElevationFeet) ? fallbackElevationFeet : state.userAltFeet;
+    return resolvePointElevationFeet(point && point.z, defaultElevationFeet);
   }
 
   function loadPayload() {
@@ -455,9 +535,12 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     state.userLat = pos.coords.latitude;
     state.userLon = pos.coords.longitude;
     const altitudeMeters = Number(pos.coords.altitude);
+    let nextRawAltFeet = state.rawUserAltFeet;
     if (Number.isFinite(altitudeMeters)) {
-      state.userAltFeet = altitudeMeters * METERS_TO_FEET;
+      nextRawAltFeet = altitudeMeters * METERS_TO_FEET;
     }
+    state.rawUserAltFeet = nextRawAltFeet;
+    refreshObserverElevation();
     if (state.payload && state.payload.georef) {
       state.ownWorld = latLngToWorldAffine(state.userLat, state.userLon, state.payload.georef);
     }
@@ -713,7 +796,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
         drawStats.dropBadGeoref += 1;
         continue;
       }
-      const zFeet = resolvePointElevationFeet(p.z, state.userAltFeet);
+      const zFeet = resolvePayloadPointElevationFeet(p);
 
       if (hasUserLocation) {
         const delta = latLonDeltaMeters(state.userLat, state.userLon, ll.lat, ll.lng);
