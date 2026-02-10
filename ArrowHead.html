@@ -61,6 +61,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   const FEET_TO_METERS = 0.3048006096012192;
   const METERS_TO_FEET = 1 / FEET_TO_METERS;
   const ON_TARGET_CENTER_FRACTION = 0.1;
+  const GEOLOCATION_OPTIONS = { enableHighAccuracy: true, timeout: 8000, maximumAge: 1000 };
 
   const video = document.getElementById('camera');
   const canvas = document.getElementById('overlay');
@@ -318,7 +319,19 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
   }
 
   async function startCamera() {
-    const stream = await requestCameraStream({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    let stream;
+    try {
+      stream = await requestCameraStream({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    } catch (error) {
+      const errorName = String(error && error.name ? error.name : '');
+      const needsFallback =
+        errorName === 'OverconstrainedError' ||
+        errorName === 'ConstraintNotSatisfiedError' ||
+        errorName === 'NotFoundError' ||
+        errorName === 'TypeError';
+      if (!needsFallback) throw error;
+      stream = await requestCameraStream({ video: true, audio: false });
+    }
     video.srcObject = stream;
   }
 
@@ -347,21 +360,36 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     setStatus(message);
   }
 
+  function applyGeolocationPosition(pos) {
+    state.userLat = pos.coords.latitude;
+    state.userLon = pos.coords.longitude;
+    const altitudeMeters = Number(pos.coords.altitude);
+    if (Number.isFinite(altitudeMeters)) {
+      state.userAltFeet = altitudeMeters * METERS_TO_FEET;
+    }
+    if (state.payload && state.payload.georef) {
+      state.ownWorld = latLngToWorldAffine(state.userLat, state.userLon, state.payload.georef);
+    }
+    sendArPresence();
+  }
+
+  function requestInitialGeolocationPermissionIfNeeded() {
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        applyGeolocationPosition(pos);
+        resolve(true);
+      }, () => {
+        resolve(false);
+      }, GEOLOCATION_OPTIONS);
+    });
+  }
+
   function watchGeolocation() {
     navigator.geolocation.watchPosition((pos) => {
-      state.userLat = pos.coords.latitude;
-      state.userLon = pos.coords.longitude;
-      const altitudeMeters = Number(pos.coords.altitude);
-      if (Number.isFinite(altitudeMeters)) {
-        state.userAltFeet = altitudeMeters * METERS_TO_FEET;
-      }
-      if (state.payload && state.payload.georef) {
-        state.ownWorld = latLngToWorldAffine(state.userLat, state.userLon, state.payload.georef);
-      }
-      sendArPresence();
+      applyGeolocationPosition(pos);
     }, () => {
       setStatus('GPS unavailable. Enable location for AR placement.', true);
-    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 1000 });
+    }, GEOLOCATION_OPTIONS);
   }
 
   function connectCollaboration() {
@@ -708,6 +736,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
     try {
       await startCamera();
+      const geolocationPermissionGranted = await requestInitialGeolocationPermissionIfNeeded();
       const orientationPermissionGranted = await requestOrientationPermissionIfNeeded();
       const motionPermissionGranted = await requestMotionPermissionIfNeeded();
       watchGeolocation();
@@ -716,6 +745,10 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       state.started = true;
       if (!orientationPermissionGranted || !motionPermissionGranted) {
         enableMouseLookFallback('Camera + GPS enabled. iOS sensor access denied, so mouse look is enabled as a fallback.');
+        return;
+      }
+      if (!geolocationPermissionGranted) {
+        setStatus('Camera enabled. GPS permission denied, so points may not align until location access is granted.', true);
         return;
       }
       setStatus('Sensors enabled. Move your phone to align geometry with the field view.');
