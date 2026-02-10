@@ -43,6 +43,9 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /const\s+pose\s*=\s*deriveDevicePoseRadians\(event, currentScreenAngle\(\), state\.headingOffsetRad\);/, 'ArrowHead should derive heading and tilt from the normalized orientation helper');
   assert.match(html, /<button id="useGyro">Use Gyroscope Heading: Off<\/button>/, 'ArrowHead should expose a gyroscope heading mode toggle button');
   assert.match(html, /<button id="useMouseLook">Use Mouse Look: Off<\/button>/, 'ArrowHead should expose a mouse-look toggle for desktop browsers without orientation sensors');
+  assert.match(html, /<pre id="debugInfo" class="debug">Debug info will appear after sensors start\.<\/pre>/, 'ArrowHead should render an inline debug panel for field diagnostics');
+  assert.match(html, /function\s+updateDebugInfo\(stats\s*=\s*null\)\s*\{[\s\S]*GPS lat\/lon\/alt\(ft\):[\s\S]*Projection projected\/total:[\s\S]*Nearest bearing abs\/relative:/, 'ArrowHead should publish GPS, projection, and nearest-point diagnostics to the debug panel');
+  assert.match(html, /updateDebugInfo\(drawStats\);[\s\S]*setStatus\(`AR live/, 'ArrowHead should refresh debug diagnostics each draw tick before status updates');
   assert.match(html, /if \(!state\.useGyroscopeHeading && Number\.isFinite\(pose\.headingRad\)\) state\.headingRad = pose\.headingRad;/, 'ArrowHead should default to magnetometer heading updates unless gyroscope mode is enabled');
   assert.match(html, /state\.gyroHeadingRawRad = integrateGyroscopeHeadingRadians\(state\.gyroHeadingRawRad, rotationRateAlpha, dtMs\);/, 'ArrowHead should integrate gyroscope rotationRate alpha into heading when gyroscope mode is enabled');
   assert.match(html, /state\.gyroHeadingOffsetRad = normalizeRadians\(-state\.gyroHeadingRawRad\);/, 'ArrowHead should support center calibration for gyroscope heading mode');
