@@ -101,6 +101,7 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     remotePresence: new Map(),
     ownWorld: null,
     hasAbsoluteHeadingLock: false,
+    lastAbsoluteOrientationEventMs: 0,
     lastPayloadRaw: '',
     payloadSyncIntervalId: 0,
     useGyroscopeHeading: false,
@@ -647,12 +648,22 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
 
   function attachOrientationSensors() {
     const applyOrientationEvent = (event) => {
-      if (!shouldApplyOrientationEvent(event.type, event, state.hasAbsoluteHeadingLock)) return;
+      const now = Date.now();
+      if (!shouldApplyOrientationEvent(
+        event.type,
+        event,
+        state.hasAbsoluteHeadingLock,
+        state.lastAbsoluteOrientationEventMs,
+        now,
+      )) return;
       const isAbsoluteEvent =
         String(event.type || '').toLowerCase() === 'deviceorientationabsolute'
         || event.absolute === true
         || Number.isFinite(Number(event.webkitCompassHeading));
-      if (isAbsoluteEvent) state.hasAbsoluteHeadingLock = true;
+      if (isAbsoluteEvent) {
+        state.hasAbsoluteHeadingLock = true;
+        state.lastAbsoluteOrientationEventMs = now;
+      }
       const pose = deriveDevicePoseRadians(event, currentScreenAngle(), state.headingOffsetRad);
       if (!state.useGyroscopeHeading && Number.isFinite(pose.headingRad)) state.headingRad = pose.headingRad;
       state.pitchRad = pose.pitchRad;

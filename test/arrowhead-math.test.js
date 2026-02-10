@@ -51,6 +51,22 @@ test('shouldApplyOrientationEvent prefers absolute heading updates after absolut
   assert.equal(shouldApplyOrientationEvent('deviceorientation', { webkitCompassHeading: 270 }, true), true);
 });
 
+test('shouldApplyOrientationEvent falls back to relative events when absolute stream stalls', () => {
+  const lastAbsoluteEventAtMs = 1_000;
+  const staleNowMs = lastAbsoluteEventAtMs + 2_000;
+  const freshNowMs = lastAbsoluteEventAtMs + 200;
+
+  assert.equal(
+    shouldApplyOrientationEvent('deviceorientation', { alpha: 130, absolute: false }, true, lastAbsoluteEventAtMs, freshNowMs, 1_500),
+    false,
+  );
+
+  assert.equal(
+    shouldApplyOrientationEvent('deviceorientation', { alpha: 130, absolute: false }, true, lastAbsoluteEventAtMs, staleNowMs, 1_500),
+    true,
+  );
+});
+
 test('integrateGyroscopeHeadingRadians accumulates alpha rotation over time', () => {
   const quarterTurnPerSecond = 90;
   const updated = integrateGyroscopeHeadingRadians(0, quarterTurnPerSecond, 1000);
