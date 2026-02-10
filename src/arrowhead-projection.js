@@ -50,7 +50,7 @@ export function projectEnuPointToScreen(options) {
   // Apply a conservative gain to avoid over-rotating overlays on hardware where
   // DeviceOrientation roll reports are more aggressive than the live camera image.
   const safeRollGain = Number.isFinite(rollCompensationGain) ? rollCompensationGain : 0.7;
-  const safeRoll = (Number.isFinite(roll) ? -(roll * safeRollGain) : 0) * -1;
+  const safeRoll = (Number.isFinite(roll) ? -(roll * safeRollGain) : 0) * -0.5;
 
   const cosHeading = Math.cos(safeHeading);
   const sinHeading = Math.sin(safeHeading);
@@ -65,8 +65,8 @@ export function projectEnuPointToScreen(options) {
 
   const cosRoll = Math.cos(safeRoll);
   const sinRoll = Math.sin(safeRoll);
-  const xCamera = xYaw * sinRoll - yPitch * cosRoll;
-  const yCamera = xYaw * cosRoll + yPitch * sinRoll;
+  const xCamera = xYaw * cosRoll - yPitch * sinRoll;
+  const yCamera = xYaw * sinRoll + yPitch * cosRoll;
   const zCamera = zPitch;
 
   if (!(zCamera > clipDistance)) return null;
