@@ -198,6 +198,34 @@ function normalizeRingPoints(feature, source) {
   return out;
 }
 
+function inferBoundaryRole(feature) {
+  const attrs = feature?.attributes || {};
+  const hasParcelIdentity = [
+    attrs.PARCEL,
+    attrs.Parcel,
+    attrs.PIN,
+    attrs.Pin,
+    attrs.RP,
+    attrs.AIN,
+    attrs.APN,
+    attrs.PARCEL_ID,
+    attrs.PARCELID,
+    attrs.PARCELNO,
+  ].some((value) => String(value ?? '').trim());
+  if (hasParcelIdentity) return 'parcel';
+
+  const hasSubdivisionIdentity = [
+    attrs.SUB_NAME,
+    attrs.SUBDIVISION,
+    attrs.SUB,
+    attrs.PLAT_NAME,
+    attrs.PLATNAME,
+  ].some((value) => String(value ?? '').trim());
+  if (hasSubdivisionIdentity) return 'subdivision';
+
+  return null;
+}
+
 function sectionExtent(sectionFeature) {
   const ring = stripClosingDup(sectionFeature?.geometry?.rings?.[0] || []);
   if (!ring.length) return null;
@@ -248,10 +276,19 @@ export function buildRosBoundaryCsvRowsPNEZD({
   notesByCoordinate = new Map(),
   includePlssWithoutNotes = true,
 } = {}) {
+  let resolvedParcelFeature = parcelFeature2243;
+  let resolvedSubdivisionFeature = subdivisionFeature2243;
+  const parcelRole = inferBoundaryRole(parcelFeature2243);
+  const subdivisionRole = inferBoundaryRole(subdivisionFeature2243);
+  if (parcelRole === 'subdivision' && subdivisionRole === 'parcel') {
+    resolvedParcelFeature = subdivisionFeature2243;
+    resolvedSubdivisionFeature = parcelFeature2243;
+  }
+
   const points = new Map();
   const sources = [
-    ...normalizeRingPoints(parcelFeature2243, 'parcel'),
-    ...normalizeRingPoints(subdivisionFeature2243, 'subdivision'),
+    ...normalizeRingPoints(resolvedParcelFeature, 'parcel'),
+    ...normalizeRingPoints(resolvedSubdivisionFeature, 'subdivision'),
     ...aliquotFeatures2243.flatMap((feature) => normalizeRingPoints(feature, 'aliquot')),
   ];
 
