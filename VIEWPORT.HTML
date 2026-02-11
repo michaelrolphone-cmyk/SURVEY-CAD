@@ -374,6 +374,8 @@
     }
     .clusterTooltip.hidden{ display:none; }
     .clusterTooltip b{ color:#ffd54a; }
+    .clusterTooltip .clusterTooltipLayerName,
+    .clusterTooltip .clusterTooltipPointName{ font-weight:700; }
     .clusterTooltip ul{ margin:6px 0 0 16px; padding:0; }
     .clusterTooltip li{ margin:2px 0; }
     .quickToolField{
@@ -3576,18 +3578,27 @@
         const countsByLayer = new Map();
         for (const entry of cluster.members) {
           const point = entry.point;
-          const layerName = String(getLayerById(point.layerId)?.name || "Unassigned").trim() || "Unassigned";
-          countsByLayer.set(layerName, (countsByLayer.get(layerName) || 0) + 1);
+          const layer = getLayerById(point.layerId);
+          const layerName = String(layer?.name || "Unassigned").trim() || "Unassigned";
+          const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
+          const existing = countsByLayer.get(layerName);
+          if (existing) {
+            existing.count += 1;
+          } else {
+            countsByLayer.set(layerName, { count: 1, color: layerColor });
+          }
         }
         return Array.from(countsByLayer.entries())
-          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-          .map(([layerName, count]) => `<li><b>${escapeHtml(layerName)}</b>: ${count} point${count === 1 ? "" : "s"}</li>`)
+          .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+          .map(([layerName, meta]) => `<li><b class="clusterTooltipLayerName" style="color:${escapeHtml(meta.color)}">${escapeHtml(layerName)}</b>: ${meta.count} point${meta.count === 1 ? "" : "s"}</li>`)
           .join("");
       })()
       : cluster.members.map((entry) => {
         const point = entry.point;
+        const layer = getLayerById(point.layerId);
+        const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
         const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
-        return `<li><b>${escapeHtml(point.num)}</b>${code}</li>`;
+        return `<li><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</li>`;
       }).join("");
     clusterTooltip.innerHTML = `<div><b>${cluster.members.length} clustered points</b></div><ul>${listHtml}</ul>`;
     clusterTooltip.classList.remove("hidden");

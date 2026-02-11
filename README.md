@@ -728,3 +728,5 @@ No API endpoints or CLI commands changed in this LineSmith implicit post-END seq
 No API endpoints or CLI commands changed in this LineSmith point-clustering/tooltip/cluster-zoom and label-spread update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 No API endpoints or CLI commands changed in this LineSmith HTML layer-dropdown customization update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed in this LineSmith cluster-tooltip layer-color styling update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
