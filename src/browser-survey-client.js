@@ -43,6 +43,11 @@ export async function loadSubdivisionAtPoint(lon, lat, outSR = 4326) {
   return payload.subdivision || null;
 }
 
+export async function loadUtilitiesByAddress(address, outSR = 2243) {
+  const payload = await requestJson('/api/utilities', { address, outSR });
+  return payload.utilities || [];
+}
+
 export function buildRosPdfProxyUrl(url) {
   return buildUrl('/api/ros-pdf', { url });
 }

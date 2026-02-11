@@ -208,6 +208,7 @@ curl "http://localhost:3000/api/parcel?lon=-116.2&lat=43.61&outSR=2243&searchMet
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61"
 curl "http://localhost:3000/api/aliquots?lon=-116.2&lat=43.61&outSR=2243"
 curl "http://localhost:3000/api/subdivision?lon=-116.2&lat=43.61&outSR=2243"
+curl "http://localhost:3000/api/utilities?address=1600%20W%20Front%20St%2C%20Boise&outSR=2243"
 curl "http://localhost:3000/api/ros-pdf?url=https%3A%2F%2Fexample.com%2Fros.pdf"
 curl "http://localhost:3000/api/project-file/template?projectName=Demo&client=Ada%20County&address=100%20Main%20St%2C%20Boise"
 curl "http://localhost:3000/api/localstorage-sync"
@@ -227,7 +228,7 @@ WebSocket endpoint for LineSmith realtime collaboration:
 ws://localhost:3000/ws/lineforge?room=<room-id>
 ```
 
-Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. Geocoding now tries Nominatim first and then automatically falls back to ArcGIS World Geocode when Nominatim fails. `/api/lookup` will still return a successful payload when geocoding fails but the Ada County address layer returns a match (including a fallback query that relaxes directional/suffix filters). If both data sources fail to locate the address, `/api/lookup` returns a clear validation error instead of bubbling an upstream HTTP error.
+Upstream HTTP failures from third-party services (for example, geocoding provider 403s) are returned as `502 Bad Gateway` from this API so callers can distinguish dependency outages from client-side request validation errors. Geocoding now tries Nominatim first and then automatically falls back to ArcGIS World Geocode when Nominatim fails. `/api/lookup` will still return a successful payload when geocoding fails but the Ada County address layer returns a match (including a fallback query that relaxes directional/suffix filters). If both data sources fail to locate the address, `/api/lookup` returns a clear validation error instead of bubbling an upstream HTTP error. `/api/lookup` now also attempts Idaho Power residential utility lookup (projected to EPSG:2243 when available) and includes a `utilities` array in the response for RecordQuarry map/export workflows.
 When requesting projected output (`outSR`, e.g. `2243`) from `/api/parcel` and `/api/subdivision`, the server now first resolves the containing feature in WGS84 and then refetches that exact record by `OBJECTID` in the requested spatial reference to keep CSV/export geometry aligned with the looked-up address. If the projected refetch is rejected by the upstream ArcGIS layer, the API now gracefully falls back to the original WGS84 geometry instead of failing the request. If `/api/subdivision` receives an upstream projection error for the initial requested `outSR`, the server retries the same lookup in WGS84 (`4326`) and still returns a successful payload when possible. `/api/subdivision` and related lookup flows also fall back to nearest returned polygon when the point is outside all returned rings, preventing centroid helper runtime errors and preserving a valid geometry response.
 
 `/api/localstorage-sync` provides an in-memory localStorage mirror for the current Node.js server process. The launcher sends the full localStorage snapshot plus a numeric `version` (`surveyfoundryLocalStorageVersion`) whenever browser storage changes. If the browser posts an older version than the server has, the API responds with `status: "client-stale"` and the newer server snapshot so the launcher can merge stale keys from the server into browser storage without clearing unrelated local app payloads.
@@ -243,6 +244,7 @@ The static HTML tools use `src/browser-survey-client.js` so network calls flow t
 - `loadSectionAtPoint(lon, lat)` → `/api/section`
 - `loadAliquotsAtPoint(lon, lat, outSR?)` → `/api/aliquots`
 - `loadSubdivisionAtPoint(lon, lat, outSR?)` → `/api/subdivision`
+- `loadUtilitiesByAddress(address, outSR?)` → `/api/utilities` (Idaho Power residential utility lookup normalized for RecordQuarry preview markers and PointForge export points)
 - `buildRosPdfProxyUrl(url)` → `/api/ros-pdf?url=...` (stream ROS/aliquot PDFs through the API server to avoid browser CORS blocking; supports absolute URLs and relative PDF paths found in ArcGIS attributes)
 
 ### Static HTML files

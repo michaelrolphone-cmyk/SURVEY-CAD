@@ -27,6 +27,29 @@ function createMockServer(options = {}) {
     }
 
 
+    if (url.pathname === '/idaho-power/utilities') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        utilities: [{
+          id: 'utility-1',
+          provider: 'Idaho Power',
+          name: 'Boise Service Utility',
+          geometry: { x: -116.2, y: 43.61, spatialReference: { wkid: 4326 } },
+        }],
+      }));
+      return;
+    }
+
+    if (url.pathname === '/geometry/project') {
+      const geometriesRaw = url.searchParams.get('geometries') || '{}';
+      const geometries = JSON.parse(geometriesRaw).geometries || [];
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        geometries: geometries.map((point) => ({ x: Number(point.x) + 1000000, y: Number(point.y) + 1000000 })),
+      }));
+      return;
+    }
+
     if (url.pathname === '/arcgis-geocode') {
       headers.arcgisGeocodeUserAgent = req.headers['user-agent'] || null;
       res.setHeader('Content-Type', 'application/json');
@@ -406,6 +429,32 @@ test('loadSubdivisionAtPoint falls back to WGS84 geometry when projected refetch
     assert.equal(subdivision.attributes.NAME, 'polygon');
     assert.deepEqual(subdivision.geometry.rings[0][0], [-116.3, 43.5]);
     assert.ok(requests.some((r) => r.includes('/18/query') && r.includes('outSR=2243')));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+
+test('lookupUtilitiesByAddress normalizes Idaho Power utility payload and projects to export SR', async () => {
+  const { server, port } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode`,
+    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+    arcgisGeometryProjectUrl: `${base}/geometry/project`,
+  });
+
+  try {
+    const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
+    assert.equal(utilities.length, 1);
+    assert.equal(utilities[0].provider, 'Idaho Power');
+    assert.deepEqual(utilities[0].location, { lon: -116.2, lat: 43.61 });
+    assert.deepEqual(utilities[0].projected, {
+      east: 999883.8,
+      north: 1000043.61,
+      spatialReference: { wkid: 2243 },
+    });
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

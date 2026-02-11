@@ -299,6 +299,15 @@ export function createSurveyServer({
         return;
       }
 
+      if (urlObj.pathname === '/api/utilities') {
+        const address = urlObj.searchParams.get('address');
+        if (!address) throw new Error('address query parameter is required.');
+        const outSR = Number(urlObj.searchParams.get('outSR') || 2243);
+        const utilities = await client.lookupUtilitiesByAddress(address, outSR);
+        sendJson(res, 200, { utilities });
+        return;
+      }
+
       if (urlObj.pathname === '/api/static-map') {
         const { lon, lat } = parseLonLat(urlObj);
         const address = urlObj.searchParams.get('address') || '';
