@@ -59,6 +59,15 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 - `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
 
+### LineSmith Field-to-Finish commands
+
+LineSmith parses field-to-finish tokens from point codes and can auto-generate geometry:
+
+- `JPN <pointNumber>`: connect this point to another point by point number (e.g. `JPN 102`).
+- `<code> BEG/END/CLO`: start/end/close sequential linework for a linework code.
+- `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
+  - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
+
 ## Test
 
 ```bash
