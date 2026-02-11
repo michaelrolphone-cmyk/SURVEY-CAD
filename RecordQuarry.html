@@ -385,8 +385,8 @@
 </div>
 
 <script type="module">
-import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
-import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport } from "./src/ros-export.js";
+import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, loadUtilitiesByAddress, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
+import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport } from "./src/ros-export.js";
 
 (() => {
   // -----------------------------
@@ -1395,6 +1395,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     section: L.layerGroup().addTo(map),
     township: L.layerGroup().addTo(map),
     ros: L.layerGroup().addTo(map),
+    utilities: L.layerGroup().addTo(map),
     aliquots: L.layerGroup().addTo(map),
     cornerMarkers: L.layerGroup().addTo(map),
   };
@@ -1448,6 +1449,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     lastLookupAddress: '',
     exportGeoJSON: null,
     lastLonLat: null,
+    utilityLocations: [],
     projectContext: initialProjectContext
   };
 
@@ -1693,6 +1695,19 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     m.bindPopup(`<b>Address</b><br/>${escapeHtml(formatAddressAttrs(f.attributes || {}))}`);
     layers.address.addLayer(m);
     return m;
+  }
+
+  function drawUtilityLocations(utilities = []) {
+    layers.utilities.clearLayers();
+    for (const utility of (utilities || [])) {
+      const lon = Number(utility?.location?.lon);
+      const lat = Number(utility?.location?.lat);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+      const label = utility?.name || utility?.provider || 'Utility';
+      const marker = L.circleMarker([lat, lon], { radius: 6, weight: 2, color: '#ffffff', fillColor: '#ffcc66', fillOpacity: 0.9 });
+      marker.bindPopup(`<b>Utility</b><br/>${escapeHtml(label)}<br/><span class="small">${escapeHtml(utility?.provider || 'Idaho Power')}</span>`);
+      layers.utilities.addLayer(marker);
+    }
   }
 
   function drawPolygonFeature(f, group, geojsonOptions, label) {
@@ -2123,6 +2138,17 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
 
       const rosFromLookup = normalizeRosFeatures(lookup.ros || []);
       const ros = filterRosFeaturesForSection(rosFromLookup, section);
+      let utilityLocations = Array.isArray(lookup?.utilities) ? lookup.utilities : [];
+      if (!utilityLocations.length) {
+        try {
+          utilityLocations = await loadUtilitiesByAddress(rawAddr, EXPORT_OUT_SR);
+        } catch (utilityError) {
+          log(`Utility lookup failed: ${utilityError.message || utilityError}`, 'warn');
+        }
+      }
+      state.utilityLocations = utilityLocations;
+      drawUtilityLocations(state.utilityLocations);
+      log(`Utility locations found: ${state.utilityLocations.length}`);
       state.rosFeatures = ros;
       log(`ROS in containing section: ${ros.length} (from ${rosFromLookup.length} nearby ROS)`);
 
@@ -2240,6 +2266,10 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
         cards.push(...aliquotCards);
       }
 
+      if (state.utilityLocations.length) {
+        cards.push(card("Utilities", "Idaho Power residential utility locations", [["Count", String(state.utilityLocations.length)]], []));
+      }
+
       if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
       if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
@@ -2326,6 +2356,7 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
     state.lastLonLat = null;
+    state.utilityLocations = [];
     $("pdfFindings").style.display = "none";
     $("pdfFindings").textContent = "";
     log("Cleared.");
@@ -2407,22 +2438,30 @@ import { buildAliquotSelectionKey, buildRosBoundaryCsvRowsPNEZD, filterAliquotFe
       });
       if (!uniquePart.count) throw new Error('No parcel/subdivision points or CP&F-backed PLSS points available to export to PointForge.');
 
+      const utilityMarkers = (state.utilityLocations || []).map((utility, index) => ({
+        east: Number(utility?.projected?.east),
+        north: Number(utility?.projected?.north),
+        label: `${utility?.provider || "Idaho Power"} ${utility?.name || `Utility ${index + 1}`}`.trim(),
+      })).filter((point) => Number.isFinite(point.east) && Number.isFinite(point.north));
+      const utilityRows = buildPointMarkerCsvRowsPNEZD(utilityMarkers, uniquePart.nextPoint, 'UTILITY');
+      const pointForgeCsv = `${uniquePart.csv}${utilityRows.csv}`;
+
       localStorage.setItem(POINTFORGE_ROS_IMPORT_STORAGE_KEY, JSON.stringify({
         source: 'ros-html',
         exportedAt: new Date().toISOString(),
-        csv: uniquePart.csv,
+        csv: pointForgeCsv,
       }));
       const projectFileUpdate = persistPointForgeExportProjectFile({
         projectContext: state.projectContext,
         notesByCoordinate,
-        csv: uniquePart.csv,
-        pointCount: uniquePart.count,
+        csv: pointForgeCsv,
+        pointCount: uniquePart.count + utilityRows.count,
       });
       if (projectFileUpdate) {
         log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references).`);
       }
       openLinkedApp('/POINT_TRANSFORMER.HTML?source=ros');
-      log(`Sent ${uniquePart.count} unique boundary points to PointForge.`);
+      log(`Sent ${uniquePart.count + utilityRows.count} points to PointForge (${utilityRows.count} utility point(s)).`);
     } catch (e) {
       log(`PointForge export failed: ${e.message || e}`, "bad");
       console.error(e);

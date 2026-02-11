@@ -78,6 +78,30 @@ function createMockServer() {
       return;
     }
 
+    if (url.pathname === '/idaho-power/utilities') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        utilities: [{
+          id: 'utility-1',
+          provider: 'Idaho Power',
+          name: 'Boise Service Utility',
+          geometry: { x: -116.2, y: 43.61, spatialReference: { wkid: 4326 } },
+        }],
+      }));
+      return;
+    }
+
+    if (url.pathname === '/geometry/project') {
+      const geometriesRaw = url.searchParams.get('geometries') || '{}';
+      const geometries = JSON.parse(geometriesRaw).geometries || [];
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        geometries: geometries.map((point) => ({ x: Number(point.x) + 1000000, y: Number(point.y) + 1000000 })),
+      }));
+      return;
+    }
+
+
     if (url.pathname === '/sample.pdf') {
       res.setHeader('Content-Type', 'application/pdf');
       res.end(Buffer.from('%PDF-1.4\n%mock\n', 'utf8'));
@@ -107,6 +131,8 @@ test('server exposes survey APIs and static html', async () => {
     nominatimUrl: `${base}/geocode`,
     blmFirstDivisionLayer: `${base}/blm1`,
     blmSecondDivisionLayer: `${base}/blm2`,
+    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+    arcgisGeometryProjectUrl: `${base}/geometry/project`,
   });
   const app = await startApiServer(client);
 
@@ -169,6 +195,12 @@ test('server exposes survey APIs and static html', async () => {
     const subdivisionPayload = await subdivisionRes.json();
     assert.equal(subdivisionPayload.subdivision.attributes.NAME, 'polygon');
     assert.deepEqual(subdivisionPayload.subdivision.geometry.rings[0][0], [-116.3, 43.5]);
+
+    const utilitiesRes = await fetch(`http://127.0.0.1:${app.port}/api/utilities?address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(utilitiesRes.status, 200);
+    const utilitiesPayload = await utilitiesRes.json();
+    assert.equal(utilitiesPayload.utilities.length, 1);
+    assert.equal(utilitiesPayload.utilities[0].provider, 'Idaho Power');
 
     const rosPdfRes = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=${encodeURIComponent(`${base}/sample.pdf`)}`);
     assert.equal(rosPdfRes.status, 200);

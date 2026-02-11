@@ -17,6 +17,8 @@ const DEFAULTS = {
   nominatimEmail: "admin@example.com",
   arcgisGeocodeUrl:
     "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+  idahoPowerUtilityLookupUrl: "https://tools.idahopower.com/ServiceEstimator/api/ResidentialUtilities",
+  arcgisGeometryProjectUrl: "https://utility.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer/project",
 };
 
 const DIRS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
@@ -254,6 +256,108 @@ export class SurveyCadClient {
     return this.fetchJson(url);
   }
 
+  async projectPoints(points = [], inSR = 4326, outSR = 2243) {
+    if (!Array.isArray(points) || !points.length || inSR === outSR) {
+      return points;
+    }
+
+    const url = new URL(this.config.arcgisGeometryProjectUrl);
+    url.searchParams.set('f', 'json');
+    url.searchParams.set('inSR', String(inSR));
+    url.searchParams.set('outSR', String(outSR));
+    url.searchParams.set('geometries', JSON.stringify({
+      geometryType: 'esriGeometryPoint',
+      geometries: points.map((point) => ({ x: Number(point.x), y: Number(point.y) })),
+    }));
+
+    const payload = await this.fetchJson(url.toString());
+    return payload?.geometries || [];
+  }
+
+  normalizeUtilityLocation(entry = {}) {
+    const geometry = entry.geometry || entry.location || {};
+    const attrs = entry.attributes || entry.properties || {};
+
+    const lon = Number(
+      geometry.x ?? geometry.lon ?? geometry.lng ?? geometry.longitude ?? entry.lon ?? entry.lng ?? entry.longitude,
+    );
+    const lat = Number(
+      geometry.y ?? geometry.lat ?? geometry.latitude ?? entry.lat ?? entry.latitude,
+    );
+
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+
+    const spatialReference = geometry.spatialReference || entry.spatialReference || {};
+    const wkid = Number(spatialReference.wkid || spatialReference.latestWkid || 4326);
+
+    return {
+      id: String(attrs.id || attrs.ID || attrs.OBJECTID || attrs.objectid || entry.id || `${lon},${lat}`),
+      name: String(attrs.name || attrs.NAME || entry.name || entry.utilityName || 'Utility location'),
+      provider: String(attrs.provider || attrs.PROVIDER || entry.provider || 'Idaho Power'),
+      geometry: {
+        x: lon,
+        y: lat,
+        spatialReference: { wkid },
+      },
+    };
+  }
+
+  async lookupUtilitiesByAddress(address, outSR = 4326) {
+    const url = new URL(this.config.idahoPowerUtilityLookupUrl);
+    url.searchParams.set('address', address);
+
+    const payload = await this.fetchJson(url.toString());
+    const rawUtilities = payload?.features || payload?.utilities || payload?.results || [];
+    const normalized = rawUtilities
+      .map((entry) => this.normalizeUtilityLocation(entry))
+      .filter(Boolean);
+
+    if (!normalized.length) {
+      return [];
+    }
+
+    const groupedByWkid = new Map();
+    normalized.forEach((utility, index) => {
+      const wkid = Number(utility?.geometry?.spatialReference?.wkid || 4326);
+      if (!groupedByWkid.has(wkid)) groupedByWkid.set(wkid, []);
+      groupedByWkid.get(wkid).push({ utility, index });
+    });
+
+    const output = [...normalized];
+    for (const [wkid, group] of groupedByWkid.entries()) {
+      if (wkid === outSR) continue;
+      const projected = await this.projectPoints(group.map(({ utility }) => utility.geometry), wkid, outSR);
+      for (let i = 0; i < group.length; i += 1) {
+        const projectedPoint = projected[i];
+        if (!projectedPoint) continue;
+        output[group[i].index] = {
+          ...output[group[i].index],
+          projected: {
+            east: Number(projectedPoint.x),
+            north: Number(projectedPoint.y),
+            spatialReference: { wkid: outSR },
+          },
+        };
+      }
+    }
+
+    return output.map((utility) => {
+      const lon = Number(utility.geometry.x);
+      const lat = Number(utility.geometry.y);
+      const projected = utility.projected || (outSR === 4326
+        ? { east: lon, north: lat, spatialReference: { wkid: 4326 } }
+        : null);
+
+      return {
+        id: utility.id,
+        name: utility.name,
+        provider: utility.provider,
+        location: { lon, lat },
+        projected,
+      };
+    });
+  }
+
   async findBestAddressFeature(rawAddress) {
     const parsed = parseAddress(rawAddress);
     const response = await this.arcQuery(this.config.layers.address, {
@@ -457,6 +561,13 @@ export class SurveyCadClient {
     const subdivision = await this.findContainingPolygon(this.config.layers.subdivisions, lon, lat, 2500);
     const ros = await this.findRosNearPoint(lon, lat, 1600);
 
+    let utilities = [];
+    try {
+      utilities = await this.lookupUtilitiesByAddress(address, 2243);
+    } catch {
+      utilities = [];
+    }
+
     return {
       geocode,
       addressFeature,
@@ -466,6 +577,7 @@ export class SurveyCadClient {
       township,
       subdivision,
       ros,
+      utilities,
     };
   }
 }
