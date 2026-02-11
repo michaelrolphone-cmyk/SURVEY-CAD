@@ -291,15 +291,35 @@
       top:10px;
       left:10px;
       z-index:6;
+      right:10px;
       display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      max-width:min(100% - 130px, 920px);
+      flex-direction:column;
+      gap:6px;
+      width:calc(100% - 20px);
       padding:8px;
       border:1px solid var(--border);
       border-radius:12px;
       background:rgba(8,8,8,0.92);
       backdrop-filter:blur(4px);
+    }
+    .quickToolsRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+      min-width:0;
+    }
+    .quickToolsRowSecondary{
+      padding-top:2px;
+      border-top:1px solid rgba(255,255,255,0.08);
+    }
+    .app.panelCollapsed .quickTools{
+      left:0;
+      right:0;
+      width:100%;
+      border-left:none;
+      border-right:none;
+      border-radius:0;
     }
     .quickToolBtn{
       width:34px;
@@ -1154,49 +1174,52 @@
     <button id="drawerEdgeExpand" class="drawerEdgeExpand" aria-label="Expand controls drawer" title="Expand controls drawer">←</button>
     <button id="drawerToggle" class="drawerToggle">Tools</button>
     <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
-      <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
-      <button id="quickOpenArrowHead" class="quickToolBtn" title="Open ArrowHead AR" aria-label="Open ArrowHead AR"><i class="fa-solid fa-vr-cardboard"></i></button>
-      <label class="quickToolField" title="Show map layer behind canvas"><input id="quickMapLayerEnabled" type="checkbox" /> Map</label>
-      <div class="quickToolField" title="Map tiles">
-        <select id="quickMapTileType" aria-label="Quick Map Tile Type">
-          <option value="satellite" selected>Satellite</option>
-          <option value="osmStandard">OSM Standard</option>
-          <option value="osmHumanitarian">OSM Humanitarian</option>
-          <option value="osmCycle">OSM Cycle</option>
-        </select>
-      </div>
-      <div class="quickToolField quickToolToggleGroup" title="Point display toggles" aria-label="Point display toggles">
-        <button id="quickShowPoints" class="quickToggleBtn active" title="Toggle point markers" aria-label="Toggle point markers"><i class="fa-solid fa-location-crosshairs"></i><span class="sr-only">Points</span></button>
-        <button id="quickShowPointNames" class="quickToggleBtn active" title="Toggle point names" aria-label="Toggle point names"><i class="fa-solid fa-tag"></i><span class="sr-only">Names</span></button>
-        <button id="quickShowPointCodes" class="quickToggleBtn active" title="Toggle point codes" aria-label="Toggle point codes"><i class="fa-solid fa-hashtag"></i><span class="sr-only">Codes</span></button>
-        <button id="quickShowPointNotes" class="quickToggleBtn" title="Toggle point notes" aria-label="Toggle point notes"><i class="fa-solid fa-note-sticky"></i><span class="sr-only">Notes</span></button>
-        <button id="quickTogglePointClustering" class="quickToggleBtn active" title="Toggle point clustering" aria-label="Toggle point clustering"><i class="fa-solid fa-circle-nodes"></i><span class="sr-only">Clustering</span></button>
-      </div>
-      <div class="quickToolField quickToolLayer" title="Active layer">
-        <span id="quickLayerColor" class="quickToolLayerSwatch" aria-hidden="true"></span>
-        <div id="quickLayerDropdown" class="quickLayerDropdown">
-          <button id="quickLayerDropdownButton" class="quickLayerDropdownBtn" aria-label="Active Layer" aria-haspopup="listbox" aria-expanded="false">
-            <span id="quickLayerDropdownLabel" class="quickLayerDropdownBtnText">Layer</span>
-            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-          </button>
-          <div id="quickLayerDropdownMenu" class="quickLayerDropdownMenu hidden" role="listbox" aria-label="Layer options"></div>
+      <div class="quickToolsRow quickToolsRowPrimary">
+        <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
+        <button id="quickOpenArrowHead" class="quickToolBtn" title="Open ArrowHead AR" aria-label="Open ArrowHead AR"><i class="fa-solid fa-vr-cardboard"></i></button>
+        <label class="quickToolField" title="Show map layer behind canvas"><input id="quickMapLayerEnabled" type="checkbox" /> Map</label>
+        <div class="quickToolField" title="Map tiles">
+          <select id="quickMapTileType" aria-label="Quick Map Tile Type">
+            <option value="satellite" selected>Satellite</option>
+            <option value="osmStandard">OSM Standard</option>
+            <option value="osmHumanitarian">OSM Humanitarian</option>
+            <option value="osmCycle">OSM Cycle</option>
+          </select>
         </div>
+        <div class="quickToolField quickToolToggleGroup" title="Point display toggles" aria-label="Point display toggles">
+          <button id="quickShowPoints" class="quickToggleBtn active" title="Toggle point markers" aria-label="Toggle point markers"><i class="fa-solid fa-location-crosshairs"></i><span class="sr-only">Points</span></button>
+          <button id="quickShowPointNames" class="quickToggleBtn active" title="Toggle point names" aria-label="Toggle point names"><i class="fa-solid fa-tag"></i><span class="sr-only">Names</span></button>
+          <button id="quickShowPointCodes" class="quickToggleBtn active" title="Toggle point codes" aria-label="Toggle point codes"><i class="fa-solid fa-hashtag"></i><span class="sr-only">Codes</span></button>
+          <button id="quickShowPointNotes" class="quickToggleBtn" title="Toggle point notes" aria-label="Toggle point notes"><i class="fa-solid fa-note-sticky"></i><span class="sr-only">Notes</span></button>
+          <button id="quickTogglePointClustering" class="quickToggleBtn active" title="Toggle point clustering" aria-label="Toggle point clustering"><i class="fa-solid fa-circle-nodes"></i><span class="sr-only">Clustering</span></button>
+        </div>
+        <div class="quickToolField quickToolLayer" title="Active layer">
+          <span id="quickLayerColor" class="quickToolLayerSwatch" aria-hidden="true"></span>
+          <div id="quickLayerDropdown" class="quickLayerDropdown">
+            <button id="quickLayerDropdownButton" class="quickLayerDropdownBtn" aria-label="Active Layer" aria-haspopup="listbox" aria-expanded="false">
+              <span id="quickLayerDropdownLabel" class="quickLayerDropdownBtnText">Layer</span>
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </button>
+            <div id="quickLayerDropdownMenu" class="quickLayerDropdownMenu hidden" role="listbox" aria-label="Layer options"></div>
+          </div>
+        </div>
+        <button id="quickLayerManager" class="quickToolBtn" title="Layer Manager" aria-label="Layer Manager"><i class="fa-solid fa-layer-group"></i></button>
       </div>
-      <button id="quickLayerManager" class="quickToolBtn" title="Layer Manager" aria-label="Layer Manager"><i class="fa-solid fa-layer-group"></i></button>
-      <span class="quickToolDivider" aria-hidden="true"></span>
-      <button id="quickSelect" class="quickToolBtn primary" title="Select / Move" aria-label="Select / Move"><i class="fa-solid fa-arrow-pointer"></i></button>
-      <button id="quickAddPoint" class="quickToolBtn" title="Add Point" aria-label="Add Point"><i class="fa-solid fa-circle-plus"></i></button>
-      <button id="quickLineByPoints" class="quickToolBtn" title="Line by Points" aria-label="Line by Points"><i class="fa-solid fa-share-nodes"></i></button>
-      <span class="quickToolDivider" aria-hidden="true"></span>
-      <button id="quickUndo" class="quickToolBtn" title="Undo" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
-      <button id="quickRedo" class="quickToolBtn" title="Redo" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
-      <button id="quickZoomExtents" class="quickToolBtn" title="Zoom Extents" aria-label="Zoom Extents"><i class="fa-solid fa-expand"></i></button>
-      <span class="quickToolDivider" aria-hidden="true"></span>
-      <button id="quickExtend" class="quickToolBtn" title="Extend to Intersect" aria-label="Extend"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-      <button id="quickTrimIntersect" class="quickToolBtn" title="Trim to Intersect" aria-label="Trim / Intersect"><i class="fa-solid fa-scissors"></i></button>
-      <button id="quickOffsetLine" class="quickToolBtn" title="Offset Selected Line" aria-label="Offset Selected Line"><i class="fa-solid fa-arrows-left-right"></i></button>
-      <button id="quickRotateSelection" class="quickToolBtn" title="Rotate Selection (Reference)" aria-label="Rotate Selection"><i class="fa-solid fa-rotate"></i></button>
-      <button id="quickPointManager" class="quickToolBtn" title="Open Points Manager" aria-label="Point Manager"><i class="fa-solid fa-list"></i></button>
+      <div class="quickToolsRow quickToolsRowSecondary">
+        <button id="quickSelect" class="quickToolBtn primary" title="Select / Move" aria-label="Select / Move"><i class="fa-solid fa-arrow-pointer"></i></button>
+        <button id="quickAddPoint" class="quickToolBtn" title="Add Point" aria-label="Add Point"><i class="fa-solid fa-circle-plus"></i></button>
+        <button id="quickLineByPoints" class="quickToolBtn" title="Line by Points" aria-label="Line by Points"><i class="fa-solid fa-share-nodes"></i></button>
+        <span class="quickToolDivider" aria-hidden="true"></span>
+        <button id="quickUndo" class="quickToolBtn" title="Undo" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
+        <button id="quickRedo" class="quickToolBtn" title="Redo" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
+        <button id="quickZoomExtents" class="quickToolBtn" title="Zoom Extents" aria-label="Zoom Extents"><i class="fa-solid fa-expand"></i></button>
+        <span class="quickToolDivider" aria-hidden="true"></span>
+        <button id="quickExtend" class="quickToolBtn" title="Extend to Intersect" aria-label="Extend"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+        <button id="quickTrimIntersect" class="quickToolBtn" title="Trim to Intersect" aria-label="Trim / Intersect"><i class="fa-solid fa-scissors"></i></button>
+        <button id="quickOffsetLine" class="quickToolBtn" title="Offset Selected Line" aria-label="Offset Selected Line"><i class="fa-solid fa-arrows-left-right"></i></button>
+        <button id="quickRotateSelection" class="quickToolBtn" title="Rotate Selection (Reference)" aria-label="Rotate Selection"><i class="fa-solid fa-rotate"></i></button>
+        <button id="quickPointManager" class="quickToolBtn" title="Open Points Manager" aria-label="Point Manager"><i class="fa-solid fa-list"></i></button>
+      </div>
     </div>
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>

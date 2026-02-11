@@ -19,6 +19,12 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
 
   assert.match(html, /cdnjs\.cloudflare\.com\/ajax\/libs\/font-awesome\//, 'LineSmith should load a font icon set for quick toolbar buttons');
   assert.match(html, /id="quickTools"\s+class="quickTools"/, 'canvas should render a quick tools toolbar at the top of the drawing window');
+  assert.match(html, /class="quickToolsRow quickToolsRowPrimary"/, 'quick toolbar should render a dedicated first row for map and layer controls');
+  assert.match(html, /class="quickToolsRow quickToolsRowSecondary"/, 'quick toolbar should render a dedicated second row for draw and edit tools');
+  assert.match(html, /class="quickToolsRow quickToolsRowSecondary"[\s\S]*id="quickSelect"/, 'quick toolbar second row should begin with the Select\/Move tool');
+  assert.match(html, /\.quickTools\{[\s\S]*left:10px;[\s\S]*right:10px;[\s\S]*width:calc\(100% - 20px\);/, 'quick toolbar should span the full visible map width while respecting edge insets');
+  assert.match(html, /\.app\.panelCollapsed \.quickTools\{[\s\S]*left:0;[\s\S]*right:0;[\s\S]*width:100%;/, 'quick toolbar should expand to full viewport width when the tools drawer is collapsed');
+  assert.match(html, /\.quickToolsRow\{[\s\S]*flex-wrap:wrap;/, 'each quick toolbar row should preserve wrapping behavior on narrow widths');
   assert.match(html, /id="quickSave"[\s\S]*fa-floppy-disk/, 'quick toolbar should include Save icon shortcut');
   assert.match(html, /id="quickOpenArrowHead"[\s\S]*fa-vr-cardboard/, 'quick toolbar should include Open ArrowHead shortcut');
   assert.match(html, /id="quickMapLayerEnabled"\s+type="checkbox"/, 'quick toolbar should include map layer toggle');
