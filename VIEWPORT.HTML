@@ -64,7 +64,7 @@
       border-left:none;
       padding:0;
       overflow:hidden;
-      pointer-events:none;
+      pointer-events:auto;
     }
     .panelCollapseHandle{
       position:absolute;
@@ -380,7 +380,7 @@
       color:var(--text);
       font-size:11px;
       line-height:1.4;
-      pointer-events:none;
+      pointer-events:auto;
       padding:8px;
       white-space:normal;
     }
@@ -396,6 +396,17 @@
       padding:1px 4px;
       margin-left:-4px;
       margin-right:-4px;
+    }
+    .clusterTooltip .clusterTooltipAction{
+      width:100%;
+      text-align:left;
+      background:transparent;
+      border:0;
+      color:inherit;
+      padding:0;
+      margin:0;
+      cursor:pointer;
+      font:inherit;
     }
     .pointHoverTooltipRow{ margin:2px 0; }
     .pointHoverTooltipLabel{
@@ -2042,8 +2053,15 @@
   const POINT_CLUSTER_POLYGON_AREA_RATIO_TARGET = 0.5;
   const POINT_CLUSTER_POLYGON_AREA_RATIO_TOLERANCE = 0.15;
   const POINT_CLUSTER_POLYGON_MIN_WIDTH_TO_HEIGHT_RATIO = 1 / 3;
+  const POINT_CLUSTER_TOOLTIP_HIDE_DELAY_MS = 180;
   let cachedPointClusters = [];
   let hoveredClusterPointId = null;
+  let activeClusterTooltip = {
+    cluster: null,
+    expandedLayerId: null
+  };
+  let clusterTooltipHovering = false;
+  let clusterTooltipHideTimer = null;
 
   const mapLayerState = {
     enabled: false,
@@ -4064,39 +4082,75 @@
     return closest;
   }
 
-  function showClusterTooltip(cluster, screenX = mouse.x, screenY = mouse.y) {
-    if (!clusterTooltip || !cluster) return;
-    const hoveredMember = getClusterMemberClosestToScreen(cluster, screenX, screenY);
-    hoveredClusterPointId = hoveredMember?.id ?? null;
-    const listHtml = cluster.members.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT
-      ? (() => {
-        const countsByLayer = new Map();
-        for (const entry of cluster.members) {
-          const point = entry.point;
-          const layer = getLayerById(point.layerId);
-          const layerName = String(layer?.name || "Unassigned").trim() || "Unassigned";
-          const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
-          const existing = countsByLayer.get(layerName);
-          if (existing) {
-            existing.count += 1;
-          } else {
-            countsByLayer.set(layerName, { count: 1, color: layerColor });
-          }
-        }
-        return Array.from(countsByLayer.entries())
-          .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
-          .map(([layerName, meta]) => `<li><b class="clusterTooltipLayerName" style="color:${escapeHtml(meta.color)}">${escapeHtml(layerName)}</b>: ${meta.count} point${meta.count === 1 ? "" : "s"}</li>`)
-          .join("");
-      })()
-      : cluster.members.map((entry) => {
+
+  function isLineDrawingToolActive() {
+    return tool === "line2pt" || tool === "lineDB";
+  }
+
+  function clearClusterTooltipHideTimer() {
+    if (clusterTooltipHideTimer == null) return;
+    window.clearTimeout(clusterTooltipHideTimer);
+    clusterTooltipHideTimer = null;
+  }
+
+  function scheduleClusterTooltipHide() {
+    clearClusterTooltipHideTimer();
+    clusterTooltipHideTimer = window.setTimeout(() => {
+      clusterTooltipHideTimer = null;
+      if (clusterTooltipHovering) return;
+      hideClusterTooltip();
+    }, POINT_CLUSTER_TOOLTIP_HIDE_DELAY_MS);
+  }
+
+  function renderClusterTooltipMembers(cluster, expandedLayerId = null) {
+    const showLayerGroups = cluster.members.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT && !expandedLayerId;
+    if (showLayerGroups) {
+      const countsByLayer = new Map();
+      for (const entry of cluster.members) {
         const point = entry.point;
         const layer = getLayerById(point.layerId);
+        const layerId = String(point.layerId || "");
+        const layerName = String(layer?.name || "Unassigned").trim() || "Unassigned";
         const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
-        const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
-        const activeClass = point.id === hoveredClusterPointId ? " class=\"active\"" : "";
-        return `<li${activeClass}><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</li>`;
-      }).join("");
-    clusterTooltip.innerHTML = `<div><b>${cluster.members.length} clustered points</b></div><ul>${listHtml}</ul>`;
+        const existing = countsByLayer.get(layerId);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          countsByLayer.set(layerId, { count: 1, name: layerName, color: layerColor });
+        }
+      }
+      return Array.from(countsByLayer.entries())
+        .sort((a, b) => b[1].count - a[1].count || a[1].name.localeCompare(b[1].name))
+        .map(([layerId, meta]) => `<li><button type="button" class="clusterTooltipAction" data-cluster-action="expand-layer" data-layer-id="${escapeHtml(layerId)}"><b class="clusterTooltipLayerName" style="color:${escapeHtml(meta.color)}">${escapeHtml(meta.name)}</b>: ${meta.count} point${meta.count === 1 ? "" : "s"}</button></li>`)
+        .join("");
+    }
+
+    const members = expandedLayerId
+      ? cluster.members.filter((entry) => String(entry.point?.layerId || "") === String(expandedLayerId))
+      : cluster.members;
+    return members.map((entry) => {
+      const point = entry.point;
+      const layer = getLayerById(point.layerId);
+      const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
+      const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
+      const activeClass = point.id === hoveredClusterPointId ? " class=\"active\"" : "";
+      return `<li${activeClass}><button type="button" class="clusterTooltipAction" data-cluster-action="select-point" data-point-id="${escapeHtml(point.id)}"><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</button></li>`;
+    }).join("");
+  }
+
+  function showClusterTooltip(cluster, screenX = mouse.x, screenY = mouse.y, options = {}) {
+    if (!clusterTooltip || !cluster) return;
+    clearClusterTooltipHideTimer();
+    const expandedLayerId = Object.prototype.hasOwnProperty.call(options, "expandedLayerId") ? options.expandedLayerId : activeClusterTooltip.expandedLayerId;
+    const hoveredMember = getClusterMemberClosestToScreen(cluster, screenX, screenY);
+    hoveredClusterPointId = hoveredMember?.id ?? null;
+    activeClusterTooltip = { cluster, expandedLayerId };
+
+    const membersHtml = renderClusterTooltipMembers(cluster, expandedLayerId);
+    const backButtonHtml = expandedLayerId
+      ? `<div><button type="button" class="clusterTooltipAction" data-cluster-action="show-layer-groups">← Back to layers</button></div>`
+      : "";
+    clusterTooltip.innerHTML = `${backButtonHtml}<div><b>${cluster.members.length} clustered points</b></div><ul>${membersHtml}</ul>`;
     clusterTooltip.classList.remove("hidden");
 
     const rect = canvas.getBoundingClientRect();
@@ -4112,10 +4166,13 @@
 
   function hideClusterTooltip() {
     if (!clusterTooltip) return;
+    clearClusterTooltipHideTimer();
+    activeClusterTooltip = { cluster: null, expandedLayerId: null };
     hoveredClusterPointId = null;
     clusterTooltip.classList.add("hidden");
     clusterTooltip.textContent = "";
   }
+
 
   function shouldShowPointHoverTooltip() {
     return !pointDisplayVisibility.names || !pointDisplayVisibility.codes || selectedPointIds.length === 1;
@@ -7329,8 +7386,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     }
   });
 
-  function handleCanvasPrimaryAction({ additive = false } = {}) {
-    const pid = pickPoint(mouse.x, mouse.y, 10);
+  function handleCanvasPrimaryAction({ additive = false, forcedPointId = null } = {}) {
+    const pid = forcedPointId != null ? forcedPointId : pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
     if (rotateSelectionSession.active && !rotateSelectionSession.awaitingSelection) {
@@ -7703,7 +7760,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         showClusterTooltip(cluster);
         hidePointHoverTooltip();
       } else {
-        hideClusterTooltip();
+        if (isLineDrawingToolActive() && activeClusterTooltip.cluster) {
+          scheduleClusterTooltipHide();
+        } else {
+          hideClusterTooltip();
+        }
         const pid = pointDisplayVisibility.points ? pickPoint(mouse.x, mouse.y, 10) : null;
         if (pid != null && points.has(pid) && shouldShowPointHoverTooltip()) {
           showPointHoverTooltip(points.get(pid), mouse.x, mouse.y);
@@ -7878,10 +7939,50 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     handleMouseUpCommon();
   });
 
+  clusterTooltip?.addEventListener("mouseenter", () => {
+    clusterTooltipHovering = true;
+    clearClusterTooltipHideTimer();
+  });
+
+  clusterTooltip?.addEventListener("mouseleave", () => {
+    clusterTooltipHovering = false;
+    if (!isLineDrawingToolActive()) {
+      hideClusterTooltip();
+      return;
+    }
+    scheduleClusterTooltipHide();
+  });
+
+  clusterTooltip?.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-cluster-action]");
+    if (!target) return;
+    const action = target.dataset.clusterAction;
+    if (action === "expand-layer") {
+      const layerId = String(target.dataset.layerId || "");
+      if (!activeClusterTooltip.cluster) return;
+      showClusterTooltip(activeClusterTooltip.cluster, mouse.x, mouse.y, { expandedLayerId: layerId });
+      return;
+    }
+    if (action === "show-layer-groups") {
+      if (!activeClusterTooltip.cluster) return;
+      showClusterTooltip(activeClusterTooltip.cluster, mouse.x, mouse.y, { expandedLayerId: null });
+      return;
+    }
+    if (action !== "select-point") return;
+    const pointId = String(target.dataset.pointId || "");
+    if (!points.has(pointId)) return;
+    handleCanvasPrimaryAction({ forcedPointId: pointId });
+    if (!isLineDrawingToolActive()) hideClusterTooltip();
+  });
+
   canvas.addEventListener("mouseleave", () => {
     mouse.down = false;
     endDrag();
-    hideClusterTooltip();
+    if (isLineDrawingToolActive() && activeClusterTooltip.cluster) {
+      scheduleClusterTooltipHide();
+    } else {
+      hideClusterTooltip();
+    }
     hidePointHoverTooltip();
   });
 
