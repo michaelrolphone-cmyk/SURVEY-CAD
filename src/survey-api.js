@@ -97,8 +97,11 @@ function buildNearPointPrimaryPointsUrl(baseUrl, lon, lat) {
 }
 
 function extractUtilitiesFromNearPointPayload(payload = {}) {
+  const nearPointObject = payload?.object && typeof payload.object === 'object' ? payload.object : null;
   const buckets = [
     payload?.primaryPoints,
+    nearPointObject?.primaryPoints,
+    nearPointObject?.transformers,
     payload?.points,
     payload?.results,
     payload?.features,

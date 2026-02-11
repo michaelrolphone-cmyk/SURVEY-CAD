@@ -11,6 +11,7 @@ function createMockServer(options = {}) {
     utilities404 = false,
     estimateCalculate404 = false,
     nearPoint404 = false,
+    nearPointWrapsObject = false,
     includeServiceLines = false,
     omitTransformers = false,
   } = options;
@@ -45,14 +46,18 @@ function createMockServer(options = {}) {
         return;
       }
 
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
+      const nearPointPayload = {
         primaryPoints: [
           { id: 'pm-1', serviceTypeId: 1, code: 'PM', geometry: { x: -12936280.004339488, y: 5406832.06332747, spatialReference: { wkid: 3857 } } },
           { id: 'up-1', serviceTypeId: 2, code: 'UP', geometry: { x: -12936180.004339488, y: 5406882.06332747, spatialReference: { wkid: 3857 } } },
           { id: 'oh-1', serviceTypeId: 3, code: 'OH', geometry: { x: -12936080.004339488, y: 5406932.06332747, spatialReference: { wkid: 3857 } } },
         ],
-      }));
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(nearPointWrapsObject
+        ? { object: nearPointPayload, wasSuccessful: true, message: null, validationIssues: null }
+        : nearPointPayload));
       return;
     }
 
@@ -616,6 +621,24 @@ test('lookupUtilitiesByAddress returns [] when NearPoint endpoint is unavailable
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     assert.deepEqual(utilities, []);
     assert.ok(requests.some((requestPath) => requestPath.includes('/serviceEstimator/api/NearPoint/Residential/PrimaryPoints/')));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('lookupUtilitiesByAddress supports NearPoint responses wrapped in object payloads', async () => {
+  const { server, port } = await createMockServer({ nearPointWrapsObject: true });
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    nominatimUrl: `${base}/geocode`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
+    arcgisGeometryProjectUrl: `${base}/geometry/project`,
+  });
+
+  try {
+    const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
+    assert.equal(utilities.length, 3);
+    assert.deepEqual(new Set(utilities.map((utility) => utility.code)), new Set(['PM', 'UP', 'OH']));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
