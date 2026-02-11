@@ -217,6 +217,18 @@ test('VIEWPORT.HTML exposes map backdrop controls with expected defaults and wir
 });
 
 
+
+
+test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom, and spread labels', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+POINT_CLUSTER_DISTANCE_PX\s*=\s*18\s*;/, 'LineSmith should define a screen-space clustering threshold for super-close points');
+  assert.match(html, /function\s+buildPointClusters\(\)/, 'LineSmith should build dynamic point clusters for nearby points');
+  assert.match(html, /id="clusterTooltip"\s+class="clusterTooltip\s+hidden"/, 'LineSmith should include a dedicated tooltip container for hover cluster membership lists');
+  assert.match(html, /function\s+showClusterTooltip\(cluster\)/, 'LineSmith should render clustered point membership details on hover');
+  assert.match(html, /const\s+cluster\s*=\s*getPointClusterAtScreen\(mouse\.x,\s*mouse\.y\);[\s\S]*zoomToWorldBounds\(cluster\.minX,\s*cluster\.minY,\s*cluster\.maxX,\s*cluster\.maxY,\s*\{\s*paddingFraction:\s*0\.15\s*\}\);/, 'double-clicking a cluster should zoom to that cluster with 15% padding');
+  assert.match(html, /const\s+labelRadius\s*=\s*POINT_LABEL_SPREAD_RADIUS_PX\s*\+\s*Math\.min\(20,\s*cluster\.members\.length\s*\*\s*2\);/, 'clustered points should spread out number labels radially to prevent overlap');
+});
 test('VIEWPORT.HTML maps Idaho state plane coordinates to Leaflet lat/lon via georeference transform', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
