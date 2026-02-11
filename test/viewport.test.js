@@ -14,6 +14,16 @@ test('VIEWPORT.HTML allows map tile rendering to continue zooming past native ti
   assert.match(html, /function\s+scaleToLeafletZoomForLat\(scale, lat\)\s*\{[\s\S]*return\s+clamp\(zoom,\s*MAP_LAYER_MIN_RENDER_ZOOM,\s*MAP_LAYER_MAX_RENDER_ZOOM\);/, 'georeferenced zoom conversion should clamp against the extended map render zoom range');
   assert.match(html, /mapInstance\s*=\s*L\.map\("mapLayer",\s*\{[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'Leaflet map instance should accept the extended render zoom ceiling so setView can continue beyond tile max-native zoom');
 });
+
+test('VIEWPORT.HTML double right-click zooms out one map zoom level when nothing is selected', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+DOUBLE_RIGHT_CLICK_ZOOM_OUT_MS\s*=\s*325\s*;/, 'canvas interaction state should define a double-right-click detection window');
+  assert.match(html, /function\s+leafletZoomToScaleForLat\(zoom, lat\)\s*\{[\s\S]*return\s+clamp\(1 \/ Math\.max\(1e-9, feetPerPixel\), MIN_SCALE, MAX_SCALE\);/, 'zoom-out shortcut should convert target map zoom levels back into drawing scale while respecting limits');
+  assert.match(html, /function\s+nextZoomOutLeafletLevel\(currentZoom\)\s*\{[\s\S]*Math\.floor\(currentZoom\)/, 'double-right-click workflow should pick the next lower map zoom level');
+  assert.match(html, /function\s+zoomOutToNextMapLevelAtScreenPoint\(screenX, screenY\)\s*\{[\s\S]*setStatus\(`Zoomed out to map zoom \$\{targetZoom\.toFixed\(0\)\}\.`, "ok"\);/, 'shortcut should anchor zoom-out at cursor location and confirm the zoom step');
+  assert.match(html, /canvas\.addEventListener\("contextmenu",\s*\(e\)\s*=>\s*\{[\s\S]*const\s+isDoubleRightClick\s*=\s*now - lastRightClickAtMs <= DOUBLE_RIGHT_CLICK_ZOOM_OUT_MS;[\s\S]*if \(isDoubleRightClick && !hasSelection\(\) && !modalIsOpen\(\)\)\s*\{[\s\S]*zoomOutToNextMapLevelAtScreenPoint\(mouse\.x, mouse\.y\);/, 'right-click handler should zoom out on a double right-click only when nothing is selected');
+});
 test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmith actions', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
