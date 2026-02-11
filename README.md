@@ -79,6 +79,32 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Current LineSmith behavior: it treats `entityType === "2"` + `processingOn === true` as linework codes and `entityType === "0"` + `processingOn === true` as symbol codes.
 - Companion-code sequencing: for active linework rules, LineSmith also honors each rule's `companionCodes` list during sequential connectivity (for example, `WL` can continue through `WM` points when `WM` is configured as a companion code for `WL`, while `WM` remains a symbol code on its own).
 
+
+## LineSmith Layer Controls
+
+`VIEWPORT.HTML` now includes a layer system intended to support Field-to-Finish layer semantics directly in LineSmith drawing workflows.
+
+- Toolbar controls:
+  - Active layer dropdown (`quickLayerSelect`) with color swatch and quick flag toggles (lock / visibility / fill).
+  - Layer manager button (`quickLayerManager`) that opens a layer editor modal table.
+- Layer properties:
+  - `name`, `color`, `locked`, `visible`, `lineWeight`, `fill`.
+- Drawing behavior:
+  - New points and lines are created on the currently selected layer.
+  - Points/symbols and lines render with the layer color.
+  - Line stroke width follows layer `lineWeight`.
+  - Closed loops on fill-enabled layers render with the layer color at ~10% opacity.
+  - Locked layers block edit operations against entities owned by that layer.
+  - Invisible layers are hidden from drawing and selection.
+
+There are no new server API endpoints or CLI commands required for this UI-only layer feature. Existing commands continue to work:
+
+```bash
+npm run cli -- --help
+npm run ros:cli -- --help
+node --test test/viewport.test.js
+```
+
 ## RecordQuarry Launch Params
 
 `RecordQuarry.html` supports launcher query params for auto-loading and cached restore behavior:

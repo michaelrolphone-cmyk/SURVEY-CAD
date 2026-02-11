@@ -80,7 +80,7 @@ test('VIEWPORT.HTML line-between-selected prompts for nearest non-connected orde
 test('VIEWPORT.HTML renders unlocked lines in maroon for movement warning', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /ctx\.strokeStyle = isMovable\(ln\.movable\) \? "#800000" : "#fff";/, 'unlocked lines should render maroon while locked lines remain white');
+  assert.match(html, /ctx\.strokeStyle = isMovable\(ln\.movable\) \? "#800000" : layer\.color;/, 'unlocked lines should render maroon while normal lines follow layer color');
 });
 test('VIEWPORT.HTML includes command line controls for line, move, rotate, and inverse workflows', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
@@ -102,8 +102,8 @@ test('VIEWPORT.HTML only treats strict boolean true as movable for point/line dr
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+isMovable\(value\)\s*\{\s*return\s+value\s*===\s*true;\s*\}/, 'movable helper should require strict true');
-  assert.match(html, /if \(selectedPointId === pid && isMovable\(p\?\.movable\)\)/, 'point drag should require strict movable true');
-  assert.match(html, /if \(isMovable\(ln\?\.movable\)\)\s*\{\s*history\.push\("move line"\)/, 'line drag should require strict movable true');
+  assert.match(html, /if \(selectedPointId === pid && isMovable\(p\?\.movable\) && !isPointLockedByLayer\(pid\)\)/, 'point drag should require strict movable true and unlocked layer');
+  assert.match(html, /if \(isMovable\(ln\?\.movable\) && !isLineLockedByLayer\(lpick\.lineId\)\)\s*\{\s*history\.push\("move line"\)/, 'line drag should require strict movable true and unlocked layer');
 });
 
 
@@ -129,8 +129,8 @@ test('VIEWPORT.HTML supports reference-angle rotation of selected geometry from 
 test('VIEWPORT.HTML restores persisted movable flags as strict booleans', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /points\.set\(p\.id,\s*\{\s*\.\.\.p,\s*movable:\s*isMovable\(p\.movable\)\s*\}\)/, 'restored points should normalize movable flags');
-  assert.match(html, /lines\.set\(l\.id,\s*\{\s*\.\.\.l,\s*movable:\s*isMovable\(l\.movable\)\s*\}\)/, 'restored lines should normalize movable flags');
+  assert.match(html, /points\.set\(p\.id,\s*\{\s*\.\.\.p,\s*movable:\s*isMovable\(p\.movable\),\s*layerId:\s*String\(p\.layerId \|\| selectedLayerId \|\| DEFAULT_LAYER_ID\)\s*\}\)/, 'restored points should normalize movable flags and layer ownership');
+  assert.match(html, /lines\.set\(l\.id,\s*\{\s*\.\.\.l,\s*movable:\s*isMovable\(l\.movable\),\s*layerId:\s*String\(l\.layerId \|\| selectedLayerId \|\| DEFAULT_LAYER_ID\)\s*\}\)/, 'restored lines should normalize movable flags and layer ownership');
 });
 
 
@@ -394,8 +394,8 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /drawingsFolder\.index\.sort\(\(a, b\) => \{[\s\S]*latestSavedAt[\s\S]*return bValue - aValue;[\s\S]*\}\);/, 'project drawing resources should be sorted by latest saved timestamp descending');
   assert.match(html, /drawingsFolder\.index\s*=\s*drawingsFolder\.index\.filter\(\(entry\) => entry && typeof entry === "object"\);/, 'project drawing metadata save should ignore malformed drawing index entries before accessing entry ids');
   assert.match(html, /if \(mapLayerState\.enabled\) syncMapToView\(true\);/, 'restoring a drawing should resync map view after georeference hydration');
-  assert.match(html, /for \(const p of \(s\.points \|\| \[\]\)\) \{[\s\S]*if \(!p \|\| typeof p !== "object" \|\| p\.id == null\) continue;[\s\S]*points\.set\(p\.id, \{ \.\.\.p, movable: isMovable\(p\.movable\) \}\);[\s\S]*\}/, 'restoreState should skip malformed point entries before indexing by id');
-  assert.match(html, /for \(const l of \(s\.lines \|\| \[\]\)\) \{[\s\S]*if \(!l \|\| typeof l !== "object" \|\| l\.id == null \|\| l\.a == null \|\| l\.b == null\) continue;[\s\S]*lines\.set\(l\.id, \{ \.\.\.l, movable: isMovable\(l\.movable\) \}\);[\s\S]*\}/, 'restoreState should skip malformed line entries before indexing by id');
+  assert.match(html, /for \(const p of \(s\.points \|\| \[\]\)\) \{[\s\S]*if \(!p \|\| typeof p !== "object" \|\| p\.id == null\) continue;[\s\S]*points\.set\(p\.id, \{ \.\.\.p, movable: isMovable\(p\.movable\), layerId: String\(p\.layerId \|\| selectedLayerId \|\| DEFAULT_LAYER_ID\) \}\);[\s\S]*\}/, 'restoreState should skip malformed point entries and normalize movable/layer metadata');
+  assert.match(html, /for \(const l of \(s\.lines \|\| \[\]\)\) \{[\s\S]*if \(!l \|\| typeof l !== "object" \|\| l\.id == null \|\| l\.a == null \|\| l\.b == null\) continue;[\s\S]*lines\.set\(l\.id, \{ \.\.\.l, movable: isMovable\(l\.movable\), layerId: String\(l\.layerId \|\| selectedLayerId \|\| DEFAULT_LAYER_ID\) \}\);[\s\S]*\}/, 'restoreState should skip malformed line entries and normalize movable/layer metadata');
   assert.match(html, /selectedPointIds = Array\.isArray\(s\.selection\?\.selectedPointIds\)[\s\S]*filter\(\(id\) => points\.has\(id\)\)/, 'restoreState should drop stale selected point ids that are not present in restored points');
   assert.match(html, /selectedLines = Array\.isArray\(s\.selection\?\.selectedLines\)[\s\S]*filter\(\(entry\) => entry\?\.id != null && lines\.has\(entry\.id\)\)/, 'restoreState should drop stale selected lines that are not present in restored lines');
   assert.match(html, /let\s+lastSavedDrawingSnapshot\s*=\s*"";/, 'LineSmith should track a saved-state snapshot for unsaved-change prompts');
@@ -483,4 +483,22 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
   assert.match(html, /if \(field === "code"\) \{[\s\S]*ensureLegacyAutoFieldToFinishLineMetadata\(\);[\s\S]*syncFieldToFinishLinework\(\);/, 'editing point code in the point editor should re-sync auto-generated field-to-finish linework and clean stale lines');
   assert.match(html, /if \(field === "code"\) \{[\s\S]*syncFieldToFinishLinework\(\);[\s\S]*setStatus\(`Auto-updated linework for point \$\{p\.num\}: \+\$\{addedJpn\} JPN, \+\$\{addedSequential\} sequential, -\$\{removed\} removed\.`, "ok"\);/, 'code-edit linework updates should run in-place and avoid forced table rerender calls that break typing focus');
   assert.match(html, /Auto-updated linework for point \$\{p\.num\}: \+\$\{addedJpn\} JPN, \+\$\{addedSequential\} sequential, -\$\{removed\} removed\./, 'LineSmith should report add/remove totals when code edits re-sync field-to-finish linework');
+});
+
+test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal for drawing rules', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+DEFAULT_LAYER_ID\s*=\s*"layer-1";/, 'LineSmith should define a default layer id for new drawings');
+  assert.match(html, /const\s+layers\s*=\s*new\s+Map\(\);\s*\/\/ id -> \{id,name,color,locked,visible,lineWeight,fill\}/, 'LineSmith should maintain a first-class layer registry');
+  assert.match(html, /id="quickLayerSelect"/, 'quick toolbar should expose a layer dropdown for active drawing layer');
+  assert.match(html, /id="quickLayerManager"[\s\S]*fa-layer-group/, 'quick toolbar should include a layer-manager icon button');
+  assert.match(html, /id="layersModal"\s+class="modalOverlay hidden"/, 'LineSmith should define a layer manager modal');
+  assert.match(html, /<th>Name<\/th>[\s\S]*<th>Color<\/th>[\s\S]*<th>Line Weight<\/th>[\s\S]*<th>Lock<\/th>[\s\S]*<th>Visible<\/th>[\s\S]*<th>Fill<\/th>/, 'layer manager table should provide editable layer fields and flags');
+  assert.match(html, /function\s+addPoint\(\{num, x, y, z=0, code="", notes="", movable=false, layerId = selectedLayerId\}\)/, 'new points should default to the currently selected layer');
+  assert.match(html, /function\s+addLine\(aPointId, bPointId, movable=false, layerId = selectedLayerId\)/, 'new lines should default to the currently selected layer');
+  assert.match(html, /if \(!isLayerVisible\(p\.layerId\)\) continue;/, 'rendering should hide point symbols for invisible layers');
+  assert.match(html, /if \(!isLayerVisible\(ln\.layerId\)\) continue;/, 'rendering and selection should hide linework for invisible layers');
+  assert.match(html, /ctx\.strokeStyle = isMovable\(ln\.movable\) \? "#800000" : layer\.color;[\s\S]*ctx\.lineWidth = Math\.max\(0\.5, layer\.lineWeight\);/, 'line rendering should use per-layer color and lineweight');
+  assert.match(html, /if \(!layer\.fill \|\| layer\.visible === false\) continue;[\s\S]*ctx\.fillStyle = `\$\{layer\.color\}1A`;/, 'closed loops on fill-enabled layers should render with low-opacity layer color fill');
+  assert.match(html, /if \(isLayerLocked\(p\.layerId\)\) \{[\s\S]*Layer .* is locked\./, 'point edits should be blocked when the owning layer is locked');
 });
