@@ -6,6 +6,7 @@ This repository includes:
 - A CLI in `src/cli.js`.
 - A standalone ROS basis-of-bearing OCR API in `src/ros-ocr-api.js`.
 - A standalone ROS basis-of-bearing CLI in `src/ros-basis-cli.js`.
+- A Field-to-Finish (`.fld`) parser in `src/fld-config.js` for pipe-delimited code-table configurations.
 - A Heroku-compatible web server in `src/server.js` that serves the repository HTML files statically and exposes the surveying library as JSON API endpoints.
 
 ## Install / Run
@@ -16,6 +17,7 @@ npm test
 npm run cli -- --help
 npm run ros:cli -- --help
 npm run icons:generate
+npm run cli -- fld-config --file config/MLS.fld --summary
 npm start
 npm run ros:ocr
 ```
@@ -53,8 +55,17 @@ heroku open
 npm run cli -- --help
 npm run ros:cli -- --help
 npm run icons:generate
+node src/cli.js fld-config --file config/MLS.fld --summary
 node --test test/arrowhead-projection.test.js
 ```
+
+`fld-config` returns JSON with:
+- `versionTag`: header tag from files like `#2010V#`.
+- `columns`: normalized column metadata (with unique keys for duplicate column names).
+- `rules`: parsed rows with common linework fields (`code`, `layer`, `entityType`, `lineType`, `processingOn`, `codeSequence`, `companionCodes`) and a `raw` field containing all original columns.
+- `rulesByCode`: direct lookup map keyed by rule `code`.
+
+Use `--summary` to emit a compact payload (`versionTag`, `columnCount`, `ruleCount`, and `codes`) when you only need command-line inspection.
 
 ## RecordQuarry Launch Params
 

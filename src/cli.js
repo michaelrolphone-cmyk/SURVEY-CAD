@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { SurveyCadClient } from "./survey-api.js";
 import { buildProjectArchivePlan, createProjectFile } from "./project-file.js";
+import { loadFldConfig } from "./fld-config.js";
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -31,7 +32,8 @@ async function main() {
   node src/cli.js lookup --address "1600 W Front St, Boise"
   node src/cli.js section --lat 43.61 --lon -116.20
   node src/cli.js aliquots --lat 43.61 --lon -116.20
-  node src/cli.js project-file --projectName "Demo" --client "Ada County" --address "100 Main St, Boise"`);
+  node src/cli.js project-file --projectName "Demo" --client "Ada County" --address "100 Main St, Boise"
+  node src/cli.js fld-config --file config/MLS.fld`);
     process.exit(0);
   }
 
@@ -71,6 +73,23 @@ async function main() {
 
     const archivePlan = await buildProjectArchivePlan(projectFile);
     console.log(JSON.stringify({ projectFile, archivePlan }, null, 2));
+    return;
+  }
+
+  if (cmd === "fld-config") {
+    if (!args.file) throw new Error("--file is required");
+    const config = await loadFldConfig(args.file);
+    if (args.summary) {
+      console.log(JSON.stringify({
+        versionTag: config.versionTag,
+        columnCount: config.columns.length,
+        ruleCount: config.rules.length,
+        codes: config.rules.map((rule) => rule.code).filter(Boolean),
+      }, null, 2));
+      return;
+    }
+
+    console.log(JSON.stringify(config, null, 2));
     return;
   }
 
