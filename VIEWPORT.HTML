@@ -316,6 +316,26 @@
       border-color:#285836;
       background:#102116;
     }
+    .clusterTooltip{
+      position:absolute;
+      z-index:8;
+      min-width:180px;
+      max-width:280px;
+      border:1px solid #3a3a3a;
+      border-radius:8px;
+      background:rgba(14,14,14,0.96);
+      box-shadow:0 8px 20px rgba(0,0,0,0.4);
+      color:var(--text);
+      font-size:11px;
+      line-height:1.4;
+      pointer-events:none;
+      padding:8px;
+      white-space:normal;
+    }
+    .clusterTooltip.hidden{ display:none; }
+    .clusterTooltip b{ color:#ffd54a; }
+    .clusterTooltip ul{ margin:6px 0 0 16px; padding:0; }
+    .clusterTooltip li{ margin:2px 0; }
     .quickToolField{
       display:inline-flex;
       flex-direction:row;
@@ -1016,6 +1036,7 @@
     </div>
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>
+    <div id="clusterTooltip" class="clusterTooltip hidden" role="status" aria-live="polite"></div>
     <div id="workflowToast" class="workflowToast hidden" role="status" aria-live="polite" aria-atomic="true">
       <div id="workflowToastTitle" class="workflowToastTitle"></div>
       <div id="workflowToastMessage" class="workflowToastMessage"></div>
@@ -1603,6 +1624,7 @@
   const quickLayerColor = $("#quickLayerColor");
   const quickLayerToggles = $("#quickLayerToggles");
   const quickLayerManagerBtn = $("#quickLayerManager");
+  const clusterTooltip = $("#clusterTooltip");
 
   const hudTool = $("#hudTool");
   const hudMouse = $("#hudMouse");
@@ -1711,6 +1733,10 @@
     codes: true,
     notes: false
   };
+  const POINT_CLUSTER_DISTANCE_PX = 18;
+  const POINT_CLUSTER_PICK_PADDING_PX = 8;
+  const POINT_LABEL_SPREAD_RADIUS_PX = 24;
+  let cachedPointClusters = [];
 
   const mapLayerState = {
     enabled: false,
@@ -3259,6 +3285,115 @@
     return best;
   }
 
+  function buildPointClusters() {
+    const visiblePoints = [];
+    for (const p of points.values()) {
+      if (!isLayerVisible(p.layerId)) continue;
+      const s = worldToScreen(p.x, p.y);
+      visiblePoints.push({ id: p.id, point: p, sx: s.x, sy: s.y });
+    }
+
+    const clusters = [];
+    const visited = new Set();
+    for (let i = 0; i < visiblePoints.length; i++) {
+      if (visited.has(i)) continue;
+      const queue = [i];
+      const members = [];
+      visited.add(i);
+      while (queue.length) {
+        const current = queue.shift();
+        const candidate = visiblePoints[current];
+        members.push(candidate);
+        for (let j = 0; j < visiblePoints.length; j++) {
+          if (visited.has(j)) continue;
+          const peer = visiblePoints[j];
+          if (dist(candidate.sx, candidate.sy, peer.sx, peer.sy) <= POINT_CLUSTER_DISTANCE_PX) {
+            visited.add(j);
+            queue.push(j);
+          }
+        }
+      }
+      if (members.length < 2) continue;
+      members.sort((a, b) => String(a.point.num).localeCompare(String(b.point.num)) || a.id - b.id);
+
+      let centerX = 0;
+      let centerY = 0;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const member of members) {
+        centerX += member.sx;
+        centerY += member.sy;
+        minX = Math.min(minX, member.point.x);
+        minY = Math.min(minY, member.point.y);
+        maxX = Math.max(maxX, member.point.x);
+        maxY = Math.max(maxY, member.point.y);
+      }
+      centerX /= members.length;
+      centerY /= members.length;
+
+      clusters.push({
+        ids: members.map((m) => m.id),
+        members,
+        centerX,
+        centerY,
+        minX,
+        minY,
+        maxX,
+        maxY,
+        markerRadius: 10 + Math.min(14, members.length * 0.8)
+      });
+    }
+    return clusters;
+  }
+
+  function getPointClusterAtScreen(screenX, screenY) {
+    for (const cluster of cachedPointClusters) {
+      const limit = cluster.markerRadius + POINT_CLUSTER_PICK_PADDING_PX;
+      if (dist(screenX, screenY, cluster.centerX, cluster.centerY) <= limit) {
+        return cluster;
+      }
+    }
+    return null;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function showClusterTooltip(cluster) {
+    if (!clusterTooltip || !cluster) return;
+    const listHtml = cluster.members.map((entry) => {
+      const point = entry.point;
+      const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
+      return `<li><b>${escapeHtml(point.num)}</b>${code}</li>`;
+    }).join("");
+    clusterTooltip.innerHTML = `<div><b>${cluster.members.length} clustered points</b></div><ul>${listHtml}</ul>`;
+    clusterTooltip.classList.remove("hidden");
+
+    const rect = canvas.getBoundingClientRect();
+    const localX = mouse.x - rect.left;
+    const localY = mouse.y - rect.top;
+    const tooltipWidth = clusterTooltip.offsetWidth || 220;
+    const tooltipHeight = clusterTooltip.offsetHeight || 80;
+    const left = clamp(localX + 14, 10, Math.max(10, rect.width - tooltipWidth - 10));
+    const top = clamp(localY + 14, 10, Math.max(10, rect.height - tooltipHeight - 10));
+    clusterTooltip.style.left = `${left}px`;
+    clusterTooltip.style.top = `${top}px`;
+  }
+
+  function hideClusterTooltip() {
+    if (!clusterTooltip) return;
+    clusterTooltip.classList.add("hidden");
+    clusterTooltip.textContent = "";
+  }
+
   function pickLine(screenX, screenY, thresholdPx=8) {
     const w = screenToWorld(screenX, screenY);
     let best = null;
@@ -3572,8 +3707,12 @@
     }
 
     // points
+    cachedPointClusters = buildPointClusters();
+    const clusteredPointIds = new Set(cachedPointClusters.flatMap((cluster) => cluster.ids));
+
     for (const p of points.values()) {
       if (!isLayerVisible(p.layerId)) continue;
+      if (clusteredPointIds.has(p.id)) continue;
       const layer = getLayerById(p.layerId);
       const sp = worldToScreen(p.x,p.y);
 
@@ -3620,6 +3759,50 @@
         const notesText = String(p.notes);
         ctx.fillText(notesText, sp.x + 8, sp.y + 14);
         blockedTextRects.push({ x: sp.x + 8, y: sp.y + 8, w: ctx.measureText(notesText).width, h: 12 });
+      }
+    }
+
+    for (const cluster of cachedPointClusters) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,213,74,0.2)";
+      ctx.strokeStyle = "#ffd54a";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cluster.centerX, cluster.centerY, cluster.markerRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffd54a";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(String(cluster.members.length), cluster.centerX, cluster.centerY);
+      ctx.restore();
+
+      const labelRadius = POINT_LABEL_SPREAD_RADIUS_PX + Math.min(20, cluster.members.length * 2);
+      const membersCount = Math.max(1, cluster.members.length);
+      for (let i = 0; i < cluster.members.length; i++) {
+        const member = cluster.members[i];
+        const angle = (Math.PI * 2 * i) / membersCount - Math.PI / 2;
+        const labelX = cluster.centerX + Math.cos(angle) * labelRadius;
+        const labelY = cluster.centerY + Math.sin(angle) * labelRadius;
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,213,74,0.45)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cluster.centerX, cluster.centerY);
+        ctx.lineTo(labelX - 3, labelY - 2);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        const numText = String(member.point.num);
+        ctx.fillText(numText, labelX, labelY);
+        blockedTextRects.push({ x: labelX, y: labelY - 6, w: ctx.measureText(numText).width, h: 12 });
       }
     }
 
@@ -4377,22 +4560,10 @@
   // -------------------------
   // Zoom extents
   // -------------------------
-  function zoomExtents(options = {}) {
-    const { skipHistory = false, silent = false } = options;
-    if (points.size === 0) {
-      if (!silent) setStatus("No points to zoom to.", "warn");
-      return false;
-    }
-    if (!skipHistory) history.push("zoom extents");
-    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-    for (const p of points.values()) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x);
-      maxY = Math.max(maxY, p.y);
-    }
+  function zoomToWorldBounds(minX, minY, maxX, maxY, { paddingFraction = 0.05 } = {}) {
+    if (![minX, minY, maxX, maxY].every(Number.isFinite)) return false;
     const rect = canvas.getBoundingClientRect();
-    const pad = 60;
+    const pad = Math.max(20, Math.min(rect.width, rect.height) * paddingFraction);
     const w = Math.max(1, rect.width - pad*2);
     const h = Math.max(1, rect.height - pad*2);
 
@@ -4412,9 +4583,30 @@
     view.scale = newScale;
     view.panX = rect.width * 0.5 - cx * view.scale;
     view.panY = rect.height * 0.5 + cy * view.scale;
+    return true;
+  }
+
+  function zoomExtents(options = {}) {
+    const { skipHistory = false, silent = false } = options;
+    if (points.size === 0) {
+      if (!silent) setStatus("No points to zoom to.", "warn");
+      return false;
+    }
+    if (!skipHistory) history.push("zoom extents");
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    for (const p of points.values()) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+
+    zoomToWorldBounds(minX, minY, maxX, maxY, { paddingFraction: 0.05 });
 
     if (!silent) {
-      setStatus(`Zoomed to extents.\nX: [${fmt(minX)}, ${fmt(maxX)}]\nY: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
+      setStatus(`Zoomed to extents.
+X: [${fmt(minX)}, ${fmt(maxX)}]
+Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     }
     return true;
   }
@@ -5857,6 +6049,14 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
   canvas.addEventListener("dblclick", (e) => {
     updateMouseFromEvent(e);
+    const cluster = getPointClusterAtScreen(mouse.x, mouse.y);
+    if (cluster) {
+      history.push("zoom to point cluster");
+      zoomToWorldBounds(cluster.minX, cluster.minY, cluster.maxX, cluster.maxY, { paddingFraction: 0.15 });
+      setStatus(`Zoomed to ${cluster.members.length}-point cluster with 15% padding.`, "ok");
+      return;
+    }
+
     const pid = pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
@@ -6227,7 +6427,15 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (modalIsOpen()) return;
     updateMouseFromEvent(e);
     broadcastCursor();
-    if (!mouse.drag) return;
+
+    if (!mouse.drag) {
+      const cluster = getPointClusterAtScreen(mouse.x, mouse.y);
+      if (cluster) showClusterTooltip(cluster);
+      else hideClusterTooltip();
+      return;
+    }
+
+    hideClusterTooltip();
 
     if (mouse.dragObj?.type === "pan") {
       const dx = mouse.x - mouse.dragStartX;
@@ -6389,6 +6597,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   canvas.addEventListener("mouseleave", () => {
     mouse.down = false;
     endDrag();
+    hideClusterTooltip();
   });
 
   canvas.addEventListener("wheel", (e) => {
