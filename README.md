@@ -49,6 +49,7 @@ Display behavior note:
 
 - When **Draw point names** and/or **Draw point codes** are turned off, hovering a point on the canvas shows a tooltip with point name, code, layer, and description (notes).
 - When exactly one point is selected, hovering a different point shows an inset summary at the top of the tooltip with inverse **Distance** and **Bearing** back to the selected point, including a layer-colored source point pill (for example: `1234.12' from 123`).
+- The inset source-point pill uses dark text to keep point numbers readable on lighter layer colors.
 
 ### LineSmith Field-to-Finish commands
 
