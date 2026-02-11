@@ -91,7 +91,7 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 
 `VIEWPORT.HTML` now includes a layer system intended to support Field-to-Finish layer semantics directly in LineSmith drawing workflows.
 
-- Single-point cursor leader preview: when exactly one point is selected in LineSmith, a thin light-gray leader line is drawn from that point to the live cursor to improve spatial awareness while editing.
+- Single-point cursor leader preview: when exactly one point is selected in LineSmith, a thin light-gray leader tail is drawn from the point to the live cursor and fades to zero opacity at the selected point so it reads as a cursor tail instead of a hard line.
 - Right-click marquee zoom framing: while drawing a selection window, right-click now zooms to the exact drag window using the live cursor endpoint and applies extra extent padding so all geometry inside the window remains visible after zooming.
 - API/CLI surface impact: no new endpoints or commands were introduced for this viewport zoom-window framing behavior; continue using existing endpoints (`GET /api/fld-config`) and existing CLI commands (`npm run cli -- --help`, `npm run ros:cli -- --help`, `npm run icons:generate`).
 - API/CLI surface impact: no new endpoints or commands were introduced for this viewport preview behavior; continue using existing endpoints (`GET /api/fld-config`) and existing CLI commands (`npm run cli -- --help`, `npm run ros:cli -- --help`, `npm run icons:generate`).

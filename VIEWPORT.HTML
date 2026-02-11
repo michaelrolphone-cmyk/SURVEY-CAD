@@ -4350,8 +4350,11 @@
       if (selectedPoint) {
         const selectedPointScreen = worldToScreen(selectedPoint.x, selectedPoint.y);
         ctx.save();
-        ctx.strokeStyle = "rgba(220,220,220,0.8)";
         ctx.lineWidth = 1;
+        const leaderGradient = ctx.createLinearGradient(mouse.x, mouse.y, selectedPointScreen.x, selectedPointScreen.y);
+        leaderGradient.addColorStop(0, "rgba(220,220,220,0.82)");
+        leaderGradient.addColorStop(1, "rgba(220,220,220,0)");
+        ctx.strokeStyle = leaderGradient;
         ctx.beginPath();
         ctx.moveTo(selectedPointScreen.x, selectedPointScreen.y);
         ctx.lineTo(mouse.x, mouse.y);

@@ -237,7 +237,7 @@ test('VIEWPORT.HTML draws a light leader line from a single selected point to th
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /if \(selectedPointIds\.length === 1\) \{[\s\S]*selectedPointScreen = worldToScreen\(selectedPoint\.x, selectedPoint\.y\);/, 'draw loop should detect exactly one selected point and convert it to screen coordinates');
-  assert.match(html, /ctx\.strokeStyle = "rgba\(220,220,220,0\.8\)";[\s\S]*ctx\.lineWidth = 1;/, 'leader line should render as a thin light-gray stroke');
+  assert.match(html, /ctx\.lineWidth = 1;[\s\S]*const\s+leaderGradient\s*=\s*ctx\.createLinearGradient\(mouse\.x, mouse\.y, selectedPointScreen\.x, selectedPointScreen\.y\);[\s\S]*leaderGradient\.addColorStop\(0, "rgba\(220,220,220,0\.82\)"\);[\s\S]*leaderGradient\.addColorStop\(1, "rgba\(220,220,220,0\)"\);[\s\S]*ctx\.strokeStyle = leaderGradient;/, 'leader line should render as a thin light-gray gradient tail that fades out at the selected point');
   assert.match(html, /ctx\.moveTo\(selectedPointScreen\.x, selectedPointScreen\.y\);[\s\S]*ctx\.lineTo\(mouse\.x, mouse\.y\);/, 'leader line should connect the selected point to the current cursor location');
 });
 
