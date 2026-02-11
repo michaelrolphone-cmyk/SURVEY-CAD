@@ -84,7 +84,7 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Layer assignment during auto linework generation: if an FTF-generated segment connects two points on the same layer, the line is created on that shared layer.
 - Companion-code cross-layer precedence: when a sequential segment crosses layers via companion-code continuity (for example `WL` through `WM`), the line is assigned to the FLD layer configured for the owning linework code (`WL` in that case).
 - JPN cross-layer precedence: JPN-generated lines always inherit the source point's layer (the point containing `JPN...`), not the referenced target point's layer.
-- API/CLI surface impact: no new endpoints or commands were introduced for this behavior; use existing `GET /api/fld-config` and existing CLI entrypoints (`npm run cli`, `npm run ros:cli`).
+- API/CLI surface impact: no new endpoints or commands were introduced for this behavior; use existing endpoints (for example `GET /api/fld-config`) and existing CLI entrypoints (`npm run cli`, `npm run ros:cli`, `npm run icons:generate`).
 
 
 ## LineSmith Layer Controls
@@ -92,9 +92,10 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 `VIEWPORT.HTML` now includes a layer system intended to support Field-to-Finish layer semantics directly in LineSmith drawing workflows.
 
 - Toolbar controls:
-  - Active layer dropdown (`quickLayerSelect`) with color swatch and quick flag toggles (lock / visibility / fill).
-  - Layer manager button (`quickLayerManager`) that opens a layer editor modal table.
-  - Quick toolbar layout now uses two rows: row 1 for map/layer controls (wrapping as needed) and row 2 beginning at Select/Move for drawing/edit actions; when the controls drawer is collapsed the toolbar stretches edge-to-edge across the viewport.
+  - Active layer dropdown (`quickLayerSelect`) with color swatch and quick flag toggles (lock / visibility / fill); dropdown sizing now expands to fit full layer names without truncating labels.
+  - Layer manager button (`quickLayerManager`) that opens a layer editor modal table and sits to the left of the active layer dropdown in the top toolbar.
+  - Search-first quick input (`quickCommandSearchInput`) in the top toolbar row that searches point number/code/notes/layer text and shows layer-colored point matches as you type; command entry is submitted with Enter and command tokens (`line`, `move`, `rotate`, `inverse`) show autocomplete suggestions.
+  - Quick toolbar layout now uses two rows: row 1 for save/ArrowHead, layers, point visibility toggles, compact search input, then map controls at the end (with an icon-based map toggle), and row 2 beginning at Select/Move for drawing/edit actions; the toolbar keeps padded rounded floating styling instead of stretching edge-to-edge, even when the controls drawer is collapsed.
 - Layer properties:
   - `name`, `color`, `locked`, `visible`, `lineWeight`, `fill`.
 - Drawing behavior:
