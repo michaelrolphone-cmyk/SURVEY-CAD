@@ -24,8 +24,12 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickMapLayerEnabled"\s+type="checkbox"/, 'quick toolbar should include map layer toggle');
   assert.match(html, /<div class="quickToolField" title="Map tiles">\s*<select id="quickMapTileType"/, 'quick toolbar should include unlabeled inline map tile type dropdown');
   assert.doesNotMatch(html, /title="Map tiles">\s*Tiles\s*</, 'quick toolbar map tile selector should not include a redundant Tiles text label');
-  assert.match(html, /id="quickShowPointCodes"\s+type="checkbox"\s+checked/, 'quick toolbar should include point code visibility toggle');
-  assert.match(html, /id="quickShowPointNotes"\s+type="checkbox"(?!\s+checked)/, 'quick toolbar should include point notes visibility toggle defaulted off');
+  assert.match(html, /id="quickShowPoints"[\s\S]*fa-location-crosshairs/, 'quick toolbar should include point marker visibility icon toggle');
+  assert.match(html, /id="quickShowPointNames"[\s\S]*fa-tag/, 'quick toolbar should include point names visibility icon toggle');
+  assert.match(html, /id="quickShowPointCodes"[\s\S]*fa-hashtag/, 'quick toolbar should include point code visibility icon toggle');
+  assert.match(html, /id="quickShowPointNotes"[\s\S]*fa-note-sticky/, 'quick toolbar should include point notes visibility icon toggle');
+  assert.match(html, /id="quickEnablePointClustering"\s+type="checkbox"\s+checked/, 'quick toolbar should include point clustering toggle');
+  assert.match(html, /class="quickToolField quickToolToggleGroup"/, 'quick toolbar should group point display toggles together');
   assert.match(html, /\.quickToolField\{[\s\S]*display:inline-flex;[\s\S]*flex-direction:row;/, 'quick toolbar control labels should render inline with row direction');
   assert.doesNotMatch(html, /\.quickToolField input\[type="checkbox"\][\s\S]*accent-color:/, 'quick toolbar checkboxes should keep native accent color styling');
   assert.match(html, /id="quickSelect"[\s\S]*fa-arrow-pointer/, 'quick toolbar should include Select/Move icon shortcut');
@@ -73,7 +77,7 @@ test('VIEWPORT.HTML initializes layersTableDirty before any early resetLayers sc
 test('VIEWPORT.HTML defaults point notes off, hides Select/Move workflow toast, and removes center controls', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /const\s+labelVisibility\s*=\s*\{[\s\S]*notes:\s*false[\s\S]*\}/, 'point-note label visibility should default to off');
+  assert.match(html, /const\s+pointDisplayVisibility\s*=\s*\{[\s\S]*notes:\s*false[\s\S]*\}/, 'point-note label visibility should default to off');
   assert.match(html, /setPointNotesVisibility\(false\);/, 'initial point-note visibility sync should keep notes hidden by default');
   assert.match(html, /if \(activeTool === "select"\) \{[\s\S]*return null;[\s\S]*\}/, 'select tool should not provide workflow-toast payload');
   assert.doesNotMatch(html, /Select \/ Move Workflow/, 'select/move workflow toast copy should not be present');
@@ -163,17 +167,29 @@ test('VIEWPORT.HTML preserves unchanged array entries in drawing diffs', async (
 });
 
 
-test('VIEWPORT.HTML provides toggles to hide/show point code and notes labels', async () => {
+test('VIEWPORT.HTML provides toggles for point markers, names, codes, notes, and clustering', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
+  assert.match(html, /id="showPoints"\s+type="checkbox"\s+checked/, 'display section should include a checked point markers toggle');
+  assert.match(html, /id="showPointNames"\s+type="checkbox"\s+checked/, 'display section should include a checked point names toggle');
   assert.match(html, /id="showPointCodes"\s+type="checkbox"\s+checked/, 'display section should include a checked point code toggle');
   assert.match(html, /id="showPointNotes"\s+type="checkbox"(?!\s+checked)/, 'display section should include a point notes toggle defaulted off');
-  assert.match(html, /if \(labelVisibility\.codes && p\.code\)/, 'code labels should render only when the code toggle is enabled');
-  assert.match(html, /if \(labelVisibility\.notes && p\.notes\)/, 'notes labels should render only when the notes toggle is enabled');
+  assert.match(html, /id="enablePointClustering"\s+type="checkbox"\s+checked/, 'display section should include a checked point clustering toggle');
+  assert.match(html, /if \(pointDisplayVisibility\.points\) \{[\s\S]*ctx\.moveTo\(sp\.x-5, sp\.y-5\)/, 'point marker draw should be gated by point marker visibility toggle');
+  assert.match(html, /if \(pointDisplayVisibility\.names\) \{[\s\S]*const numText = String\(p\.num\);/, 'point name draw should be gated by point name visibility toggle');
+  assert.match(html, /if \(pointDisplayVisibility\.codes && p\.code\)/, 'code labels should render only when the code toggle is enabled');
+  assert.match(html, /if \(pointDisplayVisibility\.notes && p\.notes\)/, 'notes labels should render only when the notes toggle is enabled');
+  assert.match(html, /if \(!pointDisplayVisibility\.points \|\| !pointDisplayVisibility\.clustering\) return \[\];/, 'point clustering should disable cluster generation when points or clustering are hidden');
+  assert.match(html, /showPointsInput\?\.addEventListener\("change"/, 'point marker visibility toggle should be wired to change events');
+  assert.match(html, /quickShowPointsBtn\?\.addEventListener\("click"/, 'quick toolbar point marker toggle should be wired to click events');
+  assert.match(html, /showPointNamesInput\?\.addEventListener\("change"/, 'point name visibility toggle should be wired to change events');
+  assert.match(html, /quickShowPointNamesBtn\?\.addEventListener\("click"/, 'quick toolbar point names toggle should be wired to click events');
   assert.match(html, /showPointCodesInput\?\.addEventListener\("change"/, 'code visibility toggle should be wired to change events');
-  assert.match(html, /quickShowPointCodesInput\?\.addEventListener\("change"/, 'quick toolbar code toggle should be wired to change events');
+  assert.match(html, /quickShowPointCodesBtn\?\.addEventListener\("click"/, 'quick toolbar code toggle should be wired to click events');
   assert.match(html, /showPointNotesInput\?\.addEventListener\("change"/, 'notes visibility toggle should be wired to change events');
-  assert.match(html, /quickShowPointNotesInput\?\.addEventListener\("change"/, 'quick toolbar notes toggle should be wired to change events');
+  assert.match(html, /quickShowPointNotesBtn\?\.addEventListener\("click"/, 'quick toolbar notes toggle should be wired to click events');
+  assert.match(html, /enablePointClusteringInput\?\.addEventListener\("change"/, 'clustering visibility toggle should be wired to change events');
+  assert.match(html, /quickEnablePointClusteringInput\?\.addEventListener\("change"/, 'quick toolbar clustering toggle should be wired to change events');
 });
 
 
@@ -224,14 +240,14 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
 
   assert.match(html, /const\s+POINT_CLUSTER_DISTANCE_PX\s*=\s*18\s*;/, 'LineSmith should define a screen-space clustering threshold for super-close points');
   assert.match(html, /const\s+POINT_CLUSTER_LABEL_BREAKOUT_LIMIT\s*=\s*5\s*;/, 'LineSmith should cap radial point-number breakout labels once a cluster exceeds five points');
-  assert.match(html, /if \(cluster\.members\.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT\) continue;/, 'cluster markers should skip radial point-number breakout labels when cluster size is above the configured cap');
+  assert.match(html, /if \(!pointDisplayVisibility\.names \|\| cluster\.members\.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT\) continue;/, 'cluster markers should skip radial point-number breakout labels when cluster size is above the configured cap');
   assert.match(html, /const\s+POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT\s*=\s*10\s*;/, 'LineSmith should define when cluster tooltip detail switches from per-point to per-layer summaries');
   assert.match(html, /cluster\.members\.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT[\s\S]*countsByLayer/, 'cluster tooltip should aggregate large cluster details by drawing layer');
   assert.match(html, /<li><b>\$\{escapeHtml\(layerName\)\}<\/b>: \$\{count\} point\$\{count === 1 \? "" : "s"\}<\/li>/, 'large cluster tooltip rows should report per-layer point counts');
   assert.match(html, /function\s+buildPointClusters\(\)/, 'LineSmith should build dynamic point clusters for nearby points');
   assert.match(html, /id="clusterTooltip"\s+class="clusterTooltip\s+hidden"/, 'LineSmith should include a dedicated tooltip container for hover cluster membership lists');
   assert.match(html, /function\s+showClusterTooltip\(cluster\)/, 'LineSmith should render clustered point membership details on hover');
-  assert.match(html, /const\s+cluster\s*=\s*getPointClusterAtScreen\(mouse\.x,\s*mouse\.y\);[\s\S]*zoomToWorldBounds\(cluster\.minX,\s*cluster\.minY,\s*cluster\.maxX,\s*cluster\.maxY,\s*\{\s*paddingFraction:\s*0\.15\s*\}\);/, 'double-clicking a cluster should zoom to that cluster with 15% padding');
+  assert.match(html, /const\s+cluster\s*=\s*pointDisplayVisibility\.clustering\s*\?\s*getPointClusterAtScreen\(mouse\.x,\s*mouse\.y\)\s*:\s*null;[\s\S]*zoomToWorldBounds\(cluster\.minX,\s*cluster\.minY,\s*cluster\.maxX,\s*cluster\.maxY,\s*\{\s*paddingFraction:\s*0\.15\s*\}\);/, 'double-clicking a cluster should zoom to that cluster with 15% padding');
   assert.match(html, /const\s+labelRadius\s*=\s*POINT_LABEL_SPREAD_RADIUS_PX\s*\+\s*Math\.min\(20,\s*cluster\.members\.length\s*\*\s*2\);/, 'small clustered groups should spread out number labels radially to prevent overlap');
 });
 test('VIEWPORT.HTML maps Idaho state plane coordinates to Leaflet lat/lon via georeference transform', async () => {
