@@ -1987,6 +1987,8 @@
   const POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT = 10;
   const POINT_CLUSTER_MIN_STROKE_ALPHA = 0.25;
   const POINT_CLUSTER_MAX_STROKE_ALPHA = 0.7;
+  const POINT_CLUSTER_COUNT_TEXT_FILL_ALPHA = 0.98;
+  const POINT_CLUSTER_COUNT_TEXT_STROKE_ALPHA = 0.9;
   const POINT_CLUSTER_POLYGON_AREA_RATIO_TARGET = 0.5;
   const POINT_CLUSTER_POLYGON_AREA_RATIO_TOLERANCE = 0.15;
   const POINT_CLUSTER_POLYGON_MIN_WIDTH_TO_HEIGHT_RATIO = 1 / 3;
@@ -4231,11 +4233,16 @@
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = `rgba(255,213,74,${strokeAlpha})`;
+      const clusterCountText = cluster.countText || String(cluster.members.length);
+      ctx.strokeStyle = `rgba(0,0,0,${POINT_CLUSTER_COUNT_TEXT_STROKE_ALPHA})`;
+      ctx.lineWidth = 3;
+      ctx.lineJoin = "round";
+      ctx.fillStyle = `rgba(255,246,166,${POINT_CLUSTER_COUNT_TEXT_FILL_ALPHA})`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "bold 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(cluster.countText || String(cluster.members.length), cluster.centerX, cluster.centerY);
+      ctx.strokeText(clusterCountText, cluster.centerX, cluster.centerY);
+      ctx.fillText(clusterCountText, cluster.centerX, cluster.centerY);
       ctx.restore();
 
       if (!pointDisplayVisibility.names || cluster.members.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT) continue;
