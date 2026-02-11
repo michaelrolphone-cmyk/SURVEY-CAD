@@ -4,6 +4,7 @@ import {
   buildParcelCsvPNEZD,
   buildPolygonCornerCsvRowsPNEZD,
   buildPointMarkerCsvRowsPNEZD,
+  buildPowerUtilityMarkersForPointForge,
   buildUniquePolygonCsvRowsPNEZD,
   buildRosBoundaryCsvRowsPNEZD,
   buildAliquotSelectionKey,
@@ -64,6 +65,24 @@ test('buildPointMarkerCsvRowsPNEZD emits arbitrary marker points', () => {
 
 
 
+
+
+
+test('buildPowerUtilityMarkersForPointForge links the first power point to exported junction points', () => {
+  const utilities = [
+    { projected: { east: 100, north: 200 }, code: 'OH PWR BEG' },
+    { projected: { east: 110, north: 210 }, code: 'UG PWR END' },
+    { projected: { east: 120, north: 220 }, code: 'OH PWR END' },
+  ];
+
+  const markers = buildPowerUtilityMarkersForPointForge(utilities, 25);
+
+  assert.deepEqual(markers, [
+    { east: 100, north: 200, code: 'PM JPN26 JPN27' },
+    { east: 110, north: 210, code: 'JPN26' },
+    { east: 120, north: 220, code: 'JPN27' },
+  ]);
+});
 
 test('buildPointMarkerCsvRowsPNEZD supports explicit marker code values without a prefix', () => {
   const markers = [
