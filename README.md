@@ -42,6 +42,15 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 npm test
 ```
 
+## API + CLI quick verification commands
+
+```bash
+npm run cli -- --help
+npm run ros:cli -- --help
+curl "http://localhost:3000/health"
+curl "http://localhost:3000/api/apps"
+```
+
 ---
 
 ## CLI Commands
