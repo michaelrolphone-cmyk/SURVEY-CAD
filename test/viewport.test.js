@@ -38,6 +38,8 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /<div class="quickToolField" title="Map tiles">\s*<select id="quickMapTileType"/, 'quick toolbar should include unlabeled inline map tile type dropdown');
   assert.doesNotMatch(html, /title="Map tiles">\s*Tiles\s*</, 'quick toolbar map tile selector should not include a redundant Tiles text label');
   assert.match(html, /id="quickShowPoints"[\s\S]*fa-location-crosshairs/, 'quick toolbar should include point marker visibility icon toggle');
+  assert.match(html, /id="quickShowLines"[\s\S]*fa-slash/, 'quick toolbar should include line visibility icon toggle');
+  assert.match(html, /id="quickShowBearings"[\s\S]*fa-compass/, 'quick toolbar should include bearing visibility icon toggle');
   assert.match(html, /id="quickShowPointNames"[\s\S]*fa-tag/, 'quick toolbar should include point names visibility icon toggle');
   assert.match(html, /id="quickShowPointCodes"[\s\S]*fa-hashtag/, 'quick toolbar should include point code visibility icon toggle');
   assert.match(html, /id="quickShowPointNotes"[\s\S]*fa-note-sticky/, 'quick toolbar should include point notes visibility icon toggle');
@@ -204,6 +206,10 @@ test('VIEWPORT.HTML provides toggles for point markers, names, codes, notes, and
   assert.match(html, /showPointsInput\?\.addEventListener\("change"/, 'point marker visibility toggle should be wired to change events');
   assert.match(html, /quickShowPointsBtn\?\.addEventListener\("click"/, 'quick toolbar point marker toggle should be wired to click events');
   assert.match(html, /showPointNamesInput\?\.addEventListener\("change"/, 'point name visibility toggle should be wired to change events');
+  assert.match(html, /showLinesInput\?\.addEventListener\("change"/, 'line visibility toggle should be wired to change events');
+  assert.match(html, /quickShowLinesBtn\?\.addEventListener\("click"/, 'quick toolbar line visibility toggle should be wired to click events');
+  assert.match(html, /showBearingsInput\?\.addEventListener\("change"/, 'bearing visibility toggle should be wired to change events');
+  assert.match(html, /quickShowBearingsBtn\?\.addEventListener\("click"/, 'quick toolbar bearing visibility toggle should be wired to click events');
   assert.match(html, /quickShowPointNamesBtn\?\.addEventListener\("click"/, 'quick toolbar point names toggle should be wired to click events');
   assert.match(html, /showPointCodesInput\?\.addEventListener\("change"/, 'code visibility toggle should be wired to change events');
   assert.match(html, /quickShowPointCodesBtn\?\.addEventListener\("click"/, 'quick toolbar code toggle should be wired to click events');
@@ -218,6 +224,11 @@ test('VIEWPORT.HTML renders conditional line labels and avoids text collisions',
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /const\s+lineLabelCandidates\s*=\s*\[\]/, 'draw loop should gather line label candidates');
+  assert.match(html, /pointDisplayVisibility\s*=\s*\{[\s\S]*lines:\s*true,[\s\S]*bearings:\s*true,/, 'display state should default line and bearing rendering to visible');
+  assert.match(html, /id="showLines"\s+type="checkbox"\s+checked/, 'display controls should include a default-on draw lines checkbox');
+  assert.match(html, /id="showBearings"\s+type="checkbox"\s+checked/, 'display controls should include a default-on draw bearings checkbox');
+  assert.match(html, /if \(pointDisplayVisibility\.lines\) \{[\s\S]*for \(const ln of lines\.values\(\)\)/, 'line rendering loop should be gated behind line visibility state');
+  assert.match(html, /if \(pointDisplayVisibility\.bearings\) \{[\s\S]*for \(const c of lineLabelCandidates\)/, 'bearing label drawing should be gated behind bearing visibility state');
   assert.match(html, /if \(pixelLength < labelW \+ 24\) continue;/, 'line labels should only draw when the label can fit beside the line');
   assert.match(html, /blockedTextRects\.some\(\(r\) => rectsOverlap\(r, candidateAabb\)\)/, 'line labels should skip drawing when they overlap existing text bounds');
 });

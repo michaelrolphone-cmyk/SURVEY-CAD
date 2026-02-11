@@ -94,6 +94,8 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Toolbar controls:
   - Active layer dropdown (`quickLayerSelect`) with color swatch and quick flag toggles (lock / visibility / fill); dropdown sizing now expands to fit full layer names without truncating labels.
   - Layer manager button (`quickLayerManager`) that opens a layer editor modal table and sits to the left of the active layer dropdown in the top toolbar.
+  - Line visibility toggles (`showLines` and `quickShowLines`) let you hide/show all drawn segments without deleting geometry.
+  - Bearing visibility toggles (`showBearings` and `quickShowBearings`) let you hide/show on-canvas line bearing/distance labels while keeping line geometry visible.
   - Search-first quick input (`quickCommandSearchInput`) in the top toolbar row that searches point number/code/notes/layer text and shows layer-colored point matches as you type; command entry is submitted with Enter and command tokens (`line`, `move`, `rotate`, `inverse`) show autocomplete suggestions.
   - Quick toolbar layout now uses two rows: row 1 for save/ArrowHead, layers, point visibility toggles, compact search input, then map controls at the end (with an icon-based map toggle), and row 2 beginning at Select/Move for drawing/edit actions; the toolbar keeps padded rounded floating styling instead of stretching edge-to-edge, even when the controls drawer is collapsed.
 - Layer properties:
@@ -109,6 +111,8 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 There are no new server API endpoints or CLI commands required for this UI-only layer feature. Existing commands continue to work:
 
 - Toolbar layout update impact: no API/CLI changes; continue using existing endpoints (`GET /api/fld-config`) and existing commands (`npm run cli`, `npm run ros:cli`).
+- Line visibility toggle impact: no API/CLI changes; continue using existing endpoints (`GET /api/fld-config`) and existing commands (`npm run cli`, `npm run ros:cli`).
+- Bearing visibility toggle impact: no API/CLI changes; continue using existing endpoints (`GET /api/fld-config`) and existing commands (`npm run cli`, `npm run ros:cli`).
 
 ```bash
 npm run cli -- --help
