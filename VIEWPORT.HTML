@@ -397,6 +397,11 @@
       margin-left:-4px;
       margin-right:-4px;
     }
+    .pointHoverTooltipRow{ margin:2px 0; }
+    .pointHoverTooltipLabel{
+      color:var(--muted);
+      margin-right:4px;
+    }
     .quickToolField{
       display:inline-flex;
       flex-direction:row;
@@ -1278,6 +1283,7 @@
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
     <canvas id="c"></canvas>
     <div id="clusterTooltip" class="clusterTooltip hidden" role="status" aria-live="polite"></div>
+    <div id="pointHoverTooltip" class="clusterTooltip hidden" role="status" aria-live="polite"></div>
     <div id="workflowToast" class="workflowToast hidden" role="status" aria-live="polite" aria-atomic="true">
       <div id="workflowToastTitle" class="workflowToastTitle"></div>
       <div id="workflowToastMessage" class="workflowToastMessage"></div>
@@ -1884,6 +1890,7 @@
   const quickLayerColor = $("#quickLayerColor");
   const quickLayerManagerBtn = $("#quickLayerManager");
   const clusterTooltip = $("#clusterTooltip");
+  const pointHoverTooltip = $("#pointHoverTooltip");
 
   const hudTool = $("#hudTool");
   const hudMouse = $("#hudMouse");
@@ -3899,6 +3906,42 @@
     clusterTooltip.textContent = "";
   }
 
+  function shouldShowPointHoverTooltip() {
+    return !pointDisplayVisibility.names || !pointDisplayVisibility.codes;
+  }
+
+  function showPointHoverTooltip(point, screenX = mouse.x, screenY = mouse.y) {
+    if (!pointHoverTooltip || !point || !shouldShowPointHoverTooltip()) return;
+    const layer = getLayerById(point.layerId);
+    const layerName = String(layer?.name || "Unassigned").trim() || "Unassigned";
+    const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
+    const renderedCode = getRenderedPointCode(point.code);
+    const code = renderedCode || String(point.code || "").trim() || "(none)";
+    const description = String(point.notes || "").trim() || "(none)";
+    pointHoverTooltip.innerHTML = `
+      <div><b style="color:${escapeHtml(layerColor)}">Point ${escapeHtml(String(point.num || ""))}</b></div>
+      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Name:</span>${escapeHtml(String(point.num || ""))}</div>
+      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Code:</span>${escapeHtml(code)}</div>
+      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Layer:</span>${escapeHtml(layerName)}</div>
+      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Description:</span>${escapeHtml(description)}</div>`;
+    pointHoverTooltip.classList.remove("hidden");
+    const rect = canvas.getBoundingClientRect();
+    const localX = screenX - rect.left;
+    const localY = screenY - rect.top;
+    const tooltipWidth = pointHoverTooltip.offsetWidth || 220;
+    const tooltipHeight = pointHoverTooltip.offsetHeight || 100;
+    const left = clamp(localX + 14, 10, Math.max(10, rect.width - tooltipWidth - 10));
+    const top = clamp(localY + 14, 10, Math.max(10, rect.height - tooltipHeight - 10));
+    pointHoverTooltip.style.left = `${left}px`;
+    pointHoverTooltip.style.top = `${top}px`;
+  }
+
+  function hidePointHoverTooltip() {
+    if (!pointHoverTooltip) return;
+    pointHoverTooltip.classList.add("hidden");
+    pointHoverTooltip.textContent = "";
+  }
+
   function pickLine(screenX, screenY, thresholdPx=8) {
     const w = screenToWorld(screenX, screenY);
     let best = null;
@@ -4758,7 +4801,10 @@
     pointDisplayVisibility.points = !!enabled;
     if (showPointsInput) showPointsInput.checked = pointDisplayVisibility.points;
     setQuickToggleButtonState(quickShowPointsBtn, pointDisplayVisibility.points);
-    if (!pointDisplayVisibility.points) hideClusterTooltip();
+    if (!pointDisplayVisibility.points) {
+      hideClusterTooltip();
+      hidePointHoverTooltip();
+    }
   }
 
   function setLineVisibility(enabled) {
@@ -4777,12 +4823,14 @@
     pointDisplayVisibility.names = !!enabled;
     if (showPointNamesInput) showPointNamesInput.checked = pointDisplayVisibility.names;
     setQuickToggleButtonState(quickShowPointNamesBtn, pointDisplayVisibility.names);
+    if (!shouldShowPointHoverTooltip()) hidePointHoverTooltip();
   }
 
   function setPointCodeVisibility(enabled) {
     pointDisplayVisibility.codes = !!enabled;
     if (showPointCodesInput) showPointCodesInput.checked = pointDisplayVisibility.codes;
     setQuickToggleButtonState(quickShowPointCodesBtn, pointDisplayVisibility.codes);
+    if (!shouldShowPointHoverTooltip()) hidePointHoverTooltip();
   }
 
   function setPointNotesVisibility(enabled) {
@@ -7396,12 +7444,23 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
     if (!mouse.drag) {
       const cluster = pointDisplayVisibility.clustering ? getPointClusterAtScreen(mouse.x, mouse.y) : null;
-      if (cluster) showClusterTooltip(cluster);
-      else hideClusterTooltip();
+      if (cluster) {
+        showClusterTooltip(cluster);
+        hidePointHoverTooltip();
+      } else {
+        hideClusterTooltip();
+        const pid = pointDisplayVisibility.points ? pickPoint(mouse.x, mouse.y, 10) : null;
+        if (pid != null && points.has(pid) && shouldShowPointHoverTooltip()) {
+          showPointHoverTooltip(points.get(pid), mouse.x, mouse.y);
+        } else {
+          hidePointHoverTooltip();
+        }
+      }
       return;
     }
 
     hideClusterTooltip();
+    hidePointHoverTooltip();
 
     if (mouse.dragObj?.type === "pan") {
       const dx = mouse.x - mouse.dragStartX;
@@ -7568,6 +7627,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     mouse.down = false;
     endDrag();
     hideClusterTooltip();
+    hidePointHoverTooltip();
   });
 
   canvas.addEventListener("wheel", (e) => {
