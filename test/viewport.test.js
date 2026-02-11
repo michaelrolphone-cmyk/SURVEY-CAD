@@ -677,3 +677,16 @@ test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal 
   assert.match(html, /if \(!layer\.fill \|\| layer\.visible === false\) continue;[\s\S]*ctx\.fillStyle = `\$\{layer\.color\}1A`;/, 'closed loops on fill-enabled layers should render with low-opacity layer color fill');
   assert.match(html, /if \(isLayerLocked\(p\.layerId\)\) \{[\s\S]*Layer .* is locked\./, 'point edits should be blocked when the owning layer is locked');
 });
+
+
+test('VIEWPORT.HTML points manager supports grouping and layer-tinted rows', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="ptGroupBy"[\s\S]*value="layer"[\s\S]*value="code"/, 'points manager should expose a group-by control with Layer and Code options');
+  assert.match(html, /let\s+pointsGroupMode\s*=\s*"none"\s*;/, 'points manager should track a group-by mode state for grouped rendering');
+  assert.match(html, /\$\("#ptGroupBy"\)\.addEventListener\("change",[\s\S]*pointsGroupMode\s*=\s*String\(event\.target\?\.value\s*\|\|\s*"none"\)/, 'group-by dropdown should update the active grouping mode and rerender');
+  assert.match(html, /function\s+pointsGroupLabel\(point\)\s*\{[\s\S]*pointsGroupMode\s*===\s*"layer"[\s\S]*pointsGroupMode\s*===\s*"code"/, 'points manager should compute group labels for both layer and code modes');
+  assert.match(html, /function\s+getGroupedPoints\(sortedPoints\)\s*\{[\s\S]*groupsByLabel[\s\S]*map\(\(\[label, groupedPoints\]\) => \(\{ label, points: groupedPoints \}\)\)/, 'points manager should partition sorted points into grouped sections for rendering');
+  assert.match(html, /function\s+colorToRgba\(color, alpha = 0\.1\)[\s\S]*return\s+`rgba\(\$\{r\},\$\{g\},\$\{b\},\$\{clamp\(alpha, 0, 1\)\}\)`;/, 'points manager should derive faint row tint colors from layer hex values');
+  assert.match(html, /const\s+tint\s*=\s*colorToRgba\(getLayerById\(p\.layerId\)\?\.color,\s*0\.12\);[\s\S]*if\s*\(tint\)\s*tr\.style\.background\s*=\s*tint;/, 'points manager rows should apply a faint background tint from the point layer color');
+});
