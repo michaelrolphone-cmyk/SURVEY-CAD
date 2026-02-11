@@ -17,11 +17,102 @@ const DEFAULTS = {
   nominatimEmail: "admin@example.com",
   arcgisGeocodeUrl:
     "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
-  idahoPowerUtilityLookupUrl: "https://tools.idahopower.com/ServiceEstimator/api/ResidentialUtilities",
+  idahoPowerUtilityLookupUrl: "https://api.idahopower.com/serviceEstimator/api/EstimateDetail/Calculate",
   arcgisGeometryProjectUrl: "https://utility.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer/project",
 };
 
 const DIRS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
+
+function isUpstreamHttpError(err) {
+  return /^HTTP\s+\d{3}:/i.test(String(err?.message || ''));
+}
+
+function buildLegacyUtilityLookupCandidates(baseUrl, address) {
+  const candidates = [];
+
+  const primary = new URL(baseUrl);
+  primary.searchParams.set('address', address);
+  candidates.push(primary.toString());
+
+  if (/\/ResidentialUtilities\/?$/i.test(primary.pathname)) {
+    const fallback = new URL(primary.toString());
+    fallback.pathname = fallback.pathname.replace(/\/ResidentialUtilities\/?$/i, '/Utilities');
+    fallback.searchParams.set('address', address);
+    candidates.push(fallback.toString());
+  }
+
+  return [...new Set(candidates)];
+}
+
+function buildEstimateCalculateForm({ lon, lat }) {
+  const beginLongitude = Number(lon);
+  const beginLatitude = Number(lat);
+  const endLongitude = Number(lon) - 0.00002;
+  const endLatitude = Number(lat) + 0.00017;
+
+  const meters = haversineMeters(beginLatitude, beginLongitude, endLatitude, endLongitude);
+  const lineLengthFt = meters * 3.280839895;
+
+  const params = new URLSearchParams();
+  params.set('phaseId', '3');
+  params.set('primaryVoltageId', '4');
+  params.set('serviceEstimateCustomerTypeId', '1');
+  params.set('serviceEstimateServiceTypeId', '1');
+  params.set('lineLengthFt', String(lineLengthFt));
+  params.set('giso', '');
+  params.set('feederId', '');
+  params.set('region', '');
+  params.set('isVested', 'false');
+  params.set('beginLongitude', String(beginLongitude));
+  params.set('endLongitude', String(endLongitude));
+  params.set('beginLatitude', String(beginLatitude));
+  params.set('endLatitude', String(endLatitude));
+  params.set('transformers', '');
+  return params;
+}
+
+function extractUtilitiesFromEstimatePayload(payload = {}, fallbackPoint = null) {
+  const estimateDetail = payload?.estimateDetail || payload?.estimate || payload;
+  const transformerLists = [
+    payload?.transformers,
+    estimateDetail?.transformers,
+    estimateDetail?.Transformer,
+  ];
+
+  for (const entry of transformerLists) {
+    if (Array.isArray(entry) && entry.length) {
+      return entry;
+    }
+  }
+
+  if (Number.isFinite(Number(estimateDetail?.beginLongitude)) && Number.isFinite(Number(estimateDetail?.beginLatitude))) {
+    return [{
+      id: estimateDetail?.estimateDetailId || 'estimate-begin',
+      provider: 'Idaho Power',
+      name: estimateDetail?.feederId || 'Idaho Power Service Estimate',
+      geometry: {
+        x: Number(estimateDetail.beginLongitude),
+        y: Number(estimateDetail.beginLatitude),
+        spatialReference: { wkid: 4326 },
+      },
+    }];
+  }
+
+  if (fallbackPoint) {
+    return [{
+      id: 'estimate-fallback',
+      provider: 'Idaho Power',
+      name: 'Idaho Power Service Estimate',
+      geometry: {
+        x: Number(fallbackPoint.lon),
+        y: Number(fallbackPoint.lat),
+        spatialReference: { wkid: 4326 },
+      },
+    }];
+  }
+
+  return [];
+}
 
 function normalizeSpaces(s) {
   return (s || "").trim().replace(/\s+/g, " ");
@@ -303,11 +394,58 @@ export class SurveyCadClient {
   }
 
   async lookupUtilitiesByAddress(address, outSR = 4326) {
-    const url = new URL(this.config.idahoPowerUtilityLookupUrl);
-    url.searchParams.set('address', address);
+    const lookupUrl = String(this.config.idahoPowerUtilityLookupUrl || '');
 
-    const payload = await this.fetchJson(url.toString());
-    const rawUtilities = payload?.features || payload?.utilities || payload?.results || [];
+    let rawUtilities = [];
+    if (/\/EstimateDetail\/Calculate\/?$/i.test(lookupUrl)) {
+      let geocode;
+      try {
+        geocode = await this.geocodeAddress(address);
+      } catch {
+        return [];
+      }
+
+      const params = buildEstimateCalculateForm({ lon: geocode.lon, lat: geocode.lat });
+      try {
+        const payload = await this.fetchJson(lookupUrl, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'User-Agent': this.config.nominatimUserAgent,
+          },
+          body: params.toString(),
+        });
+        rawUtilities = extractUtilitiesFromEstimatePayload(payload, { lon: geocode.lon, lat: geocode.lat });
+      } catch (err) {
+        if (isUpstreamHttpError(err)) {
+          return [];
+        }
+        throw err;
+      }
+    } else {
+      const candidates = buildLegacyUtilityLookupCandidates(lookupUrl, address);
+      let payload = null;
+      let lastError = null;
+      for (const candidate of candidates) {
+        try {
+          payload = await this.fetchJson(candidate);
+          break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!payload) {
+        if (isUpstreamHttpError(lastError)) {
+          return [];
+        }
+        throw lastError;
+      }
+
+      rawUtilities = payload?.features || payload?.utilities || payload?.results || [];
+    }
+
     const normalized = rawUtilities
       .map((entry) => this.normalizeUtilityLocation(entry))
       .filter(Boolean);

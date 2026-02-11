@@ -4,7 +4,8 @@ import http from 'node:http';
 import { createSurveyServer } from '../src/server.js';
 import SurveyCadClient from '../src/survey-api.js';
 
-function createMockServer() {
+function createMockServer(options = {}) {
+  const { utilities404 = false, estimateCalculate404 = false } = options;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
@@ -78,7 +79,39 @@ function createMockServer() {
       return;
     }
 
+    if (url.pathname === '/serviceEstimator/api/EstimateDetail/Calculate') {
+      if (estimateCalculate404) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'not found' }));
+        return;
+      }
+      const chunks = [];
+      req.on('data', (chunk) => chunks.push(chunk));
+      req.on('end', () => {
+        const form = new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          transformers: [{
+            id: 'tx-1',
+            provider: 'Idaho Power',
+            name: 'Boise Service Utility',
+            longitude: Number(form.get('beginLongitude')),
+            latitude: Number(form.get('beginLatitude')),
+          }],
+        }));
+      });
+      return;
+    }
+
+
     if (url.pathname === '/idaho-power/utilities') {
+      if (utilities404) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'not found' }));
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         utilities: [{
@@ -131,7 +164,7 @@ test('server exposes survey APIs and static html', async () => {
     nominatimUrl: `${base}/geocode`,
     blmFirstDivisionLayer: `${base}/blm1`,
     blmSecondDivisionLayer: `${base}/blm2`,
-    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
   });
   const app = await startApiServer(client);
@@ -233,6 +266,25 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(projectBrowserStaticRes.status, 200);
     const projectBrowserHtml = await projectBrowserStaticRes.text();
     assert.match(projectBrowserHtml, /SurveyFoundry Project Browser/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+    await new Promise((resolve) => upstream.server.close(resolve));
+  }
+});
+
+test('server returns empty utility payload when upstream utility endpoint is unavailable', async () => {
+  const upstream = await createMockServer({ estimateCalculate404: true });
+  const base = `http://127.0.0.1:${upstream.port}`;
+  const client = new SurveyCadClient({
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+  });
+  const app = await startApiServer(client);
+
+  try {
+    const utilitiesRes = await fetch(`http://127.0.0.1:${app.port}/api/utilities?address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(utilitiesRes.status, 200);
+    const utilitiesPayload = await utilitiesRes.json();
+    assert.deepEqual(utilitiesPayload, { utilities: [] });
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));
