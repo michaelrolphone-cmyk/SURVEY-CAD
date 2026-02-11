@@ -1975,6 +1975,8 @@
   };
   let pendingMarqueeZoomRect = null;
   let pendingMarqueeSelectionSnapshot = null;
+  const DOUBLE_RIGHT_CLICK_ZOOM_OUT_MS = 325;
+  let lastRightClickAtMs = 0;
 
   const mobileInteraction = {
     longPressMs: 450,
@@ -2319,6 +2321,38 @@
     const cosLat = Math.max(0.01, Math.cos((lat * Math.PI) / 180));
     const zoom = Math.log2((156543.03392 * cosLat) / Math.max(1e-9, metersPerPixel));
     return clamp(zoom, MAP_LAYER_MIN_RENDER_ZOOM, MAP_LAYER_MAX_RENDER_ZOOM);
+  }
+
+  function leafletZoomToScaleForLat(zoom, lat) {
+    if (!Number.isFinite(zoom)) return view.scale;
+    if (!mapGeoreference) {
+      return clamp((256 * (2 ** zoom)) / 360, MIN_SCALE, MAX_SCALE);
+    }
+    const cosLat = Math.max(0.01, Math.cos((lat * Math.PI) / 180));
+    const metersPerPixel = (156543.03392 * cosLat) / (2 ** zoom);
+    const feetPerPixel = metersPerPixel / FEET_TO_METERS;
+    return clamp(1 / Math.max(1e-9, feetPerPixel), MIN_SCALE, MAX_SCALE);
+  }
+
+  function nextZoomOutLeafletLevel(currentZoom) {
+    if (!Number.isFinite(currentZoom)) return MAP_LAYER_MIN_RENDER_ZOOM;
+    const epsilon = 1e-6;
+    const nextLevel = Math.abs(currentZoom - Math.round(currentZoom)) <= epsilon
+      ? currentZoom - 1
+      : Math.floor(currentZoom);
+    return clamp(nextLevel, MAP_LAYER_MIN_RENDER_ZOOM, MAP_LAYER_MAX_RENDER_ZOOM);
+  }
+
+  function zoomOutToNextMapLevelAtScreenPoint(screenX, screenY) {
+    const before = screenToWorld(screenX, screenY);
+    const centerLatLng = worldToLatLng(before.x, before.y);
+    const currentZoom = scaleToLeafletZoomForLat(view.scale, centerLatLng.lat);
+    const targetZoom = nextZoomOutLeafletLevel(currentZoom);
+    const targetScale = leafletZoomToScaleForLat(targetZoom, centerLatLng.lat);
+    view.scale = targetScale;
+    view.panX = screenX - before.x * view.scale;
+    view.panY = screenY + before.y * view.scale;
+    setStatus(`Zoomed out to map zoom ${targetZoom.toFixed(0)}.`, "ok");
   }
 
   function syncViewToGeoreference(payload) {
@@ -7281,6 +7315,9 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   canvas.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     updateMouseFromEvent(e);
+    const now = performance.now();
+    const isDoubleRightClick = now - lastRightClickAtMs <= DOUBLE_RIGHT_CLICK_ZOOM_OUT_MS;
+    lastRightClickAtMs = now;
     if (mouse.dragObj?.type === "marquee") {
       mouse.dragObj.x1 = mouse.x;
       mouse.dragObj.y1 = mouse.y;
@@ -7295,6 +7332,12 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       zoomToScreenRect(pendingWindowRect);
       applySelectionSnapshot(consumePendingMarqueeSelectionSnapshot());
       setStatus("Zoomed to window without changing selection.", "ok");
+      return;
+    }
+
+    if (isDoubleRightClick && !hasSelection() && !modalIsOpen()) {
+      zoomOutToNextMapLevelAtScreenPoint(mouse.x, mouse.y);
+      pendingEscapeLockEntity = null;
       return;
     }
 

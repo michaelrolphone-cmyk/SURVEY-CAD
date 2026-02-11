@@ -36,6 +36,10 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 - `Cmd+S` (macOS)
 - `Ctrl+Shift+S` / `Cmd+Shift+S` (handled as save in-app)
 
+## LineSmith Mouse Shortcut
+
+When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** zooms out to the next map zoom level at the cursor position.
+
 ## LineSmith Quick Search
 
 In `VIEWPORT.HTML`, the point/command quick-search flyout is intentionally wider than the input field so long code/notes descriptions remain readable, and point suggestions now display the point number without a `P` prefix.
