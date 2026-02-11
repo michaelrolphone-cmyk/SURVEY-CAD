@@ -500,6 +500,14 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
   assert.match(html, /Auto-updated linework for point \$\{p\.num\}: \+\$\{addedJpn\} JPN, \+\$\{addedSequential\} sequential, -\$\{removed\} removed\./, 'LineSmith should report add/remove totals when code edits re-sync field-to-finish linework');
 });
 
+
+test('VIEWPORT.HTML filters applied field-to-finish tokens from rendered point labels', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+getRenderedPointCode\(rawCode = ""\)\s*\{[\s\S]*if \(i === 0\) \{[\s\S]*directives\.has\(tokenUpper\)[\s\S]*\/\^JPN\[A-Z0-9\]\+\$\/i\.test\(tokenRaw\)[\s\S]*fieldToFinishRuleState\.lineworkCodes\.has\(tokenUpper\)/, 'LineSmith should keep the first code token while filtering applied directives, JPN commands, and linework tokens from displayed labels');
+  assert.match(html, /const\s+codeText\s*=\s*getRenderedPointCode\(p\.code\);/, 'point label rendering should use filtered code text rather than raw point codes');
+});
+
 test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal for drawing rules', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

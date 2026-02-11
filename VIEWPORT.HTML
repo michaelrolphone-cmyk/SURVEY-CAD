@@ -2640,6 +2640,42 @@
     return { tokensUpper, commands };
   }
 
+  function getRenderedPointCode(rawCode = "") {
+    const tokens = String(rawCode ?? "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (tokens.length <= 1) return tokens.join(" ");
+
+    const directives = new Set(["BEG", "END", "CLO"]);
+    const rendered = [];
+
+    for (let i = 0; i < tokens.length; i++) {
+      const tokenRaw = tokens[i];
+      const tokenUpper = tokenRaw.toUpperCase();
+
+      if (i === 0) {
+        rendered.push(tokenRaw);
+        continue;
+      }
+
+      if (directives.has(tokenUpper)) continue;
+      if (/^JPN[A-Z0-9]+$/i.test(tokenRaw)) continue;
+      if (tokenUpper === "JPN") {
+        const next = String(tokens[i + 1] ?? "");
+        if (/^[A-Z0-9]+$/i.test(next)) i++;
+        continue;
+      }
+
+      if (fieldToFinishRuleState.lineworkCodes.has(tokenUpper)) continue;
+      if (fieldToFinishRuleState.companionToLineworkCodes.has(tokenUpper)) continue;
+
+      rendered.push(tokenRaw);
+    }
+
+    return rendered.join(" ");
+  }
+
   function extractJpnTargetPointNumbers(code = "") {
     const targets = [];
     const seen = new Set();
@@ -3502,9 +3538,11 @@
 
       if (labelVisibility.codes && p.code) {
         ctx.fillStyle = "#39ff79";
-        const codeText = String(p.code);
-        ctx.fillText(codeText, sp.x + 8, sp.y + 2);
-        blockedTextRects.push({ x: sp.x + 8, y: sp.y - 4, w: ctx.measureText(codeText).width, h: 12 });
+        const codeText = getRenderedPointCode(p.code);
+        if (codeText) {
+          ctx.fillText(codeText, sp.x + 8, sp.y + 2);
+          blockedTextRects.push({ x: sp.x + 8, y: sp.y - 4, w: ctx.measureText(codeText).width, h: 12 });
+        }
       }
       if (labelVisibility.notes && p.notes) {
         ctx.fillStyle = "#3aa3ff";

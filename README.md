@@ -78,6 +78,7 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Response: same schema as CLI `fld-config` (`versionTag`, `columns`, `rules`, `rulesByCode`).
 - Current LineSmith behavior: it treats `entityType === "2"` + `processingOn === true` as linework codes and `entityType === "0"` + `processingOn === true` as symbol codes.
 - Companion-code sequencing: for active linework rules, LineSmith also honors each rule's `companionCodes` list during sequential connectivity (for example, `WL` can continue through `WM` points when `WM` is configured as a companion code for `WL`, while `WM` remains a symbol code on its own).
+- Point code label filtering: when drawing point-code labels, LineSmith now removes non-leading Field-to-Finish command tokens that are already applied (for example `BEG`, `END`, `CLO`, `JPN###`, configured linework codes, and companion linework tokens), while preserving the first code token for readability (`WL BEG JPN123 57G` renders as `WL 57G`).
 
 
 ## LineSmith Layer Controls
