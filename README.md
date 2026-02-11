@@ -7,7 +7,7 @@ This repository includes:
 - A standalone ROS basis-of-bearing OCR API in `src/ros-ocr-api.js`.
 - A standalone ROS basis-of-bearing CLI in `src/ros-basis-cli.js`.
 - A Field-to-Finish (`.fld`) parser in `src/fld-config.js` for pipe-delimited code-table configurations.
-- A Heroku-compatible web server in `src/server.js` that serves the repository HTML files statically and exposes the surveying library as JSON API endpoints.
+- A Heroku-compatible web server in `src/server.js` that serves the repository HTML files statically and exposes the surveying library as JSON API endpoints, including a Field-to-Finish parser endpoint used by LineSmith (`/api/fld-config`).
 
 ## Install / Run
 
@@ -56,6 +56,7 @@ npm run cli -- --help
 npm run ros:cli -- --help
 npm run icons:generate
 node src/cli.js fld-config --file config/MLS.fld --summary
+curl "http://localhost:3000/api/fld-config?file=config/MLS.fld"
 node --test test/arrowhead-projection.test.js
 ```
 
@@ -66,6 +67,16 @@ node --test test/arrowhead-projection.test.js
 - `rulesByCode`: direct lookup map keyed by rule `code`.
 
 Use `--summary` to emit a compact payload (`versionTag`, `columnCount`, `ruleCount`, and `codes`) when you only need command-line inspection.
+
+
+## FLD API Endpoint
+
+LineSmith now loads field-to-finish behavior rules from the server-provided FLD parser output instead of hardcoded point-code assumptions.
+
+- Endpoint: `GET /api/fld-config?file=config/MLS.fld`
+- Query param: `file` is a repo-relative path to a `.fld` file under the server static directory.
+- Response: same schema as CLI `fld-config` (`versionTag`, `columns`, `rules`, `rulesByCode`).
+- Current LineSmith behavior: it treats `entityType === "2"` + `processingOn === true` as linework codes and `entityType === "0"` + `processingOn === true` as symbol codes.
 
 ## RecordQuarry Launch Params
 

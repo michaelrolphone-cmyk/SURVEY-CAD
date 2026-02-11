@@ -8,6 +8,7 @@ import { listApps } from './app-catalog.js';
 import { buildProjectArchivePlan, createProjectFile } from './project-file.js';
 import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
+import { loadFldConfig } from './fld-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -209,6 +210,23 @@ export function createSurveyServer({
         }
         const app = await rosOcrHandlerPromise;
         app(req, res);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/fld-config') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const requestedPath = urlObj.searchParams.get('file') || 'config/MLS.fld';
+        const safePath = requestedPath.replace(/^\/+/, '');
+        const absolutePath = path.resolve(staticDir, safePath);
+        if (!absolutePath.startsWith(path.resolve(staticDir))) {
+          sendJson(res, 403, { error: 'Forbidden path.' });
+          return;
+        }
+        const config = await loadFldConfig(absolutePath);
+        sendJson(res, 200, config);
         return;
       }
 

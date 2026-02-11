@@ -2341,6 +2341,50 @@
     return false;
   }
 
+  const defaultFldConfigPath = "config/MLS.fld";
+  const fieldToFinishRuleState = {
+    lineworkCodes: new Set(),
+    symbolCodes: new Set(),
+    source: null,
+    loaded: false,
+    attempted: false,
+  };
+
+  function deriveFieldToFinishCodeSetsFromConfig(config) {
+    const lineworkCodes = new Set();
+    const symbolCodes = new Set();
+    const rules = Array.isArray(config?.rules) ? config.rules : [];
+    for (const rule of rules) {
+      if (!rule?.processingOn || !rule.code) continue;
+      const code = String(rule.code).trim().toUpperCase();
+      const entityType = String(rule.entityType ?? "").trim();
+      if (!code) continue;
+      if (entityType === "2") lineworkCodes.add(code);
+      if (entityType === "0") symbolCodes.add(code);
+    }
+    return { lineworkCodes, symbolCodes };
+  }
+
+  async function loadFieldToFinishRulesFromFld(path = defaultFldConfigPath) {
+    fieldToFinishRuleState.attempted = true;
+    try {
+      const response = await fetch(`/api/fld-config?file=${encodeURIComponent(path)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const config = await response.json();
+      const { lineworkCodes, symbolCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
+      fieldToFinishRuleState.lineworkCodes = lineworkCodes;
+      fieldToFinishRuleState.symbolCodes = symbolCodes;
+      fieldToFinishRuleState.source = path;
+      fieldToFinishRuleState.loaded = true;
+      return true;
+    } catch (_err) {
+      fieldToFinishRuleState.loaded = false;
+      fieldToFinishRuleState.lineworkCodes = new Set();
+      fieldToFinishRuleState.symbolCodes = new Set();
+      return false;
+    }
+  }
+
   const fieldToFinishCommandParsers = [
     {
       type: "join-point-number",
@@ -2429,6 +2473,8 @@
     for (const point of pointsInOrder) {
       const { tokensUpper, commands } = parseFieldToFinishCommands(point.code);
       const tokenSet = new Set(tokensUpper);
+      const lineworkCodes = fieldToFinishRuleState.lineworkCodes;
+      const pointLineworkCodes = [...tokenSet].filter((token) => lineworkCodes.has(token));
 
       for (const baseCode of [...activeSequences.keys()]) {
         if (!tokenSet.has(baseCode)) activeSequences.delete(baseCode);
@@ -2454,6 +2500,13 @@
           lineCommands.push({ a: active.lastPointId, b: active.startPointId });
         }
         activeSequences.delete(baseCode);
+      }
+
+      for (const lineCode of pointLineworkCodes) {
+        if (explicitActions.has(lineCode)) continue;
+        if (!activeSequences.has(lineCode)) {
+          activeSequences.set(lineCode, { startPointId: point.id, lastPointId: point.id });
+        }
       }
 
       for (const [baseCode, active] of activeSequences.entries()) {
@@ -5904,7 +5957,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   // -------------------------
   // Boot
   // -------------------------
-  function boot() {
+  async function boot() {
+    await loadFieldToFinishRulesFromFld(defaultFldConfigPath);
     resize();
     window.addEventListener("resize", resize);
     mapEnabledInput.checked = false;

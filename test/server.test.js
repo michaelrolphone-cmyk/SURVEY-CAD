@@ -236,6 +236,13 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(rosPdfRes.status, 200);
     assert.match(rosPdfRes.headers.get('content-type') || '', /application\/pdf/i);
 
+    const fldConfigRes = await fetch(`http://127.0.0.1:${app.port}/api/fld-config?file=config/MLS.fld`);
+    assert.equal(fldConfigRes.status, 200);
+    const fldConfig = await fldConfigRes.json();
+    assert.equal(fldConfig.versionTag, '2010V');
+    assert.equal(fldConfig.rulesByCode.WL.entityType, '2');
+    assert.equal(fldConfig.rulesByCode.WM.entityType, '0');
+
     const staticRes = await fetch(`http://127.0.0.1:${app.port}/RecordQuarry.html`);
     assert.equal(staticRes.status, 200);
     const html = await staticRes.text();

@@ -231,9 +231,14 @@ test('VIEWPORT.HTML parses generic field-to-finish commands for sequential BEG/E
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /const\s+fieldToFinishCommandParsers\s*=\s*\[/, 'LineSmith should maintain a registry of field-to-finish command parsers for extensible code-token handling');
+  assert.match(html, /const\s+fieldToFinishRuleState\s*=\s*\{[\s\S]*lineworkCodes:\s*new\s+Set\(\),[\s\S]*symbolCodes:\s*new\s+Set\(\)/, 'LineSmith should maintain FLD-derived linework and symbol code sets for field-to-finish behavior');
+  assert.match(html, /function\s+deriveFieldToFinishCodeSetsFromConfig\(config\)\s*\{[\s\S]*if \(entityType === "2"\) lineworkCodes\.add\(code\);[\s\S]*if \(entityType === "0"\) symbolCodes\.add\(code\);/, 'LineSmith should derive linework and symbol code classes from FLD entity types instead of hardcoded point-code values');
+  assert.match(html, /await\s+loadFieldToFinishRulesFromFld\(defaultFldConfigPath\);/, 'LineSmith boot should load FLD field-to-finish rules before import workflows run');
+  assert.match(html, /function\s+loadFieldToFinishRulesFromFld\(path\s*=\s*defaultFldConfigPath\)\s*\{[\s\S]*fetch\(`\/api\/fld-config\?file=\$\{encodeURIComponent\(path\)\}`\)/, 'LineSmith should fetch FLD parser output from the server API so different FLD files can drive drawing behavior');
   assert.match(html, /\{\s*type:\s*"sequential-line",[\s\S]*const\s+directives\s*=\s*new\s+Set\(\["BEG",\s*"END",\s*"CLO"\]\)/, 'field-to-finish parser should recognize sequential line directives BEG, END, and CLO');
   assert.match(html, /function\s+parseFieldToFinishCommands\(code\s*=\s*""\)\s*\{[\s\S]*for \(const parser of fieldToFinishCommandParsers\)/, 'LineSmith should parse point-code tokens through the command-parser registry so new directives can be added without rewriting import logic');
   assert.match(html, /function\s+buildFieldToFinishSequentialLineCommands\(\)\s*\{[\s\S]*activeSequences\s*=\s*new\s+Map\(\)/, 'LineSmith should build sequential field-to-finish line commands using tracked active code sequences');
+  assert.match(html, /const\s+pointLineworkCodes\s*=\s*\[\.\.\.tokenSet\]\.filter\(\(token\)\s*=>\s*lineworkCodes\.has\(token\)\);/, 'LineSmith should only auto-sequence codes that FLD marks as linework entities');
   assert.match(html, /if \(action === "CLO" && active\.startPointId !== active\.lastPointId\) \{[\s\S]*lineCommands\.push\(\{ a: active\.lastPointId, b: active\.startPointId \}\);/, 'CLO directives should close sequential linework by connecting the current point back to the BEG point');
   assert.match(html, /const\s+sequentialLinesAdded\s*=\s*connectFieldToFinishSequentialLines\(\);/, 'code edits should apply sequential field-to-finish line commands immediately so new BEG/END/CLO tokens generate linework');
 });
