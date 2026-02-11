@@ -77,6 +77,7 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Query param: `file` is a repo-relative path to a `.fld` file under the server static directory.
 - Response: same schema as CLI `fld-config` (`versionTag`, `columns`, `rules`, `rulesByCode`).
 - Current LineSmith behavior: it treats `entityType === "2"` + `processingOn === true` as linework codes and `entityType === "0"` + `processingOn === true` as symbol codes.
+- Companion-code sequencing: for active linework rules, LineSmith also honors each rule's `companionCodes` list during sequential connectivity (for example, `WL` can continue through `WM` points when `WM` is configured as a companion code for `WL`, while `WM` remains a symbol code on its own).
 
 ## RecordQuarry Launch Params
 
