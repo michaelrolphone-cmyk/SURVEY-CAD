@@ -402,6 +402,25 @@
       color:var(--muted);
       margin-right:4px;
     }
+    .pointHoverTooltipDelta{
+      margin:0 0 7px;
+      padding:6px 8px;
+      border:1px solid #2f2f2f;
+      border-radius:7px;
+      background:rgba(4,4,4,0.72);
+      box-shadow:inset 0 1px 2px rgba(0,0,0,0.6);
+    }
+    .pointHoverTooltipDelta .pointHoverTooltipRow{ margin:0; }
+    .pointHoverTooltipFromPill{
+      display:inline-flex;
+      align-items:center;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.28);
+      padding:0 6px;
+      line-height:1.45;
+      font-weight:700;
+      margin:0 1px;
+    }
     .quickToolField{
       display:inline-flex;
       flex-direction:row;
@@ -3989,18 +4008,24 @@
     const description = String(point.notes || "").trim() || "(none)";
     const basePointId = selectedPointIds.length === 1 ? selectedPointIds[0] : null;
     const basePoint = basePointId != null ? points.get(basePointId) : null;
-    const pointDelta = basePoint && basePoint.id !== point.id ? lineMeasurement(basePoint, point) : null;
+    const pointDelta = basePoint && basePoint.id !== point.id ? lineMeasurement(point, basePoint) : null;
+    const basePointLayer = basePoint ? getLayerById(basePoint.layerId) : null;
+    const fromPointColor = String(basePointLayer?.color || "#ffd54a").trim() || "#ffd54a";
+    const fromPointNumber = escapeHtml(String(basePoint?.num || ""));
     const pointDeltaHtml = pointDelta
-      ? `<div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Distance:</span>${pointDelta.distance.toFixed(3)}</div>
-      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Bearing:</span>${escapeHtml(pointDelta.bearing)}</div>`
+      ? `<div class="pointHoverTooltipDelta">
+        <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Distance:</span>${pointDelta.distance.toFixed(2)}' from <span class="pointHoverTooltipFromPill" style="background:${escapeHtml(fromPointColor)};">${fromPointNumber}</span></div>
+        <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Bearing:</span>${escapeHtml(pointDelta.bearing)}</div>
+      </div>`
       : "";
     pointHoverTooltip.innerHTML = `
+      ${pointDeltaHtml}
       <div><b style="color:${escapeHtml(layerColor)}">Point ${escapeHtml(String(point.num || ""))}</b></div>
       <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Name:</span>${escapeHtml(String(point.num || ""))}</div>
       <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Code:</span>${escapeHtml(code)}</div>
       <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Layer:</span>${escapeHtml(layerName)}</div>
       <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Description:</span>${escapeHtml(description)}</div>
-      ${pointDeltaHtml}`;
+      `;
     pointHoverTooltip.classList.remove("hidden");
     const rect = canvas.getBoundingClientRect();
     const localX = screenX - rect.left;
