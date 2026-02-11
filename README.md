@@ -111,6 +111,22 @@ npm run ros:cli -- --help
 node --test test/viewport.test.js
 ```
 
+## LineSmith Point Cluster UX
+
+`VIEWPORT.HTML` now limits dense point-cluster annotation for readability:
+
+- Cluster marker radial point-number breakout labels render only when the cluster has **5 points or fewer**.
+- Cluster tooltip content switches behavior at **10 points**:
+  - `<= 10` points: per-point rows (point number + code as before).
+  - `> 10` points: grouped rows by layer with point counts (for example `Default: 12 points`).
+- API/CLI surface impact: no new endpoints or commands were added for this UI behavior; continue using existing endpoints like `GET /api/fld-config` and existing CLI entrypoints (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+Validation command:
+
+```bash
+node --test test/viewport.test.js
+```
+
 ## RecordQuarry Launch Params
 
 `RecordQuarry.html` supports launcher query params for auto-loading and cached restore behavior:

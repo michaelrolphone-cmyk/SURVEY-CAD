@@ -1736,6 +1736,8 @@
   const POINT_CLUSTER_DISTANCE_PX = 18;
   const POINT_CLUSTER_PICK_PADDING_PX = 8;
   const POINT_LABEL_SPREAD_RADIUS_PX = 24;
+  const POINT_CLUSTER_LABEL_BREAKOUT_LIMIT = 5;
+  const POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT = 10;
   let cachedPointClusters = [];
 
   const mapLayerState = {
@@ -3369,11 +3371,24 @@
 
   function showClusterTooltip(cluster) {
     if (!clusterTooltip || !cluster) return;
-    const listHtml = cluster.members.map((entry) => {
-      const point = entry.point;
-      const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
-      return `<li><b>${escapeHtml(point.num)}</b>${code}</li>`;
-    }).join("");
+    const listHtml = cluster.members.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT
+      ? (() => {
+        const countsByLayer = new Map();
+        for (const entry of cluster.members) {
+          const point = entry.point;
+          const layerName = String(getLayerById(point.layerId)?.name || "Unassigned").trim() || "Unassigned";
+          countsByLayer.set(layerName, (countsByLayer.get(layerName) || 0) + 1);
+        }
+        return Array.from(countsByLayer.entries())
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+          .map(([layerName, count]) => `<li><b>${escapeHtml(layerName)}</b>: ${count} point${count === 1 ? "" : "s"}</li>`)
+          .join("");
+      })()
+      : cluster.members.map((entry) => {
+        const point = entry.point;
+        const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
+        return `<li><b>${escapeHtml(point.num)}</b>${code}</li>`;
+      }).join("");
     clusterTooltip.innerHTML = `<div><b>${cluster.members.length} clustered points</b></div><ul>${listHtml}</ul>`;
     clusterTooltip.classList.remove("hidden");
 
@@ -3778,6 +3793,8 @@
       ctx.font = "bold 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
       ctx.fillText(String(cluster.members.length), cluster.centerX, cluster.centerY);
       ctx.restore();
+
+      if (cluster.members.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT) continue;
 
       const labelRadius = POINT_LABEL_SPREAD_RADIUS_PX + Math.min(20, cluster.members.length * 2);
       const membersCount = Math.max(1, cluster.members.length);

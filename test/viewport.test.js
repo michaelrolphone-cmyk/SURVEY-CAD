@@ -223,11 +223,16 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /const\s+POINT_CLUSTER_DISTANCE_PX\s*=\s*18\s*;/, 'LineSmith should define a screen-space clustering threshold for super-close points');
+  assert.match(html, /const\s+POINT_CLUSTER_LABEL_BREAKOUT_LIMIT\s*=\s*5\s*;/, 'LineSmith should cap radial point-number breakout labels once a cluster exceeds five points');
+  assert.match(html, /if \(cluster\.members\.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT\) continue;/, 'cluster markers should skip radial point-number breakout labels when cluster size is above the configured cap');
+  assert.match(html, /const\s+POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT\s*=\s*10\s*;/, 'LineSmith should define when cluster tooltip detail switches from per-point to per-layer summaries');
+  assert.match(html, /cluster\.members\.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT[\s\S]*countsByLayer/, 'cluster tooltip should aggregate large cluster details by drawing layer');
+  assert.match(html, /<li><b>\$\{escapeHtml\(layerName\)\}<\/b>: \$\{count\} point\$\{count === 1 \? "" : "s"\}<\/li>/, 'large cluster tooltip rows should report per-layer point counts');
   assert.match(html, /function\s+buildPointClusters\(\)/, 'LineSmith should build dynamic point clusters for nearby points');
   assert.match(html, /id="clusterTooltip"\s+class="clusterTooltip\s+hidden"/, 'LineSmith should include a dedicated tooltip container for hover cluster membership lists');
   assert.match(html, /function\s+showClusterTooltip\(cluster\)/, 'LineSmith should render clustered point membership details on hover');
   assert.match(html, /const\s+cluster\s*=\s*getPointClusterAtScreen\(mouse\.x,\s*mouse\.y\);[\s\S]*zoomToWorldBounds\(cluster\.minX,\s*cluster\.minY,\s*cluster\.maxX,\s*cluster\.maxY,\s*\{\s*paddingFraction:\s*0\.15\s*\}\);/, 'double-clicking a cluster should zoom to that cluster with 15% padding');
-  assert.match(html, /const\s+labelRadius\s*=\s*POINT_LABEL_SPREAD_RADIUS_PX\s*\+\s*Math\.min\(20,\s*cluster\.members\.length\s*\*\s*2\);/, 'clustered points should spread out number labels radially to prevent overlap');
+  assert.match(html, /const\s+labelRadius\s*=\s*POINT_LABEL_SPREAD_RADIUS_PX\s*\+\s*Math\.min\(20,\s*cluster\.members\.length\s*\*\s*2\);/, 'small clustered groups should spread out number labels radially to prevent overlap');
 });
 test('VIEWPORT.HTML maps Idaho state plane coordinates to Leaflet lat/lon via georeference transform', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
