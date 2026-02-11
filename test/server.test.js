@@ -232,8 +232,12 @@ test('server exposes survey APIs and static html', async () => {
     const utilitiesRes = await fetch(`http://127.0.0.1:${app.port}/api/utilities?address=${encodeURIComponent('100 Main St, Boise')}`);
     assert.equal(utilitiesRes.status, 200);
     const utilitiesPayload = await utilitiesRes.json();
-    assert.equal(utilitiesPayload.utilities.length, 1);
-    assert.equal(utilitiesPayload.utilities[0].provider, 'Idaho Power');
+    assert.equal(utilitiesPayload.utilities.length, 3);
+    assert.ok(utilitiesPayload.utilities.every((utility) => utility.provider === 'Idaho Power'));
+    assert.deepEqual(
+      utilitiesPayload.utilities.map((utility) => utility.code).sort(),
+      ['OH PWR TX', 'UG PWR TX', 'UG PWR TX'],
+    );
 
     const rosPdfRes = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=${encodeURIComponent(`${base}/sample.pdf`)}`);
     assert.equal(rosPdfRes.status, 200);

@@ -73,8 +73,17 @@ function buildEstimateCalculateForm({ lon, lat, serviceTypeId = 1 }) {
 
 const ESTIMATE_SERVICE_TYPE_IDS = Object.freeze([1, 2, 3]);
 
-function extractUtilitiesFromEstimatePayload(payload = {}, fallbackPoint = null) {
+function utilityCodePrefixForServiceType(serviceTypeId) {
+  const normalized = Number(serviceTypeId);
+  if (normalized === 1) return 'OH PWR';
+  if (normalized === 2 || normalized === 3) return 'UG PWR';
+  return 'PWR';
+}
+
+function extractUtilitiesFromEstimatePayload(payload = {}, options = {}) {
+  const { fallbackPoint = null, serviceTypeId = null } = options;
   const estimateDetail = payload?.estimateDetail || payload?.estimate || payload;
+  const codePrefix = utilityCodePrefixForServiceType(serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId);
   const transformerLists = [
     payload?.transformers,
     estimateDetail?.transformers,
@@ -83,28 +92,63 @@ function extractUtilitiesFromEstimatePayload(payload = {}, fallbackPoint = null)
 
   for (const entry of transformerLists) {
     if (Array.isArray(entry) && entry.length) {
-      return entry;
+      return entry.map((transformer, index) => ({
+        ...transformer,
+        code: transformer?.code || `${codePrefix} TX`,
+        name: transformer?.name || `${codePrefix} TRANSFORMER`,
+        serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
+        id: transformer?.id || `estimate-${serviceTypeId || 'unknown'}-transformer-${index + 1}`,
+      }));
     }
   }
 
-  if (Number.isFinite(Number(estimateDetail?.beginLongitude)) && Number.isFinite(Number(estimateDetail?.beginLatitude))) {
-    return [{
-      id: estimateDetail?.estimateDetailId || 'estimate-begin',
+  const beginLongitude = Number(estimateDetail?.beginLongitude);
+  const beginLatitude = Number(estimateDetail?.beginLatitude);
+  const endLongitude = Number(estimateDetail?.endLongitude);
+  const endLatitude = Number(estimateDetail?.endLatitude);
+  if (Number.isFinite(beginLongitude) && Number.isFinite(beginLatitude)) {
+    const utilities = [{
+      id: `${estimateDetail?.estimateDetailId || `estimate-${serviceTypeId || 'unknown'}`}-beg`,
       provider: 'Idaho Power',
-      name: estimateDetail?.feederId || 'Idaho Power Service Estimate',
+      name: `${codePrefix} BEG`,
+      code: `${codePrefix} BEG`,
+      serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
       geometry: {
-        x: Number(estimateDetail.beginLongitude),
-        y: Number(estimateDetail.beginLatitude),
+        x: beginLongitude,
+        y: beginLatitude,
         spatialReference: { wkid: 4326 },
       },
     }];
+
+    if (
+      Number.isFinite(endLongitude)
+      && Number.isFinite(endLatitude)
+      && (endLongitude !== beginLongitude || endLatitude !== beginLatitude)
+    ) {
+      utilities.push({
+        id: `${estimateDetail?.estimateDetailId || `estimate-${serviceTypeId || 'unknown'}`}-end`,
+        provider: 'Idaho Power',
+        name: `${codePrefix} END`,
+        code: `${codePrefix} END`,
+        serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
+        geometry: {
+          x: endLongitude,
+          y: endLatitude,
+          spatialReference: { wkid: 4326 },
+        },
+      });
+    }
+
+    return utilities;
   }
 
   if (fallbackPoint) {
     return [{
       id: 'estimate-fallback',
       provider: 'Idaho Power',
-      name: 'Idaho Power Service Estimate',
+      name: `${codePrefix} BEG`,
+      code: `${codePrefix} BEG`,
+      serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
       geometry: {
         x: Number(fallbackPoint.lon),
         y: Number(fallbackPoint.lat),
@@ -510,7 +554,7 @@ export class SurveyCadClient {
             lat: geocode.lat,
             serviceTypeId,
           });
-          return this.fetchJson(lookupUrl, {
+          const payload = await this.fetchJson(lookupUrl, {
             method: 'POST',
             headers: {
               Accept: 'application/json',
@@ -519,12 +563,13 @@ export class SurveyCadClient {
             },
             body: params.toString(),
           });
+          return { payload, serviceTypeId };
         }));
 
-        rawUtilities = estimatePayloads.flatMap((payload) => (
-          extractUtilitiesFromEstimatePayload(payload, { lon: geocode.lon, lat: geocode.lat })
+        rawUtilities = estimatePayloads.flatMap(({ payload, serviceTypeId }) => (
+          extractUtilitiesFromEstimatePayload(payload, { fallbackPoint: { lon: geocode.lon, lat: geocode.lat }, serviceTypeId })
         ));
-        const serviceLineUtilities = estimatePayloads.flatMap((payload) => extractServiceLineUtilities(payload || {}));
+        const serviceLineUtilities = estimatePayloads.flatMap(({ payload }) => extractServiceLineUtilities(payload || {}));
         rawUtilities.push(...serviceLineUtilities);
       } catch (err) {
         if (isUpstreamHttpError(err)) {
