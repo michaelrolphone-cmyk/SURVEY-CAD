@@ -664,3 +664,28 @@ test('lookupUtilitiesByAddress labels EstimateDetail transformers as TRANSF', as
   }
 });
 
+
+test('localizePointforgePointsToStatePlane projects anchor lat/lon and translates local points', async () => {
+  const { server, port } = await createMockServer();
+  const client = new SurveyCadClient({
+    arcgisGeometryProjectUrl: `http://127.0.0.1:${port}/geometry/project`,
+  });
+
+  const localized = await client.localizePointforgePointsToStatePlane([
+    { name: 'P1', x: 1000, y: 1000 },
+    { name: 'P2', x: 1015, y: 995 },
+  ], {
+    anchorLocalX: 1000,
+    anchorLocalY: 1000,
+    lat: 43.61,
+    lon: -116.2,
+  });
+
+  assert.equal(localized.projectedAnchor.outSR, 2243);
+  assert.equal(localized.points[0].east, 999883.8);
+  assert.equal(localized.points[0].north, 1000043.61);
+  assert.equal(localized.points[1].east, 999898.8);
+  assert.equal(localized.points[1].north, 1000038.61);
+
+  server.close();
+});

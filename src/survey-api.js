@@ -1,3 +1,5 @@
+import { translateLocalPointsToStatePlane } from './georeference-transform.js';
+
 const DEFAULTS = {
   adaMapServer: "https://adacountyassessor.org/arcgis/rest/services/External/ExternalMap/MapServer",
   layers: {
@@ -576,6 +578,39 @@ export class SurveyCadClient {
 
     const payload = await this.fetchJson(url.toString());
     return payload?.geometries || [];
+  }
+
+  async localizePointforgePointsToStatePlane(points = [], options = {}) {
+    const lat = Number(options.lat);
+    const lon = Number(options.lon);
+    const outSR = Number(options.outSR || 2243);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      throw new Error('lat and lon are required numeric values');
+    }
+
+    const [projectedAnchor] = await this.projectPoints([{ x: lon, y: lat }], 4326, outSR);
+    const anchorEast = Number(projectedAnchor?.x);
+    const anchorNorth = Number(projectedAnchor?.y);
+    if (!Number.isFinite(anchorEast) || !Number.isFinite(anchorNorth)) {
+      throw new Error('Unable to project the anchor lat/lon to state plane coordinates');
+    }
+
+    return {
+      ...translateLocalPointsToStatePlane(points, {
+        anchorLocalX: options.anchorLocalX,
+        anchorLocalY: options.anchorLocalY,
+        anchorEast,
+        anchorNorth,
+      }),
+      projectedAnchor: {
+        lat,
+        lon,
+        east: anchorEast,
+        north: anchorNorth,
+        outSR,
+      },
+    };
   }
 
   normalizeUtilityLocation(entry = {}) {
