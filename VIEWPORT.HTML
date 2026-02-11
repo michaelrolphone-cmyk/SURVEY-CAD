@@ -1857,6 +1857,8 @@
   const POINT_LABEL_SPREAD_RADIUS_PX = 24;
   const POINT_CLUSTER_LABEL_BREAKOUT_LIMIT = 5;
   const POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT = 10;
+  const POINT_CLUSTER_MIN_STROKE_ALPHA = 0.25;
+  const POINT_CLUSTER_MAX_STROKE_ALPHA = 0.7;
   let cachedPointClusters = [];
 
   const mapLayerState = {
@@ -3453,6 +3455,8 @@
       }
       centerX /= members.length;
       centerY /= members.length;
+      const countText = String(members.length);
+      const markerRadius = 10 + Math.max(0, countText.length - 2) * 3;
 
       clusters.push({
         ids: members.map((m) => m.id),
@@ -3463,8 +3467,24 @@
         minY,
         maxX,
         maxY,
-        markerRadius: 10 + Math.min(14, members.length * 0.8)
+        markerRadius,
+        countText,
+        strokeAlpha: POINT_CLUSTER_MIN_STROKE_ALPHA
       });
+    }
+    if (clusters.length) {
+      let minCount = Infinity;
+      let maxCount = -Infinity;
+      for (const cluster of clusters) {
+        const count = cluster.members.length;
+        minCount = Math.min(minCount, count);
+        maxCount = Math.max(maxCount, count);
+      }
+      const span = Math.max(1, maxCount - minCount);
+      for (const cluster of clusters) {
+        const normalized = (cluster.members.length - minCount) / span;
+        cluster.strokeAlpha = POINT_CLUSTER_MIN_STROKE_ALPHA + normalized * (POINT_CLUSTER_MAX_STROKE_ALPHA - POINT_CLUSTER_MIN_STROKE_ALPHA);
+      }
     }
     return clusters;
   }
@@ -3897,20 +3917,21 @@
     }
 
     for (const cluster of cachedPointClusters) {
+      const strokeAlpha = clamp(cluster.strokeAlpha ?? POINT_CLUSTER_MIN_STROKE_ALPHA, POINT_CLUSTER_MIN_STROKE_ALPHA, POINT_CLUSTER_MAX_STROKE_ALPHA);
       ctx.save();
       ctx.fillStyle = "rgba(255,213,74,0.2)";
-      ctx.strokeStyle = "#ffd54a";
+      ctx.strokeStyle = `rgba(255,213,74,${strokeAlpha})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(cluster.centerX, cluster.centerY, cluster.markerRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#ffd54a";
+      ctx.fillStyle = `rgba(255,213,74,${strokeAlpha})`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "bold 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(String(cluster.members.length), cluster.centerX, cluster.centerY);
+      ctx.fillText(cluster.countText || String(cluster.members.length), cluster.centerX, cluster.centerY);
       ctx.restore();
 
       if (cluster.members.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT) continue;
