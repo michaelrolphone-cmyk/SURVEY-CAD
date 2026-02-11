@@ -2515,6 +2515,7 @@
   const fieldToFinishRuleState = {
     lineworkCodes: new Set(),
     symbolCodes: new Set(),
+    codeLayers: new Map(),
     lineworkCompanionCodes: new Map(),
     companionToLineworkCodes: new Map(),
     source: null,
@@ -2525,6 +2526,7 @@
   function deriveFieldToFinishCodeSetsFromConfig(config) {
     const lineworkCodes = new Set();
     const symbolCodes = new Set();
+    const codeLayers = new Map();
     const lineworkCompanionCodes = new Map();
     const companionToLineworkCodes = new Map();
     const rules = Array.isArray(config?.rules) ? config.rules : [];
@@ -2532,9 +2534,11 @@
       if (!rule?.processingOn || !rule.code) continue;
       const code = String(rule.code).trim().toUpperCase();
       const entityType = String(rule.entityType ?? "").trim();
+      const layerName = String(rule.layer ?? "").trim();
       if (!code) continue;
       if (entityType === "2") lineworkCodes.add(code);
       if (entityType === "0") symbolCodes.add(code);
+      if (layerName) codeLayers.set(code, layerName);
 
       if (entityType !== "2") continue;
       const companionCodes = Array.isArray(rule.companionCodes) ? rule.companionCodes : [];
@@ -2549,7 +2553,7 @@
         companionToLineworkCodes.get(companionCode).add(code);
       }
     }
-    return { lineworkCodes, symbolCodes, lineworkCompanionCodes, companionToLineworkCodes };
+    return { lineworkCodes, symbolCodes, codeLayers, lineworkCompanionCodes, companionToLineworkCodes };
   }
 
   async function loadFieldToFinishRulesFromFld(path = defaultFldConfigPath) {
@@ -2558,9 +2562,10 @@
       const response = await fetch(`/api/fld-config?file=${encodeURIComponent(path)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const config = await response.json();
-      const { lineworkCodes, symbolCodes, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
+      const { lineworkCodes, symbolCodes, codeLayers, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
       fieldToFinishRuleState.lineworkCodes = lineworkCodes;
       fieldToFinishRuleState.symbolCodes = symbolCodes;
+      fieldToFinishRuleState.codeLayers = codeLayers;
       fieldToFinishRuleState.lineworkCompanionCodes = lineworkCompanionCodes;
       fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
       fieldToFinishRuleState.source = path;
@@ -2570,6 +2575,7 @@
       fieldToFinishRuleState.loaded = false;
       fieldToFinishRuleState.lineworkCodes = new Set();
       fieldToFinishRuleState.symbolCodes = new Set();
+      fieldToFinishRuleState.codeLayers = new Map();
       fieldToFinishRuleState.lineworkCompanionCodes = new Map();
       fieldToFinishRuleState.companionToLineworkCodes = new Map();
       return false;
@@ -2674,6 +2680,39 @@
     }
 
     return rendered.join(" ");
+  }
+  function buildLayerIdFromName(layerName = "") {
+    const base = String(layerName ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return `layer-ftf-${base || Date.now()}`;
+  }
+
+  function ensureLayerByName(layerName = "") {
+    const desiredName = String(layerName ?? "").trim();
+    if (!desiredName) return null;
+    for (const layer of layers.values()) {
+      if (String(layer.name).trim().toUpperCase() === desiredName.toUpperCase()) return layer.id;
+    }
+    const baseId = buildLayerIdFromName(desiredName);
+    let id = baseId;
+    let suffix = 2;
+    while (layers.has(id)) {
+      id = `${baseId}-${suffix}`;
+      suffix++;
+    }
+    layers.set(id, sanitizeLayer({ id, name: desiredName, color: "#00a6ff", lineWeight: 1.5, locked: false, visible: true, fill: false }, id));
+    renderLayerControls();
+    scheduleLayersTableRender();
+    return id;
+  }
+
+  function resolveFieldToFinishLayerIdForCode(pointCode = "") {
+    const { tokensUpper } = parseFieldToFinishCommands(pointCode);
+    for (const token of tokensUpper) {
+      const layerName = fieldToFinishRuleState.codeLayers.get(token);
+      if (!layerName) continue;
+      return ensureLayerByName(layerName);
+    }
+    return null;
   }
 
   function extractJpnTargetPointNumbers(code = "") {
@@ -4459,6 +4498,7 @@
       const z = parseNum(row[idx.z], 0);
       const code = String(row[idx.code] ?? "");
       const notes = String(row[idx.notes] ?? "");
+      const ruleLayerId = resolveFieldToFinishLayerIdForCode(code);
 
       let num = numRaw;
 
@@ -4467,6 +4507,7 @@
           const pid = byNum.get(num);
           const p = points.get(pid);
           p.x = x; p.y = y; p.z = z; p.code = code; p.notes = notes;
+          if (ruleLayerId && layers.has(ruleLayerId)) p.layerId = ruleLayerId;
           updated++;
           continue;
         }
@@ -4478,7 +4519,7 @@
         }
       }
 
-      const pid = addPoint({ num, x, y, z, code, notes, movable:false });
+      const pid = addPoint({ num, x, y, z, code, notes, movable:false, layerId: ruleLayerId || selectedLayerId });
       byNum.set(String(num), pid);
       added++;
     }
