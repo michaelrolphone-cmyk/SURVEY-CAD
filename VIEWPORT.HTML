@@ -4324,6 +4324,21 @@
       ctx.restore();
     }
 
+    if (selectedPointIds.length === 1) {
+      const selectedPoint = points.get(selectedPointIds[0]);
+      if (selectedPoint) {
+        const selectedPointScreen = worldToScreen(selectedPoint.x, selectedPoint.y);
+        ctx.save();
+        ctx.strokeStyle = "rgba(220,220,220,0.8)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(selectedPointScreen.x, selectedPointScreen.y);
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     // marquee (selection window)
     drawMarquee();
 
