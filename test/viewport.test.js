@@ -468,7 +468,7 @@ test('VIEWPORT.HTML trim-to-intersect resolves trim side from click side on seco
 });
 
 
-test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected point notes', async () => {
+test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected and nearby points', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="pointInspector"\s+class="inspectorCard"/, 'selection panel should include a point inspector card');
@@ -476,8 +476,12 @@ test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected
   assert.ok(html.includes('raw.replace(/^CPNFS?:\\s*/i, "")'), 'point inspector should strip CPNFS prefix from notes when parsing instrument IDs');
   assert.ok(html.includes('.split(/\\.\\.\\.|[,;|\\n]+/)'), 'point inspector should split CP&F notes on ellipses and common delimiters');
   assert.match(html, /function\s+buildCpfInstrumentUrl\(instrument\)/, 'point inspector should build CP&F PDF links from instrument IDs');
+  assert.match(html, /const\s+CPNF_NEARBY_DISTANCE_FEET\s*=\s*15;/, 'point inspector should define a 15-foot nearby CPNF search radius');
+  assert.match(html, /function\s+collectNearbyCpfInstruments\(point,\s*radiusFeet\s*=\s*CPNF_NEARBY_DISTANCE_FEET\)/, 'point inspector should gather CP&F instruments from selected and nearby points');
+  assert.match(html, /if \(dist2\(point\.x, point\.y, candidate\.x, candidate\.y\) > radiusSquared\) continue;/, 'nearby CP&F lookup should filter points by planar distance threshold');
+  assert.match(html, /const\s+cpfInstruments\s*=\s*collectNearbyCpfInstruments\(p\);/, 'point inspector should merge selected-point and nearby-point CP&F notes before rendering');
   assert.match(html, /ADA_CPF_PDF_BASE\s*=\s*"https:\/\/gisprod\.adacounty\.id\.gov\/apps\/acdscpf\/CpfPdfs\/"/, 'point inspector should use the Ada CP&F PDF base path');
-  assert.match(html, /cpfLabel\.textContent\s*=\s*"CP&F"/, 'point inspector should render a dedicated CP&F row');
+  assert.match(html, /cpfLabel\.textContent\s*=\s*`CP&F \(≤\$\{CPNF_NEARBY_DISTANCE_FEET\}ft\)`/, 'point inspector should label CP&F row with nearby radius context');
   assert.match(html, /a\.textContent\s*=\s*`Open\s+\$\{instrument\}`/, 'point inspector should render quick-open CP&F links per instrument');
 });
 

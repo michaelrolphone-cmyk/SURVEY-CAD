@@ -4973,6 +4973,20 @@
     return ADA_CPF_PDF_BASE + encodeURIComponent(String(instrument).trim()) + ".pdf";
   }
 
+  const CPNF_NEARBY_DISTANCE_FEET = 15;
+
+  function collectNearbyCpfInstruments(point, radiusFeet = CPNF_NEARBY_DISTANCE_FEET) {
+    if (!point) return [];
+    const merged = new Set(parseCpfInstruments(point.notes));
+    const radiusSquared = Math.max(0, Number(radiusFeet) || 0) ** 2;
+    for (const candidate of points.values()) {
+      if (!candidate || candidate.id === point.id) continue;
+      if (dist2(point.x, point.y, candidate.x, candidate.y) > radiusSquared) continue;
+      for (const instrument of parseCpfInstruments(candidate.notes)) merged.add(instrument);
+    }
+    return [...merged];
+  }
+
   function updatePointInspectorFromSelection() {
     pointInspector.innerHTML = "";
     const p = selectedPointId ? points.get(selectedPointId) : null;
@@ -4998,11 +5012,11 @@
       pointInspector.appendChild(row);
     }
 
-    const cpfInstruments = parseCpfInstruments(p.notes);
+    const cpfInstruments = collectNearbyCpfInstruments(p);
     const cpfRow = document.createElement("div");
     cpfRow.className = "inspectorRow";
     const cpfLabel = document.createElement("span");
-    cpfLabel.textContent = "CP&F";
+    cpfLabel.textContent = `CP&F (≤${CPNF_NEARBY_DISTANCE_FEET}ft)`;
     const cpfValue = document.createElement("b");
     cpfValue.textContent = cpfInstruments.length ? cpfInstruments.join(", ") : "None";
     cpfRow.append(cpfLabel, cpfValue);
