@@ -44,7 +44,7 @@ function buildLegacyUtilityLookupCandidates(baseUrl, address) {
   return [...new Set(candidates)];
 }
 
-function buildEstimateCalculateForm({ lon, lat }) {
+function buildEstimateCalculateForm({ lon, lat, serviceTypeId = 1 }) {
   const beginLongitude = Number(lon);
   const beginLatitude = Number(lat);
   const endLongitude = Number(lon) - 0.00002;
@@ -57,7 +57,7 @@ function buildEstimateCalculateForm({ lon, lat }) {
   params.set('phaseId', '3');
   params.set('primaryVoltageId', '4');
   params.set('serviceEstimateCustomerTypeId', '1');
-  params.set('serviceEstimateServiceTypeId', '1');
+  params.set('serviceEstimateServiceTypeId', String(serviceTypeId));
   params.set('lineLengthFt', String(lineLengthFt));
   params.set('giso', '');
   params.set('feederId', '');
@@ -70,6 +70,8 @@ function buildEstimateCalculateForm({ lon, lat }) {
   params.set('transformers', '');
   return params;
 }
+
+const ESTIMATE_SERVICE_TYPE_IDS = Object.freeze([1, 2, 3]);
 
 function extractUtilitiesFromEstimatePayload(payload = {}, fallbackPoint = null) {
   const estimateDetail = payload?.estimateDetail || payload?.estimate || payload;
@@ -493,7 +495,6 @@ export class SurveyCadClient {
     const lookupUrl = String(this.config.idahoPowerUtilityLookupUrl || '');
 
     let rawUtilities = [];
-    let estimatePayload = null;
     if (/\/EstimateDetail\/Calculate\/?$/i.test(lookupUrl)) {
       let geocode;
       try {
@@ -502,19 +503,29 @@ export class SurveyCadClient {
         return [];
       }
 
-      const params = buildEstimateCalculateForm({ lon: geocode.lon, lat: geocode.lat });
       try {
-        const payload = await this.fetchJson(lookupUrl, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'User-Agent': this.config.nominatimUserAgent,
-          },
-          body: params.toString(),
-        });
-        estimatePayload = payload;
-        rawUtilities = extractUtilitiesFromEstimatePayload(payload, { lon: geocode.lon, lat: geocode.lat });
+        const estimatePayloads = await Promise.all(ESTIMATE_SERVICE_TYPE_IDS.map(async (serviceTypeId) => {
+          const params = buildEstimateCalculateForm({
+            lon: geocode.lon,
+            lat: geocode.lat,
+            serviceTypeId,
+          });
+          return this.fetchJson(lookupUrl, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+              'User-Agent': this.config.nominatimUserAgent,
+            },
+            body: params.toString(),
+          });
+        }));
+
+        rawUtilities = estimatePayloads.flatMap((payload) => (
+          extractUtilitiesFromEstimatePayload(payload, { lon: geocode.lon, lat: geocode.lat })
+        ));
+        const serviceLineUtilities = estimatePayloads.flatMap((payload) => extractServiceLineUtilities(payload || {}));
+        rawUtilities.push(...serviceLineUtilities);
       } catch (err) {
         if (isUpstreamHttpError(err)) {
           return [];
@@ -544,9 +555,7 @@ export class SurveyCadClient {
       rawUtilities = payload?.features || payload?.utilities || payload?.results || [];
     }
 
-    const rawLineUtilities = extractServiceLineUtilities(estimatePayload || {});
-
-    const normalized = [...rawUtilities, ...rawLineUtilities]
+    const normalized = rawUtilities
       .map((entry) => this.normalizeUtilityLocation(entry))
       .filter(Boolean);
 
