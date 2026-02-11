@@ -27,6 +27,14 @@ npm start
 
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
+## LineSmith Save Shortcuts
+
+When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the same project-linked save workflow as the **Save Drawing to Project** button:
+
+- `Ctrl+S` (Windows/Linux)
+- `Cmd+S` (macOS)
+- `Ctrl+Shift+S` / `Cmd+Shift+S` (handled as save in-app)
+
 ## Test
 
 ```bash

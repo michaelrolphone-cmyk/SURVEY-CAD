@@ -500,6 +500,7 @@ test('VIEWPORT.HTML right-click cancels active command before clearing selection
   assert.match(html, /canvas\.addEventListener\("contextmenu", \(e\) => \{[\s\S]*runCanvasCancelOrClearAction\(\{ trigger: "right-click" \}\);/, 'context-menu right-click should run the shared cancel-or-clear workflow');
   assert.match(html, /function\s+runCanvasCancelOrClearAction\(\{ trigger = "generic" \} = \{\}\)\s*\{[\s\S]*if \(\(trigger === "escape" \|\| trigger === "right-click"\) && lastUnlockedEntity\) \{[\s\S]*lockLastUnlockedEntityFromEscape\(\);[\s\S]*Press Escape or right-click again to lock the last unlocked point\/line\./, 'Escape cancel routine should support double-escape locking of the last unlocked point/line when nothing is selected');
   assert.match(html, /window\.addEventListener\("keydown", \(e\) => \{[\s\S]*if \(!typing && e\.key === "Escape"\) \{[\s\S]*runCanvasCancelOrClearAction\(\{ trigger: "escape" \}\);/, 'Escape should call cancel-or-clear with escape trigger metadata for double-escape lock behavior');
+  assert.match(html, /window\.addEventListener\("keydown", \(e\) => \{[\s\S]*const\s+key\s*=\s*e\.key\.toLowerCase\(\);[\s\S]*if \(\(e\.ctrlKey \|\| e\.metaKey\) && !e\.altKey && key === "s"\) \{[\s\S]*saveDrawingToProject\(\);[\s\S]*return;[\s\S]*\}/, 'Ctrl+S/Cmd+S should trigger drawing save and suppress browser default save behavior');
 });
 
 
