@@ -734,3 +734,5 @@ No API endpoints or CLI commands changed in this LineSmith point-clustering/tool
 No API endpoints or CLI commands changed in this LineSmith HTML layer-dropdown customization update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 No API endpoints or CLI commands changed in this LineSmith cluster-tooltip layer-color styling update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed in this LineSmith point-inspector nearby CPNF visibility update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
