@@ -1915,6 +1915,7 @@
   let selectedPointIds = [];    // multi points (ordered)
   let selectedLines = [];       // [{ lineId, grip, t }]
   let lastSelectedLineId = null;
+  let lastLayerDisplaySignature = "";
   const rotateSelectionSession = {
     active: false,
     step: 0,
@@ -1947,6 +1948,7 @@
     dragStartWorldX: 0, dragStartWorldY: 0,
     dragObj: null
   };
+  let pendingMarqueeZoomRect = null;
 
   const mobileInteraction = {
     longPressMs: 450,
@@ -2121,6 +2123,46 @@
 
   function activeLayer() {
     return getLayerById(selectedLayerId);
+  }
+
+  function getSelectionLayerDisplayState() {
+    const layerIds = new Set();
+    for (const pointId of selectedPointIds) {
+      const point = points.get(pointId);
+      if (point && layers.has(point.layerId)) layerIds.add(point.layerId);
+    }
+    for (const selectedLine of selectedLines) {
+      const line = lines.get(selectedLine?.lineId);
+      if (line && layers.has(line.layerId)) layerIds.add(line.layerId);
+    }
+
+    if (!layerIds.size) {
+      const layer = activeLayer();
+      return {
+        mode: "none",
+        layerId: selectedLayerId,
+        label: layer?.name || "Layer",
+        color: layer?.color || "#ffffff"
+      };
+    }
+
+    if (layerIds.size > 1) {
+      return {
+        mode: "multiple",
+        layerId: null,
+        label: "Multiple Layers",
+        color: "#6f7785"
+      };
+    }
+
+    const [layerId] = [...layerIds];
+    const layer = getLayerById(layerId);
+    return {
+      mode: "single",
+      layerId,
+      label: layer?.name || "Layer",
+      color: layer?.color || "#ffffff"
+    };
   }
 
   function scaleToLeafletZoom(scale) {
@@ -3872,6 +3914,12 @@
     const s = selectionSummary();
     selSummary.textContent = s;
     hudSel.textContent = s;
+    const layerDisplayState = getSelectionLayerDisplayState();
+    const signature = `${layerDisplayState.mode}:${layerDisplayState.layerId || "none"}:${layerDisplayState.label}`;
+    if (signature !== lastLayerDisplaySignature) {
+      lastLayerDisplaySignature = signature;
+      renderLayerControls();
+    }
   }
 
   // -------------------------
@@ -5022,6 +5070,13 @@
     }
 
     pendingEscapeLockEntity = null;
+  }
+
+  function consumePendingMarqueeZoomRect() {
+    if (!pendingMarqueeZoomRect) return null;
+    const rect = pendingMarqueeZoomRect;
+    pendingMarqueeZoomRect = null;
+    return rect;
   }
 
   function doDeleteSelected() {
@@ -6818,6 +6873,12 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     updateMouseFromEvent(e);
     const cluster = pointDisplayVisibility.clustering ? getPointClusterAtScreen(mouse.x, mouse.y) : null;
     if (cluster) {
+      selectedPointIds = [];
+      selectedPointId = null;
+      selectedLines = [];
+      lastSelectedLineId = null;
+      updatePointEditorFromSelection();
+      schedulePointsTableRender();
       history.push("zoom to point cluster");
       zoomToWorldBounds(cluster.minX, cluster.minY, cluster.maxX, cluster.maxY, { paddingFraction: 0.15 });
       setStatus(`Zoomed to ${cluster.members.length}-point cluster with 15% padding.`, "ok");
@@ -7032,6 +7093,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     mouse.button = e.button;
 
     const additive = e.shiftKey;
+    pendingMarqueeZoomRect = null;
 
     if (toolIsPan()) {
       beginDrag({type:"pan"});
@@ -7053,6 +7115,13 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       endDrag();
       return;
     }
+
+    const pendingWindowRect = consumePendingMarqueeZoomRect();
+    if (pendingWindowRect) {
+      zoomToScreenRect(pendingWindowRect);
+      return;
+    }
+
     runCanvasCancelOrClearAction({ trigger: "right-click" });
   });
 
@@ -7332,6 +7401,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (!mouse.drag) return;
 
     if (mouse.dragObj?.type === "marquee") {
+      const marqueeRect = rectNorm(mouse.dragObj.x0, mouse.dragObj.y0, mouse.dragObj.x1, mouse.dragObj.y1);
+      pendingMarqueeZoomRect = marqueeRect;
       applyMarqueeSelection(mouse.dragObj);
       endDrag();
       return;
@@ -7408,17 +7479,19 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   function renderLayerControls() {
     if (!quickLayerDropdownButton || !quickLayerDropdownMenu) return;
     if (!layers.has(selectedLayerId)) selectedLayerId = layers.keys().next().value;
-    const selectedLayer = activeLayer();
-    if (quickLayerColor && selectedLayer) quickLayerColor.style.background = selectedLayer.color;
-    if (quickLayerDropdownLabel) quickLayerDropdownLabel.textContent = selectedLayer?.name || "Layer";
+    const layerDisplayState = getSelectionLayerDisplayState();
+    const toolbarLayerId = layerDisplayState.mode === "single" ? layerDisplayState.layerId : selectedLayerId;
+    if (quickLayerColor) quickLayerColor.style.background = layerDisplayState.color;
+    if (quickLayerDropdownLabel) quickLayerDropdownLabel.textContent = layerDisplayState.label;
 
     quickLayerDropdownMenu.innerHTML = "";
     for (const layer of layers.values()) {
+      const isActive = layer.id === toolbarLayerId && layerDisplayState.mode !== "multiple";
       const rowBtn = document.createElement("button");
-      rowBtn.className = `quickLayerDropdownItem${layer.id === selectedLayerId ? " active" : ""}`;
+      rowBtn.className = `quickLayerDropdownItem${isActive ? " active" : ""}`;
       rowBtn.type = "button";
       rowBtn.setAttribute("role", "option");
-      rowBtn.setAttribute("aria-selected", layer.id === selectedLayerId ? "true" : "false");
+      rowBtn.setAttribute("aria-selected", isActive ? "true" : "false");
 
       const swatch = document.createElement("span");
       swatch.className = "quickToolLayerSwatch";
