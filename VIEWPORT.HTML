@@ -1947,6 +1947,7 @@
     dragStartWorldX: 0, dragStartWorldY: 0,
     dragObj: null
   };
+  let pendingMarqueeZoomRect = null;
 
   const mobileInteraction = {
     longPressMs: 450,
@@ -5021,6 +5022,13 @@
     pendingEscapeLockEntity = null;
   }
 
+  function consumePendingMarqueeZoomRect() {
+    if (!pendingMarqueeZoomRect) return null;
+    const rect = pendingMarqueeZoomRect;
+    pendingMarqueeZoomRect = null;
+    return rect;
+  }
+
   function doDeleteSelected() {
     const hasPts = selectedPointIds.length > 0;
     const hasLns = selectedLines.length > 0;
@@ -7035,6 +7043,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     mouse.button = e.button;
 
     const additive = e.shiftKey;
+    pendingMarqueeZoomRect = null;
 
     if (toolIsPan()) {
       beginDrag({type:"pan"});
@@ -7056,6 +7065,13 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       endDrag();
       return;
     }
+
+    const pendingWindowRect = consumePendingMarqueeZoomRect();
+    if (pendingWindowRect) {
+      zoomToScreenRect(pendingWindowRect);
+      return;
+    }
+
     runCanvasCancelOrClearAction({ trigger: "right-click" });
   });
 
@@ -7335,6 +7351,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (!mouse.drag) return;
 
     if (mouse.dragObj?.type === "marquee") {
+      const marqueeRect = rectNorm(mouse.dragObj.x0, mouse.dragObj.y0, mouse.dragObj.x1, mouse.dragObj.y1);
+      pendingMarqueeZoomRect = marqueeRect;
       applyMarqueeSelection(mouse.dragObj);
       endDrag();
       return;
