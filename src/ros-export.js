@@ -146,6 +146,49 @@ export function buildPointMarkerCsvRowsPNEZD(markers2243, startPoint = 1, labelP
   return { csv: lines.length ? `${lines.join('\n')}\n` : '', nextPoint: pointNumber, count: lines.length };
 }
 
+export function buildPowerUtilityMarkersForPointForge(utilities2243, startPoint = 1) {
+  const points = (utilities2243 || [])
+    .map((utility, index) => ({
+      east: Number(utility?.projected?.east),
+      north: Number(utility?.projected?.north),
+      index,
+    }))
+    .filter((point) => Number.isFinite(point.east) && Number.isFinite(point.north));
+
+  if (!points.length) return [];
+
+  const firstPointNumber = Number(startPoint);
+  const junctionCodes = [];
+  const markers = points.map((point, pointIndex) => {
+    const pointNumber = firstPointNumber + pointIndex;
+    const base = {
+      east: point.east,
+      north: point.north,
+    };
+
+    if (pointIndex === 0) {
+      return {
+        ...base,
+        code: 'PM',
+      };
+    }
+
+    const code = `JPN${pointNumber}`;
+    junctionCodes.push(code);
+    return {
+      ...base,
+      code,
+    };
+  });
+
+  markers[0] = {
+    ...markers[0],
+    code: ['PM', ...junctionCodes].join(' ').trim(),
+  };
+
+  return markers;
+}
+
 export function buildUniquePolygonCsvRowsPNEZD(features2243, startPoint = 1, labelPrefix = 'POLYGON_CORNER') {
   const features = features2243 || [];
   const lines = [];

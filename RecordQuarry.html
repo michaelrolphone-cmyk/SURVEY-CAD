@@ -385,8 +385,8 @@
 </div>
 
 <script type="module">
-import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadUtilitiesByAddress, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
-import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport } from "./src/ros-export.js";
+import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, loadUtilitiesByAddress, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
+import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtilityMarkersForPointForge, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport } from "./src/ros-export.js";
 
 (() => {
   // -----------------------------
@@ -2458,11 +2458,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildRosBoundar
       });
       if (!uniquePart.count) throw new Error('No parcel/subdivision points or CP&F-backed PLSS points available to export to PointForge.');
 
-      const utilityMarkers = (state.utilityLocations || []).map((utility, index) => ({
-        east: Number(utility?.projected?.east),
-        north: Number(utility?.projected?.north),
-        code: String(utility?.code || `${utility?.provider || "Idaho Power"} ${utility?.name || `Utility ${index + 1}`}`.trim()),
-      })).filter((point) => Number.isFinite(point.east) && Number.isFinite(point.north));
+      const utilityMarkers = buildPowerUtilityMarkersForPointForge(state.utilityLocations, uniquePart.nextPoint);
       const utilityRows = buildPointMarkerCsvRowsPNEZD(utilityMarkers, uniquePart.nextPoint, '');
       const pointForgeCsv = `${uniquePart.csv}${utilityRows.csv}`;
 
