@@ -134,6 +134,14 @@ test('VIEWPORT.HTML restores persisted movable flags as strict booleans', async 
 });
 
 
+test('VIEWPORT.HTML preserves unchanged array entries in drawing diffs', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /if \(child === undefined\) \{[\s\S]*out\[i\] = \{ __unchanged: true \};/, 'array diffing should mark unchanged entries with a serializable sentinel');
+  assert.match(html, /if \(diff\.__unchanged\) return deepClone\(base\);/, 'diff apply should restore unchanged sentinel entries from prior state');
+});
+
+
 test('VIEWPORT.HTML provides toggles to hide/show point code and notes labels', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
