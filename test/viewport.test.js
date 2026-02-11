@@ -273,6 +273,8 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
   assert.match(html, /const\s+POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT\s*=\s*10\s*;/, 'LineSmith should define when cluster tooltip detail switches from per-point to per-layer summaries');
   assert.match(html, /const\s+POINT_CLUSTER_MIN_STROKE_ALPHA\s*=\s*0\.25\s*;/, 'cluster outlines should define a minimum 25% opacity for lower-magnitude groups');
   assert.match(html, /const\s+POINT_CLUSTER_MAX_STROKE_ALPHA\s*=\s*0\.7\s*;/, 'cluster outlines should define a maximum 70% opacity for higher-magnitude groups');
+  assert.match(html, /const\s+POINT_CLUSTER_COUNT_TEXT_FILL_ALPHA\s*=\s*0\.98\s*;/, 'cluster count labels should keep a near-opaque fill for readability independent of cluster opacity');
+  assert.match(html, /const\s+POINT_CLUSTER_COUNT_TEXT_STROKE_ALPHA\s*=\s*0\.9\s*;/, 'cluster count labels should use a strong dark outline for contrast on translucent clusters');
   assert.match(html, /const\s+POINT_CLUSTER_POLYGON_AREA_RATIO_TARGET\s*=\s*0\.5\s*;/, 'cluster boundary rendering should target hull area around half of the cluster bounding box area');
   assert.match(html, /const\s+POINT_CLUSTER_POLYGON_MIN_WIDTH_TO_HEIGHT_RATIO\s*=\s*1\s*\/\s*3\s*;/, 'cluster boundary rendering should require a minimum width-to-height ratio of 1:3 before polygon rendering is allowed');
   assert.match(html, /cluster\.members\.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT[\s\S]*countsByLayer/, 'cluster tooltip should aggregate large cluster details by drawing layer');
@@ -293,6 +295,7 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
   assert.match(html, /const\s+labelRadius\s*=\s*POINT_LABEL_SPREAD_RADIUS_PX\s*\+\s*Math\.min\(20,\s*cluster\.members\.length\s*\*\s*2\);/, 'small clustered groups should spread out number labels radially to prevent overlap');
   assert.match(html, /if \(cluster\.renderAsPolygon && cluster\.hullPoints\?\.length >= 3\) \{[\s\S]*isPointInPolygon\(\{ x: screenX, y: screenY \}, cluster\.hullPoints, POINT_CLUSTER_PICK_PADDING_PX\)/, 'cluster hit-testing should use polygon containment checks when polygon boundaries are rendered');
   assert.match(html, /if \(cluster\.renderAsPolygon && cluster\.hullPoints\?\.length >= 3\) \{[\s\S]*ctx\.moveTo\(cluster\.hullPoints\[0\]\.x, cluster\.hullPoints\[0\]\.y\);[\s\S]*ctx\.closePath\(\);[\s\S]*\} else \{[\s\S]*ctx\.arc\(cluster\.centerX, cluster\.centerY, cluster\.markerRadius, 0, Math\.PI \* 2\);/, 'cluster rendering should draw polygon outlines when shape rules pass and fall back to circle markers otherwise');
+  assert.match(html, /ctx\.strokeText\(clusterCountText, cluster\.centerX, cluster\.centerY\);[\s\S]*ctx\.fillText\(clusterCountText, cluster\.centerX, cluster\.centerY\);/, 'cluster count labels should render outlined text to stay legible while preserving opacity-scaled cluster shapes');
 });
 test('VIEWPORT.HTML maps Idaho state plane coordinates to Leaflet lat/lon via georeference transform', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
