@@ -5305,7 +5305,7 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
   }
 
   function zoomToScreenRect(screenRect, options = {}) {
-    const { skipHistory = false, silent = false } = options;
+    const { skipHistory = false, silent = false, extentPaddingFraction = 0.06 } = options;
     if (!screenRect) return false;
 
     const widthPx = Math.max(1, screenRect.maxX - screenRect.minX);
@@ -5328,15 +5328,22 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     const minY = Math.min(worldA.y, worldB.y);
     const maxY = Math.max(worldA.y, worldB.y);
 
-    const dx = Math.max(EPS, maxX - minX);
-    const dy = Math.max(EPS, maxY - minY);
+    const padX = Math.max(EPS, (maxX - minX) * extentPaddingFraction);
+    const padY = Math.max(EPS, (maxY - minY) * extentPaddingFraction);
+    const paddedMinX = minX - padX;
+    const paddedMaxX = maxX + padX;
+    const paddedMinY = minY - padY;
+    const paddedMaxY = maxY + padY;
+
+    const dx = Math.max(EPS, paddedMaxX - paddedMinX);
+    const dy = Math.max(EPS, paddedMaxY - paddedMinY);
 
     const scaleX = usableW / dx;
     const scaleY = usableH / dy;
     const newScale = clamp(Math.min(scaleX, scaleY) * 0.95, MIN_SCALE, MAX_SCALE);
 
-    const cx = (minX + maxX) * 0.5;
-    const cy = (minY + maxY) * 0.5;
+    const cx = (paddedMinX + paddedMaxX) * 0.5;
+    const cy = (paddedMinY + paddedMaxY) * 0.5;
 
     if (!skipHistory) history.push("zoom window");
     view.scale = newScale;
@@ -5344,7 +5351,7 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     view.panY = rect.height * 0.5 + cy * view.scale;
 
     if (!silent) {
-      setStatus(`Zoomed to window.\nX: [${fmt(minX)}, ${fmt(maxX)}]\nY: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
+      setStatus(`Zoomed to window.\nX: [${fmt(paddedMinX)}, ${fmt(paddedMaxX)}]\nY: [${fmt(paddedMinY)}, ${fmt(paddedMaxY)}]`, "ok");
     }
     return true;
   }
@@ -6983,6 +6990,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     e.preventDefault();
     updateMouseFromEvent(e);
     if (mouse.dragObj?.type === "marquee") {
+      mouse.dragObj.x1 = mouse.x;
+      mouse.dragObj.y1 = mouse.y;
       const windowRect = rectNorm(mouse.dragObj.x0, mouse.dragObj.y0, mouse.dragObj.x1, mouse.dragObj.y1);
       zoomToScreenRect(windowRect);
       endDrag();
