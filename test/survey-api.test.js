@@ -10,6 +10,7 @@ function createMockServer(options = {}) {
     failProjectedRefetch = false,
     utilities404 = false,
     estimateCalculate404 = false,
+    includeServiceLines = false,
   } = options;
   const requests = [];
   const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBody: null };
@@ -47,7 +48,7 @@ function createMockServer(options = {}) {
         const body = new URLSearchParams(raw);
         headers.estimateCalculateBody = raw;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
+        const response = {
           estimateDetail: {
             estimateDetailId: 88,
             feederId: body.get('feederId') || 'GARY15',
@@ -61,7 +62,30 @@ function createMockServer(options = {}) {
             longitude: Number(body.get('beginLongitude')),
             latitude: Number(body.get('beginLatitude')),
           }],
-        }));
+        };
+        if (includeServiceLines) {
+          response.estimateDetail.overheadLines = [{
+            id: 'oh-line-1',
+            geometry: {
+              paths: [[
+                [Number(body.get('beginLongitude')), Number(body.get('beginLatitude'))],
+                [Number(body.get('beginLongitude')) + 0.001, Number(body.get('beginLatitude')) + 0.001],
+              ]],
+              spatialReference: { wkid: 4326 },
+            },
+          }];
+          response.estimateDetail.undergroundLines = [{
+            id: 'ug-line-1',
+            geometry: {
+              paths: [[
+                [Number(body.get('beginLongitude')) + 0.002, Number(body.get('beginLatitude')) + 0.002],
+                [Number(body.get('beginLongitude')) + 0.003, Number(body.get('beginLatitude')) + 0.003],
+              ]],
+              spatialReference: { wkid: 4326 },
+            },
+          }];
+        }
+        res.end(JSON.stringify(response));
       });
       return;
     }
@@ -512,6 +536,34 @@ test('lookupUtilitiesByAddress uses Idaho Power EstimateDetail Calculate API and
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('lookupUtilitiesByAddress emits OH/UG line endpoint points with BEG/END codes', async () => {
+  const { server, port, requests } = await createMockServer({ includeServiceLines: true });
+  const base = `http://127.0.0.1:${port}`;
+
+  const client = new SurveyCadClient({
+    nominatimUrl: `${base}/geocode`,
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    arcgisGeometryProjectUrl: `${base}/geometry/project`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+  });
+
+  try {
+    const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
+    const codes = new Set(utilities.map((utility) => utility.code));
+
+    assert.equal(utilities.length, 5);
+    assert.ok(codes.has('OH PWR BEG'));
+    assert.ok(codes.has('OH PWR END'));
+    assert.ok(codes.has('UG PWR BEG'));
+    assert.ok(codes.has('UG PWR END'));
+    assert.ok(utilities.every((utility) => Number.isFinite(utility?.projected?.east) && Number.isFinite(utility?.projected?.north)));
+    assert.ok(requests.some((requestPath) => requestPath.includes('/geometry/project?')));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 
 test('lookupUtilitiesByAddress returns [] when utility provider endpoint is unavailable', async () => {
   const { server, port, requests } = await createMockServer({ estimateCalculate404: true });

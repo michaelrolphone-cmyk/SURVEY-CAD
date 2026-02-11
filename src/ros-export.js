@@ -129,12 +129,16 @@ export function buildPointMarkerCsvRowsPNEZD(markers2243, startPoint = 1, labelP
     const north = Number(marker.north);
     if (!Number.isFinite(east) || !Number.isFinite(north)) continue;
 
+    const markerLabel = String(marker.code || marker.label || `POINT_${i + 1}`);
+    const prefix = String(labelPrefix || '').trim();
+    const description = prefix ? `${prefix} ${markerLabel}` : markerLabel;
+
     lines.push([
       pointNumber,
       north.toFixed(3),
       east.toFixed(3),
       '0.000',
-      csvEscape(`${labelPrefix} ${marker.label || `POINT_${i + 1}`}`),
+      csvEscape(description),
     ].join(','));
     pointNumber += 1;
   }

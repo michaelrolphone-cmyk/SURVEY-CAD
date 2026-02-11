@@ -63,6 +63,21 @@ test('buildPointMarkerCsvRowsPNEZD emits arbitrary marker points', () => {
 });
 
 
+
+
+test('buildPointMarkerCsvRowsPNEZD supports explicit marker code values without a prefix', () => {
+  const markers = [
+    { east: 100, north: 200, code: 'OH PWR BEG' },
+    { east: 110, north: 210, code: 'UG PWR END' },
+  ];
+
+  const { csv, count } = buildPointMarkerCsvRowsPNEZD(markers, 1, '');
+  const lines = csv.trim().split('\n');
+
+  assert.equal(count, 2);
+  assert.equal(lines[0], '1,200.000,100.000,0.000,OH PWR BEG');
+  assert.equal(lines[1], '2,210.000,110.000,0.000,UG PWR END');
+});
 test('buildUniquePolygonCsvRowsPNEZD emits each coordinate once across parcel/subdivision/section features', () => {
   const features = [
     {

@@ -114,6 +114,101 @@ function extractUtilitiesFromEstimatePayload(payload = {}, fallbackPoint = null)
   return [];
 }
 
+function extractLineEndpointFromGeometry(line = {}) {
+  const geometry = line.geometry || line;
+  const paths = geometry?.paths;
+  if (Array.isArray(paths) && paths.length) {
+    const firstPath = paths.find((path) => Array.isArray(path) && path.length);
+    const lastPath = [...paths].reverse().find((path) => Array.isArray(path) && path.length);
+    if (firstPath?.length && lastPath?.length) {
+      const start = firstPath[0];
+      const end = lastPath[lastPath.length - 1];
+      if (Array.isArray(start) && Array.isArray(end)) {
+        return {
+          start: { x: Number(start[0]), y: Number(start[1]) },
+          end: { x: Number(end[0]), y: Number(end[1]) },
+          spatialReference: geometry?.spatialReference || line?.spatialReference || { wkid: 4326 },
+        };
+      }
+    }
+  }
+
+  const beginLongitude = Number(line.beginLongitude ?? line.startLongitude ?? line.fromLongitude ?? line.fromLon ?? line.x1);
+  const beginLatitude = Number(line.beginLatitude ?? line.startLatitude ?? line.fromLatitude ?? line.fromLat ?? line.y1);
+  const endLongitude = Number(line.endLongitude ?? line.stopLongitude ?? line.toLongitude ?? line.toLon ?? line.x2);
+  const endLatitude = Number(line.endLatitude ?? line.stopLatitude ?? line.toLatitude ?? line.toLat ?? line.y2);
+
+  if ([beginLongitude, beginLatitude, endLongitude, endLatitude].every(Number.isFinite)) {
+    return {
+      start: { x: beginLongitude, y: beginLatitude },
+      end: { x: endLongitude, y: endLatitude },
+      spatialReference: geometry?.spatialReference || line?.spatialReference || { wkid: 4326 },
+    };
+  }
+
+  return null;
+}
+
+function extractServiceLineUtilities(payload = {}) {
+  const estimateDetail = payload?.estimateDetail || payload?.estimate || payload;
+  const lineCollections = [];
+  for (const source of [payload, estimateDetail]) {
+    for (const [key, value] of Object.entries(source || {})) {
+      if (!Array.isArray(value) || !value.length) continue;
+      if (/(overhead|\boh\b)/i.test(key)) {
+        lineCollections.push({ type: 'OH PWR', lines: value });
+      } else if (/(underground|\bug\b)/i.test(key)) {
+        lineCollections.push({ type: 'UG PWR', lines: value });
+      }
+    }
+  }
+
+  const utilities = [];
+  const seen = new Set();
+  for (const collection of lineCollections) {
+    collection.lines.forEach((line, index) => {
+      const endpoint = extractLineEndpointFromGeometry(line);
+      if (!endpoint) return;
+      const wkid = Number(endpoint?.spatialReference?.wkid || endpoint?.spatialReference?.latestWkid || 4326);
+      const lineId = String(line?.id || line?.lineId || line?.name || `${collection.type}-${index + 1}`);
+      const begCode = `${collection.type} BEG`;
+      const endCode = `${collection.type} END`;
+      const begKey = `${begCode}:${Number(endpoint.start.x).toFixed(9)},${Number(endpoint.start.y).toFixed(9)}`;
+      const endKey = `${endCode}:${Number(endpoint.end.x).toFixed(9)},${Number(endpoint.end.y).toFixed(9)}`;
+      if (!seen.has(begKey)) {
+        seen.add(begKey);
+        utilities.push({
+          id: `${lineId}-beg`,
+        provider: 'Idaho Power',
+          name: begCode,
+          code: begCode,
+          geometry: {
+            x: Number(endpoint.start.x),
+            y: Number(endpoint.start.y),
+            spatialReference: { wkid },
+          },
+        });
+      }
+      if (!seen.has(endKey)) {
+        seen.add(endKey);
+        utilities.push({
+          id: `${lineId}-end`,
+        provider: 'Idaho Power',
+          name: endCode,
+          code: endCode,
+          geometry: {
+            x: Number(endpoint.end.x),
+            y: Number(endpoint.end.y),
+            spatialReference: { wkid },
+          },
+        });
+      }
+    });
+  }
+
+  return utilities;
+}
+
 function normalizeSpaces(s) {
   return (s || "").trim().replace(/\s+/g, " ");
 }
@@ -384,6 +479,7 @@ export class SurveyCadClient {
     return {
       id: String(attrs.id || attrs.ID || attrs.OBJECTID || attrs.objectid || entry.id || `${lon},${lat}`),
       name: String(attrs.name || attrs.NAME || entry.name || entry.utilityName || 'Utility location'),
+      code: String(attrs.code || attrs.CODE || entry.code || entry.name || entry.utilityName || 'Utility location'),
       provider: String(attrs.provider || attrs.PROVIDER || entry.provider || 'Idaho Power'),
       geometry: {
         x: lon,
@@ -397,6 +493,7 @@ export class SurveyCadClient {
     const lookupUrl = String(this.config.idahoPowerUtilityLookupUrl || '');
 
     let rawUtilities = [];
+    let estimatePayload = null;
     if (/\/EstimateDetail\/Calculate\/?$/i.test(lookupUrl)) {
       let geocode;
       try {
@@ -416,6 +513,7 @@ export class SurveyCadClient {
           },
           body: params.toString(),
         });
+        estimatePayload = payload;
         rawUtilities = extractUtilitiesFromEstimatePayload(payload, { lon: geocode.lon, lat: geocode.lat });
       } catch (err) {
         if (isUpstreamHttpError(err)) {
@@ -446,7 +544,9 @@ export class SurveyCadClient {
       rawUtilities = payload?.features || payload?.utilities || payload?.results || [];
     }
 
-    const normalized = rawUtilities
+    const rawLineUtilities = extractServiceLineUtilities(estimatePayload || {});
+
+    const normalized = [...rawUtilities, ...rawLineUtilities]
       .map((entry) => this.normalizeUtilityLocation(entry))
       .filter(Boolean);
 
@@ -489,6 +589,7 @@ export class SurveyCadClient {
       return {
         id: utility.id,
         name: utility.name,
+        code: utility.code || utility.name,
         provider: utility.provider,
         location: { lon, lat },
         projected,

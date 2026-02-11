@@ -1703,7 +1703,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildRosBoundar
       const lon = Number(utility?.location?.lon);
       const lat = Number(utility?.location?.lat);
       if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
-      const label = utility?.name || utility?.provider || 'Utility';
+      const label = utility?.code || utility?.name || utility?.provider || 'Utility';
       const marker = L.circleMarker([lat, lon], { radius: 6, weight: 2, color: '#ffffff', fillColor: '#ffcc66', fillOpacity: 0.9 });
       marker.bindPopup(`<b>Utility</b><br/>${escapeHtml(label)}<br/><span class="small">${escapeHtml(utility?.provider || 'Idaho Power')}</span>`);
       layers.utilities.addLayer(marker);
@@ -2441,9 +2441,9 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildRosBoundar
       const utilityMarkers = (state.utilityLocations || []).map((utility, index) => ({
         east: Number(utility?.projected?.east),
         north: Number(utility?.projected?.north),
-        label: `${utility?.provider || "Idaho Power"} ${utility?.name || `Utility ${index + 1}`}`.trim(),
+        code: String(utility?.code || `${utility?.provider || "Idaho Power"} ${utility?.name || `Utility ${index + 1}`}`.trim()),
       })).filter((point) => Number.isFinite(point.east) && Number.isFinite(point.north));
-      const utilityRows = buildPointMarkerCsvRowsPNEZD(utilityMarkers, uniquePart.nextPoint, 'UTILITY');
+      const utilityRows = buildPointMarkerCsvRowsPNEZD(utilityMarkers, uniquePart.nextPoint, '');
       const pointForgeCsv = `${uniquePart.csv}${utilityRows.csv}`;
 
       localStorage.setItem(POINTFORGE_ROS_IMPORT_STORAGE_KEY, JSON.stringify({
