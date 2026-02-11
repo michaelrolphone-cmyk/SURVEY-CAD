@@ -89,11 +89,38 @@ function webMercatorToLonLat(x, y) {
   return { lon, lat };
 }
 
-function buildNearPointPrimaryPointsUrl(baseUrl, lon, lat) {
+function buildNearPointPrimaryPointsUrlFromWebMercator(baseUrl, x, y) {
   const base = String(baseUrl || '').replace(/\/+$/, '');
-  const x = lonToWebMercatorX(lon);
-  const y = latToWebMercatorY(lat);
-  return `${base}/${x}/${y}/`;
+  return `${base}/${Number(x)}/${Number(y)}/`;
+}
+
+function feetToMeters(feet) {
+  return Number(feet) * 0.3048;
+}
+
+function buildNearPointLookupLocations(lon, lat) {
+  const diagonalComponentFeet = 700 / Math.sqrt(2);
+  return [
+    { key: 'origin', xOffsetMeters: 0, yOffsetMeters: 0 },
+    { key: 'north-500ft', xOffsetMeters: 0, yOffsetMeters: feetToMeters(500) },
+    { key: 'south-500ft', xOffsetMeters: 0, yOffsetMeters: -feetToMeters(500) },
+    { key: 'east-500ft', xOffsetMeters: feetToMeters(500), yOffsetMeters: 0 },
+    { key: 'west-500ft', xOffsetMeters: -feetToMeters(500), yOffsetMeters: 0 },
+    { key: 'ne-700ft', xOffsetMeters: feetToMeters(diagonalComponentFeet), yOffsetMeters: feetToMeters(diagonalComponentFeet) },
+    { key: 'nw-700ft', xOffsetMeters: -feetToMeters(diagonalComponentFeet), yOffsetMeters: feetToMeters(diagonalComponentFeet) },
+    { key: 'se-700ft', xOffsetMeters: feetToMeters(diagonalComponentFeet), yOffsetMeters: -feetToMeters(diagonalComponentFeet) },
+    { key: 'sw-700ft', xOffsetMeters: -feetToMeters(diagonalComponentFeet), yOffsetMeters: -feetToMeters(diagonalComponentFeet) },
+  ].map((location) => {
+    const centerX = lonToWebMercatorX(lon);
+    const centerY = latToWebMercatorY(lat);
+    return {
+      ...location,
+      lon,
+      lat,
+      webMercatorX: centerX + location.xOffsetMeters,
+      webMercatorY: centerY + location.yOffsetMeters,
+    };
+  });
 }
 
 function extractUtilitiesFromNearPointPayload(payload = {}) {
@@ -162,8 +189,8 @@ function extractUtilitiesFromEstimatePayload(payload = {}, options = {}) {
     if (Array.isArray(entry) && entry.length) {
       return entry.map((transformer, index) => ({
         ...transformer,
-        code: transformer?.code || `${codePrefix} TX`,
-        name: transformer?.name || `${codePrefix} TRANSFORMER`,
+        code: transformer?.code || 'TRANSF',
+        name: transformer?.name || 'TRANSF',
         serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
         id: transformer?.id || `estimate-${serviceTypeId || 'unknown'}-transformer-${index + 1}`,
       }));
@@ -602,16 +629,23 @@ export class SurveyCadClient {
       }
 
       try {
-        const nearPointUrl = buildNearPointPrimaryPointsUrl(lookupUrl, geocode.lon, geocode.lat);
-        const payload = await this.fetchJson(nearPointUrl, {
-          headers: {
-            Accept: '*/*',
-            'User-Agent': this.config.nominatimUserAgent,
-            Referer: 'https://tools.idahopower.com/',
-            Origin: 'https://tools.idahopower.com',
-          },
-        });
-        rawUtilities = extractUtilitiesFromNearPointPayload(payload);
+        const lookupLocations = buildNearPointLookupLocations(geocode.lon, geocode.lat);
+        const payloads = await Promise.all(lookupLocations.map((location) => {
+          const nearPointUrl = buildNearPointPrimaryPointsUrlFromWebMercator(
+            lookupUrl,
+            location.webMercatorX,
+            location.webMercatorY,
+          );
+          return this.fetchJson(nearPointUrl, {
+            headers: {
+              Accept: '*/*',
+              'User-Agent': this.config.nominatimUserAgent,
+              Referer: 'https://tools.idahopower.com/',
+              Origin: 'https://tools.idahopower.com',
+            },
+          });
+        }));
+        rawUtilities = payloads.flatMap((payload) => extractUtilitiesFromNearPointPayload(payload));
       } catch (err) {
         if (isUpstreamHttpError(err)) {
           return [];
@@ -674,18 +708,32 @@ export class SurveyCadClient {
       .map((entry) => this.normalizeUtilityLocation(entry))
       .filter(Boolean);
 
-    if (!normalized.length) {
+    const dedupedNormalized = [];
+    const dedupeKeys = new Set();
+    normalized.forEach((utility) => {
+      const key = [
+        Number(utility?.geometry?.x).toFixed(9),
+        Number(utility?.geometry?.y).toFixed(9),
+        Number(utility?.geometry?.spatialReference?.wkid || 4326),
+        String(utility?.code || ''),
+      ].join('|');
+      if (dedupeKeys.has(key)) return;
+      dedupeKeys.add(key);
+      dedupedNormalized.push(utility);
+    });
+
+    if (!dedupedNormalized.length) {
       return [];
     }
 
     const groupedByWkid = new Map();
-    normalized.forEach((utility, index) => {
+    dedupedNormalized.forEach((utility, index) => {
       const wkid = Number(utility?.geometry?.spatialReference?.wkid || 4326);
       if (!groupedByWkid.has(wkid)) groupedByWkid.set(wkid, []);
       groupedByWkid.get(wkid).push({ utility, index });
     });
 
-    const output = [...normalized];
+    const output = [...dedupedNormalized];
     for (const [wkid, group] of groupedByWkid.entries()) {
       if (wkid === outSR) continue;
       const projected = await this.projectPoints(group.map(({ utility }) => utility.geometry), wkid, outSR);

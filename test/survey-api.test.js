@@ -16,7 +16,7 @@ function createMockServer(options = {}) {
     omitTransformers = false,
   } = options;
   const requests = [];
-  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [], nearPointPath: null };
+  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [], nearPointPath: null, nearPointPaths: [] };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
@@ -39,6 +39,7 @@ function createMockServer(options = {}) {
 
     if (url.pathname.startsWith('/serviceEstimator/api/NearPoint/Residential/PrimaryPoints/')) {
       headers.nearPointPath = url.pathname;
+      headers.nearPointPaths.push(url.pathname);
       if (nearPoint404) {
         res.statusCode = 404;
         res.setHeader('Content-Type', 'application/json');
@@ -554,6 +555,7 @@ test('lookupUtilitiesByAddress uses Idaho Power NearPoint PrimaryPoints API and 
     );
 
     assert.match(headers.nearPointPath || '', /\/serviceEstimator\/api\/NearPoint\/Residential\/PrimaryPoints\//);
+    assert.equal(headers.nearPointPaths.length, 9);
 
     const uniqueProjected = new Set(utilities.map((utility) => `${utility.projected.east.toFixed(3)},${utility.projected.north.toFixed(3)}`));
     assert.equal(uniqueProjected.size, 3);
@@ -643,3 +645,22 @@ test('lookupUtilitiesByAddress supports NearPoint responses wrapped in object pa
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('lookupUtilitiesByAddress labels EstimateDetail transformers as TRANSF', async () => {
+  const { server, port } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    nominatimUrl: `${base}/geocode`,
+    arcgisGeometryProjectUrl: `${base}/geometry/project`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+  });
+
+  try {
+    const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
+    assert.equal(utilities.length, 3);
+    assert.deepEqual(new Set(utilities.map((utility) => utility.code)), new Set(['TRANSF']));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
