@@ -233,6 +233,14 @@ test('VIEWPORT.HTML provides toggles for point markers, names, codes, notes, and
 });
 
 
+
+test('VIEWPORT.HTML quick point search selection zooms to 10 px per unit before centering', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+QUICK_SEARCH_POINT_SCALE\s*=\s*10\s*;/, 'quick point search should define a fixed zoom target of 10 px per unit');
+  assert.match(html, /function\s+selectPointFromQuickSearch\(pointId\)\s*\{[\s\S]*view\.scale\s*=\s*clamp\(QUICK_SEARCH_POINT_SCALE,\s*MIN_SCALE,\s*MAX_SCALE\);[\s\S]*centerViewOnPoint\(point\);/, 'quick point search selection should apply the fixed zoom target before recentering to the selected point');
+});
+
 test('VIEWPORT.HTML renders conditional line labels and avoids text collisions', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

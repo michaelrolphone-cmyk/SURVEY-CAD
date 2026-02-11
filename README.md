@@ -45,6 +45,8 @@ When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** z
 In `VIEWPORT.HTML`, the point/command quick-search flyout is intentionally wider than the input field so long code/notes descriptions remain readable, and point suggestions now display the point number without a `P` prefix.
 Display behavior note:
 
+- Selecting a point from quick search now auto-zooms to **10 px/unit** and centers that point in view.
+
 - When **Draw point names** and/or **Draw point codes** are turned off, hovering a point on the canvas shows a tooltip with point name, code, layer, and description (notes).
 - When exactly one point is selected, hovering a different point shows that hovered point tooltip plus inverse **Distance** and **Bearing** from the selected point.
 

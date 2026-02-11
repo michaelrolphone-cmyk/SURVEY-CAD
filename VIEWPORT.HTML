@@ -4688,6 +4688,7 @@
     { command: "rotate", usage: "rotate", detail: "Start rotate selection workflow" },
     { command: "inverse", usage: "inverse <point1> <point2>", detail: "Measure bearing and distance" }
   ];
+  const QUICK_SEARCH_POINT_SCALE = 10;
 
   function centerViewOnPoint(point) {
     if (!point) return;
@@ -4749,6 +4750,7 @@
   function selectPointFromQuickSearch(pointId) {
     const point = points.get(pointId);
     if (!point) return;
+    view.scale = clamp(QUICK_SEARCH_POINT_SCALE, MIN_SCALE, MAX_SCALE);
     selectedPointIds = [point.id];
     selectedPointId = point.id;
     selectedLines = [];
