@@ -40,6 +40,14 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 
 When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** zooms out to the next map zoom level at the cursor position.
 
+## LineSmith Cluster Tooltip During Line Drawing
+
+When point clustering is enabled in `VIEWPORT.HTML` while drawing lines:
+
+- Hovering a point cluster keeps the cluster tooltip open long enough to move from the canvas marker onto the tooltip and choose a specific point.
+- For large clusters that collapse to layer-group counts, clicking a layer group drills into the points from that layer in-place.
+- Moving off the cluster and not onto the tooltip closes the tooltip after a short delay (normal behavior).
+
 ## LineSmith Quick Search
 
 In `VIEWPORT.HTML`, the point/command quick-search flyout is intentionally wider than the input field so long code/notes descriptions remain readable, and point suggestions now display the point number without a `P` prefix.
