@@ -226,6 +226,24 @@ function inferBoundaryRole(feature) {
   return null;
 }
 
+function ringArea(ring = []) {
+  if (!Array.isArray(ring) || ring.length < 3) return 0;
+  let area = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x1, y1] = ring[i] || [];
+    const [x2, y2] = ring[(i + 1) % ring.length] || [];
+    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+    area += (x1 * y2) - (x2 * y1);
+  }
+  return Math.abs(area / 2);
+}
+
+function polygonArea(feature) {
+  const rings = feature?.geometry?.rings || [];
+  if (!rings.length) return 0;
+  return rings.reduce((sum, ring) => sum + ringArea(stripClosingDup(ring)), 0);
+}
+
 function sectionExtent(sectionFeature) {
   const ring = stripClosingDup(sectionFeature?.geometry?.rings?.[0] || []);
   if (!ring.length) return null;
@@ -280,7 +298,14 @@ export function buildRosBoundaryCsvRowsPNEZD({
   let resolvedSubdivisionFeature = subdivisionFeature2243;
   const parcelRole = inferBoundaryRole(parcelFeature2243);
   const subdivisionRole = inferBoundaryRole(subdivisionFeature2243);
-  if (parcelRole === 'subdivision' && subdivisionRole === 'parcel') {
+  const parcelArea = polygonArea(parcelFeature2243);
+  const subdivisionArea = polygonArea(subdivisionFeature2243);
+  const shouldSwapByArea = Number.isFinite(parcelArea)
+    && Number.isFinite(subdivisionArea)
+    && parcelArea > 0
+    && subdivisionArea > 0
+    && parcelArea >= subdivisionArea;
+  if (parcelRole === 'subdivision' && subdivisionRole === 'parcel' && shouldSwapByArea) {
     resolvedParcelFeature = subdivisionFeature2243;
     resolvedSubdivisionFeature = parcelFeature2243;
   }

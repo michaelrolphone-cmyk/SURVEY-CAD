@@ -171,6 +171,34 @@ test('buildRosBoundaryCsvRowsPNEZD preserves COR/SUB labels when parcel and subd
   assert.ok(subdivisionLines.every((line) => /,SUB,$/.test(line)), 'subdivision points should still be labeled SUB');
 });
 
+test('buildRosBoundaryCsvRowsPNEZD does not flip COR/SUB labels when attributes are ambiguous but geometry order is correct', () => {
+  const parcelShape = {
+    // Some parcel service payloads include subdivision text fields.
+    attributes: { SUB_NAME: 'WEST ACRES' },
+    geometry: { rings: [[[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]]] },
+  };
+  const subdivisionShape = {
+    // Some subdivision payloads can include parcel-like labels from legal text.
+    attributes: { PARCEL: 'R12345' },
+    geometry: { rings: [[[-20, -20], [80, -20], [80, 80], [-20, 80], [-20, -20]]] },
+  };
+
+  const { csv } = buildRosBoundaryCsvRowsPNEZD({
+    parcelFeature2243: parcelShape,
+    subdivisionFeature2243: subdivisionShape,
+    startPoint: 1,
+  });
+
+  const lines = csv.trim().split('\n');
+  const parcelLines = lines.filter((line) => line.includes(',0.000,0.000,') || line.includes(',20.000,20.000,'));
+  const subdivisionLines = lines.filter((line) => line.includes(',-20.000,-20.000,') || line.includes(',80.000,80.000,'));
+
+  assert.ok(parcelLines.length > 0, 'should include parcel geometry rows');
+  assert.ok(subdivisionLines.length > 0, 'should include subdivision geometry rows');
+  assert.ok(parcelLines.every((line) => /,COR,$/.test(line)), 'parcel points should remain COR');
+  assert.ok(subdivisionLines.every((line) => /,SUB,$/.test(line)), 'subdivision points should remain SUB');
+});
+
 test('buildRosBoundaryCsvRowsPNEZD does not emit section-only corners when no aliquots are present', () => {
   const parcel = {
     geometry: { rings: [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]] },
