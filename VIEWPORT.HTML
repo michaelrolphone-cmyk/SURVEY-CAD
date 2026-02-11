@@ -241,6 +241,17 @@
       white-space:pre-wrap;
     }
     .status.warn{ border-left-color:var(--warn); }
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
     .status.ok{ border-left-color:var(--ok); }
     .inspectorCard{
       margin-top:8px;
@@ -501,6 +512,33 @@
     .layerNameCell{ font-weight:600; }
     .layerRowLocked{ opacity:0.7; }
     .quickToolField select:focus{ outline:none; }
+    .quickToolToggleGroup{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:4px;
+    }
+    .quickToggleBtn{
+      min-width:32px;
+      height:26px;
+      border-radius:6px;
+      border:1px solid #2c2c2c;
+      background:#111;
+      color:var(--muted);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:4px;
+      padding:0 7px;
+      font-size:11px;
+      line-height:1;
+    }
+    .quickToggleBtn i{ font-size:11px; }
+    .quickToggleBtn.active{
+      border-color:#5c4b14;
+      background:#201a09;
+      color:#ffe7a0;
+    }
     .mapBackdrop{
       position:absolute;
       inset:0;
@@ -967,8 +1005,13 @@
         <span>point label visibility</span>
       </div>
       <div class="inline">
+        <label><input id="showPoints" type="checkbox" checked /> Draw point markers</label>
+        <label><input id="showPointNames" type="checkbox" checked /> Draw point names</label>
+      </div>
+      <div class="inline">
         <label><input id="showPointCodes" type="checkbox" checked /> Draw point codes</label>
         <label><input id="showPointNotes" type="checkbox" /> Draw point notes</label>
+        <label><input id="enablePointClustering" type="checkbox" checked /> Cluster overlapping points</label>
       </div>
       <div class="sep"></div>
       <div class="inline">
@@ -984,7 +1027,7 @@
           </select>
         </label>
       </div>
-      <div class="hint mini">Point numbers are always shown. Toggle codes/notes anytime while sketching. Map layer defaults to 66% opacity when enabled.</div>
+      <div class="hint mini">Toggle markers, names, codes, notes, and clustering anytime while sketching. Disable point markers to view only linework. Map layer defaults to 66% opacity when enabled.</div>
     </div>
 
     <div class="section">
@@ -1122,8 +1165,13 @@
           <option value="osmCycle">OSM Cycle</option>
         </select>
       </div>
-      <label class="quickToolField" title="Toggle point code labels"><input id="quickShowPointCodes" type="checkbox" checked /> Codes</label>
-      <label class="quickToolField" title="Toggle point notes labels"><input id="quickShowPointNotes" type="checkbox" /> Notes</label>
+      <div class="quickToolField quickToolToggleGroup" title="Point display toggles" aria-label="Point display toggles">
+        <button id="quickShowPoints" class="quickToggleBtn active" title="Toggle point markers" aria-label="Toggle point markers"><i class="fa-solid fa-location-crosshairs"></i><span class="sr-only">Points</span></button>
+        <button id="quickShowPointNames" class="quickToggleBtn active" title="Toggle point names" aria-label="Toggle point names"><i class="fa-solid fa-tag"></i><span class="sr-only">Names</span></button>
+        <button id="quickShowPointCodes" class="quickToggleBtn active" title="Toggle point codes" aria-label="Toggle point codes"><i class="fa-solid fa-hashtag"></i><span class="sr-only">Codes</span></button>
+        <button id="quickShowPointNotes" class="quickToggleBtn" title="Toggle point notes" aria-label="Toggle point notes"><i class="fa-solid fa-note-sticky"></i><span class="sr-only">Notes</span></button>
+        <button id="quickTogglePointClustering" class="quickToggleBtn active" title="Toggle point clustering" aria-label="Toggle point clustering"><i class="fa-solid fa-circle-nodes"></i><span class="sr-only">Clustering</span></button>
+      </div>
       <div class="quickToolField quickToolLayer" title="Active layer">
         <span id="quickLayerColor" class="quickToolLayerSwatch" aria-hidden="true"></span>
         <div id="quickLayerDropdown" class="quickLayerDropdown">
@@ -1732,14 +1780,23 @@
   const mapOpacityValue = $("#mapOpacityValue");
   const quickMapEnabledInput = $("#quickMapLayerEnabled");
   const quickMapTileTypeInput = $("#quickMapTileType");
+  const showPointsInput = $("#showPoints");
+  const showPointNamesInput = $("#showPointNames");
   const showPointCodesInput = $("#showPointCodes");
   const showPointNotesInput = $("#showPointNotes");
-  const quickShowPointCodesInput = $("#quickShowPointCodes");
-  const quickShowPointNotesInput = $("#quickShowPointNotes");
+  
+  const enablePointClusteringInput = $("#enablePointClustering");
+  const quickShowPointsBtn = $("#quickShowPoints");
+  const quickShowPointNamesBtn = $("#quickShowPointNames");
+  const quickShowPointCodesBtn = $("#quickShowPointCodes");
+  const quickShowPointNotesBtn = $("#quickShowPointNotes");
+  const quickTogglePointClusteringBtn = $("#quickTogglePointClustering");
+
   const quickLayerDropdown = $("#quickLayerDropdown");
   const quickLayerDropdownButton = $("#quickLayerDropdownButton");
   const quickLayerDropdownLabel = $("#quickLayerDropdownLabel");
   const quickLayerDropdownMenu = $("#quickLayerDropdownMenu");
+
   const quickLayerColor = $("#quickLayerColor");
   const quickLayerManagerBtn = $("#quickLayerManager");
   const clusterTooltip = $("#clusterTooltip");
@@ -1848,9 +1905,12 @@
     boxSelectActive: false
   };
 
-  const labelVisibility = {
+  const pointDisplayVisibility = {
+    points: true,
+    names: true,
     codes: true,
-    notes: false
+    notes: false,
+    clustering: true
   };
   const POINT_CLUSTER_DISTANCE_PX = 18;
   const POINT_CLUSTER_PICK_PADDING_PX = 8;
@@ -3409,6 +3469,7 @@
   }
 
   function buildPointClusters() {
+    if (!pointDisplayVisibility.points || !pointDisplayVisibility.clustering) return [];
     const visiblePoints = [];
     for (const p of points.values()) {
       if (!isLayerVisible(p.layerId)) continue;
@@ -3862,6 +3923,7 @@
 
     // points
     cachedPointClusters = buildPointClusters();
+    if (!pointDisplayVisibility.clustering && !clusterTooltip.classList.contains("hidden")) hideClusterTooltip();
     const clusteredPointIds = new Set(cachedPointClusters.flatMap((cluster) => cluster.ids));
 
     for (const p of points.values()) {
@@ -3870,37 +3932,41 @@
       const layer = getLayerById(p.layerId);
       const sp = worldToScreen(p.x,p.y);
 
-      // marker
-      ctx.strokeStyle = layer?.color || "#ff2b2b";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(sp.x-5, sp.y-5);
-      ctx.lineTo(sp.x+5, sp.y+5);
-      ctx.moveTo(sp.x-5, sp.y+5);
-      ctx.lineTo(sp.x+5, sp.y-5);
-      ctx.stroke();
-
-      // movable hint ring
-      if (isMovable(p.movable)) {
-        ctx.save();
-        ctx.strokeStyle = "rgba(255,213,74,0.95)";
+      if (pointDisplayVisibility.points) {
+        // marker
+        ctx.strokeStyle = layer?.color || "#ff2b2b";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(sp.x, sp.y, 8, 0, Math.PI*2);
+        ctx.moveTo(sp.x-5, sp.y-5);
+        ctx.lineTo(sp.x+5, sp.y+5);
+        ctx.moveTo(sp.x-5, sp.y+5);
+        ctx.lineTo(sp.x+5, sp.y-5);
         ctx.stroke();
-        ctx.restore();
+
+        // movable hint ring
+        if (isMovable(p.movable)) {
+          ctx.save();
+          ctx.strokeStyle = "rgba(255,213,74,0.95)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, 8, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
       // labels
       ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
       ctx.textBaseline = "middle";
 
-      ctx.fillStyle = "#ffffff";
-      const numText = String(p.num);
-      ctx.fillText(numText, sp.x + 8, sp.y - 10);
-      blockedTextRects.push({ x: sp.x + 8, y: sp.y - 16, w: ctx.measureText(numText).width, h: 12 });
+      if (pointDisplayVisibility.names) {
+        ctx.fillStyle = "#ffffff";
+        const numText = String(p.num);
+        ctx.fillText(numText, sp.x + 8, sp.y - 10);
+        blockedTextRects.push({ x: sp.x + 8, y: sp.y - 16, w: ctx.measureText(numText).width, h: 12 });
+      }
 
-      if (labelVisibility.codes && p.code) {
+      if (pointDisplayVisibility.codes && p.code) {
         ctx.fillStyle = "#39ff79";
         const codeText = getRenderedPointCode(p.code);
         if (codeText) {
@@ -3908,7 +3974,7 @@
           blockedTextRects.push({ x: sp.x + 8, y: sp.y - 4, w: ctx.measureText(codeText).width, h: 12 });
         }
       }
-      if (labelVisibility.notes && p.notes) {
+      if (pointDisplayVisibility.notes && p.notes) {
         ctx.fillStyle = "#3aa3ff";
         const notesText = String(p.notes);
         ctx.fillText(notesText, sp.x + 8, sp.y + 14);
@@ -3934,7 +4000,7 @@
       ctx.fillText(cluster.countText || String(cluster.members.length), cluster.centerX, cluster.centerY);
       ctx.restore();
 
-      if (cluster.members.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT) continue;
+      if (!pointDisplayVisibility.names || cluster.members.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT) continue;
 
       const labelRadius = POINT_LABEL_SPREAD_RADIUS_PX + Math.min(20, cluster.members.length * 2);
       const membersCount = Math.max(1, cluster.members.length);
@@ -4201,16 +4267,42 @@
   $("#toolLine2pt").addEventListener("click", ()=>{ construction.startPointId = null; setTool("line2pt"); });
   $("#toolLineDB").addEventListener("click", ()=>setTool("lineDB"));
 
+  function setQuickToggleButtonState(button, enabled) {
+    if (!button) return;
+    button.classList.toggle("active", !!enabled);
+    button.setAttribute("aria-pressed", enabled ? "true" : "false");
+  }
+
+  function setPointMarkerVisibility(enabled) {
+    pointDisplayVisibility.points = !!enabled;
+    if (showPointsInput) showPointsInput.checked = pointDisplayVisibility.points;
+    setQuickToggleButtonState(quickShowPointsBtn, pointDisplayVisibility.points);
+    if (!pointDisplayVisibility.points) hideClusterTooltip();
+  }
+
+  function setPointNameVisibility(enabled) {
+    pointDisplayVisibility.names = !!enabled;
+    if (showPointNamesInput) showPointNamesInput.checked = pointDisplayVisibility.names;
+    setQuickToggleButtonState(quickShowPointNamesBtn, pointDisplayVisibility.names);
+  }
+
   function setPointCodeVisibility(enabled) {
-    labelVisibility.codes = !!enabled;
-    if (showPointCodesInput) showPointCodesInput.checked = labelVisibility.codes;
-    if (quickShowPointCodesInput) quickShowPointCodesInput.checked = labelVisibility.codes;
+    pointDisplayVisibility.codes = !!enabled;
+    if (showPointCodesInput) showPointCodesInput.checked = pointDisplayVisibility.codes;
+    setQuickToggleButtonState(quickShowPointCodesBtn, pointDisplayVisibility.codes);
   }
 
   function setPointNotesVisibility(enabled) {
-    labelVisibility.notes = !!enabled;
-    if (showPointNotesInput) showPointNotesInput.checked = labelVisibility.notes;
-    if (quickShowPointNotesInput) quickShowPointNotesInput.checked = labelVisibility.notes;
+    pointDisplayVisibility.notes = !!enabled;
+    if (showPointNotesInput) showPointNotesInput.checked = pointDisplayVisibility.notes;
+    setQuickToggleButtonState(quickShowPointNotesBtn, pointDisplayVisibility.notes);
+  }
+
+  function setPointClusteringEnabled(enabled) {
+    pointDisplayVisibility.clustering = !!enabled;
+    if (enablePointClusteringInput) enablePointClusteringInput.checked = pointDisplayVisibility.clustering;
+    setQuickToggleButtonState(quickTogglePointClusteringBtn, pointDisplayVisibility.clustering);
+    if (!pointDisplayVisibility.clustering) hideClusterTooltip();
   }
 
   function setMapTileType(tileType) {
@@ -4221,24 +4313,54 @@
     syncMapToView(true);
   }
 
-  showPointCodesInput?.addEventListener("change", () => {
-    setPointCodeVisibility(showPointCodesInput.checked);
-    setStatus(`Point code labels ${labelVisibility.codes ? "shown" : "hidden"}.`, "ok");
+  showPointsInput?.addEventListener("change", () => {
+    setPointMarkerVisibility(showPointsInput.checked);
+    setStatus(`Point markers ${pointDisplayVisibility.points ? "shown" : "hidden"}.`, "ok");
   });
 
-  quickShowPointCodesInput?.addEventListener("change", () => {
-    setPointCodeVisibility(quickShowPointCodesInput.checked);
-    setStatus(`Point code labels ${labelVisibility.codes ? "shown" : "hidden"}.`, "ok");
+  quickShowPointsBtn?.addEventListener("click", () => {
+    setPointMarkerVisibility(!pointDisplayVisibility.points);
+    setStatus(`Point markers ${pointDisplayVisibility.points ? "shown" : "hidden"}.`, "ok");
+  });
+
+  showPointNamesInput?.addEventListener("change", () => {
+    setPointNameVisibility(showPointNamesInput.checked);
+    setStatus(`Point names ${pointDisplayVisibility.names ? "shown" : "hidden"}.`, "ok");
+  });
+
+  quickShowPointNamesBtn?.addEventListener("click", () => {
+    setPointNameVisibility(!pointDisplayVisibility.names);
+    setStatus(`Point names ${pointDisplayVisibility.names ? "shown" : "hidden"}.`, "ok");
+  });
+
+  showPointCodesInput?.addEventListener("change", () => {
+    setPointCodeVisibility(showPointCodesInput.checked);
+    setStatus(`Point code labels ${pointDisplayVisibility.codes ? "shown" : "hidden"}.`, "ok");
+  });
+
+  quickShowPointCodesBtn?.addEventListener("click", () => {
+    setPointCodeVisibility(!pointDisplayVisibility.codes);
+    setStatus(`Point code labels ${pointDisplayVisibility.codes ? "shown" : "hidden"}.`, "ok");
   });
 
   showPointNotesInput?.addEventListener("change", () => {
     setPointNotesVisibility(showPointNotesInput.checked);
-    setStatus(`Point notes labels ${labelVisibility.notes ? "shown" : "hidden"}.`, "ok");
+    setStatus(`Point notes labels ${pointDisplayVisibility.notes ? "shown" : "hidden"}.`, "ok");
   });
 
-  quickShowPointNotesInput?.addEventListener("change", () => {
-    setPointNotesVisibility(quickShowPointNotesInput.checked);
-    setStatus(`Point notes labels ${labelVisibility.notes ? "shown" : "hidden"}.`, "ok");
+  quickShowPointNotesBtn?.addEventListener("click", () => {
+    setPointNotesVisibility(!pointDisplayVisibility.notes);
+    setStatus(`Point notes labels ${pointDisplayVisibility.notes ? "shown" : "hidden"}.`, "ok");
+  });
+
+  enablePointClusteringInput?.addEventListener("change", () => {
+    setPointClusteringEnabled(enablePointClusteringInput.checked);
+    setStatus(`Point clustering ${pointDisplayVisibility.clustering ? "enabled" : "disabled"}.`, "ok");
+  });
+
+  quickTogglePointClusteringBtn?.addEventListener("click", () => {
+    setPointClusteringEnabled(!pointDisplayVisibility.clustering);
+    setStatus(`Point clustering ${pointDisplayVisibility.clustering ? "enabled" : "disabled"}.`, "ok");
   });
 
   mapEnabledInput.addEventListener("change", () => {
@@ -4261,8 +4383,11 @@
   });
 
   resetLayers();
+  setPointMarkerVisibility(true);
+  setPointNameVisibility(true);
   setPointCodeVisibility(true);
   setPointNotesVisibility(false);
+  setPointClusteringEnabled(true);
   if (quickMapEnabledInput) quickMapEnabledInput.checked = mapEnabledInput.checked;
   if (quickMapTileTypeInput) quickMapTileTypeInput.value = mapTileTypeInput.value;
   $("#toolPointOnLine").addEventListener("click", ()=>setTool("pointOnLine"));
@@ -6224,7 +6349,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
   canvas.addEventListener("dblclick", (e) => {
     updateMouseFromEvent(e);
-    const cluster = getPointClusterAtScreen(mouse.x, mouse.y);
+    const cluster = pointDisplayVisibility.clustering ? getPointClusterAtScreen(mouse.x, mouse.y) : null;
     if (cluster) {
       history.push("zoom to point cluster");
       zoomToWorldBounds(cluster.minX, cluster.minY, cluster.maxX, cluster.maxY, { paddingFraction: 0.15 });
@@ -6604,7 +6729,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     broadcastCursor();
 
     if (!mouse.drag) {
-      const cluster = getPointClusterAtScreen(mouse.x, mouse.y);
+      const cluster = pointDisplayVisibility.clustering ? getPointClusterAtScreen(mouse.x, mouse.y) : null;
       if (cluster) showClusterTooltip(cluster);
       else hideClusterTooltip();
       return;

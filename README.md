@@ -121,6 +121,7 @@ node --test test/viewport.test.js
 - Cluster tooltip content switches behavior at **10 points**:
   - `<= 10` points: per-point rows (point number + code as before).
   - `> 10` points: grouped rows by layer with point counts (for example `Default: 12 points`).
+- The LineSmith quick toolbar now includes grouped icon toggles for **Points**, **Names**, **Codes**, and **Notes**, plus a clustering icon toggle so users can disable clustering and/or hide point markers entirely to view only linework.
 - API/CLI surface impact: no new endpoints or commands were added for this UI behavior; continue using existing endpoints like `GET /api/fld-config` and existing CLI entrypoints (`npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 Validation command:
