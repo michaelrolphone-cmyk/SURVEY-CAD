@@ -42,6 +42,7 @@ In `VIEWPORT.HTML`, the point/command quick-search flyout is intentionally wider
 Display behavior note:
 
 - When **Draw point names** and/or **Draw point codes** are turned off, hovering a point on the canvas shows a tooltip with point name, code, layer, and description (notes).
+- When exactly one point is selected, hovering a different point shows that hovered point tooltip plus inverse **Distance** and **Bearing** from the selected point.
 
 ## Test
 

@@ -3907,7 +3907,7 @@
   }
 
   function shouldShowPointHoverTooltip() {
-    return !pointDisplayVisibility.names || !pointDisplayVisibility.codes;
+    return !pointDisplayVisibility.names || !pointDisplayVisibility.codes || selectedPointIds.length === 1;
   }
 
   function showPointHoverTooltip(point, screenX = mouse.x, screenY = mouse.y) {
@@ -3918,12 +3918,20 @@
     const renderedCode = getRenderedPointCode(point.code);
     const code = renderedCode || String(point.code || "").trim() || "(none)";
     const description = String(point.notes || "").trim() || "(none)";
+    const basePointId = selectedPointIds.length === 1 ? selectedPointIds[0] : null;
+    const basePoint = basePointId != null ? points.get(basePointId) : null;
+    const pointDelta = basePoint && basePoint.id !== point.id ? lineMeasurement(basePoint, point) : null;
+    const pointDeltaHtml = pointDelta
+      ? `<div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Distance:</span>${pointDelta.distance.toFixed(3)}</div>
+      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Bearing:</span>${escapeHtml(pointDelta.bearing)}</div>`
+      : "";
     pointHoverTooltip.innerHTML = `
       <div><b style="color:${escapeHtml(layerColor)}">Point ${escapeHtml(String(point.num || ""))}</b></div>
       <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Name:</span>${escapeHtml(String(point.num || ""))}</div>
       <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Code:</span>${escapeHtml(code)}</div>
       <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Layer:</span>${escapeHtml(layerName)}</div>
-      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Description:</span>${escapeHtml(description)}</div>`;
+      <div class="pointHoverTooltipRow"><span class="pointHoverTooltipLabel">Description:</span>${escapeHtml(description)}</div>
+      ${pointDeltaHtml}`;
     pointHoverTooltip.classList.remove("hidden");
     const rect = canvas.getBoundingClientRect();
     const localX = screenX - rect.left;
