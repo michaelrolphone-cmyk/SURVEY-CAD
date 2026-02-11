@@ -133,6 +133,9 @@ test('VIEWPORT.HTML uses quick toolbar search for point lookup and command autoc
   assert.match(html, /for \(const point of points\.values\(\)\) \{[\s\S]*const layer = getLayerById\(point\.layerId\);/, 'point search should resolve layer metadata via getLayerById helper to avoid undefined layer lookups');
   assert.match(html, /for \(const point of points\.values\(\)\) \{[\s\S]*String\(point\.num \|\| ""\),[\s\S]*String\(point\.code \|\| ""\),[\s\S]*String\(point\.notes \|\| ""\)/, 'search should support point lookup by number, code, and notes text');
   assert.match(html, /btn\.style\.borderLeftColor = result\.layerColor;/, 'point search result rows should be color-coded by owning layer');
+  assert.match(html, /\.quickSearchResults\{[\s\S]*width:max\(100%, 420px\);[\s\S]*max-width:min\(70vw, 680px\);/, 'quick search result flyout should expand wider than the compact input so long descriptions remain visible');
+  assert.match(html, /\.quickSearchResultDescription\{[\s\S]*white-space:normal;[\s\S]*overflow-wrap:anywhere;/, 'quick search descriptions should wrap instead of truncating with ellipsis');
+  assert.match(html, /quickSearchResultTitle" style="color:\$\{escapeHtml\(result\.layerColor\)\}">\$\{escapeHtml\(result\.pointNumber\)\}<\//, 'point quick-search rows should display bare point numbers without a P prefix');
   assert.match(html, /function\s+selectPointFromQuickSearch\(pointId\)/, 'point search selections should route through a dedicated helper');
   assert.match(html, /setStatus\(`Selected point \$\{point\.num\} from quick search\.`, "ok"\);/, 'point search should report point selection feedback in status text');
   assert.match(html, /quickCommandSearchInput\?\.addEventListener\("keydown", \(e\) => \{[\s\S]*e\.key !== "Enter"[\s\S]*if \(!isLikelyCommandQuery\(raw\)\) return;/, 'toolbar search should only submit commands on Enter while leaving point search as live suggestions');
