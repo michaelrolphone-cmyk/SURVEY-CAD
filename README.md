@@ -91,6 +91,9 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 
 `VIEWPORT.HTML` now includes a layer system intended to support Field-to-Finish layer semantics directly in LineSmith drawing workflows.
 
+- Single-point cursor leader preview: when exactly one point is selected in LineSmith, a thin light-gray leader line is drawn from that point to the live cursor to improve spatial awareness while editing.
+- API/CLI surface impact: no new endpoints or commands were introduced for this viewport preview behavior; continue using existing endpoints (`GET /api/fld-config`) and existing CLI commands (`npm run cli -- --help`, `npm run ros:cli -- --help`, `npm run icons:generate`).
+
 - Toolbar controls:
   - Active layer dropdown (`quickLayerSelect`) with color swatch and quick flag toggles (lock / visibility / fill); dropdown sizing now expands to fit full layer names without truncating labels.
   - Layer manager button (`quickLayerManager`) that opens a layer editor modal table and sits to the left of the active layer dropdown in the top toolbar.

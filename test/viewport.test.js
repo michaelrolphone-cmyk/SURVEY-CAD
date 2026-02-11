@@ -222,6 +222,14 @@ test('VIEWPORT.HTML renders conditional line labels and avoids text collisions',
   assert.match(html, /blockedTextRects\.some\(\(r\) => rectsOverlap\(r, candidateAabb\)\)/, 'line labels should skip drawing when they overlap existing text bounds');
 });
 
+test('VIEWPORT.HTML draws a light leader line from a single selected point to the cursor', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /if \(selectedPointIds\.length === 1\) \{[\s\S]*selectedPointScreen = worldToScreen\(selectedPoint\.x, selectedPoint\.y\);/, 'draw loop should detect exactly one selected point and convert it to screen coordinates');
+  assert.match(html, /ctx\.strokeStyle = "rgba\(220,220,220,0\.8\)";[\s\S]*ctx\.lineWidth = 1;/, 'leader line should render as a thin light-gray stroke');
+  assert.match(html, /ctx\.moveTo\(selectedPointScreen\.x, selectedPointScreen\.y\);[\s\S]*ctx\.lineTo\(mouse\.x, mouse\.y\);/, 'leader line should connect the selected point to the current cursor location');
+});
+
 test('VIEWPORT.HTML includes line inspector card for selected line or two points', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
