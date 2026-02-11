@@ -2329,6 +2329,48 @@
     return null;
   }
 
+  function arePointsDirectlyConnected(aId, bId) {
+    for (const ln of lines.values()) {
+      if ((ln.a === aId && ln.b === bId) || (ln.a === bId && ln.b === aId)) return true;
+    }
+    return false;
+  }
+
+  function extractJpnTargetPointNumbers(code = "") {
+    const raw = String(code ?? "");
+    const targets = [];
+    const seen = new Set();
+    const regex = /\bJPN\s*([A-Za-z0-9]+)\b/gi;
+    let match = regex.exec(raw);
+    while (match) {
+      const target = String(match[1] ?? "").trim();
+      if (target && !seen.has(target)) {
+        seen.add(target);
+        targets.push(target);
+      }
+      match = regex.exec(raw);
+    }
+    return targets;
+  }
+
+  function connectJpnReferencedPoints() {
+    const byNum = new Map();
+    for (const p of points.values()) byNum.set(String(p.num), p.id);
+
+    let created = 0;
+    for (const sourcePoint of points.values()) {
+      const targets = extractJpnTargetPointNumbers(sourcePoint.code);
+      for (const targetNum of targets) {
+        const targetPointId = byNum.get(String(targetNum));
+        if (!targetPointId || targetPointId === sourcePoint.id) continue;
+        if (arePointsDirectlyConnected(sourcePoint.id, targetPointId)) continue;
+        addLine(sourcePoint.id, targetPointId, false);
+        created++;
+      }
+    }
+    return created;
+  }
+
   function moveSelectionByDelta(dx, dy) {
     const ids = getRotatablePointIdsFromSelection();
     if (!ids.length) return 0;
@@ -3831,12 +3873,15 @@
       added++;
     }
 
+    const jpnLinesAdded = connectJpnReferencedPoints();
+
     setStatus(`${sourceLabel} done.
 Added: ${added}
 Updated: ${updated}
 Renamed: ${renamed}
 Skipped: ${skipped}
-Coord-swap applied (headerless only): ${swappedApplied}`, "ok");
+Coord-swap applied (headerless only): ${swappedApplied}
+JPN lines added: ${jpnLinesAdded}`, "ok");
 
     schedulePointsTableRender();
     if ($("#autoZoomAfterImport").checked) zoomExtents();
