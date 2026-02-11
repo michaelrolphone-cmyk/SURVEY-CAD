@@ -2721,18 +2721,42 @@
         const key = getNormalizedLineKey(sourcePoint.id, targetPointId);
         if (!key || seen.has(key)) continue;
         seen.add(key);
-        commands.push({ a: sourcePoint.id, b: targetPointId, type: "jpn" });
+        commands.push({ a: sourcePoint.id, b: targetPointId, type: "jpn", sourcePointId: sourcePoint.id });
       }
     }
     return commands;
   }
 
-  function createAutoFieldToFinishLine(aPointId, bPointId, lineType = "sequential") {
-    const lineId = addLine(aPointId, bPointId, false);
+  function resolveAutoLineLayerId(aPointId, bPointId, { type = "sequential", baseCode = "", sourcePointId = null } = {}) {
+    const aPoint = points.get(aPointId);
+    const bPoint = points.get(bPointId);
+    const aLayerId = aPoint?.layerId;
+    const bLayerId = bPoint?.layerId;
+    if (aLayerId && aLayerId === bLayerId) return aLayerId;
+
+    if (type === "jpn") {
+      const sourceLayerId = points.get(sourcePointId)?.layerId;
+      if (sourceLayerId && layers.has(sourceLayerId)) return sourceLayerId;
+    }
+
+    if (baseCode) {
+      const lineworkLayerName = fieldToFinishRuleState.codeLayers.get(baseCode);
+      const lineworkLayerId = lineworkLayerName ? ensureLayerByName(lineworkLayerName) : null;
+      if (lineworkLayerId && layers.has(lineworkLayerId)) return lineworkLayerId;
+    }
+
+    if (aLayerId && layers.has(aLayerId)) return aLayerId;
+    if (bLayerId && layers.has(bLayerId)) return bLayerId;
+    return selectedLayerId || DEFAULT_LAYER_ID;
+  }
+
+  function createAutoFieldToFinishLine(aPointId, bPointId, { type = "sequential", baseCode = "", sourcePointId = null } = {}) {
+    const layerId = resolveAutoLineLayerId(aPointId, bPointId, { type, baseCode, sourcePointId });
+    const lineId = addLine(aPointId, bPointId, false, layerId);
     const line = lines.get(lineId);
     if (line) {
       line.generatedBy = "field-to-finish";
-      line.fieldToFinishType = lineType;
+      line.fieldToFinishType = type;
     }
     return lineId;
   }
@@ -2777,7 +2801,11 @@
     for (const cmd of expected.values()) {
       if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
       if (arePointsDirectlyConnected(cmd.a, cmd.b)) continue;
-      createAutoFieldToFinishLine(cmd.a, cmd.b, cmd.type === "jpn" ? "jpn" : "sequential");
+      createAutoFieldToFinishLine(cmd.a, cmd.b, {
+        type: cmd.type === "jpn" ? "jpn" : "sequential",
+        baseCode: cmd.baseCode,
+        sourcePointId: cmd.sourcePointId,
+      });
       if (cmd.type === "jpn") addedJpn++;
       else addedSequential++;
     }
@@ -2816,11 +2844,11 @@
         const active = activeSequences.get(baseCode);
         if (!active) continue;
         if (point.id !== active.lastPointId) {
-          lineCommands.push({ a: active.lastPointId, b: point.id });
+          lineCommands.push({ a: active.lastPointId, b: point.id, baseCode });
           active.lastPointId = point.id;
         }
         if (action === "CLO" && active.startPointId !== active.lastPointId) {
-          lineCommands.push({ a: active.lastPointId, b: active.startPointId });
+          lineCommands.push({ a: active.lastPointId, b: active.startPointId, baseCode });
         }
         activeSequences.delete(baseCode);
       }
@@ -2851,7 +2879,7 @@
         if (explicitActions.has(baseCode)) continue;
         if (!pointSupportsLineworkSequenceToken(tokenSet, baseCode)) continue;
         if (point.id === active.lastPointId) continue;
-        lineCommands.push({ a: active.lastPointId, b: point.id });
+        lineCommands.push({ a: active.lastPointId, b: point.id, baseCode });
         active.lastPointId = point.id;
       }
     }
