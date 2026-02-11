@@ -1720,6 +1720,8 @@
   let mapViewportSignature = "";
 
   const FEET_TO_METERS = 0.3048006096012192;
+  const MAP_LAYER_MIN_RENDER_ZOOM = 1;
+  const MAP_LAYER_MAX_RENDER_ZOOM = 40;
   let mapGeoreference = null;
   const ADA_CPF_PDF_BASE = "https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/";
 
@@ -1728,7 +1730,7 @@
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       options: {
         maxNativeZoom: 19,
-        maxZoom: 22,
+        maxZoom: MAP_LAYER_MAX_RENDER_ZOOM,
         attribution: "Tiles &copy; Esri"
       }
     },
@@ -1736,7 +1738,7 @@
       url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
       options: {
         maxNativeZoom: 19,
-        maxZoom: 22,
+        maxZoom: MAP_LAYER_MAX_RENDER_ZOOM,
         attribution: "&copy; OpenStreetMap contributors"
       }
     },
@@ -1744,7 +1746,7 @@
       url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
       options: {
         maxNativeZoom: 19,
-        maxZoom: 22,
+        maxZoom: MAP_LAYER_MAX_RENDER_ZOOM,
         attribution: "&copy; OpenStreetMap contributors, Tiles style by HOT"
       }
     },
@@ -1752,7 +1754,7 @@
       url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
       options: {
         maxNativeZoom: 17,
-        maxZoom: 20,
+        maxZoom: MAP_LAYER_MAX_RENDER_ZOOM,
         attribution: "&copy; OpenStreetMap contributors, Map style: OpenTopoMap"
       }
     }
@@ -1841,7 +1843,7 @@
   function scaleToLeafletZoom(scale) {
     if (!Number.isFinite(scale) || scale <= 0) return 2;
     const zoom = Math.log2((scale * 360) / 256);
-    return clamp(zoom, 1, 22);
+    return clamp(zoom, MAP_LAYER_MIN_RENDER_ZOOM, MAP_LAYER_MAX_RENDER_ZOOM);
   }
 
   function clampLatLng(lat, lng) {
@@ -1965,7 +1967,7 @@
     const metersPerPixel = feetPerPixel * FEET_TO_METERS;
     const cosLat = Math.max(0.01, Math.cos((lat * Math.PI) / 180));
     const zoom = Math.log2((156543.03392 * cosLat) / Math.max(1e-9, metersPerPixel));
-    return clamp(zoom, 1, 22);
+    return clamp(zoom, MAP_LAYER_MIN_RENDER_ZOOM, MAP_LAYER_MAX_RENDER_ZOOM);
   }
 
   function syncViewToGeoreference(payload) {
@@ -1994,7 +1996,9 @@
       tap: false,
       touchZoom: false,
       zoomSnap: 0,
-      zoomDelta: 0.25
+      zoomDelta: 0.25,
+      minZoom: MAP_LAYER_MIN_RENDER_ZOOM,
+      maxZoom: MAP_LAYER_MAX_RENDER_ZOOM
     });
     applyMapTileType();
     mapArPresenceLayer = L.layerGroup().addTo(mapInstance);
