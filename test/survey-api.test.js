@@ -11,6 +11,7 @@ function createMockServer(options = {}) {
     utilities404 = false,
     estimateCalculate404 = false,
     includeServiceLines = false,
+    omitTransformers = false,
   } = options;
   const requests = [];
   const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [] };
@@ -54,8 +55,10 @@ function createMockServer(options = {}) {
             feederId: body.get('feederId') || 'GARY15',
             beginLongitude: Number(body.get('beginLongitude')),
             beginLatitude: Number(body.get('beginLatitude')),
+            endLongitude: Number(body.get('endLongitude')),
+            endLatitude: Number(body.get('endLatitude')),
           },
-          transformers: [{
+          transformers: omitTransformers ? [] : [{
             id: `tx-${body.get('serviceEstimateServiceTypeId') || '1'}`,
             provider: 'Idaho Power',
             name: `Transformer ${body.get('serviceEstimateServiceTypeId') || '1'}`,
@@ -518,6 +521,10 @@ test('lookupUtilitiesByAddress uses Idaho Power EstimateDetail Calculate API and
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     assert.equal(utilities.length, 3);
     assert.ok(utilities.every((utility) => utility.provider === 'Idaho Power'));
+    assert.deepEqual(
+      utilities.map((utility) => utility.code).sort(),
+      ['OH PWR TX', 'UG PWR TX', 'UG PWR TX'],
+    );
 
     const serviceTypeIds = headers.estimateCalculateBodies
       .map((raw) => new URLSearchParams(raw).get('serviceEstimateServiceTypeId'))
@@ -543,6 +550,30 @@ test('lookupUtilitiesByAddress uses Idaho Power EstimateDetail Calculate API and
       { lon: -116.197, lat: 43.613 },
     ]);
     assert.ok(utilities.every((utility) => Number.isFinite(utility?.projected?.east) && Number.isFinite(utility?.projected?.north)));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('lookupUtilitiesByAddress labels fallback estimate points using OH/UG service rules', async () => {
+  const { server, port } = await createMockServer({ omitTransformers: true });
+  const base = `http://127.0.0.1:${port}`;
+
+  const client = new SurveyCadClient({
+    nominatimUrl: `${base}/geocode`,
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    arcgisGeometryProjectUrl: `${base}/geometry/project`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+  });
+
+  try {
+    const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
+    const codes = new Set(utilities.map((utility) => utility.code));
+    assert.ok(codes.has('OH PWR BEG'));
+    assert.ok(codes.has('OH PWR END'));
+    assert.ok(codes.has('UG PWR BEG'));
+    assert.ok(codes.has('UG PWR END'));
+    assert.ok(utilities.every((utility) => !String(utility.code).includes('Idaho Power Service Estimate')));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
