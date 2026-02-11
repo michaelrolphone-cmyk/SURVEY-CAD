@@ -1949,6 +1949,7 @@
     dragObj: null
   };
   let pendingMarqueeZoomRect = null;
+  let pendingMarqueeSelectionSnapshot = null;
 
   const mobileInteraction = {
     longPressMs: 450,
@@ -5079,6 +5080,46 @@
     return rect;
   }
 
+  function consumePendingMarqueeSelectionSnapshot() {
+    if (!pendingMarqueeSelectionSnapshot) return null;
+    const snapshot = pendingMarqueeSelectionSnapshot;
+    pendingMarqueeSelectionSnapshot = null;
+    return snapshot;
+  }
+
+  function captureSelectionSnapshot() {
+    return {
+      selectedPointIds: [...selectedPointIds],
+      selectedPointId,
+      selectedLines: selectedLines.map((entry) => ({ ...entry })),
+      lastSelectedLineId
+    };
+  }
+
+  function applySelectionSnapshot(snapshot) {
+    if (!snapshot) return;
+    selectedPointIds = Array.isArray(snapshot.selectedPointIds)
+      ? snapshot.selectedPointIds.filter((id) => points.has(id))
+      : [];
+
+    selectedPointId = snapshot.selectedPointId;
+    if (selectedPointId != null && !points.has(selectedPointId)) {
+      selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length - 1] : null;
+    }
+
+    selectedLines = Array.isArray(snapshot.selectedLines)
+      ? snapshot.selectedLines.filter((entry) => entry?.lineId != null && lines.has(entry.lineId))
+      : [];
+
+    lastSelectedLineId = snapshot.lastSelectedLineId;
+    if (lastSelectedLineId != null && !lines.has(lastSelectedLineId)) {
+      lastSelectedLineId = selectedLines.length ? selectedLines[selectedLines.length - 1].lineId : null;
+    }
+
+    updatePointEditorFromSelection();
+    schedulePointsTableRender();
+  }
+
   function doDeleteSelected() {
     const hasPts = selectedPointIds.length > 0;
     const hasLns = selectedLines.length > 0;
@@ -7094,6 +7135,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
     const additive = e.shiftKey;
     pendingMarqueeZoomRect = null;
+    pendingMarqueeSelectionSnapshot = null;
 
     if (toolIsPan()) {
       beginDrag({type:"pan"});
@@ -7119,6 +7161,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     const pendingWindowRect = consumePendingMarqueeZoomRect();
     if (pendingWindowRect) {
       zoomToScreenRect(pendingWindowRect);
+      applySelectionSnapshot(consumePendingMarqueeSelectionSnapshot());
+      setStatus("Zoomed to window without changing selection.", "ok");
       return;
     }
 
@@ -7401,8 +7445,10 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (!mouse.drag) return;
 
     if (mouse.dragObj?.type === "marquee") {
+      const selectionSnapshot = captureSelectionSnapshot();
       const marqueeRect = rectNorm(mouse.dragObj.x0, mouse.dragObj.y0, mouse.dragObj.x1, mouse.dragObj.y1);
       pendingMarqueeZoomRect = marqueeRect;
+      pendingMarqueeSelectionSnapshot = selectionSnapshot;
       applyMarqueeSelection(mouse.dragObj);
       endDrag();
       return;
