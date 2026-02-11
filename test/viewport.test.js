@@ -338,7 +338,7 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
 });
 
 
-test('VIEWPORT.HTML keeps point inspector + map opacity always visible while tool sections are collapsible', async () => {
+test('VIEWPORT.HTML keeps multi-point + point inspectors and map opacity always visible while tool sections are collapsible', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="panelToolsCollapse"\s+class="panelToolsCollapse"(?!\s+open)/, 'LineSmith should wrap drawer tool sections in a collapsed-by-default container');
@@ -347,8 +347,10 @@ test('VIEWPORT.HTML keeps point inspector + map opacity always visible while too
   assert.match(html, /function\s+syncPanelCollapseWithSelection\(\)\s*\{[\s\S]*const\s+hasSelection\s*=\s*selectedPointIds\.length > 0 \|\| selectedLines\.length > 0;[\s\S]*setPanelCollapsed\(!hasSelection\);/, 'selection sync helper should auto-expand the desktop panel when point or line selections exist and collapse it otherwise');
   assert.match(html, /function\s+updatePointEditorFromSelection\(\)\s*\{[\s\S]*syncPanelCollapseWithSelection\(\);/, 'selection-driven editor refresh should also synchronize drawer collapse state');
   assert.match(html, /<div class="title">[\s\S]*<b>Inspector \+ Map Opacity<\/b>[\s\S]*id="mapOpacity"\s+type="range"/, 'drawer should surface map opacity in an always-visible inspector section outside the collapsible tool body');
+  assert.match(html, /<div class="title">[\s\S]*<b>Inspector \+ Map Opacity<\/b>[\s\S]*id="lineInspector"\s+class="inspectorCard"/, 'always-visible inspector section should include the multi-point line inspector card');
+  assert.match(html, /id="lineInspector"\s+class="inspectorCard"[\s\S]*id="pointInspector"\s+class="inspectorCard"/, 'line inspector should render above the point inspector for quick distance checks');
   assert.match(html, /id="pointInspector"\s+class="inspectorCard"/, 'point inspector card should remain rendered in the always-visible inspector section');
-  assert.match(html, /id="panelToolsCollapse"[\s\S]*id="lineInspector"\s+class="inspectorCard"/, 'line inspector should stay within the collapsible tool body while point inspector remains always visible');
+  assert.doesNotMatch(html, /id="panelToolsCollapse"[\s\S]*id="lineInspector"\s+class="inspectorCard"/, 'line inspector should no longer live inside the collapsible tool sections');
 });
 
 
