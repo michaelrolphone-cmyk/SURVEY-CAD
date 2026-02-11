@@ -6834,6 +6834,13 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
   window.addEventListener("keydown", (e) => {
     const typing = isEditableTarget(e.target);
+    const key = e.key.toLowerCase();
+
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && key === "s") {
+      e.preventDefault();
+      saveDrawingToProject();
+      return;
+    }
 
     if (e.code === "Space") {
       keys.space = true;
@@ -6852,7 +6859,6 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     }
 
     if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey) {
-      const key = e.key.toLowerCase();
       if (key === "z") {
         e.preventDefault();
         if (e.shiftKey) history.redoAction();
