@@ -1102,8 +1102,8 @@
         <button id="quickShowPointNames" class="quickToggleBtn active" title="Toggle point names" aria-label="Toggle point names"><i class="fa-solid fa-tag"></i><span class="sr-only">Names</span></button>
         <button id="quickShowPointCodes" class="quickToggleBtn active" title="Toggle point codes" aria-label="Toggle point codes"><i class="fa-solid fa-hashtag"></i><span class="sr-only">Codes</span></button>
         <button id="quickShowPointNotes" class="quickToggleBtn" title="Toggle point notes" aria-label="Toggle point notes"><i class="fa-solid fa-note-sticky"></i><span class="sr-only">Notes</span></button>
+        <button id="quickTogglePointClustering" class="quickToggleBtn active" title="Toggle point clustering" aria-label="Toggle point clustering"><i class="fa-solid fa-circle-nodes"></i><span class="sr-only">Clustering</span></button>
       </div>
-      <label class="quickToolField" title="Cluster overlapping points"><input id="quickEnablePointClustering" type="checkbox" checked /> Cluster</label>
       <div class="quickToolField quickToolLayer" title="Active layer">
         <span id="quickLayerColor" class="quickToolLayerSwatch" aria-hidden="true"></span>
         <select id="quickLayerSelect" aria-label="Active Layer"></select>
@@ -1716,7 +1716,7 @@
   const quickShowPointNamesBtn = $("#quickShowPointNames");
   const quickShowPointCodesBtn = $("#quickShowPointCodes");
   const quickShowPointNotesBtn = $("#quickShowPointNotes");
-  const quickEnablePointClusteringInput = $("#quickEnablePointClustering");
+  const quickTogglePointClusteringBtn = $("#quickTogglePointClustering");
   const quickLayerSelect = $("#quickLayerSelect");
   const quickLayerColor = $("#quickLayerColor");
   const quickLayerToggles = $("#quickLayerToggles");
@@ -4201,7 +4201,7 @@
   function setPointClusteringEnabled(enabled) {
     pointDisplayVisibility.clustering = !!enabled;
     if (enablePointClusteringInput) enablePointClusteringInput.checked = pointDisplayVisibility.clustering;
-    if (quickEnablePointClusteringInput) quickEnablePointClusteringInput.checked = pointDisplayVisibility.clustering;
+    setQuickToggleButtonState(quickTogglePointClusteringBtn, pointDisplayVisibility.clustering);
     if (!pointDisplayVisibility.clustering) hideClusterTooltip();
   }
 
@@ -4258,8 +4258,8 @@
     setStatus(`Point clustering ${pointDisplayVisibility.clustering ? "enabled" : "disabled"}.`, "ok");
   });
 
-  quickEnablePointClusteringInput?.addEventListener("change", () => {
-    setPointClusteringEnabled(quickEnablePointClusteringInput.checked);
+  quickTogglePointClusteringBtn?.addEventListener("click", () => {
+    setPointClusteringEnabled(!pointDisplayVisibility.clustering);
     setStatus(`Point clustering ${pointDisplayVisibility.clustering ? "enabled" : "disabled"}.`, "ok");
   });
 

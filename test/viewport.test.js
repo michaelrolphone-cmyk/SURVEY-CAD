@@ -28,7 +28,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickShowPointNames"[\s\S]*fa-tag/, 'quick toolbar should include point names visibility icon toggle');
   assert.match(html, /id="quickShowPointCodes"[\s\S]*fa-hashtag/, 'quick toolbar should include point code visibility icon toggle');
   assert.match(html, /id="quickShowPointNotes"[\s\S]*fa-note-sticky/, 'quick toolbar should include point notes visibility icon toggle');
-  assert.match(html, /id="quickEnablePointClustering"\s+type="checkbox"\s+checked/, 'quick toolbar should include point clustering toggle');
+  assert.match(html, /id="quickTogglePointClustering"[\s\S]*fa-circle-nodes/, 'quick toolbar should include point clustering icon toggle');
   assert.match(html, /class="quickToolField quickToolToggleGroup"/, 'quick toolbar should group point display toggles together');
   assert.match(html, /\.quickToolField\{[\s\S]*display:inline-flex;[\s\S]*flex-direction:row;/, 'quick toolbar control labels should render inline with row direction');
   assert.doesNotMatch(html, /\.quickToolField input\[type="checkbox"\][\s\S]*accent-color:/, 'quick toolbar checkboxes should keep native accent color styling');
@@ -189,7 +189,7 @@ test('VIEWPORT.HTML provides toggles for point markers, names, codes, notes, and
   assert.match(html, /showPointNotesInput\?\.addEventListener\("change"/, 'notes visibility toggle should be wired to change events');
   assert.match(html, /quickShowPointNotesBtn\?\.addEventListener\("click"/, 'quick toolbar notes toggle should be wired to click events');
   assert.match(html, /enablePointClusteringInput\?\.addEventListener\("change"/, 'clustering visibility toggle should be wired to change events');
-  assert.match(html, /quickEnablePointClusteringInput\?\.addEventListener\("change"/, 'quick toolbar clustering toggle should be wired to change events');
+  assert.match(html, /quickTogglePointClusteringBtn\?\.addEventListener\("click"/, 'quick toolbar clustering toggle should be wired to click events');
 });
 
 
