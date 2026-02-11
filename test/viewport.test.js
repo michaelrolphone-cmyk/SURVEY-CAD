@@ -23,11 +23,18 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /class="quickToolsRow quickToolsRowSecondary"/, 'quick toolbar should render a dedicated second row for draw and edit tools');
   assert.match(html, /class="quickToolsRow quickToolsRowSecondary"[\s\S]*id="quickSelect"/, 'quick toolbar second row should begin with the Select\/Move tool');
   assert.match(html, /\.quickTools\{[\s\S]*left:10px;[\s\S]*right:10px;[\s\S]*width:calc\(100% - 20px\);/, 'quick toolbar should span the full visible map width while respecting edge insets');
-  assert.match(html, /\.app\.panelCollapsed \.quickTools\{[\s\S]*left:0;[\s\S]*right:0;[\s\S]*width:100%;/, 'quick toolbar should expand to full viewport width when the tools drawer is collapsed');
+  assert.doesNotMatch(html, /\.app\.panelCollapsed \.quickTools\{[\s\S]*width:100%;[\s\S]*border-radius:0;/, 'quick toolbar should keep rounded floating styling when the tools drawer is collapsed');
   assert.match(html, /\.quickToolsRow\{[\s\S]*flex-wrap:wrap;/, 'each quick toolbar row should preserve wrapping behavior on narrow widths');
+  assert.match(html, /\.quickToolSearch\{[\s\S]*flex:0 1 170px;[\s\S]*min-width:140px;/, 'quick toolbar search field should be compact and roughly half-width of the prior design');
   assert.match(html, /id="quickSave"[\s\S]*fa-floppy-disk/, 'quick toolbar should include Save icon shortcut');
   assert.match(html, /id="quickOpenArrowHead"[\s\S]*fa-vr-cardboard/, 'quick toolbar should include Open ArrowHead shortcut');
-  assert.match(html, /id="quickMapLayerEnabled"\s+type="checkbox"/, 'quick toolbar should include map layer toggle');
+  assert.match(html, /id="quickOpenArrowHead"[\s\S]*id="quickLayerManager"[\s\S]*id="quickLayerDropdown"/, 'quick toolbar should place the layer manager button to the left of the layer dropdown');
+  assert.match(html, /id="quickShowPoints"[\s\S]*id="quickCommandSearchInput"/, 'quick toolbar should place the search-first command field after point visibility toggles');
+  assert.match(html, /id="quickCommandSearchInput"[\s\S]*id="quickMapLayerEnabled"/, 'quick toolbar should move map controls to the end of the primary row');
+  assert.doesNotMatch(html, /id="quickCommandSearchRun"/, 'quick toolbar search should remove the separate run/play button');
+  assert.match(html, /id="quickMapLayerEnabled"\s+class="quickToggleBtn"[\s\S]*fa-map/, 'quick toolbar should include an icon-based map layer toggle');
+  assert.match(html, /\.quickLayerDropdownBtnText\{[\s\S]*text-overflow:clip;[\s\S]*white-space:nowrap;/, 'active layer dropdown label should render full layer names without ellipsis truncation');
+  assert.match(html, /\.quickLayerItemName\{[\s\S]*text-overflow:clip;[\s\S]*white-space:nowrap;/, 'layer dropdown rows should render full layer names without ellipsis truncation');
   assert.match(html, /<div class="quickToolField" title="Map tiles">\s*<select id="quickMapTileType"/, 'quick toolbar should include unlabeled inline map tile type dropdown');
   assert.doesNotMatch(html, /title="Map tiles">\s*Tiles\s*</, 'quick toolbar map tile selector should not include a redundant Tiles text label');
   assert.match(html, /id="quickShowPoints"[\s\S]*fa-location-crosshairs/, 'quick toolbar should include point marker visibility icon toggle');
@@ -113,21 +120,19 @@ test('VIEWPORT.HTML renders unlocked lines in maroon for movement warning', asyn
 
   assert.match(html, /ctx\.strokeStyle = isMovable\(ln\.movable\) \? "#800000" : layer\.color;/, 'unlocked lines should render maroon while normal lines follow layer color');
 });
-test('VIEWPORT.HTML includes command line controls for line, move, rotate, and inverse workflows', async () => {
+test('VIEWPORT.HTML uses quick toolbar search for point lookup and command autocomplete workflows', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /id="commandInput"\s+type="text"/, 'LineSmith should expose a command line text input');
-  assert.match(html, /id="runCommand"\s+class="primary"/, 'LineSmith should expose a command execution button');
-  assert.match(html, /function\s+runCommandLine\(rawCommand\)/, 'LineSmith should parse and execute command line input');
-  assert.match(html, /if \(cmd === "line"\)/, 'command line should support line creation by point numbers');
-  assert.match(html, /Usage: line <point1> <point2>/, 'line command should provide usage guidance for missing arguments');
-  assert.match(html, /if \(cmd === "move"\)/, 'command line should support move command');
-  assert.match(html, /Usage: move <dx> <dy>/, 'move command should provide usage guidance for missing arguments');
-  assert.match(html, /if \(cmd === "rotate"\)/, 'command line should support rotate command');
-  assert.match(html, /startRotateSelectionSession\(\)/, 'rotate command should trigger staged rotate workflow');
-  assert.match(html, /if \(cmd === "inverse"\)/, 'command line should support inverse command');
-  assert.match(html, /lineMeasurement\(a, b\)/, 'inverse command should compute bearing and distance from two points');
-  assert.match(html, /commandInput\?\.addEventListener\("keydown", \(e\) => \{[\s\S]*e\.key !== "Enter"/, 'command line should execute from Enter key');
+  assert.match(html, /id="quickCommandSearchInput"\s+type="text"/, 'LineSmith should expose a compact quick-toolbar search input');
+    assert.match(html, /id="quickCommandSearchResults"\s+class="quickSearchResults hidden"/, 'LineSmith should include a quick search results flyout below the toolbar search field');
+  assert.match(html, /function\s+runCommandLine\(rawCommand\)/, 'LineSmith should parse and execute command input from the toolbar search field');
+  assert.match(html, /const\s+COMMAND_AUTOCOMPLETE\s*=\s*\[[\s\S]*command:\s*"line"[\s\S]*command:\s*"move"[\s\S]*command:\s*"rotate"[\s\S]*command:\s*"inverse"/, 'toolbar command entry should publish command autocomplete metadata');
+  assert.match(html, /function\s+buildQuickCommandSearchResults\(rawValue = ""\)\s*\{[\s\S]*isLikelyCommandQuery\(normalized\)/, 'search should route command-intent input to command autocomplete suggestions first');
+  assert.match(html, /for \(const point of points\.values\(\)\) \{[\s\S]*String\(point\.num \|\| ""\),[\s\S]*String\(point\.code \|\| ""\),[\s\S]*String\(point\.notes \|\| ""\)/, 'search should support point lookup by number, code, and notes text');
+  assert.match(html, /btn\.style\.borderLeftColor = result\.layerColor;/, 'point search result rows should be color-coded by owning layer');
+  assert.match(html, /function\s+selectPointFromQuickSearch\(pointId\)/, 'point search selections should route through a dedicated helper');
+  assert.match(html, /setStatus\(`Selected point \$\{point\.num\} from quick search\.`, "ok"\);/, 'point search should report point selection feedback in status text');
+  assert.match(html, /quickCommandSearchInput\?\.addEventListener\("keydown", \(e\) => \{[\s\S]*e\.key !== "Enter"[\s\S]*if \(!isLikelyCommandQuery\(raw\)\) return;/, 'toolbar search should only submit commands on Enter while leaving point search as live suggestions');
 });
 test('VIEWPORT.HTML only treats strict boolean true as movable for point/line drag', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
@@ -225,7 +230,7 @@ test('VIEWPORT.HTML exposes map backdrop controls with expected defaults and wir
   assert.match(html, /const\s+mapLayerState\s*=\s*\{[\s\S]*enabled:\s*false,[\s\S]*tileType:\s*"satellite",[\s\S]*opacity:\s*0\.66/, 'map state should initialize disabled with satellite and 66 percent opacity');
   assert.match(html, /id="mapBackdrop"\s+class="mapBackdrop"/, 'canvas area should include a dedicated map backdrop container behind the drawing canvas');
   assert.match(html, /mapEnabledInput\.addEventListener\("change",\s*\(\)\s*=>\s*\{[\s\S]*setMapLayerEnabled\(mapEnabledInput\.checked\)/, 'map toggle should be wired to set enabled state');
-  assert.match(html, /quickMapEnabledInput\?\.addEventListener\("change",\s*\(\)\s*=>\s*\{[\s\S]*setMapLayerEnabled\(quickMapEnabledInput\.checked\)/, 'quick toolbar map toggle should be wired to set enabled state');
+  assert.match(html, /quickMapEnabledBtn\?\.addEventListener\("click",\s*\(\)\s*=>\s*\{[\s\S]*setMapLayerEnabled\(!mapLayerState\.enabled\)/, 'quick toolbar map icon toggle should be wired to invert enabled state');
   assert.match(html, /mapTileTypeInput\.addEventListener\("change"[\s\S]*setMapTileType\(mapTileTypeInput\.value\)/, 'map tile selector should update current tileset');
   assert.match(html, /quickMapTileTypeInput\?\.addEventListener\("change"[\s\S]*setMapTileType\(quickMapTileTypeInput\.value\)/, 'quick toolbar map tile selector should update current tileset');
   assert.match(html, /mapOpacityInput\.addEventListener\("input"[\s\S]*mapLayerState\.opacity\s*=\s*clamp\(parseNum\(mapOpacityInput\.value,\s*10\)\s*\/\s*100,\s*0,\s*1\)/, 'opacity slider should update map backdrop opacity');
@@ -408,7 +413,7 @@ test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate 
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="workflowToast"\s+class="workflowToast hidden"/, 'canvas should include a top-right workflow toast container');
-  assert.match(html, /@media \(max-width: 960px\) \{[\s\S]*\.workflowToast\{[\s\S]*bottom:110px;[\s\S]*left:8px;[\s\S]*\}/, 'mobile workflow toast should move above the bottom command toolbar to avoid blocking tool access');
+  assert.match(html, /@media \(max-width: 960px\) \{[\s\S]*\.workflowToast\{[\s\S]*bottom:8px;[\s\S]*left:8px;[\s\S]*\}/, 'mobile workflow toast should move above the bottom command toolbar to avoid blocking tool access');
   assert.match(html, /function\s+renderWorkflowToast\(\)/, 'workflow toast should render from reusable helper function');
   assert.match(html, /function\s+showWorkflowToast\(\{\s*title, message, steps, currentStepIndex\s*\}\)/, 'workflow toast should expose reusable show API for multi-step tools');
   assert.match(html, /function\s+hideWorkflowToast\(\)/, 'workflow toast should expose reusable hide API');
