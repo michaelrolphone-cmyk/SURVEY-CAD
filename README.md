@@ -41,6 +41,8 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 In `VIEWPORT.HTML`, the point/command quick-search flyout is intentionally wider than the input field so long code/notes descriptions remain readable, and point suggestions now display the point number without a `P` prefix.
 Display behavior note:
 
+- Selecting a point from quick search now auto-zooms to **10 px/unit** and centers that point in view.
+
 - When **Draw point names** and/or **Draw point codes** are turned off, hovering a point on the canvas shows a tooltip with point name, code, layer, and description (notes).
 
 ## Test
