@@ -655,3 +655,5 @@ No API endpoints or CLI commands changed in this LineSmith JPN/sequential linewo
 No API endpoints or CLI commands changed in this LineSmith global END sequence restart fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 No API endpoints or CLI commands changed in this LineSmith point-editor linework sync/focus fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed in this LineSmith implicit post-END sequence restart fix (including FNL + JPN continuity); existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).

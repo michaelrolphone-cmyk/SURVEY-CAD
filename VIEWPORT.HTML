@@ -2585,18 +2585,19 @@
     });
     const lineCommands = [];
     const activeSequences = new Map();
+    const explicitSequentialBaseCodes = new Set();
 
     for (const point of pointsInOrder) {
       const { tokensUpper, commands } = parseFieldToFinishCommands(point.code);
       const tokenSet = new Set(tokensUpper);
       const lineworkCodes = fieldToFinishRuleState.lineworkCodes;
-      const pointLineworkCodes = [...tokenSet].filter((token) => lineworkCodes.has(token));
 
       const explicitActions = new Set();
       for (const cmd of commands) {
         if (cmd.type !== "sequential-line") continue;
         const baseCode = cmd.baseCode;
         const action = cmd.action;
+        explicitSequentialBaseCodes.add(baseCode);
         explicitActions.add(baseCode);
         if (action === "BEG") {
           activeSequences.set(baseCode, { startPointId: point.id, lastPointId: point.id });
@@ -2614,6 +2615,10 @@
         activeSequences.delete(baseCode);
       }
 
+      const pointImplicitSequenceCodes = [...tokenSet].filter((token) => (
+        lineworkCodes.has(token) || explicitSequentialBaseCodes.has(token)
+      ));
+
       const hasGlobalEndDirective = tokenSet.has("END") && !commands.some((cmd) => cmd.type === "sequential-line");
       if (hasGlobalEndDirective) activeSequences.clear();
 
@@ -2625,7 +2630,7 @@
         activeSequences.delete(baseCode);
       }
 
-      for (const lineCode of pointLineworkCodes) {
+      for (const lineCode of pointImplicitSequenceCodes) {
         if (explicitActions.has(lineCode)) continue;
         if (!activeSequences.has(lineCode)) {
           activeSequences.set(lineCode, { startPointId: point.id, lastPointId: point.id });
