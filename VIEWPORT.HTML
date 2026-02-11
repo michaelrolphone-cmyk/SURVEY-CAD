@@ -345,6 +345,44 @@
       min-height:22px;
       min-width:140px;
     }
+    .quickToolLayer{
+      min-width:220px;
+      justify-content:space-between;
+      gap:8px;
+      padding-right:6px;
+    }
+    .quickToolLayerSwatch{
+      width:12px;
+      height:12px;
+      border-radius:2px;
+      border:1px solid rgba(255,255,255,0.3);
+      flex:0 0 auto;
+    }
+    .quickToolLayerToggles{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+    }
+    .quickToolIconBtn{
+      width:24px;
+      height:24px;
+      border-radius:6px;
+      border:1px solid #2c2c2c;
+      background:#111;
+      color:var(--muted);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:0;
+      font-size:11px;
+    }
+    .quickToolIconBtn.active{
+      color:#ffe7a0;
+      border-color:#5c4b14;
+      background:#201a09;
+    }
+    .layerNameCell{ font-weight:600; }
+    .layerRowLocked{ opacity:0.7; }
     .quickToolField select:focus{ outline:none; }
     .mapBackdrop{
       position:absolute;
@@ -955,6 +993,12 @@
       </div>
       <label class="quickToolField" title="Toggle point code labels"><input id="quickShowPointCodes" type="checkbox" checked /> Codes</label>
       <label class="quickToolField" title="Toggle point notes labels"><input id="quickShowPointNotes" type="checkbox" /> Notes</label>
+      <div class="quickToolField quickToolLayer" title="Active layer">
+        <span id="quickLayerColor" class="quickToolLayerSwatch" aria-hidden="true"></span>
+        <select id="quickLayerSelect" aria-label="Active Layer"></select>
+        <span id="quickLayerToggles" class="quickToolLayerToggles"></span>
+      </div>
+      <button id="quickLayerManager" class="quickToolBtn" title="Layer Manager" aria-label="Layer Manager"><i class="fa-solid fa-layer-group"></i></button>
       <span class="quickToolDivider" aria-hidden="true"></span>
       <button id="quickSelect" class="quickToolBtn primary" title="Select / Move" aria-label="Select / Move"><i class="fa-solid fa-arrow-pointer"></i></button>
       <button id="quickAddPoint" class="quickToolBtn" title="Add Point" aria-label="Add Point"><i class="fa-solid fa-circle-plus"></i></button>
@@ -1046,6 +1090,38 @@
     <div class="modalBody connectLinesModalBody">
       <button id="connectLinesSequential" class="primary">Sequentially</button>
       <button id="connectLinesByDistance">By Distance</button>
+    </div>
+  </div>
+</div>
+
+<div id="layersModal" class="modalOverlay hidden" aria-hidden="true">
+  <div id="layersModalWindow" class="modalWindow">
+    <div id="layersModalHeader" class="modalHeader">
+      <b>Layer Manager</b>
+      <div class="right">
+        <button id="layersAdd" class="cellBtn">Add Layer</button>
+        <button id="layersModalClose" class="cellBtn">Close</button>
+      </div>
+    </div>
+    <div class="modalBody">
+      <div class="tableWrap">
+        <div class="scrollBody">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Color</th>
+                <th>Line Weight</th>
+                <th>Lock</th>
+                <th>Visible</th>
+                <th>Fill</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="layersTbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1523,6 +1599,10 @@
   const showPointNotesInput = $("#showPointNotes");
   const quickShowPointCodesInput = $("#quickShowPointCodes");
   const quickShowPointNotesInput = $("#quickShowPointNotes");
+  const quickLayerSelect = $("#quickLayerSelect");
+  const quickLayerColor = $("#quickLayerColor");
+  const quickLayerToggles = $("#quickLayerToggles");
+  const quickLayerManagerBtn = $("#quickLayerManager");
 
   const hudTool = $("#hudTool");
   const hudMouse = $("#hudMouse");
@@ -1548,13 +1628,22 @@
   const connectLinesModal = $("#connectLinesModal");
   const connectLinesSequentialBtn = $("#connectLinesSequential");
   const connectLinesByDistanceBtn = $("#connectLinesByDistance");
+  const layersModal = $("#layersModal");
+  const layersModalWindow = $("#layersModalWindow");
+  const layersModalHeader = $("#layersModalHeader");
+  const layersModalClose = $("#layersModalClose");
+  const layersAddBtn = $("#layersAdd");
+  const layersTbody = $("#layersTbody");
 
   // -------------------------
   // Model
   // -------------------------
   let nextId = 1;
-  const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable}
-  const lines = new Map();  // id -> {id,a,b,movable}
+  const DEFAULT_LAYER_ID = "layer-1";
+  const layers = new Map(); // id -> {id,name,color,locked,visible,lineWeight,fill}
+  let selectedLayerId = DEFAULT_LAYER_ID;
+  const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable,layerId}
+  const lines = new Map();  // id -> {id,a,b,movable,layerId}
 
   // Selection
   let selectedPointId = null;   // primary point
@@ -1671,6 +1760,77 @@
 
   function isMovable(value) {
     return value === true;
+  }
+
+  function defaultLayerList() {
+    return [
+      { id: DEFAULT_LAYER_ID, name: "Default", color: "#ffffff", locked: false, visible: true, lineWeight: 1.5, fill: false }
+    ];
+  }
+
+  function clampLayerLineWeight(value) {
+    const n = Number(value);
+    return clamp(Number.isFinite(n) ? n : 1.5, 0.5, 12);
+  }
+
+  function sanitizeLayer(raw, fallbackId) {
+    const id = String(raw?.id || fallbackId || `layer-${Date.now()}`);
+    return {
+      id,
+      name: String(raw?.name || id),
+      color: String(raw?.color || "#ffffff"),
+      locked: raw?.locked === true,
+      visible: raw?.visible !== false,
+      lineWeight: clampLayerLineWeight(raw?.lineWeight),
+      fill: raw?.fill === true
+    };
+  }
+
+  function resetLayers(rawLayers = defaultLayerList()) {
+    layers.clear();
+    for (const [index, layer] of rawLayers.entries()) {
+      const sanitized = sanitizeLayer(layer, `layer-${index + 1}`);
+      if (!layers.has(sanitized.id)) layers.set(sanitized.id, sanitized);
+    }
+    if (!layers.size) {
+      const fallback = sanitizeLayer(defaultLayerList()[0], DEFAULT_LAYER_ID);
+      layers.set(fallback.id, fallback);
+    }
+    if (!layers.has(selectedLayerId)) selectedLayerId = layers.keys().next().value;
+    for (const p of points.values()) {
+      if (!layers.has(p.layerId)) p.layerId = selectedLayerId;
+    }
+    for (const ln of lines.values()) {
+      if (!layers.has(ln.layerId)) ln.layerId = selectedLayerId;
+    }
+    renderLayerControls();
+    scheduleLayersTableRender();
+  }
+
+  function getLayerById(layerId) {
+    return layers.get(layerId) || layers.get(DEFAULT_LAYER_ID) || layers.values().next().value || null;
+  }
+
+  function isLayerLocked(layerId) {
+    return getLayerById(layerId)?.locked === true;
+  }
+
+  function isLayerVisible(layerId) {
+    return getLayerById(layerId)?.visible !== false;
+  }
+
+  function isPointLockedByLayer(pointId) {
+    const p = points.get(pointId);
+    return p ? isLayerLocked(p.layerId) : false;
+  }
+
+  function isLineLockedByLayer(lineId) {
+    const ln = lines.get(lineId);
+    return ln ? isLayerLocked(ln.layerId) : false;
+  }
+
+  function activeLayer() {
+    return getLayerById(selectedLayerId);
   }
 
   function scaleToLeafletZoom(scale) {
@@ -1986,6 +2146,8 @@
       nextId,
       points: pts,
       lines: lns,
+      layers: Array.from(layers.values()).map((layer) => ({ ...layer })),
+      selectedLayerId,
       selection: {
         selectedPointId,
         selectedPointIds: [...selectedPointIds],
@@ -2010,14 +2172,17 @@
     points.clear();
     for (const p of (s.points || [])) {
       if (!p || typeof p !== "object" || p.id == null) continue;
-      points.set(p.id, { ...p, movable: isMovable(p.movable) });
+      points.set(p.id, { ...p, movable: isMovable(p.movable), layerId: String(p.layerId || selectedLayerId || DEFAULT_LAYER_ID) });
     }
 
     lines.clear();
     for (const l of (s.lines || [])) {
       if (!l || typeof l !== "object" || l.id == null || l.a == null || l.b == null) continue;
-      lines.set(l.id, { ...l, movable: isMovable(l.movable) });
+      lines.set(l.id, { ...l, movable: isMovable(l.movable), layerId: String(l.layerId || selectedLayerId || DEFAULT_LAYER_ID) });
     }
+
+    resetLayers(Array.isArray(s.layers) ? s.layers : defaultLayerList());
+    selectedLayerId = layers.has(s.selectedLayerId) ? s.selectedLayerId : (layers.keys().next().value || DEFAULT_LAYER_ID);
 
     selectedPointId = s.selection?.selectedPointId ?? null;
     if (selectedPointId != null && !points.has(selectedPointId)) selectedPointId = null;
@@ -2674,14 +2839,14 @@
     if (!ids.length) return 0;
     for (const pid of ids) {
       const p = points.get(pid);
-      if (!p) continue;
+      if (!p || isLayerLocked(p.layerId)) continue;
       p.x += dx;
       p.y += dy;
     }
     return ids.length;
   }
 
-  function addPoint({num, x, y, z=0, code="", notes="", movable=false}) {
+  function addPoint({num, x, y, z=0, code="", notes="", movable=false, layerId = selectedLayerId}) {
     const id = nextId++;
     points.set(id, {
       id,
@@ -2691,22 +2856,24 @@
       z: Number(z),
       code: String(code ?? ""),
       notes: String(notes ?? ""),
-      movable: !!movable
+      movable: !!movable,
+      layerId: layers.has(layerId) ? layerId : (selectedLayerId || DEFAULT_LAYER_ID)
     });
     schedulePointsTableRender();
     updateCounts();
     return id;
   }
 
-  function addLine(aPointId, bPointId, movable=false) {
+  function addLine(aPointId, bPointId, movable=false, layerId = selectedLayerId) {
     const id = nextId++;
-    lines.set(id, { id, a: aPointId, b: bPointId, movable: !!movable });
+    lines.set(id, { id, a: aPointId, b: bPointId, movable: !!movable, layerId: layers.has(layerId) ? layerId : (selectedLayerId || DEFAULT_LAYER_ID) });
     updateCounts();
     return id;
   }
 
   function deletePoint(pid) {
-    if (!points.has(pid)) return;
+    if (!points.has(pid)) return false;
+    if (isPointLockedByLayer(pid)) return false;
     for (const [lid, ln] of Array.from(lines.entries())) {
       if (ln.a === pid || ln.b === pid) lines.delete(lid);
     }
@@ -2718,13 +2885,16 @@
     updatePointEditorFromSelection();
     schedulePointsTableRender();
     updateCounts();
+    return true;
   }
 
   function deleteLine(lid) {
+    if (isLineLockedByLayer(lid)) return false;
     lines.delete(lid);
     selectedLines = selectedLines.filter(s => s.lineId !== lid);
     if (lastSelectedLineId === lid) lastSelectedLineId = null;
     updateCounts();
+    return true;
   }
 
   function getRotatablePointIdsFromSelection() {
@@ -2966,6 +3136,7 @@
     let best = null;
     let bestD2 = thresholdPx*thresholdPx;
     for (const p of points.values()) {
+      if (!isLayerVisible(p.layerId)) continue;
       const s = worldToScreen(p.x, p.y);
       const d2 = dist2(screenX, screenY, s.x, s.y);
       if (d2 <= bestD2) {
@@ -2984,9 +3155,10 @@
     let bestT = 0;
 
     for (const ln of lines.values()) {
+      if (!isLayerVisible(ln.layerId)) continue;
       const pa = points.get(ln.a);
       const pb = points.get(ln.b);
-      if (!pa || !pb) continue;
+      if (!pa || !pb || !isLayerVisible(pa.layerId) || !isLayerVisible(pb.layerId)) continue;
 
       const cp = segmentClosestPoint({x:w.x,y:w.y}, pa, pb);
       const d = dist(w.x, w.y, cp.x, cp.y);
@@ -3118,6 +3290,48 @@
     ctx.restore();
   }
 
+  function buildFillPolygonsForLayer(layerId) {
+    const adjacency = new Map();
+    const addNeighbor = (from, to) => {
+      if (!adjacency.has(from)) adjacency.set(from, []);
+      adjacency.get(from).push(to);
+    };
+
+    for (const ln of lines.values()) {
+      if (ln.layerId !== layerId) continue;
+      if (!isLayerVisible(ln.layerId)) continue;
+      const a = points.get(ln.a);
+      const b = points.get(ln.b);
+      if (!a || !b || !isLayerVisible(a.layerId) || !isLayerVisible(b.layerId)) continue;
+      addNeighbor(ln.a, ln.b);
+      addNeighbor(ln.b, ln.a);
+    }
+
+    const loops = [];
+    const visited = new Set();
+    for (const [start, neighbors] of adjacency.entries()) {
+      if (visited.has(start) || neighbors.length !== 2) continue;
+      const loop = [start];
+      let prev = null;
+      let current = start;
+      let valid = true;
+      while (true) {
+        visited.add(current);
+        const n = adjacency.get(current) || [];
+        if (n.length !== 2) { valid = false; break; }
+        const next = n[0] === prev ? n[1] : n[0];
+        if (next == null) { valid = false; break; }
+        prev = current;
+        current = next;
+        if (current === start) break;
+        if (loop.includes(current)) { valid = false; break; }
+        loop.push(current);
+      }
+      if (valid && loop.length >= 3 && current === start) loops.push(loop);
+    }
+    return loops;
+  }
+
   function drawRotateSelectionPreview() {
     if (!rotateSelectionSession.active || rotateSelectionSession.step < 1 || !rotateSelectionSession.basePoint) return;
 
@@ -3159,6 +3373,28 @@
 
     const blockedTextRects = [];
 
+    // layer fills
+    for (const layer of layers.values()) {
+      if (!layer.fill || layer.visible === false) continue;
+      const loops = buildFillPolygonsForLayer(layer.id);
+      if (!loops.length) continue;
+      ctx.save();
+      ctx.fillStyle = `${layer.color}1A`;
+      for (const loop of loops) {
+        ctx.beginPath();
+        for (let i = 0; i < loop.length; i++) {
+          const point = points.get(loop[i]);
+          if (!point) continue;
+          const sp = worldToScreen(point.x, point.y);
+          if (i === 0) ctx.moveTo(sp.x, sp.y);
+          else ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // lines
     ctx.lineWidth = 1;
     const lineLabelCandidates = [];
@@ -3166,9 +3402,13 @@
       const a = points.get(ln.a);
       const b = points.get(ln.b);
       if (!a || !b) continue;
+      const layer = getLayerById(ln.layerId);
+      if (!layer || layer.visible === false) continue;
+      if (!isLayerVisible(a.layerId) || !isLayerVisible(b.layerId)) continue;
       const sa = worldToScreen(a.x,a.y);
       const sb = worldToScreen(b.x,b.y);
-      ctx.strokeStyle = isMovable(ln.movable) ? "#800000" : "#fff";
+      ctx.strokeStyle = isMovable(ln.movable) ? "#800000" : layer.color;
+      ctx.lineWidth = Math.max(0.5, layer.lineWeight);
       ctx.beginPath();
       ctx.moveTo(sa.x, sa.y);
       ctx.lineTo(sb.x, sb.y);
@@ -3221,10 +3461,12 @@
 
     // points
     for (const p of points.values()) {
+      if (!isLayerVisible(p.layerId)) continue;
+      const layer = getLayerById(p.layerId);
       const sp = worldToScreen(p.x,p.y);
 
       // marker
-      ctx.strokeStyle = "#ff2b2b";
+      ctx.strokeStyle = layer?.color || "#ff2b2b";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(sp.x-5, sp.y-5);
@@ -3564,6 +3806,7 @@
     applyMapOpacity();
   });
 
+  resetLayers();
   setPointCodeVisibility(true);
   setPointNotesVisibility(false);
   if (quickMapEnabledInput) quickMapEnabledInput.checked = mapEnabledInput.checked;
@@ -3614,6 +3857,21 @@
   $("#quickOffsetLine")?.addEventListener("click", () => $("#offsetSelectedLine")?.click());
   $("#quickRotateSelection")?.addEventListener("click", () => startRotateSelectionSession());
   $("#quickPointManager")?.addEventListener("click", () => openPointsManagerBtn?.click());
+
+  quickLayerSelect?.addEventListener("change", () => {
+    if (layers.has(quickLayerSelect.value)) selectedLayerId = quickLayerSelect.value;
+    renderLayerControls();
+  });
+  quickLayerManagerBtn?.addEventListener("click", () => openLayersModal());
+  layersModalClose?.addEventListener("click", () => closeLayersModal());
+  layersModal?.addEventListener("mousedown", (e) => { if (e.target === layersModal) closeLayersModal(); });
+  layersAddBtn?.addEventListener("click", () => {
+    const id = `layer-${Date.now()}`;
+    layers.set(id, sanitizeLayer({ id, name: `Layer ${layers.size + 1}`, color: "#00a6ff", lineWeight: 1.5 }, id));
+    selectedLayerId = id;
+    renderLayerControls();
+    renderLayersTable();
+  });
 
   $("#zoomExtents").addEventListener("click", () => zoomExtents());
 
@@ -3747,10 +4005,21 @@
 
     clearSelection();
 
-    for (const pid of pointIds) deletePoint(pid);
-    for (const lid of lineIds) if (lines.has(lid)) deleteLine(lid);
+    let deletedPoints = 0;
+    let deletedLines = 0;
+    let lockedSkipped = 0;
+    for (const pid of pointIds) {
+      if (deletePoint(pid)) deletedPoints++;
+      else lockedSkipped++;
+    }
+    for (const lid of lineIds) {
+      if (!lines.has(lid)) continue;
+      if (deleteLine(lid)) deletedLines++;
+      else lockedSkipped++;
+    }
 
-    setStatus(`Deleted ${pointIds.length} point(s) and ${lineIds.length} line(s) (where applicable).`, "warn");
+    const lockSuffix = lockedSkipped ? ` (${lockedSkipped} locked item(s) skipped)` : "";
+    setStatus(`Deleted ${deletedPoints} point(s) and ${deletedLines} line(s).${lockSuffix}`, lockedSkipped ? "warn" : "ok");
   }
 
   $("#focusSelected").addEventListener("click", () => {
@@ -4713,6 +4982,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       btnMov.textContent = isMovable(p.movable) ? "Lock" : "Unlock";
       btnMov.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
+        if (isLayerLocked(p.layerId)) { setStatus(`Layer ${getLayerById(p.layerId)?.name || p.layerId} is locked.`, "warn"); return; }
         history.push("toggle point movable");
         p.movable = !isMovable(p.movable);
         schedulePointsTableRender();
@@ -4725,6 +4995,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       btnDel.textContent = "Delete";
       btnDel.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
+        if (isLayerLocked(p.layerId)) { setStatus(`Layer ${getLayerById(p.layerId)?.name || p.layerId} is locked.`, "warn"); return; }
         history.push("delete point");
         deletePoint(p.id);
         setStatus(`Deleted point ${p.num}.`, "warn");
@@ -4769,6 +5040,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     const field = inp.dataset.field;
     const p = points.get(pid);
     if (!p) return;
+    if (isLayerLocked(p.layerId)) {
+      inp.classList.add("bad");
+      setStatus(`Layer ${getLayerById(p.layerId)?.name || p.layerId} is locked.`, "warn");
+      return;
+    }
 
     pushTableEditHistoryOnce();
 
@@ -5134,6 +5410,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
     const active = s.bSel;
     const ln = lines.get(active.lineId);
+    if (isLineLockedByLayer(active.lineId)) { setStatus("Layer is locked; line edits are blocked.", "warn"); return; }
     const A = points.get(ln.a), B = points.get(ln.b);
     if (!A || !B) return;
     const hitT = pointOnLineParam({x:hit.x, y:hit.y}, A, B);
@@ -5182,6 +5459,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
     const active = s.bSel;
     const ln = lines.get(active.lineId);
+    if (isLineLockedByLayer(active.lineId)) { setStatus("Layer is locked; line edits are blocked.", "warn"); return; }
     const pA = points.get(ln.a), pB = points.get(ln.b);
     if (!pA || !pB) return;
 
@@ -5229,6 +5507,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       return;
     }
     const ln = lines.get(lastSelectedLineId);
+    if (isLineLockedByLayer(lastSelectedLineId)) { setStatus("Layer is locked; line edits are blocked.", "warn"); return; }
     const pa = points.get(ln.a), pb = points.get(ln.b);
     if (!pa || !pb) return;
 
@@ -5278,6 +5557,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       setStatus("Select a line first.", "warn");
       return;
     }
+    if (isLineLockedByLayer(lastSelectedLineId)) { setStatus("Layer is locked; line edits are blocked.", "warn"); return; }
     history.push("swap line ends");
     const ln = lines.get(lastSelectedLineId);
     const tmp = ln.a; ln.a = ln.b; ln.b = tmp;
@@ -5420,6 +5700,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
     if (pid) {
+      if (isPointLockedByLayer(pid)) { setStatus("Layer is locked; point edits are blocked.", "warn"); return; }
       history.push("toggle point movable");
       const p = points.get(pid);
       p.movable = !isMovable(p.movable);
@@ -5429,6 +5710,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       return;
     }
     if (lpick) {
+      if (isLineLockedByLayer(lpick.lineId)) { setStatus("Layer is locked; line edits are blocked.", "warn"); return; }
       history.push("toggle line movable");
       const ln = lines.get(lpick.lineId);
       ln.movable = !isMovable(ln.movable);
@@ -5470,7 +5752,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         }
 
         const p = points.get(pid);
-        if (selectedPointId === pid && isMovable(p?.movable)) {
+        if (selectedPointId === pid && isMovable(p?.movable) && !isPointLockedByLayer(pid)) {
           history.push("move point");
           beginDrag({type:"point", id: pid, _moved:false});
         }
@@ -5510,7 +5792,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         }
 
         const ln = lines.get(lpick.lineId);
-        if (isMovable(ln?.movable)) {
+        if (isMovable(ln?.movable) && !isLineLockedByLayer(lpick.lineId)) {
           history.push("move line");
           beginDrag({type:"line", id: lpick.lineId, _moved:false});
         }
@@ -5955,6 +6237,152 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     view.panX = mouse.x - before.x * view.scale;
     view.panY = mouse.y + before.y * view.scale;
   }, {passive:false});
+
+  let layersTableDirty = true;
+
+  function scheduleLayersTableRender() {
+    layersTableDirty = true;
+    if (!layersModal || layersModal.classList.contains("hidden")) return;
+    renderLayersTable();
+  }
+
+  function renderLayerControls() {
+    if (!quickLayerSelect) return;
+    const previous = selectedLayerId;
+    quickLayerSelect.innerHTML = "";
+    for (const layer of layers.values()) {
+      const option = document.createElement("option");
+      option.value = layer.id;
+      option.textContent = layer.name;
+      quickLayerSelect.appendChild(option);
+    }
+    if (!layers.has(previous)) selectedLayerId = layers.keys().next().value;
+    quickLayerSelect.value = selectedLayerId;
+    const selectedLayer = activeLayer();
+    if (quickLayerColor && selectedLayer) quickLayerColor.style.background = selectedLayer.color;
+    if (quickLayerToggles && selectedLayer) {
+      quickLayerToggles.innerHTML = "";
+      const toggles = [
+        { key: "locked", icon: "fa-lock", offIcon: "fa-lock-open", title: "Toggle lock" },
+        { key: "visible", icon: "fa-eye", offIcon: "fa-eye-slash", title: "Toggle visibility" },
+        { key: "fill", icon: "fa-fill-drip", offIcon: "fa-fill-drip", title: "Toggle polygon fill" }
+      ];
+      for (const toggle of toggles) {
+        const enabled = toggle.key === "visible" ? selectedLayer.visible !== false : selectedLayer[toggle.key] === true;
+        const btn = document.createElement("button");
+        btn.className = `quickToolIconBtn${enabled ? " active" : ""}`;
+        btn.title = `${toggle.title} (${selectedLayer.name})`;
+        btn.innerHTML = `<i class="fa-solid ${enabled ? toggle.icon : toggle.offIcon}"></i>`;
+        btn.addEventListener("click", () => {
+          if (toggle.key === "visible") selectedLayer.visible = !(selectedLayer.visible !== false);
+          else selectedLayer[toggle.key] = !selectedLayer[toggle.key];
+          renderLayerControls();
+          scheduleLayersTableRender();
+          setStatus(`Layer ${selectedLayer.name}: ${toggle.key} ${selectedLayer[toggle.key] === true || (toggle.key === "visible" && selectedLayer.visible !== false) ? "on" : "off"}.`, "ok");
+        });
+        quickLayerToggles.appendChild(btn);
+      }
+    }
+  }
+
+  function renderLayersTable() {
+    if (!layersTbody) return;
+    layersTbody.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    for (const layer of layers.values()) {
+      const tr = document.createElement("tr");
+      if (layer.locked) tr.classList.add("layerRowLocked");
+
+      const nameTd = document.createElement("td");
+      const nameInput = document.createElement("input");
+      nameInput.className = "cellInput layerNameCell";
+      nameInput.value = layer.name;
+      nameInput.addEventListener("input", () => { layer.name = String(nameInput.value || "").trim() || layer.id; renderLayerControls(); });
+      nameTd.appendChild(nameInput);
+
+      const colorTd = document.createElement("td");
+      const colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.value = layer.color;
+      colorInput.addEventListener("input", () => { layer.color = colorInput.value; renderLayerControls(); });
+      colorTd.appendChild(colorInput);
+
+      const lwTd = document.createElement("td");
+      const lwInput = document.createElement("input");
+      lwInput.className = "cellInput";
+      lwInput.type = "number";
+      lwInput.min = "0.5";
+      lwInput.max = "12";
+      lwInput.step = "0.25";
+      lwInput.value = String(layer.lineWeight);
+      lwInput.addEventListener("input", () => { layer.lineWeight = clampLayerLineWeight(lwInput.value); });
+      lwTd.appendChild(lwInput);
+
+      const mkToggleTd = (key) => {
+        const td = document.createElement("td");
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.checked = key === "visible" ? layer.visible !== false : layer[key] === true;
+        chk.addEventListener("change", () => {
+          if (key === "visible") layer.visible = chk.checked;
+          else layer[key] = chk.checked;
+          renderLayerControls();
+          scheduleLayersTableRender();
+        });
+        td.appendChild(chk);
+        return td;
+      };
+
+      const actTd = document.createElement("td");
+      const useBtn = document.createElement("button");
+      useBtn.className = "cellBtn";
+      useBtn.textContent = "Use";
+      useBtn.addEventListener("click", () => { selectedLayerId = layer.id; renderLayerControls(); });
+      actTd.appendChild(useBtn);
+
+      if (layer.id !== DEFAULT_LAYER_ID) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "cellBtn danger";
+        delBtn.style.marginLeft = "8px";
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener("click", () => {
+          for (const p of points.values()) if (p.layerId === layer.id) p.layerId = DEFAULT_LAYER_ID;
+          for (const ln of lines.values()) if (ln.layerId === layer.id) ln.layerId = DEFAULT_LAYER_ID;
+          layers.delete(layer.id);
+          if (selectedLayerId === layer.id) selectedLayerId = DEFAULT_LAYER_ID;
+          renderLayerControls();
+          scheduleLayersTableRender();
+        });
+        actTd.appendChild(delBtn);
+      }
+
+      tr.append(nameTd, colorTd, lwTd, mkToggleTd("locked"), mkToggleTd("visible"), mkToggleTd("fill"), actTd);
+      frag.appendChild(tr);
+    }
+    layersTbody.appendChild(frag);
+    layersTableDirty = false;
+  }
+
+  function openLayersModal() {
+    if (!layersModal) return;
+    layersModal.classList.remove("hidden");
+    layersModal.setAttribute("aria-hidden", "false");
+    if (layersModalWindow && (!layersModalWindow.style.left || !layersModalWindow.style.top)) {
+      const w = Math.min(window.innerWidth - 36, 920);
+      const h = Math.min(window.innerHeight - 36, 520);
+      layersModalWindow.style.width = `${w}px`;
+      layersModalWindow.style.height = `${h}px`;
+      layersModalWindow.style.left = `${Math.max(18, (window.innerWidth - w) / 2)}px`;
+      layersModalWindow.style.top = `${Math.max(18, (window.innerHeight - h) / 2)}px`;
+    }
+    renderLayersTable();
+  }
+
+  function closeLayersModal() {
+    if (!layersModal) return;
+    layersModal.classList.add("hidden");
+    layersModal.setAttribute("aria-hidden", "true");
+  }
 
   // -------------------------
   // Counts / tool hint enrichment
