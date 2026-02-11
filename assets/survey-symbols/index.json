@@ -1,0 +1,185 @@
+{
+  "viewBox": "0 0 100 100",
+  "symbols": [
+    {
+      "id": "aluminum-cap",
+      "file": "aluminum-cap.svg",
+      "code": "ALUMINUM_CAP"
+    },
+    {
+      "id": "benchmark",
+      "file": "benchmark.svg",
+      "code": "BENCHMARK"
+    },
+    {
+      "id": "brass-cap",
+      "file": "brass-cap.svg",
+      "code": "BRASS_CAP"
+    },
+    {
+      "id": "catch-basin",
+      "file": "catch-basin.svg",
+      "code": "CATCH_BASIN"
+    },
+    {
+      "id": "centerline-monument",
+      "file": "centerline-monument.svg",
+      "code": "CENTERLINE_MONUMENT"
+    },
+    {
+      "id": "control-point-triangle-in-circle",
+      "file": "control-point-triangle-in-circle.svg",
+      "code": "CONTROL_POINT_TRIANGLE_IN_CIRCLE"
+    },
+    {
+      "id": "control-point-triangle-in-square",
+      "file": "control-point-triangle-in-square.svg",
+      "code": "CONTROL_POINT_TRIANGLE_IN_SQUARE"
+    },
+    {
+      "id": "control-point-triangle",
+      "file": "control-point-triangle.svg",
+      "code": "CONTROL_POINT_TRIANGLE"
+    },
+    {
+      "id": "coper-cap",
+      "file": "coper-cap.svg",
+      "code": "COPER_CAP"
+    },
+    {
+      "id": "copper-cap",
+      "file": "copper-cap.svg",
+      "code": "COPPER_CAP"
+    },
+    {
+      "id": "edge-of-pavement",
+      "file": "edge-of-pavement.svg",
+      "code": "EDGE_OF_PAVEMENT"
+    },
+    {
+      "id": "electric-meter",
+      "file": "electric-meter.svg",
+      "code": "ELECTRIC_METER"
+    },
+    {
+      "id": "fence-corner",
+      "file": "fence-corner.svg",
+      "code": "FENCE_CORNER"
+    },
+    {
+      "id": "fire-hydrant",
+      "file": "fire-hydrant.svg",
+      "code": "FIRE_HYDRANT"
+    },
+    {
+      "id": "gas-meter",
+      "file": "gas-meter.svg",
+      "code": "GAS_METER"
+    },
+    {
+      "id": "light-pole",
+      "file": "light-pole.svg",
+      "code": "LIGHT_POLE"
+    },
+    {
+      "id": "monument-set",
+      "file": "monument-set.svg",
+      "code": "MONUMENT_SET"
+    },
+    {
+      "id": "monument",
+      "file": "monument.svg",
+      "code": "MONUMENT"
+    },
+    {
+      "id": "nail-set",
+      "file": "nail-set.svg",
+      "code": "NAIL_SET"
+    },
+    {
+      "id": "power-pole",
+      "file": "power-pole.svg",
+      "code": "POWER_POLE"
+    },
+    {
+      "id": "property-pin-found",
+      "file": "property-pin-found.svg",
+      "code": "PROPERTY_PIN_FOUND"
+    },
+    {
+      "id": "property-pin",
+      "file": "property-pin.svg",
+      "code": "PROPERTY_PIN"
+    },
+    {
+      "id": "sanitary-manhole",
+      "file": "sanitary-manhole.svg",
+      "code": "SANITARY_MANHOLE"
+    },
+    {
+      "id": "sewer-manhole",
+      "file": "sewer-manhole.svg",
+      "code": "SEWER_MANHOLE"
+    },
+    {
+      "id": "sign-double-post",
+      "file": "sign-double-post.svg",
+      "code": "SIGN_DOUBLE_POST"
+    },
+    {
+      "id": "sign-single-post",
+      "file": "sign-single-post.svg",
+      "code": "SIGN_SINGLE_POST"
+    },
+    {
+      "id": "storm-manhole",
+      "file": "storm-manhole.svg",
+      "code": "STORM_MANHOLE"
+    },
+    {
+      "id": "telecom-manhole",
+      "file": "telecom-manhole.svg",
+      "code": "TELECOM_MANHOLE"
+    },
+    {
+      "id": "tree-conifer",
+      "file": "tree-conifer.svg",
+      "code": "TREE_CONIFER"
+    },
+    {
+      "id": "tree-deciduous",
+      "file": "tree-deciduous.svg",
+      "code": "TREE_DECIDUOUS"
+    },
+    {
+      "id": "utility-pole-guy",
+      "file": "utility-pole-guy.svg",
+      "code": "UTILITY_POLE_GUY"
+    },
+    {
+      "id": "valve-gas",
+      "file": "valve-gas.svg",
+      "code": "VALVE_GAS"
+    },
+    {
+      "id": "valve-water",
+      "file": "valve-water.svg",
+      "code": "VALVE_WATER"
+    },
+    {
+      "id": "vault-electric",
+      "file": "vault-electric.svg",
+      "code": "VAULT_ELECTRIC"
+    },
+    {
+      "id": "vault-telecom",
+      "file": "vault-telecom.svg",
+      "code": "VAULT_TELECOM"
+    },
+    {
+      "id": "water-meter",
+      "file": "water-meter.svg",
+      "code": "WATER_METER"
+    }
+  ]
+}

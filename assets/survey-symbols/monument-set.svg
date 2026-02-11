@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Monument Set</title>
+  <desc id="desc">Survey symbol for Monument Set.</desc>
+  <polygon points="50,14 86,50 50,86 14,50" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><line x1="50" y1="20" x2="50" y2="80" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><line x1="20" y1="50" x2="80" y2="50" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Gas Meter</title>
+  <desc id="desc">Survey symbol for Gas Meter.</desc>
+  <rect x="20" y="20" width="60" height="60" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><text x="50" y="56" text-anchor="middle" font-family="Arial" font-size="20" fill="#111">GM</text>
+</svg>
