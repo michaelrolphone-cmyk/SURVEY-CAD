@@ -78,6 +78,8 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Response: same schema as CLI `fld-config` (`versionTag`, `columns`, `rules`, `rulesByCode`).
 - Current LineSmith behavior: it treats `entityType === "2"` + `processingOn === true` as linework codes and `entityType === "0"` + `processingOn === true` as symbol codes.
 - Companion-code sequencing: for active linework rules, LineSmith also honors each rule's `companionCodes` list during sequential connectivity (for example, `WL` can continue through `WM` points when `WM` is configured as a companion code for `WL`, while `WM` remains a symbol code on its own).
+- Layer assignment during point parsing: when an imported point code matches an FLD rule that defines `layer`, LineSmith now auto-assigns the point to that named drawing layer and creates the layer on-the-fly if it does not exist yet.
+- API/CLI surface impact: no new endpoints or commands were introduced for this behavior; use existing `GET /api/fld-config` and existing CLI entrypoints (`npm run cli`, `npm run ros:cli`).
 
 
 ## LineSmith Layer Controls
