@@ -2460,6 +2460,91 @@
     return byNum;
   }
 
+
+  function getNormalizedLineKey(aPointId, bPointId) {
+    const a = Number(aPointId);
+    const b = Number(bPointId);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return "";
+    return a < b ? `${a}:${b}` : `${b}:${a}`;
+  }
+
+  function buildExpectedJpnLineCommands() {
+    const byNum = buildPointIdByNumberMap();
+    const commands = [];
+    const seen = new Set();
+    for (const sourcePoint of points.values()) {
+      const targets = extractJpnTargetPointNumbers(sourcePoint.code);
+      for (const targetNum of targets) {
+        const targetPointId = byNum.get(String(targetNum));
+        if (!targetPointId || targetPointId === sourcePoint.id) continue;
+        const key = getNormalizedLineKey(sourcePoint.id, targetPointId);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        commands.push({ a: sourcePoint.id, b: targetPointId, type: "jpn" });
+      }
+    }
+    return commands;
+  }
+
+  function createAutoFieldToFinishLine(aPointId, bPointId, lineType = "sequential") {
+    const lineId = addLine(aPointId, bPointId, false);
+    const line = lines.get(lineId);
+    if (line) {
+      line.generatedBy = "field-to-finish";
+      line.fieldToFinishType = lineType;
+    }
+    return lineId;
+  }
+
+  function ensureLegacyAutoFieldToFinishLineMetadata() {
+    const expectedKeys = new Set();
+    for (const cmd of buildExpectedJpnLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
+    for (const cmd of buildFieldToFinishSequentialLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
+    for (const ln of lines.values()) {
+      if (ln.generatedBy === "field-to-finish") continue;
+      if (isMovable(ln.movable)) continue;
+      const key = getNormalizedLineKey(ln.a, ln.b);
+      if (!key || !expectedKeys.has(key)) continue;
+      ln.generatedBy = "field-to-finish";
+      ln.fieldToFinishType = "legacy";
+    }
+  }
+
+  function syncFieldToFinishLinework() {
+    const expected = new Map();
+    for (const cmd of buildExpectedJpnLineCommands()) {
+      const key = getNormalizedLineKey(cmd.a, cmd.b);
+      if (key) expected.set(key, { ...cmd });
+    }
+    for (const cmd of buildFieldToFinishSequentialLineCommands()) {
+      const key = getNormalizedLineKey(cmd.a, cmd.b);
+      if (!key || expected.has(key)) continue;
+      expected.set(key, { ...cmd, type: "sequential" });
+    }
+
+    let removed = 0;
+    for (const [lineId, ln] of Array.from(lines.entries())) {
+      if (ln.generatedBy !== "field-to-finish") continue;
+      const key = getNormalizedLineKey(ln.a, ln.b);
+      if (key && expected.has(key)) continue;
+      lines.delete(lineId);
+      removed++;
+    }
+
+    let addedJpn = 0;
+    let addedSequential = 0;
+    for (const cmd of expected.values()) {
+      if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
+      if (arePointsDirectlyConnected(cmd.a, cmd.b)) continue;
+      createAutoFieldToFinishLine(cmd.a, cmd.b, cmd.type === "jpn" ? "jpn" : "sequential");
+      if (cmd.type === "jpn") addedJpn++;
+      else addedSequential++;
+    }
+
+    updateCounts();
+    return { addedJpn, addedSequential, removed };
+  }
+
   function buildFieldToFinishSequentialLineCommands() {
     const pointsInOrder = [...points.values()].sort((a, b) => {
       const aNum = Number(a.num);
@@ -2475,10 +2560,6 @@
       const tokenSet = new Set(tokensUpper);
       const lineworkCodes = fieldToFinishRuleState.lineworkCodes;
       const pointLineworkCodes = [...tokenSet].filter((token) => lineworkCodes.has(token));
-
-      for (const baseCode of [...activeSequences.keys()]) {
-        if (!tokenSet.has(baseCode)) activeSequences.delete(baseCode);
-      }
 
       const explicitActions = new Set();
       for (const cmd of commands) {
@@ -2502,6 +2583,17 @@
         activeSequences.delete(baseCode);
       }
 
+      const hasGlobalEndDirective = tokenSet.has("END") && !commands.some((cmd) => cmd.type === "sequential-line");
+      if (hasGlobalEndDirective) activeSequences.clear();
+
+      // Maintain sequence continuity for normal linework codes even when a point
+      // also carries join directives (e.g. "FNL JPN131 ...").
+      for (const baseCode of [...activeSequences.keys()]) {
+        if (explicitActions.has(baseCode)) continue;
+        if (pointLineworkCodes.includes(baseCode)) continue;
+        activeSequences.delete(baseCode);
+      }
+
       for (const lineCode of pointLineworkCodes) {
         if (explicitActions.has(lineCode)) continue;
         if (!activeSequences.has(lineCode)) {
@@ -2522,56 +2614,23 @@
   }
 
   function connectFieldToFinishSequentialLines() {
-    const lineCommands = buildFieldToFinishSequentialLineCommands();
-    let created = 0;
-    for (const cmd of lineCommands) {
-      if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
-      if (arePointsDirectlyConnected(cmd.a, cmd.b)) continue;
-      addLine(cmd.a, cmd.b, false);
-      created++;
-    }
-    return created;
+    const { addedSequential } = syncFieldToFinishLinework();
+    return addedSequential;
   }
 
   function connectJpnReferencedPoints() {
-    const byNum = buildPointIdByNumberMap();
-
-    let created = 0;
-    for (const sourcePoint of points.values()) {
-      const targets = extractJpnTargetPointNumbers(sourcePoint.code);
-      for (const targetNum of targets) {
-        const targetPointId = byNum.get(String(targetNum));
-        if (!targetPointId || targetPointId === sourcePoint.id) continue;
-        if (arePointsDirectlyConnected(sourcePoint.id, targetPointId)) continue;
-        addLine(sourcePoint.id, targetPointId, false);
-        created++;
-      }
-    }
-    return created;
+    const { addedJpn } = syncFieldToFinishLinework();
+    return addedJpn;
   }
 
-  function connectJpnReferencedPointsForSource(sourcePointId) {
-    const sourcePoint = points.get(sourcePointId);
-    if (!sourcePoint) return 0;
-
-    const byNum = buildPointIdByNumberMap();
-
-    let created = 0;
-    const targets = extractJpnTargetPointNumbers(sourcePoint.code);
-    for (const targetNum of targets) {
-      const targetPointId = byNum.get(String(targetNum));
-      if (!targetPointId || targetPointId === sourcePoint.id) continue;
-      if (arePointsDirectlyConnected(sourcePoint.id, targetPointId)) continue;
-      addLine(sourcePoint.id, targetPointId, false);
-      created++;
-    }
-    return created;
+  function connectJpnReferencedPointsForSource(_sourcePointId) {
+    const { addedJpn } = syncFieldToFinishLinework();
+    return addedJpn;
   }
 
   function connectFieldToFinishLinework() {
-    const jpnLinesAdded = connectJpnReferencedPoints();
-    const sequentialLinesAdded = connectFieldToFinishSequentialLines();
-    return { jpnLinesAdded, sequentialLinesAdded };
+    const { addedJpn, addedSequential } = syncFieldToFinishLinework();
+    return { jpnLinesAdded: addedJpn, sequentialLinesAdded: addedSequential };
   }
 
   function moveSelectionByDelta(dx, dy) {
@@ -4708,11 +4767,10 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         if (field === "notes") $("#ptNotes").value = p.notes;
       }
       if (field === "code") {
-        const jpnLinesAdded = connectJpnReferencedPointsForSource(pid);
-        const sequentialLinesAdded = connectFieldToFinishSequentialLines();
-        if (jpnLinesAdded > 0 || sequentialLinesAdded > 0) {
-          schedulePointsTableRender();
-          setStatus(`Auto-connected ${jpnLinesAdded} JPN line${jpnLinesAdded === 1 ? "" : "s"} and ${sequentialLinesAdded} field-to-finish sequential line${sequentialLinesAdded === 1 ? "" : "s"} for point ${p.num}.`, "ok");
+        ensureLegacyAutoFieldToFinishLineMetadata();
+        const { addedJpn, addedSequential, removed } = syncFieldToFinishLinework();
+        if (addedJpn > 0 || addedSequential > 0 || removed > 0) {
+          setStatus(`Auto-updated linework for point ${p.num}: +${addedJpn} JPN, +${addedSequential} sequential, -${removed} removed.`, "ok");
         }
       }
       return;
