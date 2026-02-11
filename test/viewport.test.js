@@ -200,6 +200,10 @@ test('VIEWPORT.HTML exposes map backdrop controls with expected defaults and wir
   assert.match(html, /function\s+zoomExtents\(options\s*=\s*\{\}\)/, 'zoom extents helper should accept options for silent and history-safe recentering');
   assert.match(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*if \(mapLayerState\.enabled\) \{[\s\S]*ensureMapLayer\(\);[\s\S]*mapBackdrop\.classList\.toggle\("on", mapLayerState\.enabled\);[\s\S]*syncMapToView\(true\);/, 'enabling map layer should initialize Leaflet and sync to the current drawing viewport');
   assert.doesNotMatch(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*zoomExtents\(\{ skipHistory: true, silent: true \}\);/, 'enabling map layer should not force a zoom-extents recenter');
+  assert.match(html, /satellite:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*22/, 'satellite tiles should allow overzooming beyond native coverage');
+  assert.match(html, /osmStandard:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*22/, 'OSM standard tiles should allow overzooming beyond native coverage');
+  assert.match(html, /osmHumanitarian:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*22/, 'OSM humanitarian tiles should allow overzooming beyond native coverage');
+  assert.match(html, /osmCycle:[\s\S]*maxNativeZoom:\s*17,[\s\S]*maxZoom:\s*20/, 'OpenTopoMap tiles should overzoom from their lower native max zoom');
 });
 
 
