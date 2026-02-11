@@ -9,9 +9,10 @@ function createMockServer(options = {}) {
     addressAlwaysMiss = false,
     failProjectedRefetch = false,
     utilities404 = false,
+    estimateCalculate404 = false,
   } = options;
   const requests = [];
-  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null };
+  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBody: null };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
@@ -31,6 +32,39 @@ function createMockServer(options = {}) {
       return;
     }
 
+
+    if (url.pathname === '/serviceEstimator/api/EstimateDetail/Calculate') {
+      if (estimateCalculate404) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'not found' }));
+        return;
+      }
+      const form = new URLSearchParams();
+      req.on('data', (chunk) => form.append('__chunk', chunk.toString()));
+      req.on('end', () => {
+        const raw = form.getAll('__chunk').join('');
+        const body = new URLSearchParams(raw);
+        headers.estimateCalculateBody = raw;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          estimateDetail: {
+            estimateDetailId: 88,
+            feederId: body.get('feederId') || 'GARY15',
+            beginLongitude: Number(body.get('beginLongitude')),
+            beginLatitude: Number(body.get('beginLatitude')),
+          },
+          transformers: [{
+            id: 'tx-1',
+            provider: 'Idaho Power',
+            name: 'Transformer 1',
+            longitude: Number(body.get('beginLongitude')),
+            latitude: Number(body.get('beginLatitude')),
+          }],
+        }));
+      });
+      return;
+    }
 
     if (url.pathname === '/idaho-power/utilities') {
       if (utilities404) {
@@ -446,13 +480,13 @@ test('loadSubdivisionAtPoint falls back to WGS84 geometry when projected refetch
 });
 
 
-test('lookupUtilitiesByAddress normalizes Idaho Power utility payload and projects to export SR', async () => {
-  const { server, port } = await createMockServer();
+test('lookupUtilitiesByAddress uses Idaho Power EstimateDetail Calculate API and projects utility geometry', async () => {
+  const { server, port, headers } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
   const client = new SurveyCadClient({
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
     nominatimUrl: `${base}/geocode`,
-    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
   });
 
@@ -466,22 +500,31 @@ test('lookupUtilitiesByAddress normalizes Idaho Power utility payload and projec
       north: 1000043.61,
       spatialReference: { wkid: 2243 },
     });
+
+    const form = new URLSearchParams(headers.estimateCalculateBody || '');
+    assert.equal(form.get('phaseId'), '3');
+    assert.equal(form.get('primaryVoltageId'), '4');
+    assert.equal(form.get('serviceEstimateCustomerTypeId'), '1');
+    assert.equal(form.get('serviceEstimateServiceTypeId'), '1');
+    assert.equal(form.get('beginLongitude'), '-116.2');
+    assert.equal(form.get('beginLatitude'), '43.61');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
 test('lookupUtilitiesByAddress returns [] when utility provider endpoint is unavailable', async () => {
-  const { server, port, requests } = await createMockServer({ utilities404: true });
+  const { server, port, requests } = await createMockServer({ estimateCalculate404: true });
   const base = `http://127.0.0.1:${port}`;
   const client = new SurveyCadClient({
-    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+    nominatimUrl: `${base}/geocode`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
   });
 
   try {
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     assert.deepEqual(utilities, []);
-    assert.ok(requests.some((requestPath) => requestPath.includes('/idaho-power/utilities')));
+    assert.ok(requests.some((requestPath) => requestPath.includes('/serviceEstimator/api/EstimateDetail/Calculate')));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

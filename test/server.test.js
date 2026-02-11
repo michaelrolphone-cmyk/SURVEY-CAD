@@ -5,7 +5,7 @@ import { createSurveyServer } from '../src/server.js';
 import SurveyCadClient from '../src/survey-api.js';
 
 function createMockServer(options = {}) {
-  const { utilities404 = false } = options;
+  const { utilities404 = false, estimateCalculate404 = false } = options;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
@@ -79,6 +79,32 @@ function createMockServer(options = {}) {
       return;
     }
 
+    if (url.pathname === '/serviceEstimator/api/EstimateDetail/Calculate') {
+      if (estimateCalculate404) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'not found' }));
+        return;
+      }
+      const chunks = [];
+      req.on('data', (chunk) => chunks.push(chunk));
+      req.on('end', () => {
+        const form = new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          transformers: [{
+            id: 'tx-1',
+            provider: 'Idaho Power',
+            name: 'Boise Service Utility',
+            longitude: Number(form.get('beginLongitude')),
+            latitude: Number(form.get('beginLatitude')),
+          }],
+        }));
+      });
+      return;
+    }
+
+
     if (url.pathname === '/idaho-power/utilities') {
       if (utilities404) {
         res.statusCode = 404;
@@ -138,7 +164,7 @@ test('server exposes survey APIs and static html', async () => {
     nominatimUrl: `${base}/geocode`,
     blmFirstDivisionLayer: `${base}/blm1`,
     blmSecondDivisionLayer: `${base}/blm2`,
-    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
   });
   const app = await startApiServer(client);
@@ -247,10 +273,10 @@ test('server exposes survey APIs and static html', async () => {
 });
 
 test('server returns empty utility payload when upstream utility endpoint is unavailable', async () => {
-  const upstream = await createMockServer({ utilities404: true });
+  const upstream = await createMockServer({ estimateCalculate404: true });
   const base = `http://127.0.0.1:${upstream.port}`;
   const client = new SurveyCadClient({
-    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
   });
   const app = await startApiServer(client);
 
