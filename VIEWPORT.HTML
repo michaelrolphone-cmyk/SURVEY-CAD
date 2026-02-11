@@ -2924,6 +2924,33 @@
     return `layer-ftf-${base || Date.now()}`;
   }
 
+  const fieldToFinishStandardLayerColorRules = [
+    { pattern: /\bwater\b|\bpotable\b|\birrigation\b/i, color: "#007bff" },
+    { pattern: /\bgas\b|\bnatural\s*gas\b/i, color: "#ffd400" },
+    { pattern: /\bsewer\b|\bsanitary\b|\bwaste\b/i, color: "#00a651" },
+    { pattern: /\bpower\b|\belectric\b|\bprimary\b|\bsecondary\b/i, color: "#ff3b30" },
+    { pattern: /\bstorm\b|\bdrain\b/i, color: "#00c2ff" },
+    { pattern: /\btelecom\b|\bphone\b|\bfiber\b|\bcommunication\b/i, color: "#ff8c00" }
+  ];
+
+  const fieldToFinishHighVisibilityPalette = [
+    "#ff2d55", "#00c7ff", "#ffd60a", "#39ff14", "#bf5af2", "#ff9f0a", "#64d2ff", "#ff375f", "#30d158", "#ff453a", "#0a84ff", "#ffd1dc"
+  ];
+
+  function pickFieldToFinishLayerColor(layerName = "") {
+    const normalizedName = String(layerName ?? "").trim();
+    for (const rule of fieldToFinishStandardLayerColorRules) {
+      if (rule.pattern.test(normalizedName)) return rule.color;
+    }
+
+    const usedColors = new Set();
+    for (const layer of layers.values()) usedColors.add(String(layer.color || "").toLowerCase());
+    const available = fieldToFinishHighVisibilityPalette.filter((color) => !usedColors.has(color.toLowerCase()));
+    const palette = available.length ? available : fieldToFinishHighVisibilityPalette;
+    const index = Math.floor(Math.random() * palette.length);
+    return palette[index] || "#00c7ff";
+  }
+
   function ensureLayerByName(layerName = "") {
     const desiredName = String(layerName ?? "").trim();
     if (!desiredName) return null;
@@ -2937,7 +2964,8 @@
       id = `${baseId}-${suffix}`;
       suffix++;
     }
-    layers.set(id, sanitizeLayer({ id, name: desiredName, color: "#00a6ff", lineWeight: 1.5, locked: false, visible: true, fill: false }, id));
+    const color = pickFieldToFinishLayerColor(desiredName);
+    layers.set(id, sanitizeLayer({ id, name: desiredName, color, lineWeight: 1.5, locked: false, visible: true, fill: false }, id));
     renderLayerControls();
     scheduleLayersTableRender();
     return id;
