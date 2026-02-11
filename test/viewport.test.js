@@ -245,7 +245,8 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
   assert.match(html, /const\s+POINT_CLUSTER_MIN_STROKE_ALPHA\s*=\s*0\.25\s*;/, 'cluster outlines should define a minimum 25% opacity for lower-magnitude groups');
   assert.match(html, /const\s+POINT_CLUSTER_MAX_STROKE_ALPHA\s*=\s*0\.7\s*;/, 'cluster outlines should define a maximum 70% opacity for higher-magnitude groups');
   assert.match(html, /cluster\.members\.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT[\s\S]*countsByLayer/, 'cluster tooltip should aggregate large cluster details by drawing layer');
-  assert.match(html, /<li><b>\$\{escapeHtml\(layerName\)\}<\/b>: \$\{count\} point\$\{count === 1 \? "" : "s"\}<\/li>/, 'large cluster tooltip rows should report per-layer point counts');
+  assert.match(html, /<li><b class="clusterTooltipLayerName" style="color:\$\{escapeHtml\(meta\.color\)\}">\$\{escapeHtml\(layerName\)\}<\/b>: \$\{meta\.count\} point\$\{meta\.count === 1 \? "" : "s"\}<\/li>/, 'large cluster tooltip layer names should use their layer color while reporting per-layer point counts');
+  assert.match(html, /<li><b class="clusterTooltipPointName" style="color:\$\{escapeHtml\(layerColor\)\}">\$\{escapeHtml\(point\.num\)\}<\/b>\$\{code\}<\/li>/, 'small cluster tooltip point names should use their layer color');
   assert.match(html, /function\s+buildPointClusters\(\)/, 'LineSmith should build dynamic point clusters for nearby points');
   assert.match(html, /const\s+markerRadius\s*=\s*10\s*\+\s*Math\.max\(0,\s*countText\.length\s*-\s*2\)\s*\*\s*3\s*;/, 'cluster marker radius should stay fixed by count-text width rather than scaling by cluster population');
   assert.match(html, /cluster\.strokeAlpha\s*=\s*POINT_CLUSTER_MIN_STROKE_ALPHA\s*\+\s*normalized\s*\*\s*\(POINT_CLUSTER_MAX_STROKE_ALPHA\s*-\s*POINT_CLUSTER_MIN_STROKE_ALPHA\)/, 'cluster opacity should interpolate between min and max alpha based on group magnitude');
