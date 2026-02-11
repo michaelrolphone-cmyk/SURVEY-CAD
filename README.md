@@ -93,6 +93,7 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Toolbar controls:
   - Active layer dropdown (`quickLayerSelect`) with color swatch and quick flag toggles (lock / visibility / fill).
   - Layer manager button (`quickLayerManager`) that opens a layer editor modal table.
+  - Quick toolbar layout now uses two rows: row 1 for map/layer controls (wrapping as needed) and row 2 beginning at Select/Move for drawing/edit actions; when the controls drawer is collapsed the toolbar stretches edge-to-edge across the viewport.
 - Layer properties:
   - `name`, `color`, `locked`, `visible`, `lineWeight`, `fill`.
 - Drawing behavior:
@@ -104,6 +105,8 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
   - Invisible layers are hidden from drawing and selection.
 
 There are no new server API endpoints or CLI commands required for this UI-only layer feature. Existing commands continue to work:
+
+- Toolbar layout update impact: no API/CLI changes; continue using existing endpoints (`GET /api/fld-config`) and existing commands (`npm run cli`, `npm run ros:cli`).
 
 ```bash
 npm run cli -- --help
