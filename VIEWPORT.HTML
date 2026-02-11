@@ -1642,6 +1642,7 @@
   const DEFAULT_LAYER_ID = "layer-1";
   const layers = new Map(); // id -> {id,name,color,locked,visible,lineWeight,fill}
   let selectedLayerId = DEFAULT_LAYER_ID;
+  var layersTableDirty = true;
   const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable,layerId}
   const lines = new Map();  // id -> {id,a,b,movable,layerId}
 
@@ -6237,8 +6238,6 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     view.panX = mouse.x - before.x * view.scale;
     view.panY = mouse.y + before.y * view.scale;
   }, {passive:false});
-
-  let layersTableDirty = true;
 
   function scheduleLayersTableRender() {
     layersTableDirty = true;

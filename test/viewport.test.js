@@ -40,6 +40,17 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /\$\("#quickRotateSelection"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*startRotateSelectionSession\(\)\)/, 'quick Rotate should start reference rotate workflow');
 });
 
+test('VIEWPORT.HTML initializes layersTableDirty before any early resetLayers scheduling can run', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  const resetLayersCallIndex = html.indexOf('resetLayers();');
+  const layersTableDirtyIndex = html.indexOf('var layersTableDirty = true;');
+
+  assert.notEqual(resetLayersCallIndex, -1, 'VIEWPORT boot should still initialize layer state with resetLayers()');
+  assert.notEqual(layersTableDirtyIndex, -1, 'layers table dirty flag should use a var declaration to avoid temporal dead zone access before initialization');
+  assert.ok(layersTableDirtyIndex < resetLayersCallIndex, 'layers table dirty flag should initialize before resetLayers() executes');
+});
+
 
 
 
