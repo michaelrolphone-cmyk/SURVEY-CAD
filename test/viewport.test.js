@@ -4,6 +4,16 @@ import { readFile } from 'node:fs/promises';
 
 
 
+
+
+test('VIEWPORT.HTML allows map tile rendering to continue zooming past native tile limits', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+MAP_LAYER_MAX_RENDER_ZOOM\s*=\s*40\s*;/, 'LineSmith should define an extended map render zoom ceiling for over-zoom scaling beyond tile-native levels');
+  assert.match(html, /maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'LineSmith tile layers should reuse the extended render zoom ceiling so Leaflet can keep scaling raster tiles after native zoom is exhausted');
+  assert.match(html, /function\s+scaleToLeafletZoomForLat\(scale, lat\)\s*\{[\s\S]*return\s+clamp\(zoom,\s*MAP_LAYER_MIN_RENDER_ZOOM,\s*MAP_LAYER_MAX_RENDER_ZOOM\);/, 'georeferenced zoom conversion should clamp against the extended map render zoom range');
+  assert.match(html, /mapInstance\s*=\s*L\.map\("mapLayer",\s*\{[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'Leaflet map instance should accept the extended render zoom ceiling so setView can continue beyond tile max-native zoom');
+});
 test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmith actions', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
@@ -200,10 +210,10 @@ test('VIEWPORT.HTML exposes map backdrop controls with expected defaults and wir
   assert.match(html, /function\s+zoomExtents\(options\s*=\s*\{\}\)/, 'zoom extents helper should accept options for silent and history-safe recentering');
   assert.match(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*if \(mapLayerState\.enabled\) \{[\s\S]*ensureMapLayer\(\);[\s\S]*mapBackdrop\.classList\.toggle\("on", mapLayerState\.enabled\);[\s\S]*syncMapToView\(true\);/, 'enabling map layer should initialize Leaflet and sync to the current drawing viewport');
   assert.doesNotMatch(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*zoomExtents\(\{ skipHistory: true, silent: true \}\);/, 'enabling map layer should not force a zoom-extents recenter');
-  assert.match(html, /satellite:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*22/, 'satellite tiles should allow overzooming beyond native coverage');
-  assert.match(html, /osmStandard:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*22/, 'OSM standard tiles should allow overzooming beyond native coverage');
-  assert.match(html, /osmHumanitarian:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*22/, 'OSM humanitarian tiles should allow overzooming beyond native coverage');
-  assert.match(html, /osmCycle:[\s\S]*maxNativeZoom:\s*17,[\s\S]*maxZoom:\s*20/, 'OpenTopoMap tiles should overzoom from their lower native max zoom');
+  assert.match(html, /satellite:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'satellite tiles should allow overzooming beyond native coverage');
+  assert.match(html, /osmStandard:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'OSM standard tiles should allow overzooming beyond native coverage');
+  assert.match(html, /osmHumanitarian:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'OSM humanitarian tiles should allow overzooming beyond native coverage');
+  assert.match(html, /osmCycle:[\s\S]*maxNativeZoom:\s*17,[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'OpenTopoMap tiles should overzoom from their lower native max zoom');
 });
 
 
