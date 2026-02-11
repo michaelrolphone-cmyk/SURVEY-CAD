@@ -4275,8 +4275,17 @@
         const radiusPixels = cmd.radius * view.scale;
         if (!Number.isFinite(radiusPixels) || radiusPixels <= 0.5) continue;
         const sc = worldToScreen(center.x, center.y);
+        const circleStrokeWidth = Math.max(1, layer.lineWeight);
+
+        // Draw a dark under-stroke first so CIR geometry remains visible on aerial basemaps.
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.lineWidth = circleStrokeWidth + 1;
+        ctx.beginPath();
+        ctx.arc(sc.x, sc.y, radiusPixels, 0, Math.PI * 2);
+        ctx.stroke();
+
         ctx.strokeStyle = layer.color;
-        ctx.lineWidth = Math.max(0.5, layer.lineWeight);
+        ctx.lineWidth = circleStrokeWidth;
         ctx.beginPath();
         ctx.arc(sc.x, sc.y, radiusPixels, 0, Math.PI * 2);
         ctx.stroke();
