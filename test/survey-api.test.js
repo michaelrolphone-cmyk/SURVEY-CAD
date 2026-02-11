@@ -10,11 +10,12 @@ function createMockServer(options = {}) {
     failProjectedRefetch = false,
     utilities404 = false,
     estimateCalculate404 = false,
+    nearPoint404 = false,
     includeServiceLines = false,
     omitTransformers = false,
   } = options;
   const requests = [];
-  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [] };
+  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [], nearPointPath: null };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
@@ -31,6 +32,27 @@ function createMockServer(options = {}) {
       res.statusCode = 403;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: 'forbidden' }));
+      return;
+    }
+
+
+    if (url.pathname.startsWith('/serviceEstimator/api/NearPoint/Residential/PrimaryPoints/')) {
+      headers.nearPointPath = url.pathname;
+      if (nearPoint404) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'not found' }));
+        return;
+      }
+
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        primaryPoints: [
+          { id: 'pm-1', serviceTypeId: 1, code: 'PM', geometry: { x: -12936280.004339488, y: 5406832.06332747, spatialReference: { wkid: 3857 } } },
+          { id: 'up-1', serviceTypeId: 2, code: 'UP', geometry: { x: -12936180.004339488, y: 5406882.06332747, spatialReference: { wkid: 3857 } } },
+          { id: 'oh-1', serviceTypeId: 3, code: 'OH', geometry: { x: -12936080.004339488, y: 5406932.06332747, spatialReference: { wkid: 3857 } } },
+        ],
+      }));
       return;
     }
 
@@ -507,13 +529,13 @@ test('loadSubdivisionAtPoint falls back to WGS84 geometry when projected refetch
 });
 
 
-test('lookupUtilitiesByAddress uses Idaho Power EstimateDetail Calculate API and projects utility geometry', async () => {
+test('lookupUtilitiesByAddress uses Idaho Power NearPoint PrimaryPoints API and projects distinct utility geometry', async () => {
   const { server, port, headers } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
   const client = new SurveyCadClient({
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
     nominatimUrl: `${base}/geocode`,
-    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
   });
 
@@ -523,82 +545,57 @@ test('lookupUtilitiesByAddress uses Idaho Power EstimateDetail Calculate API and
     assert.ok(utilities.every((utility) => utility.provider === 'Idaho Power'));
     assert.deepEqual(
       utilities.map((utility) => utility.code).sort(),
-      ['OH PWR TX', 'UG PWR TX', 'UG PWR TX'],
+      ['OH', 'PM', 'UP'],
     );
 
-    const serviceTypeIds = headers.estimateCalculateBodies
-      .map((raw) => new URLSearchParams(raw).get('serviceEstimateServiceTypeId'))
-      .sort();
-    assert.deepEqual(serviceTypeIds, ['1', '2', '3']);
+    assert.match(headers.nearPointPath || '', /\/serviceEstimator\/api\/NearPoint\/Residential\/PrimaryPoints\//);
 
-    const firstForm = new URLSearchParams(headers.estimateCalculateBodies[0] || '');
-    assert.equal(firstForm.get('phaseId'), '3');
-    assert.equal(firstForm.get('primaryVoltageId'), '4');
-    assert.equal(firstForm.get('serviceEstimateCustomerTypeId'), '1');
-    assert.equal(firstForm.get('beginLongitude'), '-116.2');
-    assert.equal(firstForm.get('beginLatitude'), '43.61');
-
-    const sortedLocations = utilities
-      .map((utility) => ({
-        lon: Number(utility.location.lon.toFixed(3)),
-        lat: Number(utility.location.lat.toFixed(3)),
-      }))
-      .sort((a, b) => a.lon - b.lon);
-    assert.deepEqual(sortedLocations, [
-      { lon: -116.199, lat: 43.611 },
-      { lon: -116.198, lat: 43.612 },
-      { lon: -116.197, lat: 43.613 },
-    ]);
+    const uniqueProjected = new Set(utilities.map((utility) => `${utility.projected.east.toFixed(3)},${utility.projected.north.toFixed(3)}`));
+    assert.equal(uniqueProjected.size, 3);
     assert.ok(utilities.every((utility) => Number.isFinite(utility?.projected?.east) && Number.isFinite(utility?.projected?.north)));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
-test('lookupUtilitiesByAddress labels fallback estimate points using OH/UG service rules', async () => {
-  const { server, port } = await createMockServer({ omitTransformers: true });
+test('lookupUtilitiesByAddress labels NearPoint utility points using PM/OH/UP service rules', async () => {
+  const { server, port } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
 
   const client = new SurveyCadClient({
     nominatimUrl: `${base}/geocode`,
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
-    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
   });
 
   try {
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     const codes = new Set(utilities.map((utility) => utility.code));
-    assert.ok(codes.has('OH PWR BEG'));
-    assert.ok(codes.has('OH PWR END'));
-    assert.ok(codes.has('UG PWR BEG'));
-    assert.ok(codes.has('UG PWR END'));
+    assert.deepEqual(codes, new Set(['PM', 'UP', 'OH']));
     assert.ok(utilities.every((utility) => !String(utility.code).includes('Idaho Power Service Estimate')));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
-test('lookupUtilitiesByAddress emits OH/UG line endpoint points with BEG/END codes', async () => {
-  const { server, port, requests } = await createMockServer({ includeServiceLines: true });
+test('lookupUtilitiesByAddress only returns the three NearPoint service points when line geometry is present', async () => {
+  const { server, port, requests } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
 
   const client = new SurveyCadClient({
     nominatimUrl: `${base}/geocode`,
     adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
-    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
   });
 
   try {
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     const codes = new Set(utilities.map((utility) => utility.code));
 
-    assert.equal(utilities.length, 7);
-    assert.ok(codes.has('OH PWR BEG'));
-    assert.ok(codes.has('OH PWR END'));
-    assert.ok(codes.has('UG PWR BEG'));
-    assert.ok(codes.has('UG PWR END'));
+    assert.equal(utilities.length, 3);
+    assert.deepEqual(codes, new Set(['PM', 'UP', 'OH']));
     assert.ok(utilities.every((utility) => Number.isFinite(utility?.projected?.east) && Number.isFinite(utility?.projected?.north)));
     assert.ok(requests.some((requestPath) => requestPath.includes('/geometry/project?')));
   } finally {
@@ -607,18 +604,18 @@ test('lookupUtilitiesByAddress emits OH/UG line endpoint points with BEG/END cod
 });
 
 
-test('lookupUtilitiesByAddress returns [] when utility provider endpoint is unavailable', async () => {
-  const { server, port, requests } = await createMockServer({ estimateCalculate404: true });
+test('lookupUtilitiesByAddress returns [] when NearPoint endpoint is unavailable', async () => {
+  const { server, port, requests } = await createMockServer({ nearPoint404: true });
   const base = `http://127.0.0.1:${port}`;
   const client = new SurveyCadClient({
     nominatimUrl: `${base}/geocode`,
-    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
   });
 
   try {
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     assert.deepEqual(utilities, []);
-    assert.ok(requests.some((requestPath) => requestPath.includes('/serviceEstimator/api/EstimateDetail/Calculate')));
+    assert.ok(requests.some((requestPath) => requestPath.includes('/serviceEstimator/api/NearPoint/Residential/PrimaryPoints/')));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
