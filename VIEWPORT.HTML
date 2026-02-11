@@ -6815,6 +6815,12 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     updateMouseFromEvent(e);
     const cluster = pointDisplayVisibility.clustering ? getPointClusterAtScreen(mouse.x, mouse.y) : null;
     if (cluster) {
+      selectedPointIds = [];
+      selectedPointId = null;
+      selectedLines = [];
+      lastSelectedLineId = null;
+      updatePointEditorFromSelection();
+      schedulePointsTableRender();
       history.push("zoom to point cluster");
       zoomToWorldBounds(cluster.minX, cluster.minY, cluster.maxX, cluster.maxY, { paddingFraction: 0.15 });
       setStatus(`Zoomed to ${cluster.members.length}-point cluster with 15% padding.`, "ok");
