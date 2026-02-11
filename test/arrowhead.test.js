@@ -87,6 +87,8 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.match(html, /const\s+ON_TARGET_CENTER_FRACTION\s*=\s*0\.1;/, 'ArrowHead should define a center-target fraction matching the middle 10% of the feed');
   assert.match(html, /const\s+centerHalfWidth\s*=\s*canvas\.width\s*\*\s*ON_TARGET_CENTER_FRACTION\s*\*\s*0\.5;/, 'ArrowHead should compute horizontal center-zone bounds');
   assert.match(html, /const\s+centerHalfHeight\s*=\s*canvas\.height\s*\*\s*ON_TARGET_CENTER_FRACTION\s*\*\s*0\.5;/, 'ArrowHead should compute vertical center-zone bounds');
+  assert.match(html, /const\s+leaderGradient\s*=\s*ctx\.createLinearGradient\(centerX,\s*centerY,\s*onTargetPoint\.x,\s*onTargetPoint\.y\);[\s\S]*leaderGradient\.addColorStop\(0,\s*'rgba\(34,197,94,0\.85\)'\);[\s\S]*leaderGradient\.addColorStop\(1,\s*'rgba\(34,197,94,0\)'\);/, 'ArrowHead should draw an on-target leader tail that fades to zero opacity at the target point');
+  assert.match(html, /ctx\.moveTo\(centerX,\s*centerY\);[\s\S]*ctx\.lineTo\(onTargetPoint\.x,\s*onTargetPoint\.y\);/, 'ArrowHead should draw the on-target leader tail from the observer center toward the target point');
   assert.match(html, /ctx\.arc\(onTargetPoint\.x, onTargetPoint\.y, ringRadius, 0, Math\.PI \* 2\);/, 'ArrowHead should draw an on-target circle around the centered point');
   assert.match(html, /On target • \$\{onTargetPoint\.distanceM\.toFixed\(1\)\} m \(\$\{distanceFeet\.toFixed\(1\)\} ft\)/, 'ArrowHead should overlay on-target distance guidance text');
 });

@@ -948,6 +948,15 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
       const ringRadius = Math.max(28, window.devicePixelRatio * 18);
       const distanceFeet = onTargetPoint.distanceM * METERS_TO_FEET;
       const onTargetLabel = `On target • ${onTargetPoint.distanceM.toFixed(1)} m (${distanceFeet.toFixed(1)} ft)`;
+      const leaderGradient = ctx.createLinearGradient(centerX, centerY, onTargetPoint.x, onTargetPoint.y);
+      leaderGradient.addColorStop(0, 'rgba(34,197,94,0.85)');
+      leaderGradient.addColorStop(1, 'rgba(34,197,94,0)');
+      ctx.lineWidth = Math.max(6, window.devicePixelRatio * 4.2);
+      ctx.strokeStyle = leaderGradient;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(onTargetPoint.x, onTargetPoint.y);
+      ctx.stroke();
       ctx.lineWidth = Math.max(3, window.devicePixelRatio * 2.4);
       ctx.strokeStyle = 'rgba(34,197,94,0.95)';
       ctx.beginPath();
