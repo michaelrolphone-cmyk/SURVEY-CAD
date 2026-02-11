@@ -242,9 +242,13 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
   assert.match(html, /const\s+POINT_CLUSTER_LABEL_BREAKOUT_LIMIT\s*=\s*5\s*;/, 'LineSmith should cap radial point-number breakout labels once a cluster exceeds five points');
   assert.match(html, /if \(!pointDisplayVisibility\.names \|\| cluster\.members\.length > POINT_CLUSTER_LABEL_BREAKOUT_LIMIT\) continue;/, 'cluster markers should skip radial point-number breakout labels when cluster size is above the configured cap');
   assert.match(html, /const\s+POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT\s*=\s*10\s*;/, 'LineSmith should define when cluster tooltip detail switches from per-point to per-layer summaries');
+  assert.match(html, /const\s+POINT_CLUSTER_MIN_STROKE_ALPHA\s*=\s*0\.25\s*;/, 'cluster outlines should define a minimum 25% opacity for lower-magnitude groups');
+  assert.match(html, /const\s+POINT_CLUSTER_MAX_STROKE_ALPHA\s*=\s*0\.7\s*;/, 'cluster outlines should define a maximum 70% opacity for higher-magnitude groups');
   assert.match(html, /cluster\.members\.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT[\s\S]*countsByLayer/, 'cluster tooltip should aggregate large cluster details by drawing layer');
   assert.match(html, /<li><b>\$\{escapeHtml\(layerName\)\}<\/b>: \$\{count\} point\$\{count === 1 \? "" : "s"\}<\/li>/, 'large cluster tooltip rows should report per-layer point counts');
   assert.match(html, /function\s+buildPointClusters\(\)/, 'LineSmith should build dynamic point clusters for nearby points');
+  assert.match(html, /const\s+markerRadius\s*=\s*10\s*\+\s*Math\.max\(0,\s*countText\.length\s*-\s*2\)\s*\*\s*3\s*;/, 'cluster marker radius should stay fixed by count-text width rather than scaling by cluster population');
+  assert.match(html, /cluster\.strokeAlpha\s*=\s*POINT_CLUSTER_MIN_STROKE_ALPHA\s*\+\s*normalized\s*\*\s*\(POINT_CLUSTER_MAX_STROKE_ALPHA\s*-\s*POINT_CLUSTER_MIN_STROKE_ALPHA\)/, 'cluster opacity should interpolate between min and max alpha based on group magnitude');
   assert.match(html, /id="clusterTooltip"\s+class="clusterTooltip\s+hidden"/, 'LineSmith should include a dedicated tooltip container for hover cluster membership lists');
   assert.match(html, /function\s+showClusterTooltip\(cluster\)/, 'LineSmith should render clustered point membership details on hover');
   assert.match(html, /const\s+cluster\s*=\s*pointDisplayVisibility\.clustering\s*\?\s*getPointClusterAtScreen\(mouse\.x,\s*mouse\.y\)\s*:\s*null;[\s\S]*zoomToWorldBounds\(cluster\.minX,\s*cluster\.minY,\s*cluster\.maxX,\s*cluster\.maxY,\s*\{\s*paddingFraction:\s*0\.15\s*\}\);/, 'double-clicking a cluster should zoom to that cluster with 15% padding');
@@ -327,8 +331,11 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
 test('VIEWPORT.HTML keeps point inspector + map opacity always visible while tool sections are collapsible', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /id="panelToolsCollapse"\s+class="panelToolsCollapse"\s+open/, 'LineSmith should wrap drawer tool sections in an open-by-default collapsible container');
+  assert.match(html, /id="panelToolsCollapse"\s+class="panelToolsCollapse"(?!\s+open)/, 'LineSmith should wrap drawer tool sections in a collapsed-by-default container');
   assert.match(html, /<summary>Tool drawer sections<\/summary>/, 'collapsible container should include a summary row to collapse/expand drawer controls');
+  assert.match(html, /<div class="app panelCollapsed" id="appShell">/, 'LineSmith should initialize with the desktop controls panel collapsed by default');
+  assert.match(html, /function\s+syncPanelCollapseWithSelection\(\)\s*\{[\s\S]*const\s+hasSelection\s*=\s*selectedPointIds\.length > 0 \|\| selectedLines\.length > 0;[\s\S]*setPanelCollapsed\(!hasSelection\);/, 'selection sync helper should auto-expand the desktop panel when point or line selections exist and collapse it otherwise');
+  assert.match(html, /function\s+updatePointEditorFromSelection\(\)\s*\{[\s\S]*syncPanelCollapseWithSelection\(\);/, 'selection-driven editor refresh should also synchronize drawer collapse state');
   assert.match(html, /<div class="title">[\s\S]*<b>Inspector \+ Map Opacity<\/b>[\s\S]*id="mapOpacity"\s+type="range"/, 'drawer should surface map opacity in an always-visible inspector section outside the collapsible tool body');
   assert.match(html, /id="pointInspector"\s+class="inspectorCard"/, 'point inspector card should remain rendered in the always-visible inspector section');
   assert.match(html, /id="panelToolsCollapse"[\s\S]*id="lineInspector"\s+class="inspectorCard"/, 'line inspector should stay within the collapsible tool body while point inspector remains always visible');
@@ -578,7 +585,7 @@ test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal 
 
   assert.match(html, /const\s+DEFAULT_LAYER_ID\s*=\s*"layer-1";/, 'LineSmith should define a default layer id for new drawings');
   assert.match(html, /const\s+layers\s*=\s*new\s+Map\(\);\s*\/\/ id -> \{id,name,color,locked,visible,lineWeight,fill\}/, 'LineSmith should maintain a first-class layer registry');
-  assert.match(html, /id="quickLayerSelect"/, 'quick toolbar should expose a layer dropdown for active drawing layer');
+  assert.match(html, /id="quickLayerDropdown"[\s\S]*id="quickLayerDropdownButton"[\s\S]*id="quickLayerDropdownMenu"/, 'quick toolbar should expose an HTML layer dropdown for active drawing layer');
   assert.match(html, /id="quickLayerManager"[\s\S]*fa-layer-group/, 'quick toolbar should include a layer-manager icon button');
   assert.match(html, /id="layersModal"\s+class="modalOverlay hidden"/, 'LineSmith should define a layer manager modal');
   assert.match(html, /<th>Name<\/th>[\s\S]*<th>Color<\/th>[\s\S]*<th>Line Weight<\/th>[\s\S]*<th>Lock<\/th>[\s\S]*<th>Visible<\/th>[\s\S]*<th>Fill<\/th>/, 'layer manager table should provide editable layer fields and flags');
@@ -586,6 +593,10 @@ test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal 
   assert.match(html, /function\s+addLine\(aPointId, bPointId, movable=false, layerId = selectedLayerId\)/, 'new lines should default to the currently selected layer');
   assert.match(html, /if \(!isLayerVisible\(p\.layerId\)\) continue;/, 'rendering should hide point symbols for invisible layers');
   assert.match(html, /if \(!isLayerVisible\(ln\.layerId\)\) continue;/, 'rendering and selection should hide linework for invisible layers');
+  assert.match(html, /function\s+setQuickLayerDropdownOpen\(open\)\s*\{[\s\S]*quickLayerDropdownMenu\.classList\.toggle\("hidden", !quickLayerDropdownOpen\);/, 'quick toolbar should drive an HTML dropdown open state instead of relying on native select widgets');
+  assert.match(html, /const\s+toggles\s*=\s*\[[\s\S]*key:\s*"locked"[\s\S]*key:\s*"visible"[\s\S]*key:\s*"fill"/, 'each dropdown layer row should expose lock, visibility, and fill toggle controls');
+  assert.match(html, /btn\.addEventListener\("click", \(event\) => \{[\s\S]*event\.stopPropagation\(\);[\s\S]*toggleLayerFlag\(layer, toggle\.key\);[\s\S]*setQuickLayerDropdownOpen\(true\);/, 'toggling layer flags from the dropdown should not select the row and should keep the dropdown open');
+  assert.match(html, /\.quickLayerDropdownMenu\{[\s\S]*max-height:320px;[\s\S]*overflow-y:auto;/, 'layer dropdown should become scrollable after roughly ten rows');
   assert.match(html, /ctx\.strokeStyle = isMovable\(ln\.movable\) \? "#800000" : layer\.color;[\s\S]*ctx\.lineWidth = Math\.max\(0\.5, layer\.lineWeight\);/, 'line rendering should use per-layer color and lineweight');
   assert.match(html, /if \(!layer\.fill \|\| layer\.visible === false\) continue;[\s\S]*ctx\.fillStyle = `\$\{layer\.color\}1A`;/, 'closed loops on fill-enabled layers should render with low-opacity layer color fill');
   assert.match(html, /if \(isLayerLocked\(p\.layerId\)\) \{[\s\S]*Layer .* is locked\./, 'point edits should be blocked when the owning layer is locked');

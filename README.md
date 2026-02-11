@@ -115,6 +115,8 @@ node --test test/viewport.test.js
 
 `VIEWPORT.HTML` now limits dense point-cluster annotation for readability:
 
+- Cluster markers now keep a consistent footprint, with only a small text-width adjustment so multi-digit cluster counts still fit inside the marker.
+- Cluster marker text/outline opacity now encodes relative cluster magnitude, interpolated from **25%** (smallest visible cluster group) to **70%** (largest visible cluster group).
 - Cluster marker radial point-number breakout labels render only when the cluster has **5 points or fewer**.
 - Cluster tooltip content switches behavior at **10 points**:
   - `<= 10` points: per-point rows (point number + code as before).
@@ -430,6 +432,7 @@ Trim-to-Intersect now supports trim-boundary-first picking: select the boundary 
 LineSmith guided Extend/Trim workflows now auto-accumulate first and second line picks with normal clicks, so you no longer need to hold Shift during the command; Shift-click remains available for manual multi-select outside guided picking.
 LineSmith toolbar tools that require staged input now use the same workflow toast guidance pattern as rotate, including Line: 2 Points, Line: Dist/Bearing, and Point on Line, so each step is surfaced in-canvas as you progress.
 LineSmith controls drawer now includes an inner collapsible **Tool drawer sections** group so most controls can be hidden quickly, while **Map opacity** and **Point inspector** remain pinned in an always-visible inspector section.
+LineSmith now starts with the controls drawer collapsed by default; selecting one or more points/lines automatically expands it for inspection, and clearing selection collapses it again. The **Tool drawer sections** details group is also collapsed by default while the inspector + map opacity section remains visible.
 During the rotate pick flow, LineSmith now draws live on-canvas guide rays from the base point to your cursor, then keeps the locked reference-bearing ray visible while adding a second base-to-cursor target-bearing ray so the intended rotation is easy to visualize before finalizing.
 LineSmith now includes a canvas command line for quick operations: `line <point1> <point2>` draws by point number, `move <dx> <dy>` translates current selection, `rotate` starts the reference rotate pick flow, and `inverse <point1> <point2>` reports distance + bearing between two points.
 LineSmith canvas right-click now follows CAD-style cancel behavior: if a command is active (draw/rotate/etc.), right-click cancels the command but keeps selection; a subsequent right-click with no active command clears the current selection.
@@ -723,3 +726,5 @@ No API endpoints or CLI commands changed in this LineSmith point-editor linework
 No API endpoints or CLI commands changed in this LineSmith implicit post-END sequence restart fix (including FNL + JPN continuity); existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 No API endpoints or CLI commands changed in this LineSmith point-clustering/tooltip/cluster-zoom and label-spread update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed in this LineSmith HTML layer-dropdown customization update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
