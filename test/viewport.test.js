@@ -114,7 +114,7 @@ test('VIEWPORT.HTML line ops includes offset-selected-line controls and action w
 
   assert.match(html, /<label>Offset distance[\s\S]*<input id="lineOffsetDistance"/, 'line ops should include offset distance input in the toolbar section');
   assert.match(html, /<button id="offsetSelectedLine" class="ok">Offset Selected Line<\/button>/, 'line ops should include an offset selected line action button');
-  assert.match(html, /function\s+offsetSelectedLineByDistance\(rawDistance\)\s*\{[\s\S]*history\.push\("offset selected line"\)[\s\S]*addLine\(aId, bId, false\)/, 'line offset action should create two offset points and a new line in history');
+  assert.match(html, /function\s+offsetSelectedLineByDistance\(rawDistance\)\s*\{[\s\S]*history\.push\("offset selected line"\)[\s\S]*addManualLine\(aId, bId, false\)/, 'line offset action should create two offset points and a new line in history');
   assert.match(html, /\$\("#offsetSelectedLine"\)\.addEventListener\("click",\s*\(\)\s*=>\s*\{[\s\S]*offsetSelectedLineByDistance\(\$\("#lineOffsetDistance"\)\.value\)/, 'offset selected line button should read the toolbar distance input and run offset creation');
 });
 
@@ -688,6 +688,17 @@ test('VIEWPORT.HTML filters applied field-to-finish tokens from rendered point l
   assert.match(html, /const\s+codeText\s*=\s*getRenderedPointCode\(p\.code\);/, 'point label rendering should use filtered code text rather than raw point codes');
 });
 
+
+
+test('VIEWPORT.HTML persists manual line connections in point codes and removes directives when deleting', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+applyManualConnectionCode\(pointAId, pointBId\)\s*\{[\s\S]*if \(connectsBySequentialLinework\(pointAId, pointBId\)\) return "sequential";[\s\S]*appendTokensToPointCode\(source\.id, \[`JPN\$\{targetNum\}`\]\);/, 'manual line creation should add JPN directives when the pair is not already covered by sequential linework');
+  assert.match(html, /function\s+addManualLine\(aPointId, bPointId, movable=false, layerId = selectedLayerId\)\s*\{[\s\S]*const\s+codeType\s*=\s*applyManualConnectionCode\(aPointId, bPointId\);/, 'manual line creation should funnel through a helper that synchronizes point code directives');
+  assert.match(html, /function\s+deleteLine\(lid\)\s*\{[\s\S]*removeJpnDirectiveFromPointCode\(aPoint\.id, bPoint\.num\);[\s\S]*removeJpnDirectiveFromPointCode\(bPoint\.id, aPoint\.num\);[\s\S]*ensureSequentialBreakForPair\(aPoint\.id, bPoint\.id\);[\s\S]*if \(codeChanged\) syncFieldToFinishLinework\(\);/, 'deleting a line should remove JPN links first, or insert sequential END/BEG breaks so the removed connection does not immediately reappear');
+  assert.match(html, /const\s+lid\s*=\s*addManualLine\(aId, bId, false\);/, 'LINE command should route line creation through the manual-connection code synchronizer');
+  assert.match(html, /const\s+lid\s*=\s*addManualLine\(construction\.startPointId, endId, false\);/, 'Line 2-point tool should route line creation through the manual-connection code synchronizer');
+});
 test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal for drawing rules', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

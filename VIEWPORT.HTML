@@ -3444,6 +3444,110 @@
     return id;
   }
 
+  function splitCodeTokens(rawCode = "") {
+    const normalized = String(rawCode ?? "").trim();
+    return normalized ? normalized.split(/\s+/).filter(Boolean) : [];
+  }
+
+  function joinCodeTokens(tokens = []) {
+    return tokens.filter(Boolean).join(" ").trim();
+  }
+
+  function appendTokensToPointCode(pointId, tokens = []) {
+    const point = points.get(pointId);
+    if (!point || !tokens.length) return false;
+    const currentTokens = splitCodeTokens(point.code);
+    point.code = joinCodeTokens([...currentTokens, ...tokens]);
+    return true;
+  }
+
+  function removeJpnDirectiveFromPointCode(pointId, targetPointNumber) {
+    const point = points.get(pointId);
+    const target = String(targetPointNumber ?? "").trim().toUpperCase();
+    if (!point || !target) return false;
+    const tokens = splitCodeTokens(point.code);
+    if (!tokens.length) return false;
+    const nextTokens = [];
+    let changed = false;
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      const tokenUpper = token.toUpperCase();
+      if (tokenUpper === "JPN" && String(tokens[i + 1] ?? "").trim().toUpperCase() === target) {
+        changed = true;
+        i += 1;
+        continue;
+      }
+      if (tokenUpper === `JPN${target}`) {
+        changed = true;
+        continue;
+      }
+      nextTokens.push(token);
+    }
+    if (!changed) return false;
+    point.code = joinCodeTokens(nextTokens);
+    return true;
+  }
+
+  function connectsBySequentialLinework(aPointId, bPointId) {
+    const key = getNormalizedLineKey(aPointId, bPointId);
+    if (!key) return false;
+    const sequentialCommands = buildFieldToFinishSequentialLineCommands();
+    for (const cmd of sequentialCommands) {
+      if (getNormalizedLineKey(cmd.a, cmd.b) === key) return true;
+    }
+    return false;
+  }
+
+  function ensureSequentialBreakForPair(aPointId, bPointId) {
+    const sequentialCommands = buildFieldToFinishSequentialLineCommands();
+    let addedTokens = 0;
+    const hasSequentialDirective = (pointId, baseCode, action) => {
+      const point = points.get(pointId);
+      if (!point) return false;
+      const { commands } = parseFieldToFinishCommands(point.code);
+      return commands.some((cmd) => (
+        cmd.type === "sequential-line"
+        && cmd.baseCode === baseCode
+        && cmd.action === action
+      ));
+    };
+    for (const cmd of sequentialCommands) {
+      if (!cmd?.baseCode) continue;
+      if (cmd.a === aPointId && cmd.b === bPointId) {
+        if (!hasSequentialDirective(aPointId, cmd.baseCode, "END") && appendTokensToPointCode(aPointId, [cmd.baseCode, "END"])) addedTokens += 2;
+        if (!hasSequentialDirective(bPointId, cmd.baseCode, "BEG") && appendTokensToPointCode(bPointId, [cmd.baseCode, "BEG"])) addedTokens += 2;
+      } else if (cmd.a === bPointId && cmd.b === aPointId) {
+        if (!hasSequentialDirective(bPointId, cmd.baseCode, "END") && appendTokensToPointCode(bPointId, [cmd.baseCode, "END"])) addedTokens += 2;
+        if (!hasSequentialDirective(aPointId, cmd.baseCode, "BEG") && appendTokensToPointCode(aPointId, [cmd.baseCode, "BEG"])) addedTokens += 2;
+      }
+    }
+    return addedTokens;
+  }
+
+  function applyManualConnectionCode(pointAId, pointBId) {
+    const source = points.get(pointAId);
+    const target = points.get(pointBId);
+    if (!source || !target) return "none";
+    if (connectsBySequentialLinework(pointAId, pointBId)) return "sequential";
+    const jpnTargets = extractJpnTargetPointNumbers(source.code).map((targetNum) => String(targetNum).toUpperCase());
+    const targetNum = String(target.num ?? "").trim();
+    if (!targetNum) return "none";
+    if (jpnTargets.includes(targetNum.toUpperCase())) return "jpn";
+    appendTokensToPointCode(source.id, [`JPN${targetNum}`]);
+    return "jpn";
+  }
+
+  function addManualLine(aPointId, bPointId, movable=false, layerId = selectedLayerId) {
+    const id = addLine(aPointId, bPointId, movable, layerId);
+    const line = lines.get(id);
+    if (!line) return id;
+    const codeType = applyManualConnectionCode(aPointId, bPointId);
+    if (codeType === "jpn") line.fieldToFinishType = "jpn";
+    if (codeType === "sequential") line.fieldToFinishType = "sequential";
+    schedulePointsTableRender();
+    return id;
+  }
+
   function addLine(aPointId, bPointId, movable=false, layerId = selectedLayerId) {
     const id = nextId++;
     lines.set(id, { id, a: aPointId, b: bPointId, movable: !!movable, layerId: layers.has(layerId) ? layerId : (selectedLayerId || DEFAULT_LAYER_ID) });
@@ -3470,9 +3574,27 @@
 
   function deleteLine(lid) {
     if (isLineLockedByLayer(lid)) return false;
+    const ln = lines.get(lid);
+    if (!ln) return false;
+
+    const aPoint = points.get(ln.a);
+    const bPoint = points.get(ln.b);
+    let codeChanged = false;
+    if (aPoint && bPoint) {
+      const removedForwardJpn = removeJpnDirectiveFromPointCode(aPoint.id, bPoint.num);
+      const removedReverseJpn = removeJpnDirectiveFromPointCode(bPoint.id, aPoint.num);
+      codeChanged = removedForwardJpn || removedReverseJpn;
+      if (!codeChanged) {
+        const addedBreakTokens = ensureSequentialBreakForPair(aPoint.id, bPoint.id);
+        codeChanged = addedBreakTokens > 0;
+      }
+    }
+
     lines.delete(lid);
+    if (codeChanged) syncFieldToFinishLinework();
     selectedLines = selectedLines.filter(s => s.lineId !== lid);
     if (lastSelectedLineId === lid) lastSelectedLineId = null;
+    if (codeChanged) schedulePointsTableRender();
     updateCounts();
     return true;
   }
@@ -4690,7 +4812,7 @@
         return false;
       }
       history.push("command: line");
-      const lid = addLine(aId, bId, false);
+      const lid = addManualLine(aId, bId, false);
       selectedPointIds = [aId, bId];
       selectedPointId = bId;
       selectedLines = [{ lineId: lid, grip: "b", t: 1 }];
@@ -6588,7 +6710,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     const code = String($("#ptCode").value || "");
     const notes = String($("#ptNotes").value || "");
     const pid2 = addPoint({ num, x:x2, y:y2, z, code, notes, movable:false });
-    const lid = addLine(startId, pid2, false);
+    const lid = addManualLine(startId, pid2, false);
 
     selectedPointIds = [pid2];
     selectedPointId = pid2;
@@ -6689,11 +6811,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       let created = 0;
       let lastLine = null;
       if (orderedIds.length === 2) {
-        lastLine = addLine(orderedIds[0], orderedIds[1], false);
+        lastLine = addManualLine(orderedIds[0], orderedIds[1], false);
         created = 1;
       } else {
         for (let i = 0; i < orderedIds.length - 1; i += 1) {
-          lastLine = addLine(orderedIds[i], orderedIds[i + 1], false);
+          lastLine = addManualLine(orderedIds[i], orderedIds[i + 1], false);
           created += 1;
         }
       }
@@ -6792,7 +6914,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     const aId = addPoint({ num: aNum, x: a.x + dx, y: a.y + dy, z: defaultZ, code: defaultCode, notes: defaultNotes, movable:false });
     const bNum = nextOpenPointNumber();
     const bId = addPoint({ num: bNum, x: b.x + dx, y: b.y + dy, z: defaultZ, code: defaultCode, notes: defaultNotes, movable:false });
-    const newLineId = addLine(aId, bId, false);
+    const newLineId = addManualLine(aId, bId, false);
 
     selectedPointIds = [aId, bId];
     selectedPointId = bId;
@@ -7339,7 +7461,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
           setStatus("Endpoint cannot be the same as start point.", "warn");
           return;
         }
-        const lid = addLine(construction.startPointId, endId, false);
+        const lid = addManualLine(construction.startPointId, endId, false);
         selectedLines = [{ lineId: lid, grip:"b", t: 1 }];
         lastSelectedLineId = lid;
         selectedPointIds = [endId];
