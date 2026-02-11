@@ -47,7 +47,7 @@ test('cli fld-config command parses a field-to-finish file', () => {
   assert.equal(result.status, 0, result.stderr);
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.versionTag, '2010V');
-  assert.equal(payload.ruleCount, 103);
+  assert.equal(payload.ruleCount, 105);
   assert.ok(payload.codes.includes('CURB'));
 });
 
