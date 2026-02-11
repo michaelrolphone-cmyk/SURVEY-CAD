@@ -1056,9 +1056,11 @@
     <div class="section">
       <div class="title">
         <b>Display</b>
-        <span>point label visibility</span>
+        <span>display visibility</span>
       </div>
       <div class="inline">
+        <label><input id="showLines" type="checkbox" checked /> Draw lines</label>
+        <label><input id="showBearings" type="checkbox" checked /> Draw bearings</label>
         <label><input id="showPoints" type="checkbox" checked /> Draw point markers</label>
         <label><input id="showPointNames" type="checkbox" checked /> Draw point names</label>
       </div>
@@ -1221,7 +1223,9 @@
             <div id="quickLayerDropdownMenu" class="quickLayerDropdownMenu hidden" role="listbox" aria-label="Layer options"></div>
           </div>
         </div>
-        <div class="quickToolField quickToolToggleGroup" title="Point display toggles" aria-label="Point display toggles">
+        <div class="quickToolField quickToolToggleGroup" title="Display toggles" aria-label="Display toggles">
+          <button id="quickShowLines" class="quickToggleBtn active" title="Toggle lines" aria-label="Toggle lines"><i class="fa-solid fa-slash"></i><span class="sr-only">Lines</span></button>
+          <button id="quickShowBearings" class="quickToggleBtn active" title="Toggle bearings" aria-label="Toggle bearings"><i class="fa-solid fa-compass"></i><span class="sr-only">Bearings</span></button>
           <button id="quickShowPoints" class="quickToggleBtn active" title="Toggle point markers" aria-label="Toggle point markers"><i class="fa-solid fa-location-crosshairs"></i><span class="sr-only">Points</span></button>
           <button id="quickShowPointNames" class="quickToggleBtn active" title="Toggle point names" aria-label="Toggle point names"><i class="fa-solid fa-tag"></i><span class="sr-only">Names</span></button>
           <button id="quickShowPointCodes" class="quickToggleBtn active" title="Toggle point codes" aria-label="Toggle point codes"><i class="fa-solid fa-hashtag"></i><span class="sr-only">Codes</span></button>
@@ -1838,12 +1842,16 @@
   const mapOpacityValue = $("#mapOpacityValue");
   const quickMapEnabledBtn = $("#quickMapLayerEnabled");
   const quickMapTileTypeInput = $("#quickMapTileType");
+  const showLinesInput = $("#showLines");
+  const showBearingsInput = $("#showBearings");
   const showPointsInput = $("#showPoints");
   const showPointNamesInput = $("#showPointNames");
   const showPointCodesInput = $("#showPointCodes");
   const showPointNotesInput = $("#showPointNotes");
   
   const enablePointClusteringInput = $("#enablePointClustering");
+  const quickShowLinesBtn = $("#quickShowLines");
+  const quickShowBearingsBtn = $("#quickShowBearings");
   const quickShowPointsBtn = $("#quickShowPoints");
   const quickShowPointNamesBtn = $("#quickShowPointNames");
   const quickShowPointCodesBtn = $("#quickShowPointCodes");
@@ -1964,6 +1972,8 @@
   };
 
   const pointDisplayVisibility = {
+    lines: true,
+    bearings: true,
     points: true,
     names: true,
     codes: true,
@@ -4075,67 +4085,69 @@
     }
 
     // lines
-    ctx.lineWidth = 1;
     const lineLabelCandidates = [];
-    for (const ln of lines.values()) {
-      const a = points.get(ln.a);
-      const b = points.get(ln.b);
-      if (!a || !b) continue;
-      const layer = getLayerById(ln.layerId);
-      if (!layer || layer.visible === false) continue;
-      if (!isLayerVisible(a.layerId) || !isLayerVisible(b.layerId)) continue;
-      const sa = worldToScreen(a.x,a.y);
-      const sb = worldToScreen(b.x,b.y);
-      ctx.strokeStyle = isMovable(ln.movable) ? "#800000" : layer.color;
-      ctx.lineWidth = Math.max(0.5, layer.lineWeight);
-      ctx.beginPath();
-      ctx.moveTo(sa.x, sa.y);
-      ctx.lineTo(sb.x, sb.y);
-      ctx.stroke();
-
-      if (isMovable(ln.movable)) {
-        const mx = (sa.x+sb.x)/2, my=(sa.y+sb.y)/2;
-        ctx.save();
-        ctx.strokeStyle = "rgba(255,213,74,0.9)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(mx-6, my);
-        ctx.lineTo(mx+6, my);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      lineLabelCandidates.push({ a, b, sa, sb });
-    }
-
-    // highlight selected lines
-    if (selectedLines.length) {
-      ctx.save();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#ffd54a";
-      for (const s of selectedLines) {
-        const ln = lines.get(s.lineId);
-        if (!ln) continue;
-        const a = points.get(ln.a), b = points.get(ln.b);
+    if (pointDisplayVisibility.lines) {
+      ctx.lineWidth = 1;
+      for (const ln of lines.values()) {
+        const a = points.get(ln.a);
+        const b = points.get(ln.b);
         if (!a || !b) continue;
+        const layer = getLayerById(ln.layerId);
+        if (!layer || layer.visible === false) continue;
+        if (!isLayerVisible(a.layerId) || !isLayerVisible(b.layerId)) continue;
         const sa = worldToScreen(a.x,a.y);
         const sb = worldToScreen(b.x,b.y);
+        ctx.strokeStyle = isMovable(ln.movable) ? "#800000" : layer.color;
+        ctx.lineWidth = Math.max(0.5, layer.lineWeight);
         ctx.beginPath();
         ctx.moveTo(sa.x, sa.y);
         ctx.lineTo(sb.x, sb.y);
         ctx.stroke();
 
-        const gripPt = (s.grip === "a") ? a : b;
-        const sg = worldToScreen(gripPt.x, gripPt.y);
-        ctx.fillStyle = "rgba(255,213,74,0.12)";
-        ctx.strokeStyle = "#ffd54a";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.rect(sg.x-6, sg.y-6, 12, 12);
-        ctx.fill();
-        ctx.stroke();
+        if (isMovable(ln.movable)) {
+          const mx = (sa.x+sb.x)/2, my=(sa.y+sb.y)/2;
+          ctx.save();
+          ctx.strokeStyle = "rgba(255,213,74,0.9)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(mx-6, my);
+          ctx.lineTo(mx+6, my);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        lineLabelCandidates.push({ a, b, sa, sb });
       }
-      ctx.restore();
+
+      // highlight selected lines
+      if (selectedLines.length) {
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#ffd54a";
+        for (const s of selectedLines) {
+          const ln = lines.get(s.lineId);
+          if (!ln) continue;
+          const a = points.get(ln.a), b = points.get(ln.b);
+          if (!a || !b) continue;
+          const sa = worldToScreen(a.x,a.y);
+          const sb = worldToScreen(b.x,b.y);
+          ctx.beginPath();
+          ctx.moveTo(sa.x, sa.y);
+          ctx.lineTo(sb.x, sb.y);
+          ctx.stroke();
+
+          const gripPt = (s.grip === "a") ? a : b;
+          const sg = worldToScreen(gripPt.x, gripPt.y);
+          ctx.fillStyle = "rgba(255,213,74,0.12)";
+          ctx.strokeStyle = "#ffd54a";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.rect(sg.x-6, sg.y-6, 12, 12);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
     }
 
     // points
@@ -4271,42 +4283,44 @@
       }
     }
 
-    ctx.save();
-    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "#ffd54a";
-    for (const c of lineLabelCandidates) {
-      const measure = lineMeasurement(c.a, c.b);
-      if (!measure) continue;
-      const label = `${measure.bearing} • ${measure.distance.toFixed(3)}`;
-      const labelW = ctx.measureText(label).width;
-      const dx = c.sb.x - c.sa.x;
-      const dy = c.sb.y - c.sa.y;
-      const pixelLength = Math.hypot(dx, dy);
-      if (pixelLength < labelW + 24) continue;
-
-      let angle = measure.angle;
-      if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
-      const mx = (c.sa.x + c.sb.x) * 0.5;
-      const my = (c.sa.y + c.sb.y) * 0.5;
-      const offset = 11;
-      const nx = -dy / Math.max(pixelLength, EPS);
-      const ny = dx / Math.max(pixelLength, EPS);
-      const cx = mx + nx * offset;
-      const cy = my + ny * offset;
-      const candidateAabb = rotatedRectAabb(cx, cy, labelW + 6, 16, angle);
-      if (blockedTextRects.some((r) => rectsOverlap(r, candidateAabb))) continue;
-
+    if (pointDisplayVisibility.bearings) {
       ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, 0, 0);
-      ctx.restore();
+      ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillStyle = "#ffd54a";
+      for (const c of lineLabelCandidates) {
+        const measure = lineMeasurement(c.a, c.b);
+        if (!measure) continue;
+        const label = `${measure.bearing} • ${measure.distance.toFixed(3)}`;
+        const labelW = ctx.measureText(label).width;
+        const dx = c.sb.x - c.sa.x;
+        const dy = c.sb.y - c.sa.y;
+        const pixelLength = Math.hypot(dx, dy);
+        if (pixelLength < labelW + 24) continue;
 
-      blockedTextRects.push(candidateAabb);
+        let angle = measure.angle;
+        if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
+        const mx = (c.sa.x + c.sb.x) * 0.5;
+        const my = (c.sa.y + c.sb.y) * 0.5;
+        const offset = 11;
+        const nx = -dy / Math.max(pixelLength, EPS);
+        const ny = dx / Math.max(pixelLength, EPS);
+        const cx = mx + nx * offset;
+        const cy = my + ny * offset;
+        const candidateAabb = rotatedRectAabb(cx, cy, labelW + 6, 16, angle);
+        if (blockedTextRects.some((r) => rectsOverlap(r, candidateAabb))) continue;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+
+        blockedTextRects.push(candidateAabb);
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
     // highlight selected points
     if (selectedPointIds.length) {
@@ -4670,6 +4684,18 @@
     if (!pointDisplayVisibility.points) hideClusterTooltip();
   }
 
+  function setLineVisibility(enabled) {
+    pointDisplayVisibility.lines = !!enabled;
+    if (showLinesInput) showLinesInput.checked = pointDisplayVisibility.lines;
+    setQuickToggleButtonState(quickShowLinesBtn, pointDisplayVisibility.lines);
+  }
+
+  function setBearingVisibility(enabled) {
+    pointDisplayVisibility.bearings = !!enabled;
+    if (showBearingsInput) showBearingsInput.checked = pointDisplayVisibility.bearings;
+    setQuickToggleButtonState(quickShowBearingsBtn, pointDisplayVisibility.bearings);
+  }
+
   function setPointNameVisibility(enabled) {
     pointDisplayVisibility.names = !!enabled;
     if (showPointNamesInput) showPointNamesInput.checked = pointDisplayVisibility.names;
@@ -4702,6 +4728,26 @@
     applyMapTileType();
     syncMapToView(true);
   }
+
+  showLinesInput?.addEventListener("change", () => {
+    setLineVisibility(showLinesInput.checked);
+    setStatus(`Lines ${pointDisplayVisibility.lines ? "shown" : "hidden"}.`, "ok");
+  });
+
+  quickShowLinesBtn?.addEventListener("click", () => {
+    setLineVisibility(!pointDisplayVisibility.lines);
+    setStatus(`Lines ${pointDisplayVisibility.lines ? "shown" : "hidden"}.`, "ok");
+  });
+
+  showBearingsInput?.addEventListener("change", () => {
+    setBearingVisibility(showBearingsInput.checked);
+    setStatus(`Bearings ${pointDisplayVisibility.bearings ? "shown" : "hidden"}.`, "ok");
+  });
+
+  quickShowBearingsBtn?.addEventListener("click", () => {
+    setBearingVisibility(!pointDisplayVisibility.bearings);
+    setStatus(`Bearings ${pointDisplayVisibility.bearings ? "shown" : "hidden"}.`, "ok");
+  });
 
   showPointsInput?.addEventListener("change", () => {
     setPointMarkerVisibility(showPointsInput.checked);
