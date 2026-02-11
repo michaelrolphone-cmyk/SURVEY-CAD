@@ -150,6 +150,7 @@ function utilityPointCodeForExport(utility = {}) {
   const serviceTypeId = Number(utility?.serviceTypeId);
   const rawCode = String(utility?.code || utility?.name || '').toUpperCase();
 
+  if (/\bTRANSF\b|\bTX\b|TRANSFORMER/.test(rawCode)) return 'TRANSF';
   if (serviceTypeId === 1 || /\bPM\b|METER|CONNECTION/.test(rawCode)) return 'PM';
   if (serviceTypeId === 3 || /\bOH\b|OVERHEAD/.test(rawCode)) return 'OH';
   if (serviceTypeId === 2 || /\bUG\b|\bUP\b|UNDERGROUND/.test(rawCode)) return 'UP';
@@ -178,14 +179,11 @@ export function buildPowerUtilityMarkersForPointForge(utilities2243, startPoint 
       return (order[a.pointCode] ?? 99) - (order[b.pointCode] ?? 99);
     });
 
-  const firstPointNumber = Number(startPoint);
-  const junctionCodes = downstream.map((_, index) => `JPN${firstPointNumber + index + 1}`);
-
   return [
     {
       east: connectionPoint.east,
       north: connectionPoint.north,
-      code: ['PM', ...junctionCodes].join(' ').trim(),
+      code: 'PM',
     },
     ...downstream.map((point) => ({
       east: point.east,

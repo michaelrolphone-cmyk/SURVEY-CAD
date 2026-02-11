@@ -68,7 +68,7 @@ test('buildPointMarkerCsvRowsPNEZD emits arbitrary marker points', () => {
 
 
 
-test('buildPowerUtilityMarkersForPointForge keeps JPN references on the PM connection point only', () => {
+test('buildPowerUtilityMarkersForPointForge keeps PM as connection point code without JPN auto-connect references', () => {
   const utilities = [
     { projected: { east: 110, north: 210 }, code: 'UP', serviceTypeId: 2 },
     { projected: { east: 100, north: 200 }, code: 'PM', serviceTypeId: 1 },
@@ -78,9 +78,24 @@ test('buildPowerUtilityMarkersForPointForge keeps JPN references on the PM conne
   const markers = buildPowerUtilityMarkersForPointForge(utilities, 25);
 
   assert.deepEqual(markers, [
-    { east: 100, north: 200, code: 'PM JPN26 JPN27' },
+    { east: 100, north: 200, code: 'PM' },
     { east: 120, north: 220, code: 'OH' },
     { east: 110, north: 210, code: 'UP' },
+  ]);
+});
+
+
+
+test('buildPowerUtilityMarkersForPointForge labels transformer utilities as TRANSF', () => {
+  const utilities = [
+    { projected: { east: 100, north: 200 }, code: 'PM', serviceTypeId: 1 },
+    { projected: { east: 105, north: 205 }, name: 'Existing Transformer', serviceTypeId: 1 },
+  ];
+
+  const markers = buildPowerUtilityMarkersForPointForge(utilities, 1);
+  assert.deepEqual(markers, [
+    { east: 100, north: 200, code: 'PM' },
+    { east: 105, north: 205, code: 'TRANSF' },
   ]);
 });
 
