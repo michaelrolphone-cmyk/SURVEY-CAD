@@ -351,6 +351,9 @@ The Selection section now also includes a point inspector card that shows select
 The drawing version restore prompt now renders each saved revision on its own line, preventing script parse errors when opening project-linked drawing history.
 When saving drawing metadata back into a project file, LineSmith now ignores malformed/null drawing index entries before updating IDs, preventing `Cannot read properties of null (reading 'id')` runtime errors for older or hand-edited project snapshots.
 
+When dragging a LineSmith selection window, right-click now zooms to that marquee window instead of triggering cancel/clear behavior, making fast window zoom-in available directly from select mode.
+No API endpoints or CLI commands changed in this LineSmith marquee-zoom interaction update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
 
 ### ROS standalone tool command
 

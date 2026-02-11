@@ -302,6 +302,13 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
   assert.match(html, /beginDrag\(\{type:"marquee", x0: mouse\.x, y0: mouse\.y, x1: mouse\.x, y1: mouse\.y, additive:false\}\);/, 'long-press on blank canvas should begin box-select marquee drag');
 });
 
+test('VIEWPORT.HTML right-click zooms to an active marquee window before cancel/clear behavior', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+zoomToScreenRect\(screenRect, options\s*=\s*\{\}\)\s*\{[\s\S]*history\.push\("zoom window"\);[\s\S]*view\.scale = newScale;/, 'LineSmith should provide a reusable zoom-to-window helper that updates view scale/pan and creates a history entry');
+  assert.match(html, /canvas\.addEventListener\("contextmenu",\s*\(e\)\s*=>\s*\{[\s\S]*if \(mouse\.dragObj\?\.type === "marquee"\) \{[\s\S]*zoomToScreenRect\(windowRect\);[\s\S]*endDrag\(\);[\s\S]*return;[\s\S]*runCanvasCancelOrClearAction\(\{ trigger: "right-click" \}\);/, 'right-clicking with an active marquee should zoom to the marquee window instead of running cancel/clear selection behavior');
+});
+
 
 
 

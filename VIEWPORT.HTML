@@ -4611,6 +4611,50 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     return true;
   }
 
+  function zoomToScreenRect(screenRect, options = {}) {
+    const { skipHistory = false, silent = false } = options;
+    if (!screenRect) return false;
+
+    const widthPx = Math.max(1, screenRect.maxX - screenRect.minX);
+    const heightPx = Math.max(1, screenRect.maxY - screenRect.minY);
+    if (widthPx < 3 && heightPx < 3) {
+      if (!silent) setStatus("Zoom window is too small.", "warn");
+      return false;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const pad = 60;
+    const usableW = Math.max(1, rect.width - pad * 2);
+    const usableH = Math.max(1, rect.height - pad * 2);
+
+    const worldA = screenToWorld(screenRect.minX, screenRect.maxY);
+    const worldB = screenToWorld(screenRect.maxX, screenRect.minY);
+
+    const minX = Math.min(worldA.x, worldB.x);
+    const maxX = Math.max(worldA.x, worldB.x);
+    const minY = Math.min(worldA.y, worldB.y);
+    const maxY = Math.max(worldA.y, worldB.y);
+
+    const dx = Math.max(EPS, maxX - minX);
+    const dy = Math.max(EPS, maxY - minY);
+
+    const scaleX = usableW / dx;
+    const scaleY = usableH / dy;
+    const newScale = clamp(Math.min(scaleX, scaleY) * 0.95, MIN_SCALE, MAX_SCALE);
+
+    const cx = (minX + maxX) * 0.5;
+    const cy = (minY + maxY) * 0.5;
+
+    if (!skipHistory) history.push("zoom window");
+    view.scale = newScale;
+    view.panX = rect.width * 0.5 - cx * view.scale;
+    view.panY = rect.height * 0.5 + cy * view.scale;
+
+    if (!silent) {
+      setStatus(`Zoomed to window.\nX: [${fmt(minX)}, ${fmt(maxX)}]\nY: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
+    }
+    return true;
+  }
 
   // -------------------------
   // CSV import / export
@@ -6234,6 +6278,12 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   canvas.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     updateMouseFromEvent(e);
+    if (mouse.dragObj?.type === "marquee") {
+      const windowRect = rectNorm(mouse.dragObj.x0, mouse.dragObj.y0, mouse.dragObj.x1, mouse.dragObj.y1);
+      zoomToScreenRect(windowRect);
+      endDrag();
+      return;
+    }
     runCanvasCancelOrClearAction({ trigger: "right-click" });
   });
 
