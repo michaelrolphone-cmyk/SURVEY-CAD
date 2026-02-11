@@ -135,6 +135,7 @@ node --test test/viewport.test.js
 `VIEWPORT.HTML` now limits dense point-cluster annotation for readability:
 
 - Cluster markers now keep a consistent footprint, with only a small text-width adjustment so multi-digit cluster counts still fit inside the marker.
+- Cluster groups now render as convex-hull polygons when their hull area is close to half of the cluster bounding-box area and the bounding-box width-to-height ratio is at least **1:3**; clusters that do not meet those geometry checks continue rendering as circular markers.
 - Cluster marker text/outline opacity now encodes relative cluster magnitude, interpolated from **25%** (smallest visible cluster group) to **70%** (largest visible cluster group).
 - Cluster marker radial point-number breakout labels render only when the cluster has **5 points or fewer**.
 - Cluster tooltip content switches behavior at **10 points**:
