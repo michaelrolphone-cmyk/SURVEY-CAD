@@ -30,6 +30,8 @@ test('RecordQuarry.html routes ROS PDF links through API server and exports uniq
   assert.match(html, /id="btnExportParcelCSV"[^>]*>Export CSV<\/button>/, 'CSV export button label should be simplified to Export CSV');
   assert.match(html, /<!-- LEFT -->[\s\S]*id="btnExportParcelCSV"[\s\S]*<!-- RIGHT -->/, 'CSV export button should live in the left panel controls');
   assert.match(html, /parcel_subdivision_aliquots_unique_points_idw_ft_pnezd\.csv/, 'CSV filename should reflect unique parcel/subdivision/aliquot points');
+  assert.match(html, /function\s+fetchSubdivisionGeometry2243FromPoint\s*\(/, 'export lookup should define subdivision outSR refetch helper to keep subdivision geometry scale aligned');
+  assert.match(html, /state\.subdivisionFeature2243\s*=\s*await\s*fetchSubdivisionGeometry2243FromPoint\(lon, lat\)/, 'export lookup should fetch subdivision geometry using shared export SR helper');
   assert.match(html, /state\.sectionFeature2243\s*=\s*await\s*fetchSectionGeometry2243FromPoint\(lon, lat\)/, 'export lookup should fetch containing section geometry in export SR');
 });
 

@@ -1977,6 +1977,26 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return resp?.features?.[0] || null;
   }
 
+  async function fetchSubdivisionGeometry2243FromPoint(lon, lat) {
+    const subdivision4326 = await findContainingPolygon(LAYERS.subdivisions, lon, lat, 2500, 4326);
+    if (!subdivision4326) return null;
+
+    const objectId = Number(subdivision4326?.attributes?.OBJECTID);
+    if (!Number.isFinite(objectId)) {
+      return findContainingPolygon(LAYERS.subdivisions, lon, lat, 2500, EXPORT_OUT_SR);
+    }
+
+    const resp = await arcQuery(LAYERS.subdivisions, {
+      where: `OBJECTID=${objectId}`,
+      outFields: '*',
+      returnGeometry: true,
+      outSR: EXPORT_OUT_SR,
+      resultRecordCount: 1,
+    });
+
+    return resp?.features?.[0] || null;
+  }
+
   // -----------------------------
   // PDF Basis of Bearing (upload)
   // -----------------------------
@@ -2300,7 +2320,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       try {
         log(`Fetching parcel/subdivision/aliquot export geometry in EPSG:${EXPORT_OUT_SR}...`);
         state.parcelFeature2243 = await fetchParcelGeometry2243FromPoint(lon, lat);
-        state.subdivisionFeature2243 = await loadSubdivisionAtPoint(lon, lat, EXPORT_OUT_SR);
+        state.subdivisionFeature2243 = await fetchSubdivisionGeometry2243FromPoint(lon, lat);
         state.sectionFeature2243 = await fetchSectionGeometry2243FromPoint(lon, lat);
 
         if (state.parcelFeature2243?.geometry?.rings?.length) {
