@@ -624,3 +624,5 @@ No API endpoints or CLI commands changed in this iOS geolocation/rendering relia
 No API endpoints or CLI commands changed for the PointForge point-editor passthrough preservation and LineSmith JPN editor auto-connect fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 No API endpoints or CLI commands changed for this LineSmith field-to-finish command parsing update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed in this LineSmith drawing-save diff serialization fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
