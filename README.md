@@ -386,6 +386,7 @@ When connecting more than two selected points, LineSmith now checks sequential p
 Project Browser drawing rows in `PROJECT_BROWSER.html` now include **Open in LineSmith**, launching `VIEWPORT.HTML?source=project-browser-drawing` and auto-loading the latest saved drawing version from project storage.
 Project-file folder ordering now pins `Drawings` at the top of the folder list, and LineSmith project drawing entries are re-sorted by latest save time so most recently saved drawings appear first.
 PointForge now also includes a **Renumber start** control (default `1`) with a **Renumber Output** action button; standard Process behavior remains unchanged, and sequential repacking is only applied when the renumber button is pressed (for example, start at `1000` to move the set into a new range).
+PointForge now also includes a **Localize points with anchor GPS** workflow in the GUI: enable localization, enter an anchor **point number** from the loaded set plus anchor `lat/lon`, and PointForge projects the GPS anchor to Idaho state plane (active zone) then offsets all processed points before export/handoff.
 
 PointForge now uses a simplified launcher-aligned visual theme (header, panels, chips, and action buttons) to match SurveyFoundry app launcher and RecordQuarry styling while reducing UI clutter around ingest/map/output workflows.
 

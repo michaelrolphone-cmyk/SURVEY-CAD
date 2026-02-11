@@ -187,6 +187,24 @@
       outline: none;
       border-color: rgba(116,140,255,.75);
     }
+    .coordInput{
+      width: 132px !important;
+    }
+    .localizationPanel{
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 12px;
+      background: rgba(8,10,16,.42);
+      display:grid;
+      gap: 8px;
+    }
+    .localizationRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap: wrap;
+    }
 
     textarea{
       width: 100%;
@@ -466,6 +484,21 @@
           </span>
 
           <span class="pill">Map defaults: <span class="mono">US-ft</span> · <span class="mono">West</span> · <span class="mono">SwapXY</span></span>
+        </div>
+
+        <div class="localizationPanel">
+          <div class="localizationRow">
+            <input id="enableLocalization" type="checkbox" />
+            <label for="enableLocalization" style="color:var(--text); margin:0;">Localize points with anchor GPS</label>
+          </div>
+          <div class="localizationRow">
+            <label for="anchorPointNumber" style="color:var(--text); margin:0;">Anchor point #</label>
+            <input id="anchorPointNumber" class="coordInput" type="number" min="1" step="1" placeholder="100" disabled />
+            <label for="anchorLat" style="color:var(--text); margin:0;">Lat/Lon</label>
+            <input id="anchorLat" class="coordInput" type="number" step="0.000001" placeholder="43.610000" disabled />
+            <input id="anchorLon" class="coordInput" type="number" step="0.000001" placeholder="-116.200000" disabled />
+          </div>
+          <div class="hint" id="localizationHint" style="margin:0;">Optional: select an existing point number as the local anchor and pair it with one known GPS anchor.</div>
         </div>
 
         <div class="grid2" style="margin-top: 10px; display:none;">
@@ -958,6 +991,11 @@
     const elBasemap = document.getElementById("basemap");
     const elRenumberStart = document.getElementById("renumberStart");
     const elMapHint = document.getElementById("mapHint");
+    const elEnableLocalization = document.getElementById("enableLocalization");
+    const elAnchorPointNumber = document.getElementById("anchorPointNumber");
+    const elAnchorLat = document.getElementById("anchorLat");
+    const elAnchorLon = document.getElementById("anchorLon");
+    const elLocalizationHint = document.getElementById("localizationHint");
 
     const st_lines = document.getElementById("st_lines");
     const st_parsed = document.getElementById("st_parsed");
@@ -1515,6 +1553,103 @@
       };
     }
 
+    function cloneRecordWithFields(record){
+      return {
+        ...record,
+        fields: Array.isArray(record?.fields) ? [...record.fields] : []
+      };
+    }
+
+    function getLocalizationSettings(){
+      const enabled = !!elEnableLocalization.checked;
+      if (!enabled) return { enabled: false };
+
+      const anchorPointNumber = Number.parseInt(String(elAnchorPointNumber.value || ''), 10);
+      const lat = Number(elAnchorLat.value);
+      const lon = Number(elAnchorLon.value);
+
+      if (!Number.isInteger(anchorPointNumber) || anchorPointNumber < 1 || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+        throw new Error("Localization requires anchor point # plus numeric anchor lat/lon values.");
+      }
+
+      if (!inIdaho(lat, lon)) {
+        throw new Error("Anchor latitude/longitude is outside Idaho bounds used by this workspace.");
+      }
+
+      return { enabled, anchorPointNumber, lat, lon };
+    }
+
+    function localizeRecords(recordsSorted){
+      const settings = getLocalizationSettings();
+      if (!settings.enabled) return { recordsSorted, summary: "" };
+
+      if (!window.proj4) {
+        throw new Error("Localization requires proj4 to project anchor latitude/longitude.");
+      }
+
+      const zone = elZone.value || "west";
+      const def = PROJ_DEFS_USFT[zone];
+      const swapXY = true;
+      const projectedAnchor = proj4("WGS84", def, [settings.lon, settings.lat]);
+      const anchorEast = Number(projectedAnchor?.[0]);
+      const anchorNorth = Number(projectedAnchor?.[1]);
+
+      if (!Number.isFinite(anchorEast) || !Number.isFinite(anchorNorth)) {
+        throw new Error("Unable to project anchor latitude/longitude into Idaho state-plane coordinates.");
+      }
+
+      const anchorRecord = recordsSorted.find((record)=>{
+        const pointNumber = Number.parseInt(trimOrEmpty(record?.fields?.[0]), 10);
+        return pointNumber === settings.anchorPointNumber;
+      });
+
+      if (!anchorRecord) {
+        throw new Error(`Anchor point #${settings.anchorPointNumber} was not found in the processed point set.`);
+      }
+
+      const anchorLocalHandoffX = swapXY ? anchorRecord.y : anchorRecord.x;
+      const anchorLocalHandoffY = swapXY ? anchorRecord.x : anchorRecord.y;
+      const eastOffset = anchorEast - anchorLocalHandoffX;
+      const northOffset = anchorNorth - anchorLocalHandoffY;
+
+      const localized = [];
+      for (let i = 0; i < recordsSorted.length; i += 1){
+        const record = recordsSorted[i];
+        if (!Number.isFinite(record?.x) || !Number.isFinite(record?.y)) {
+          throw new Error(`Point ${i + 1} is missing numeric X/Y coordinates and cannot be localized.`);
+        }
+
+        const localHandoffX = swapXY ? record.y : record.x;
+        const localHandoffY = swapXY ? record.x : record.y;
+        const localizedHandoffX = localHandoffX + eastOffset;
+        const localizedHandoffY = localHandoffY + northOffset;
+
+        const localizedRecord = cloneRecordWithFields(record);
+        localizedRecord.x = swapXY ? localizedHandoffY : localizedHandoffX;
+        localizedRecord.y = swapXY ? localizedHandoffX : localizedHandoffY;
+        localizedRecord.fields[1] = String(localizedRecord.x);
+        localizedRecord.fields[2] = String(localizedRecord.y);
+        localized.push(localizedRecord);
+      }
+
+      const summary = `LOCALIZATION
+  zone: ${zone}
+  anchor point #: ${settings.anchorPointNumber}
+  anchor lat/lon: ${settings.lat.toFixed(6)}, ${settings.lon.toFixed(6)}
+  projected east/north: ${anchorEast.toFixed(3)}, ${anchorNorth.toFixed(3)}
+  offsets east/north: ${eastOffset.toFixed(3)}, ${northOffset.toFixed(3)}`;
+      return { recordsSorted: localized, summary };
+    }
+
+    function setLocalizationInputsEnabled(enabled){
+      elAnchorPointNumber.disabled = !enabled;
+      elAnchorLat.disabled = !enabled;
+      elAnchorLon.disabled = !enabled;
+      elLocalizationHint.innerHTML = enabled
+        ? 'Localization enabled: PointForge will use the selected point number as the local anchor before offsetting all points into Idaho state plane.'
+        : 'Optional: select an existing point number as the local anchor and pair it with one known GPS anchor.';
+    }
+
     function processNow(){
       const input = elIn.value || "";
       if (!input.trim()){
@@ -1534,14 +1669,36 @@
       ensureImportContextForPaste(false);
 
       const res = transformPoints(input);
-      latestTransformed = res;
-      latestOutputText = res.outputText;
+      let recordsForOutput = res.recordsSorted;
+      let localizationSummary = "";
+      try {
+        const localized = localizeRecords(recordsForOutput);
+        recordsForOutput = localized.recordsSorted;
+        localizationSummary = localized.summary;
+      } catch (error) {
+        elOut.value = "";
+        latestOutputText = "";
+        latestTransformed = null;
+        elLog.textContent = `${res.logText}\n\n${String(error?.message || error)}`;
+        refreshPointEditorTables();
+        if (layer) layer.clearLayers();
+        setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
+        elMapHint.innerHTML = `<span class="warn">Localization input error.</span> ${escapeHtml(String(error?.message || error))}`;
+        elRenumber.disabled = true;
+        elDownload.disabled = true;
+        elOpenLineSmith.disabled = true;
+        return;
+      }
 
-      elOut.value = res.outputText;
-      elLog.textContent = res.logText;
+      const outputText = recordsForOutput.map((record)=>record.fields.map(csvEscape).join(",")).join("\n");
+      latestTransformed = { ...res, recordsSorted: recordsForOutput };
+      latestOutputText = outputText;
+
+      elOut.value = outputText;
+      elLog.textContent = localizationSummary ? `${res.logText}\n\n${localizationSummary}` : res.logText;
       refreshPointEditorTables();
 
-      const plotted = refreshMap(res.recordsSorted);
+      const plotted = refreshMap(recordsForOutput);
       setStats(res.stats, plotted);
 
       elRenumber.disabled = !latestOutputText;
@@ -1635,6 +1792,25 @@
         const plotted = refreshMap(latestTransformed.recordsSorted);
         setStats(latestTransformed.stats, plotted);
       }
+    });
+
+    function rerunProcessingIfNeeded(){
+      if (!elAuto.checked && !latestTransformed?.recordsSorted?.length) return;
+      processNow();
+    }
+
+    elEnableLocalization.addEventListener("change", ()=>{
+      setLocalizationInputsEnabled(elEnableLocalization.checked);
+      rerunProcessingIfNeeded();
+    });
+
+    [elAnchorPointNumber, elAnchorLat, elAnchorLon].forEach((el)=>{
+      el.addEventListener("input", ()=>{
+        if (!elEnableLocalization.checked) return;
+        if (!elAuto.checked) return;
+        if (t) clearTimeout(t);
+        t = setTimeout(()=>processNow(), 250);
+      });
     });
 
     // Download output
@@ -1747,6 +1923,7 @@
 
     // Init: blank textarea (no sample data), locked defaults already set in HTML
     initMap();
+    setLocalizationInputsEnabled(false);
     elIn.value = "";
     setPointEditorView(false);
     setBasemap("street");

@@ -8,6 +8,17 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
 
   assert.match(html, /id="renumberStart"\s+type="number"\s+min="1"\s+step="1"\s+value="1"/, 'PointForge should render a configurable renumber start input defaulting to 1');
   assert.match(html, /id="btnRenumber"/, 'PointForge should render an explicit renumber action button');
+  assert.match(html, /id="enableLocalization"\s+type="checkbox"/, 'PointForge should render a localization toggle so anchor localization can be configured in the GUI');
+  assert.match(html, /id="anchorLat"/, 'PointForge should render an anchor latitude input for localization');
+  assert.match(html, /id="anchorLon"/, 'PointForge should render an anchor longitude input for localization');
+  assert.match(html, /id="anchorPointNumber"/, 'PointForge should render an anchor point number input for localization');
+  assert.doesNotMatch(html, /id="anchorLocalX"/, 'PointForge should not require manual local X anchor entry in localization UI');
+  assert.doesNotMatch(html, /id="anchorLocalY"/, 'PointForge should not require manual local Y anchor entry in localization UI');
+  assert.match(html, /function\s+localizeRecords\(recordsSorted\)/, 'PointForge should define a localization routine that applies anchor offsets before output');
+  assert.match(html, /const\s+projectedAnchor\s*=\s*proj4\("WGS84",\s*def,\s*\[settings\.lon,\s*settings\.lat\]\)/, 'PointForge localization should project anchor lat\/lon into active state-plane zone');
+  assert.match(html, /settings\.anchorPointNumber/, 'PointForge localization should resolve the anchor from a point number in the processed set');
+  assert.match(html, /Anchor point #\$\{settings\.anchorPointNumber\} was not found/, 'PointForge should show a clear error when the requested anchor point number does not exist');
+  assert.match(html, /recordsForOutput\s*=\s*localized\.recordsSorted;/, 'PointForge processing should substitute localized records when localization is enabled');
   assert.match(html, /function\s+transformPoints\(text\)/, 'PointForge processing pipeline should keep its original transform signature');
   assert.match(html, /function\s+renumberOutputFromStart\(startValue\)/, 'PointForge should define explicit output renumber helper');
   assert.match(html, /elRenumber\.addEventListener\("click",\s*\(\)=>renumberOutputFromStart\(elRenumberStart\.value\)\);/, 'PointForge should only renumber when the renumber button is clicked');
