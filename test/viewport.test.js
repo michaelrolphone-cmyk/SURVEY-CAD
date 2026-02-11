@@ -207,6 +207,17 @@ test('VIEWPORT.HTML auto-enables map layer when bootstrapping PointForge imports
   assert.match(html, /if \(launchSource !== "pointforge"\) return false;/, 'PointForge bootstrap should only trigger from the pointforge source query param');
   assert.match(html, /importCsvText\(payload\.csv, "PointForge import"\);[\s\S]*setMapLayerEnabled\(true\);/, 'PointForge imports should default the map layer to enabled after loading points');
 });
+
+
+test('VIEWPORT.HTML parses JPN references and auto-connects matching point numbers during import', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.ok(html.includes('const regex = /\\bJPN\\s*([A-Za-z0-9]+)\\b/gi;'), 'LineSmith should parse JPN code tokens with optional whitespace and alphanumeric suffixes');
+  assert.match(html, /while\s*\(match\)\s*\{[\s\S]*targets\.push\(target\);[\s\S]*match\s*=\s*regex\.exec\(raw\);/, 'JPN parser should collect each code reference in a point code string');
+  assert.match(html, /function\s+connectJpnReferencedPoints\(\)\s*\{[\s\S]*const\s+targets\s*=\s*extractJpnTargetPointNumbers\(sourcePoint\.code\);[\s\S]*if \(!targetPointId \|\| targetPointId === sourcePoint\.id\) continue;[\s\S]*addLine\(sourcePoint\.id, targetPointId, false\);/, 'LineSmith should create linework between the source point and each JPN target point when it exists');
+  assert.match(html, /const\s+jpnLinesAdded\s*=\s*connectJpnReferencedPoints\(\);[\s\S]*JPN lines added: \$\{jpnLinesAdded\}/, 'CSV import completion status should report JPN-generated line counts');
+});
+
 test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out drawer controls', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
