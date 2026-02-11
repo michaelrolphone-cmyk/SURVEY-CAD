@@ -36,6 +36,10 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 - `Cmd+S` (macOS)
 - `Ctrl+Shift+S` / `Cmd+Shift+S` (handled as save in-app)
 
+Display behavior note:
+
+- When **Draw point names** and/or **Draw point codes** are turned off, hovering a point on the canvas shows a tooltip with point name, code, layer, and description (notes).
+
 ## Test
 
 ```bash
