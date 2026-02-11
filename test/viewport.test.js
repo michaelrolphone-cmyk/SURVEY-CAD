@@ -302,6 +302,18 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
   assert.match(html, /beginDrag\(\{type:"marquee", x0: mouse\.x, y0: mouse\.y, x1: mouse\.x, y1: mouse\.y, additive:false\}\);/, 'long-press on blank canvas should begin box-select marquee drag');
 });
 
+
+test('VIEWPORT.HTML keeps point inspector + map opacity always visible while tool sections are collapsible', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="panelToolsCollapse"\s+class="panelToolsCollapse"\s+open/, 'LineSmith should wrap drawer tool sections in an open-by-default collapsible container');
+  assert.match(html, /<summary>Tool drawer sections<\/summary>/, 'collapsible container should include a summary row to collapse/expand drawer controls');
+  assert.match(html, /<div class="title">[\s\S]*<b>Inspector \+ Map Opacity<\/b>[\s\S]*id="mapOpacity"\s+type="range"/, 'drawer should surface map opacity in an always-visible inspector section outside the collapsible tool body');
+  assert.match(html, /id="pointInspector"\s+class="inspectorCard"/, 'point inspector card should remain rendered in the always-visible inspector section');
+  assert.match(html, /id="panelToolsCollapse"[\s\S]*id="lineInspector"\s+class="inspectorCard"/, 'line inspector should stay within the collapsible tool body while point inspector remains always visible');
+});
+
+
 test('VIEWPORT.HTML right-click zooms to an active marquee window before cancel/clear behavior', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
