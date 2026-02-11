@@ -60,6 +60,10 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 - `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
   - CIR circles render with a 35% opacity primary stroke and no black underlay so map content remains visible through the circle interior.
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
+- Manual LineSmith line connections now persist to point codes:
+  - When a user manually connects two points, LineSmith appends `JPN<targetPointNumber>` to the source point unless that pair is already connected by sequential linework rules.
+  - Deleting a line removes matching `JPN` directives when present.
+  - Deleting a sequentially generated connection inserts `<code> END` and `<code> BEG` break directives on the connected points so the removed segment stays removed.
 
 ### LineSmith Field-to-Finish commands
 
