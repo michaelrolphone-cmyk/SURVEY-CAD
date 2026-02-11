@@ -23,6 +23,27 @@ const DEFAULTS = {
 
 const DIRS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
 
+function isUpstreamHttpError(err) {
+  return /^HTTP\s+\d{3}:/i.test(String(err?.message || ''));
+}
+
+function buildUtilityLookupCandidates(baseUrl, address) {
+  const candidates = [];
+
+  const primary = new URL(baseUrl);
+  primary.searchParams.set('address', address);
+  candidates.push(primary.toString());
+
+  if (/\/ResidentialUtilities\/?$/i.test(primary.pathname)) {
+    const fallback = new URL(primary.toString());
+    fallback.pathname = fallback.pathname.replace(/\/ResidentialUtilities\/?$/i, '/Utilities');
+    fallback.searchParams.set('address', address);
+    candidates.push(fallback.toString());
+  }
+
+  return [...new Set(candidates)];
+}
+
 function normalizeSpaces(s) {
   return (s || "").trim().replace(/\s+/g, " ");
 }
@@ -303,10 +324,26 @@ export class SurveyCadClient {
   }
 
   async lookupUtilitiesByAddress(address, outSR = 4326) {
-    const url = new URL(this.config.idahoPowerUtilityLookupUrl);
-    url.searchParams.set('address', address);
+    const candidates = buildUtilityLookupCandidates(this.config.idahoPowerUtilityLookupUrl, address);
 
-    const payload = await this.fetchJson(url.toString());
+    let payload = null;
+    let lastError = null;
+    for (const candidate of candidates) {
+      try {
+        payload = await this.fetchJson(candidate);
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (!payload) {
+      if (isUpstreamHttpError(lastError)) {
+        return [];
+      }
+      throw lastError;
+    }
+
     const rawUtilities = payload?.features || payload?.utilities || payload?.results || [];
     const normalized = rawUtilities
       .map((entry) => this.normalizeUtilityLocation(entry))

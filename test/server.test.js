@@ -4,7 +4,8 @@ import http from 'node:http';
 import { createSurveyServer } from '../src/server.js';
 import SurveyCadClient from '../src/survey-api.js';
 
-function createMockServer() {
+function createMockServer(options = {}) {
+  const { utilities404 = false } = options;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
@@ -79,6 +80,12 @@ function createMockServer() {
     }
 
     if (url.pathname === '/idaho-power/utilities') {
+      if (utilities404) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'not found' }));
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         utilities: [{
@@ -233,6 +240,25 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(projectBrowserStaticRes.status, 200);
     const projectBrowserHtml = await projectBrowserStaticRes.text();
     assert.match(projectBrowserHtml, /SurveyFoundry Project Browser/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+    await new Promise((resolve) => upstream.server.close(resolve));
+  }
+});
+
+test('server returns empty utility payload when upstream utility endpoint is unavailable', async () => {
+  const upstream = await createMockServer({ utilities404: true });
+  const base = `http://127.0.0.1:${upstream.port}`;
+  const client = new SurveyCadClient({
+    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+  });
+  const app = await startApiServer(client);
+
+  try {
+    const utilitiesRes = await fetch(`http://127.0.0.1:${app.port}/api/utilities?address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(utilitiesRes.status, 200);
+    const utilitiesPayload = await utilitiesRes.json();
+    assert.deepEqual(utilitiesPayload, { utilities: [] });
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));

@@ -4,7 +4,12 @@ import http from 'node:http';
 import { SurveyCadClient, parseAddress, buildAddressWhere, arcgisQueryUrl, pointInPolygon, centroidOfPolygon } from '../src/survey-api.js';
 
 function createMockServer(options = {}) {
-  const { strictAddressMiss = false, addressAlwaysMiss = false, failProjectedRefetch = false } = options;
+  const {
+    strictAddressMiss = false,
+    addressAlwaysMiss = false,
+    failProjectedRefetch = false,
+    utilities404 = false,
+  } = options;
   const requests = [];
   const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null };
   const server = http.createServer((req, res) => {
@@ -28,6 +33,12 @@ function createMockServer(options = {}) {
 
 
     if (url.pathname === '/idaho-power/utilities') {
+      if (utilities404) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'not found' }));
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         utilities: [{
@@ -455,6 +466,22 @@ test('lookupUtilitiesByAddress normalizes Idaho Power utility payload and projec
       north: 1000043.61,
       spatialReference: { wkid: 2243 },
     });
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('lookupUtilitiesByAddress returns [] when utility provider endpoint is unavailable', async () => {
+  const { server, port, requests } = await createMockServer({ utilities404: true });
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    idahoPowerUtilityLookupUrl: `${base}/idaho-power/utilities`,
+  });
+
+  try {
+    const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
+    assert.deepEqual(utilities, []);
+    assert.ok(requests.some((requestPath) => requestPath.includes('/idaho-power/utilities')));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
