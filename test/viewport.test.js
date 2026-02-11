@@ -267,12 +267,16 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
   assert.match(html, /const\s+POINT_CLUSTER_MAX_STROKE_ALPHA\s*=\s*0\.7\s*;/, 'cluster outlines should define a maximum 70% opacity for higher-magnitude groups');
   assert.match(html, /cluster\.members\.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT[\s\S]*countsByLayer/, 'cluster tooltip should aggregate large cluster details by drawing layer');
   assert.match(html, /<li><b class="clusterTooltipLayerName" style="color:\$\{escapeHtml\(meta\.color\)\}">\$\{escapeHtml\(layerName\)\}<\/b>: \$\{meta\.count\} point\$\{meta\.count === 1 \? "" : "s"\}<\/li>/, 'large cluster tooltip layer names should use their layer color while reporting per-layer point counts');
-  assert.match(html, /<li><b class="clusterTooltipPointName" style="color:\$\{escapeHtml\(layerColor\)\}">\$\{escapeHtml\(point\.num\)\}<\/b>\$\{code\}<\/li>/, 'small cluster tooltip point names should use their layer color');
+  assert.match(html, /<li\$\{activeClass\}><b class="clusterTooltipPointName" style="color:\$\{escapeHtml\(layerColor\)\}">\$\{escapeHtml\(point\.num\)\}<\/b>\$\{code\}<\/li>/, 'small cluster tooltip point names should use their layer color');
   assert.match(html, /function\s+buildPointClusters\(\)/, 'LineSmith should build dynamic point clusters for nearby points');
   assert.match(html, /const\s+markerRadius\s*=\s*10\s*\+\s*Math\.max\(0,\s*countText\.length\s*-\s*2\)\s*\*\s*3\s*;/, 'cluster marker radius should stay fixed by count-text width rather than scaling by cluster population');
   assert.match(html, /cluster\.strokeAlpha\s*=\s*POINT_CLUSTER_MIN_STROKE_ALPHA\s*\+\s*normalized\s*\*\s*\(POINT_CLUSTER_MAX_STROKE_ALPHA\s*-\s*POINT_CLUSTER_MIN_STROKE_ALPHA\)/, 'cluster opacity should interpolate between min and max alpha based on group magnitude');
   assert.match(html, /id="clusterTooltip"\s+class="clusterTooltip\s+hidden"/, 'LineSmith should include a dedicated tooltip container for hover cluster membership lists');
-  assert.match(html, /function\s+showClusterTooltip\(cluster\)/, 'LineSmith should render clustered point membership details on hover');
+  assert.match(html, /function\s+showClusterTooltip\(cluster,\s*screenX\s*=\s*mouse\.x,\s*screenY\s*=\s*mouse\.y\)/, 'LineSmith should render clustered point membership details on hover');
+  assert.match(html, /let\s+hoveredClusterPointId\s*=\s*null\s*;/, 'LineSmith should track the hovered member within a clustered marker');
+  assert.match(html, /function\s+getClusterMemberClosestToScreen\(cluster,\s*screenX,\s*screenY\)/, 'cluster hover should resolve the closest member point to the current cursor position');
+  assert.match(html, /const\s+activeClass\s*=\s*point\.id === hoveredClusterPointId \? " class=\\"active\\"" : "";/, 'cluster tooltip point rows should mark the hovered member as active in the list');
+  assert.match(html, /if \(hoveredClusterPointId != null && points\.has\(hoveredClusterPointId\)\) \{[\s\S]*ctx\.arc\(hoveredPointScreen\.x, hoveredPointScreen\.y, 10, 0, Math\.PI \* 2\);/, 'LineSmith should draw a map highlight ring for the hovered cluster member point');
   assert.match(html, /const\s+cluster\s*=\s*pointDisplayVisibility\.clustering\s*\?\s*getPointClusterAtScreen\(mouse\.x,\s*mouse\.y\)\s*:\s*null;[\s\S]*zoomToWorldBounds\(cluster\.minX,\s*cluster\.minY,\s*cluster\.maxX,\s*cluster\.maxY,\s*\{\s*paddingFraction:\s*0\.15\s*\}\);/, 'double-clicking a cluster should zoom to that cluster with 15% padding');
   assert.match(html, /const\s+labelRadius\s*=\s*POINT_LABEL_SPREAD_RADIUS_PX\s*\+\s*Math\.min\(20,\s*cluster\.members\.length\s*\*\s*2\);/, 'small clustered groups should spread out number labels radially to prevent overlap');
 });

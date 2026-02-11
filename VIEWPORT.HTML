@@ -390,6 +390,13 @@
     .clusterTooltip .clusterTooltipPointName{ font-weight:700; }
     .clusterTooltip ul{ margin:6px 0 0 16px; padding:0; }
     .clusterTooltip li{ margin:2px 0; }
+    .clusterTooltip li.active{
+      background:rgba(255,213,74,0.16);
+      border-radius:4px;
+      padding:1px 4px;
+      margin-left:-4px;
+      margin-right:-4px;
+    }
     .quickToolField{
       display:inline-flex;
       flex-direction:row;
@@ -1971,6 +1978,7 @@
   const POINT_CLUSTER_MIN_STROKE_ALPHA = 0.25;
   const POINT_CLUSTER_MAX_STROKE_ALPHA = 0.7;
   let cachedPointClusters = [];
+  let hoveredClusterPointId = null;
 
   const mapLayerState = {
     enabled: false,
@@ -3648,8 +3656,25 @@
       .replace(/'/g, "&#39;");
   }
 
-  function showClusterTooltip(cluster) {
+  function getClusterMemberClosestToScreen(cluster, screenX, screenY) {
+    if (!cluster || !cluster.members?.length) return null;
+    let closest = cluster.members[0];
+    let closestD2 = dist2(screenX, screenY, closest.sx, closest.sy);
+    for (let i = 1; i < cluster.members.length; i++) {
+      const member = cluster.members[i];
+      const d2 = dist2(screenX, screenY, member.sx, member.sy);
+      if (d2 < closestD2) {
+        closest = member;
+        closestD2 = d2;
+      }
+    }
+    return closest;
+  }
+
+  function showClusterTooltip(cluster, screenX = mouse.x, screenY = mouse.y) {
     if (!clusterTooltip || !cluster) return;
+    const hoveredMember = getClusterMemberClosestToScreen(cluster, screenX, screenY);
+    hoveredClusterPointId = hoveredMember?.id ?? null;
     const listHtml = cluster.members.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT
       ? (() => {
         const countsByLayer = new Map();
@@ -3675,7 +3700,8 @@
         const layer = getLayerById(point.layerId);
         const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
         const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
-        return `<li><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</li>`;
+        const activeClass = point.id === hoveredClusterPointId ? " class=\"active\"" : "";
+        return `<li${activeClass}><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</li>`;
       }).join("");
     clusterTooltip.innerHTML = `<div><b>${cluster.members.length} clustered points</b></div><ul>${listHtml}</ul>`;
     clusterTooltip.classList.remove("hidden");
@@ -3693,6 +3719,7 @@
 
   function hideClusterTooltip() {
     if (!clusterTooltip) return;
+    hoveredClusterPointId = null;
     clusterTooltip.classList.add("hidden");
     clusterTooltip.textContent = "";
   }
@@ -4114,6 +4141,22 @@
         const numText = String(member.point.num);
         ctx.fillText(numText, labelX, labelY);
         blockedTextRects.push({ x: labelX, y: labelY - 6, w: ctx.measureText(numText).width, h: 12 });
+      }
+    }
+
+    if (hoveredClusterPointId != null && points.has(hoveredClusterPointId)) {
+      const hoveredPoint = points.get(hoveredClusterPointId);
+      if (hoveredPoint && isLayerVisible(hoveredPoint.layerId)) {
+        const hoveredPointScreen = worldToScreen(hoveredPoint.x, hoveredPoint.y);
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,213,74,0.95)";
+        ctx.fillStyle = "rgba(255,213,74,0.2)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(hoveredPointScreen.x, hoveredPointScreen.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
       }
     }
 
