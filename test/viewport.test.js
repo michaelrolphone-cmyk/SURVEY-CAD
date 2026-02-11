@@ -722,3 +722,14 @@ test('VIEWPORT.HTML points manager supports grouping and layer-tinted rows', asy
   assert.match(html, /function\s+colorToRgba\(color, alpha = 0\.1\)[\s\S]*return\s+`rgba\(\$\{r\},\$\{g\},\$\{b\},\$\{clamp\(alpha, 0, 1\)\}\)`;/, 'points manager should derive faint row tint colors from layer hex values');
   assert.match(html, /const\s+tint\s*=\s*colorToRgba\(getLayerById\(p\.layerId\)\?\.color,\s*0\.12\);[\s\S]*if\s*\(tint\)\s*tr\.style\.background\s*=\s*tint;/, 'points manager rows should apply a faint background tint from the point layer color');
 });
+
+
+test('VIEWPORT.HTML uses a sci-fi cockpit visual theme for LineSmith controls', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /--accent:#4df9ff;/, 'theme palette should expose a neon cyan accent token for futuristic UI highlights');
+  assert.match(html, /body::before\{[\s\S]*background-size:100% 3px, 3px 100%;/, 'global display should render a subtle holographic grid overlay');
+  assert.match(html, /class="cockpitHeader"[\s\S]*Neo-Cartography Control Deck/, 'panel should render a dedicated sci-fi cockpit header label');
+  assert.match(html, /class="cockpitHeaderTag"[\s\S]*fa-satellite-dish[\s\S]*Link Stable/, 'cockpit header should include telemetry-style status chip text and icon');
+  assert.match(html, /\.quickTools\{[\s\S]*box-shadow:0 14px 34px rgba\(2,10,31,0\.55\), 0 0 0 1px rgba\(77,249,255,0\.16\);/, 'quick tools tray should use luminous panel chrome instead of flat styling');
+});

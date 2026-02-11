@@ -7,6 +7,7 @@ SURVEY-CAD is a Node.js toolkit and web server for survey workflows. It includes
 - Command-line tools for survey lookups, project file generation, FLD parsing, point localization, and ROS basis-of-bearing extraction.
 - Static browser tools served from the repository root.
   - LineSmith (`VIEWPORT.HTML`) points manager includes row tinting by layer color and optional grouping by Layer or Code for large point sets.
+  - LineSmith now ships with a full "Neo-Cartography" sci-fi cockpit visual redesign (holographic grid overlay, luminous tool chrome, and telemetry header chips).
 
 ## Requirements
 
@@ -174,6 +175,12 @@ npm run ros:cli -- --pdf ./sample.pdf --maxPages 2 --dpi 300 --debug
   npm run ros:ocr
   ```
 
+- Start web server:
+
+  ```bash
+  npm start
+  ```
+
 ---
 
 ## HTTP API Endpoints
@@ -195,6 +202,7 @@ Base URL (local): `http://localhost:3000`
 - `GET /api/aliquots?lon=...&lat=...&outSR=4326`
 - `GET /api/subdivision?lon=...&lat=...&outSR=4326`
 - `GET /api/static-map?lon=...&lat=...&address=...`
+- `GET /api/ros-pdf?url=https://example.com/file.pdf`
 
 ### Project file
 
@@ -206,6 +214,10 @@ Base URL (local): `http://localhost:3000`
 ### Field-to-Finish (FLD)
 
 - `GET /api/fld-config?file=config/MLS.fld`
+
+### ROS OCR extraction
+
+- `POST /extract` (multipart form-data with `pdf` file upload)
 
 Returns parsed FLD data:
 
