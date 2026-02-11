@@ -2967,6 +2967,22 @@
       }
     },
     {
+      type: "circle",
+      parse(raw, _tokensUpper) {
+        const commands = [];
+        const regex = /(?:^|[^A-Z0-9])CIR\s*([0-9]*\.?[0-9]+)\s*(?:FT)?\b/gi;
+        let match = regex.exec(raw);
+        while (match) {
+          const radius = Number(match[1]);
+          if (Number.isFinite(radius) && radius > 0) {
+            commands.push({ type: "circle", radius });
+          }
+          match = regex.exec(raw);
+        }
+        return commands;
+      }
+    },
+    {
       type: "sequential-line",
       parse(_raw, tokensUpper) {
         const commands = [];
@@ -3025,6 +3041,12 @@
       if (tokenUpper === "JPN") {
         const next = String(tokens[i + 1] ?? "");
         if (/^[A-Z0-9]+$/i.test(next)) i++;
+        continue;
+      }
+      if (/^CIR\s*[0-9]*\.?[0-9]+(?:FT)?$/i.test(tokenRaw)) continue;
+      if (tokenUpper === "CIR") {
+        const next = String(tokens[i + 1] ?? "");
+        if (/^[0-9]*\.?[0-9]+(?:FT)?$/i.test(next)) i++;
         continue;
       }
 
@@ -3303,6 +3325,19 @@
     }
 
     return lineCommands;
+  }
+
+  function buildFieldToFinishCircleCommands() {
+    const circles = [];
+    for (const point of points.values()) {
+      const { commands } = parseFieldToFinishCommands(point.code);
+      for (const cmd of commands) {
+        if (cmd.type !== "circle") continue;
+        if (!Number.isFinite(cmd.radius) || cmd.radius <= 0) continue;
+        circles.push({ centerPointId: point.id, radius: cmd.radius });
+      }
+    }
+    return circles;
   }
 
   function connectFieldToFinishSequentialLines() {
@@ -4229,6 +4264,22 @@
         }
 
         lineLabelCandidates.push({ a, b, sa, sb });
+      }
+
+      const circleCommands = buildFieldToFinishCircleCommands();
+      for (const cmd of circleCommands) {
+        const center = points.get(cmd.centerPointId);
+        if (!center || !isLayerVisible(center.layerId)) continue;
+        const layer = getLayerById(center.layerId);
+        if (!layer || layer.visible === false) continue;
+        const radiusPixels = cmd.radius * view.scale;
+        if (!Number.isFinite(radiusPixels) || radiusPixels <= 0.5) continue;
+        const sc = worldToScreen(center.x, center.y);
+        ctx.strokeStyle = layer.color;
+        ctx.lineWidth = Math.max(0.5, layer.lineWeight);
+        ctx.beginPath();
+        ctx.arc(sc.x, sc.y, radiusPixels, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
       // highlight selected lines
@@ -6142,6 +6193,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
           return true;
         }
       }
+
     }
     return isCollabSocketConnected();
   }
