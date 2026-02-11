@@ -562,7 +562,7 @@ test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal 
 
   assert.match(html, /const\s+DEFAULT_LAYER_ID\s*=\s*"layer-1";/, 'LineSmith should define a default layer id for new drawings');
   assert.match(html, /const\s+layers\s*=\s*new\s+Map\(\);\s*\/\/ id -> \{id,name,color,locked,visible,lineWeight,fill\}/, 'LineSmith should maintain a first-class layer registry');
-  assert.match(html, /id="quickLayerSelect"/, 'quick toolbar should expose a layer dropdown for active drawing layer');
+  assert.match(html, /id="quickLayerDropdown"[\s\S]*id="quickLayerDropdownButton"[\s\S]*id="quickLayerDropdownMenu"/, 'quick toolbar should expose an HTML layer dropdown for active drawing layer');
   assert.match(html, /id="quickLayerManager"[\s\S]*fa-layer-group/, 'quick toolbar should include a layer-manager icon button');
   assert.match(html, /id="layersModal"\s+class="modalOverlay hidden"/, 'LineSmith should define a layer manager modal');
   assert.match(html, /<th>Name<\/th>[\s\S]*<th>Color<\/th>[\s\S]*<th>Line Weight<\/th>[\s\S]*<th>Lock<\/th>[\s\S]*<th>Visible<\/th>[\s\S]*<th>Fill<\/th>/, 'layer manager table should provide editable layer fields and flags');
@@ -570,6 +570,10 @@ test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal 
   assert.match(html, /function\s+addLine\(aPointId, bPointId, movable=false, layerId = selectedLayerId\)/, 'new lines should default to the currently selected layer');
   assert.match(html, /if \(!isLayerVisible\(p\.layerId\)\) continue;/, 'rendering should hide point symbols for invisible layers');
   assert.match(html, /if \(!isLayerVisible\(ln\.layerId\)\) continue;/, 'rendering and selection should hide linework for invisible layers');
+  assert.match(html, /function\s+setQuickLayerDropdownOpen\(open\)\s*\{[\s\S]*quickLayerDropdownMenu\.classList\.toggle\("hidden", !quickLayerDropdownOpen\);/, 'quick toolbar should drive an HTML dropdown open state instead of relying on native select widgets');
+  assert.match(html, /const\s+toggles\s*=\s*\[[\s\S]*key:\s*"locked"[\s\S]*key:\s*"visible"[\s\S]*key:\s*"fill"/, 'each dropdown layer row should expose lock, visibility, and fill toggle controls');
+  assert.match(html, /btn\.addEventListener\("click", \(event\) => \{[\s\S]*event\.stopPropagation\(\);[\s\S]*toggleLayerFlag\(layer, toggle\.key\);[\s\S]*setQuickLayerDropdownOpen\(true\);/, 'toggling layer flags from the dropdown should not select the row and should keep the dropdown open');
+  assert.match(html, /\.quickLayerDropdownMenu\{[\s\S]*max-height:320px;[\s\S]*overflow-y:auto;/, 'layer dropdown should become scrollable after roughly ten rows');
   assert.match(html, /ctx\.strokeStyle = isMovable\(ln\.movable\) \? "#800000" : layer\.color;[\s\S]*ctx\.lineWidth = Math\.max\(0\.5, layer\.lineWeight\);/, 'line rendering should use per-layer color and lineweight');
   assert.match(html, /if \(!layer\.fill \|\| layer\.visible === false\) continue;[\s\S]*ctx\.fillStyle = `\$\{layer\.color\}1A`;/, 'closed loops on fill-enabled layers should render with low-opacity layer color fill');
   assert.match(html, /if \(isLayerLocked\(p\.layerId\)\) \{[\s\S]*Layer .* is locked\./, 'point edits should be blocked when the owning layer is locked');
