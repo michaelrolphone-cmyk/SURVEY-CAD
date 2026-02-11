@@ -116,6 +116,20 @@ npm run ros:cli -- --help
 node --test test/viewport.test.js
 ```
 
+## LineSmith Footer Mouse Coordinates
+
+`VIEWPORT.HTML` now renders footer mouse coordinates as plain state-plane values (fixed 3-decimal format) to avoid scientific notation at large easting/northing magnitudes.
+
+- Footer HUD label now reads **Mouse (State Plane)**.
+- The footer coordinate formatter now uses plain decimal formatting (for example `x: 2567890.123, y: 149876.456`) instead of exponential notation when values exceed one million.
+- API/CLI surface impact: no new endpoints or commands were added for this UI behavior; continue using existing endpoints like `GET /api/fld-config` and existing CLI entrypoints (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+Validation command:
+
+```bash
+node --test test/viewport.test.js
+```
+
 ## LineSmith Point Cluster UX
 
 `VIEWPORT.HTML` now limits dense point-cluster annotation for readability:

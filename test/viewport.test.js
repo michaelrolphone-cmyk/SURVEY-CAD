@@ -162,6 +162,15 @@ test('VIEWPORT.HTML supports reference-angle rotation of selected geometry from 
   assert.match(html, /drawRotateSelectionPreview\(\);/, 'draw loop should render rotate preview overlays while session is active');
   assert.match(html, /if \(rotateSelectionSession\.active && !rotateSelectionSession\.awaitingSelection\) \{[\s\S]*handleRotateSelectionCanvasPick\(mouse\.x, mouse\.y\);[\s\S]*return;/, 'canvas clicks should route to rotate pick stages while rotate mode is active and selection has been captured');
 });
+
+
+test('VIEWPORT.HTML shows footer mouse coordinates in plain state-plane format', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /<span class="pill"><b>Mouse \(State Plane\)<\/b>\s*<span id="hudMouse">x: 0\.000, y: 0\.000<\/span><\/span>/, 'HUD footer should label mouse coordinates as state-plane and initialize plain decimal values');
+  assert.match(html, /const\s+fmtPlainCoordinate\s*=\s*\(n\)\s*=>\s*\(Number\.isFinite\(n\)[\s\S]*toLocaleString\("en-US",\s*\{\s*useGrouping:false,\s*minimumFractionDigits:3,\s*maximumFractionDigits:3\s*\}\)/, 'LineSmith should provide a plain-number formatter for state-plane coordinates that avoids scientific notation');
+  assert.match(html, /hudMouse\.textContent\s*=\s*`x: \$\{fmtPlainCoordinate\(mouse\.wx\)\}, y: \$\{fmtPlainCoordinate\(mouse\.wy\)\}`;/, 'HUD mouse readout should render state-plane coordinates using the plain-number formatter');
+});
 test('VIEWPORT.HTML restores persisted movable flags as strict booleans', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
