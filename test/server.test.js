@@ -79,28 +79,21 @@ function createMockServer(options = {}) {
       return;
     }
 
-    if (url.pathname === '/serviceEstimator/api/EstimateDetail/Calculate') {
+    if (url.pathname.startsWith('/serviceEstimator/api/NearPoint/Residential/PrimaryPoints/')) {
       if (estimateCalculate404) {
         res.statusCode = 404;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ error: 'not found' }));
         return;
       }
-      const chunks = [];
-      req.on('data', (chunk) => chunks.push(chunk));
-      req.on('end', () => {
-        const form = new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          transformers: [{
-            id: 'tx-1',
-            provider: 'Idaho Power',
-            name: 'Boise Service Utility',
-            longitude: Number(form.get('beginLongitude')),
-            latitude: Number(form.get('beginLatitude')),
-          }],
-        }));
-      });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        primaryPoints: [
+          { id: 'pm-1', serviceTypeId: 1, code: 'PM', geometry: { x: -12936280.004339488, y: 5406832.06332747, spatialReference: { wkid: 3857 } } },
+          { id: 'up-1', serviceTypeId: 2, code: 'UP', geometry: { x: -12936180.004339488, y: 5406882.06332747, spatialReference: { wkid: 3857 } } },
+          { id: 'oh-1', serviceTypeId: 3, code: 'OH', geometry: { x: -12936080.004339488, y: 5406932.06332747, spatialReference: { wkid: 3857 } } },
+        ],
+      }));
       return;
     }
 
@@ -164,7 +157,7 @@ test('server exposes survey APIs and static html', async () => {
     nominatimUrl: `${base}/geocode`,
     blmFirstDivisionLayer: `${base}/blm1`,
     blmSecondDivisionLayer: `${base}/blm2`,
-    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
   });
   const app = await startApiServer(client);
@@ -236,7 +229,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.ok(utilitiesPayload.utilities.every((utility) => utility.provider === 'Idaho Power'));
     assert.deepEqual(
       utilitiesPayload.utilities.map((utility) => utility.code).sort(),
-      ['OH PWR TX', 'UG PWR TX', 'UG PWR TX'],
+      ['OH', 'PM', 'UP'],
     );
 
     const rosPdfRes = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=${encodeURIComponent(`${base}/sample.pdf`)}`);
@@ -280,7 +273,7 @@ test('server returns empty utility payload when upstream utility endpoint is una
   const upstream = await createMockServer({ estimateCalculate404: true });
   const base = `http://127.0.0.1:${upstream.port}`;
   const client = new SurveyCadClient({
-    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/EstimateDetail/Calculate`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
   });
   const app = await startApiServer(client);
 

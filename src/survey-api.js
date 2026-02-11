@@ -17,7 +17,7 @@ const DEFAULTS = {
   nominatimEmail: "admin@example.com",
   arcgisGeocodeUrl:
     "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
-  idahoPowerUtilityLookupUrl: "https://api.idahopower.com/serviceEstimator/api/EstimateDetail/Calculate",
+  idahoPowerUtilityLookupUrl: "https://api.idahopower.com/serviceEstimator/api/NearPoint/Residential/PrimaryPoints",
   arcgisGeometryProjectUrl: "https://utility.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer/project",
 };
 
@@ -73,10 +73,75 @@ function buildEstimateCalculateForm({ lon, lat, serviceTypeId = 1 }) {
 
 const ESTIMATE_SERVICE_TYPE_IDS = Object.freeze([1, 2, 3]);
 
+function lonToWebMercatorX(lon) {
+  return Number(lon) * 20037508.34 / 180;
+}
+
+function latToWebMercatorY(lat) {
+  const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, Number(lat)));
+  const radians = clampedLat * Math.PI / 180;
+  return Math.log(Math.tan((Math.PI / 4) + (radians / 2))) * 6378137;
+}
+
+function webMercatorToLonLat(x, y) {
+  const lon = (Number(x) / 20037508.34) * 180;
+  const lat = (Math.atan(Math.exp(Number(y) / 6378137)) * 360 / Math.PI) - 90;
+  return { lon, lat };
+}
+
+function buildNearPointPrimaryPointsUrl(baseUrl, lon, lat) {
+  const base = String(baseUrl || '').replace(/\/+$/, '');
+  const x = lonToWebMercatorX(lon);
+  const y = latToWebMercatorY(lat);
+  return `${base}/${x}/${y}/`;
+}
+
+function extractUtilitiesFromNearPointPayload(payload = {}) {
+  const buckets = [
+    payload?.primaryPoints,
+    payload?.points,
+    payload?.results,
+    payload?.features,
+    Array.isArray(payload) ? payload : null,
+  ].filter(Array.isArray);
+
+  const fallbackEntries = Object.values(payload || {}).filter((value) => Array.isArray(value) && value.length);
+  const entries = (buckets.length ? buckets : fallbackEntries).flat();
+
+  return entries.map((entry, index) => {
+    const serviceTypeId = Number(
+      entry?.serviceEstimateServiceTypeId
+      ?? entry?.serviceTypeId
+      ?? entry?.primaryPointTypeId
+      ?? entry?.serviceType
+      ?? index + 1,
+    );
+    const codePrefix = utilityCodePrefixForServiceType(serviceTypeId);
+
+    return {
+      ...entry,
+      id: entry?.id || entry?.primaryPointId || `near-point-${serviceTypeId}-${index + 1}`,
+      provider: entry?.provider || 'Idaho Power',
+      name: entry?.name || `${codePrefix} PRIMARY`,
+      code: entry?.code || codePrefix,
+      serviceTypeId,
+      geometry: entry?.geometry || entry?.location || entry?.point || {
+        x: entry?.x ?? entry?.longitude ?? entry?.lon,
+        y: entry?.y ?? entry?.latitude ?? entry?.lat,
+        spatialReference: {
+          wkid: Number(entry?.spatialReference?.wkid || entry?.wkid || entry?.latestWkid || 3857),
+        },
+      },
+    };
+  });
+}
+
+
 function utilityCodePrefixForServiceType(serviceTypeId) {
   const normalized = Number(serviceTypeId);
-  if (normalized === 1) return 'OH PWR';
-  if (normalized === 2 || normalized === 3) return 'UG PWR';
+  if (normalized === 1) return 'PM';
+  if (normalized === 2) return 'UP';
+  if (normalized === 3) return 'OH';
   return 'PWR';
 }
 
@@ -104,14 +169,12 @@ function extractUtilitiesFromEstimatePayload(payload = {}, options = {}) {
 
   const beginLongitude = Number(estimateDetail?.beginLongitude);
   const beginLatitude = Number(estimateDetail?.beginLatitude);
-  const endLongitude = Number(estimateDetail?.endLongitude);
-  const endLatitude = Number(estimateDetail?.endLatitude);
   if (Number.isFinite(beginLongitude) && Number.isFinite(beginLatitude)) {
-    const utilities = [{
-      id: `${estimateDetail?.estimateDetailId || `estimate-${serviceTypeId || 'unknown'}`}-beg`,
+    return [{
+      id: `${estimateDetail?.estimateDetailId || `estimate-${serviceTypeId || 'unknown'}`}-pt`,
       provider: 'Idaho Power',
-      name: `${codePrefix} BEG`,
-      code: `${codePrefix} BEG`,
+      name: codePrefix,
+      code: codePrefix,
       serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
       geometry: {
         x: beginLongitude,
@@ -119,35 +182,14 @@ function extractUtilitiesFromEstimatePayload(payload = {}, options = {}) {
         spatialReference: { wkid: 4326 },
       },
     }];
-
-    if (
-      Number.isFinite(endLongitude)
-      && Number.isFinite(endLatitude)
-      && (endLongitude !== beginLongitude || endLatitude !== beginLatitude)
-    ) {
-      utilities.push({
-        id: `${estimateDetail?.estimateDetailId || `estimate-${serviceTypeId || 'unknown'}`}-end`,
-        provider: 'Idaho Power',
-        name: `${codePrefix} END`,
-        code: `${codePrefix} END`,
-        serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
-        geometry: {
-          x: endLongitude,
-          y: endLatitude,
-          spatialReference: { wkid: 4326 },
-        },
-      });
-    }
-
-    return utilities;
   }
 
   if (fallbackPoint) {
     return [{
       id: 'estimate-fallback',
       provider: 'Idaho Power',
-      name: `${codePrefix} BEG`,
-      code: `${codePrefix} BEG`,
+      name: codePrefix,
+      code: codePrefix,
       serviceTypeId: serviceTypeId ?? estimateDetail?.serviceEstimateServiceTypeId,
       geometry: {
         x: Number(fallbackPoint.lon),
@@ -522,15 +564,24 @@ export class SurveyCadClient {
     const spatialReference = geometry.spatialReference || entry.spatialReference || {};
     const wkid = Number(spatialReference.wkid || spatialReference.latestWkid || 4326);
 
+    const wgs84Location = wkid === 3857 || wkid === 102100 || wkid === 102113
+      ? webMercatorToLonLat(lon, lat)
+      : { lon, lat };
+
     return {
       id: String(attrs.id || attrs.ID || attrs.OBJECTID || attrs.objectid || entry.id || `${lon},${lat}`),
       name: String(attrs.name || attrs.NAME || entry.name || entry.utilityName || 'Utility location'),
       code: String(attrs.code || attrs.CODE || entry.code || entry.name || entry.utilityName || 'Utility location'),
       provider: String(attrs.provider || attrs.PROVIDER || entry.provider || 'Idaho Power'),
+      serviceTypeId: Number(entry.serviceTypeId ?? attrs.serviceTypeId ?? attrs.SERVICE_TYPE_ID ?? attrs.serviceEstimateServiceTypeId),
       geometry: {
         x: lon,
         y: lat,
         spatialReference: { wkid },
+      },
+      locationWgs84: {
+        lon: Number(wgs84Location.lon),
+        lat: Number(wgs84Location.lat),
       },
     };
   }
@@ -539,7 +590,32 @@ export class SurveyCadClient {
     const lookupUrl = String(this.config.idahoPowerUtilityLookupUrl || '');
 
     let rawUtilities = [];
-    if (/\/EstimateDetail\/Calculate\/?$/i.test(lookupUrl)) {
+    if (/\/NearPoint\/Residential\/PrimaryPoints\/?$/i.test(lookupUrl)) {
+      let geocode;
+      try {
+        geocode = await this.geocodeAddress(address);
+      } catch {
+        return [];
+      }
+
+      try {
+        const nearPointUrl = buildNearPointPrimaryPointsUrl(lookupUrl, geocode.lon, geocode.lat);
+        const payload = await this.fetchJson(nearPointUrl, {
+          headers: {
+            Accept: '*/*',
+            'User-Agent': this.config.nominatimUserAgent,
+            Referer: 'https://tools.idahopower.com/',
+            Origin: 'https://tools.idahopower.com',
+          },
+        });
+        rawUtilities = extractUtilitiesFromNearPointPayload(payload);
+      } catch (err) {
+        if (isUpstreamHttpError(err)) {
+          return [];
+        }
+        throw err;
+      }
+    } else if (/\/EstimateDetail\/Calculate\/?$/i.test(lookupUrl)) {
       let geocode;
       try {
         geocode = await this.geocodeAddress(address);
@@ -549,11 +625,7 @@ export class SurveyCadClient {
 
       try {
         const estimatePayloads = await Promise.all(ESTIMATE_SERVICE_TYPE_IDS.map(async (serviceTypeId) => {
-          const params = buildEstimateCalculateForm({
-            lon: geocode.lon,
-            lat: geocode.lat,
-            serviceTypeId,
-          });
+          const params = buildEstimateCalculateForm({ lon: geocode.lon, lat: geocode.lat, serviceTypeId });
           const payload = await this.fetchJson(lookupUrl, {
             method: 'POST',
             headers: {
@@ -565,16 +637,11 @@ export class SurveyCadClient {
           });
           return { payload, serviceTypeId };
         }));
-
         rawUtilities = estimatePayloads.flatMap(({ payload, serviceTypeId }) => (
           extractUtilitiesFromEstimatePayload(payload, { fallbackPoint: { lon: geocode.lon, lat: geocode.lat }, serviceTypeId })
         ));
-        const serviceLineUtilities = estimatePayloads.flatMap(({ payload }) => extractServiceLineUtilities(payload || {}));
-        rawUtilities.push(...serviceLineUtilities);
       } catch (err) {
-        if (isUpstreamHttpError(err)) {
-          return [];
-        }
+        if (isUpstreamHttpError(err)) return [];
         throw err;
       }
     } else {
@@ -634,8 +701,8 @@ export class SurveyCadClient {
     }
 
     return output.map((utility) => {
-      const lon = Number(utility.geometry.x);
-      const lat = Number(utility.geometry.y);
+      const lon = Number(utility.locationWgs84?.lon ?? utility.geometry.x);
+      const lat = Number(utility.locationWgs84?.lat ?? utility.geometry.y);
       const projected = utility.projected || (outSR === 4326
         ? { east: lon, north: lat, spatialReference: { wkid: 4326 } }
         : null);
@@ -645,6 +712,7 @@ export class SurveyCadClient {
         name: utility.name,
         code: utility.code || utility.name,
         provider: utility.provider,
+        serviceTypeId: Number(utility.serviceTypeId),
         location: { lon, lat },
         projected,
       };

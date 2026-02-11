@@ -146,47 +146,53 @@ export function buildPointMarkerCsvRowsPNEZD(markers2243, startPoint = 1, labelP
   return { csv: lines.length ? `${lines.join('\n')}\n` : '', nextPoint: pointNumber, count: lines.length };
 }
 
+function utilityPointCodeForExport(utility = {}) {
+  const serviceTypeId = Number(utility?.serviceTypeId);
+  const rawCode = String(utility?.code || utility?.name || '').toUpperCase();
+
+  if (serviceTypeId === 1 || /\bPM\b|METER|CONNECTION/.test(rawCode)) return 'PM';
+  if (serviceTypeId === 3 || /\bOH\b|OVERHEAD/.test(rawCode)) return 'OH';
+  if (serviceTypeId === 2 || /\bUG\b|\bUP\b|UNDERGROUND/.test(rawCode)) return 'UP';
+  return 'UP';
+}
+
 export function buildPowerUtilityMarkersForPointForge(utilities2243, startPoint = 1) {
   const points = (utilities2243 || [])
     .map((utility, index) => ({
       east: Number(utility?.projected?.east),
       north: Number(utility?.projected?.north),
+      utility,
       index,
+      pointCode: utilityPointCodeForExport(utility),
     }))
     .filter((point) => Number.isFinite(point.east) && Number.isFinite(point.north));
 
   if (!points.length) return [];
 
+  const meterIndex = points.findIndex((point) => point.pointCode === 'PM');
+  const connectionPoint = meterIndex >= 0 ? points[meterIndex] : points[0];
+  const downstream = points
+    .filter((_, index) => index !== (meterIndex >= 0 ? meterIndex : 0))
+    .sort((a, b) => {
+      const order = { OH: 0, UP: 1 };
+      return (order[a.pointCode] ?? 99) - (order[b.pointCode] ?? 99);
+    });
+
   const firstPointNumber = Number(startPoint);
-  const junctionCodes = [];
-  const markers = points.map((point, pointIndex) => {
-    const pointNumber = firstPointNumber + pointIndex;
-    const base = {
+  const junctionCodes = downstream.map((_, index) => `JPN${firstPointNumber + index + 1}`);
+
+  return [
+    {
+      east: connectionPoint.east,
+      north: connectionPoint.north,
+      code: ['PM', ...junctionCodes].join(' ').trim(),
+    },
+    ...downstream.map((point) => ({
       east: point.east,
       north: point.north,
-    };
-
-    if (pointIndex === 0) {
-      return {
-        ...base,
-        code: 'PM',
-      };
-    }
-
-    const code = `JPN${pointNumber}`;
-    junctionCodes.push(code);
-    return {
-      ...base,
-      code,
-    };
-  });
-
-  markers[0] = {
-    ...markers[0],
-    code: ['PM', ...junctionCodes].join(' ').trim(),
-  };
-
-  return markers;
+      code: point.pointCode,
+    })),
+  ];
 }
 
 export function buildUniquePolygonCsvRowsPNEZD(features2243, startPoint = 1, labelPrefix = 'POLYGON_CORNER') {
@@ -343,12 +349,18 @@ export function buildRosBoundaryCsvRowsPNEZD({
   const subdivisionRole = inferBoundaryRole(subdivisionFeature2243);
   const parcelArea = polygonArea(parcelFeature2243);
   const subdivisionArea = polygonArea(subdivisionFeature2243);
-  const shouldSwapByArea = Number.isFinite(parcelArea)
+  const hasComparableAreas = Number.isFinite(parcelArea)
     && Number.isFinite(subdivisionArea)
     && parcelArea > 0
-    && subdivisionArea > 0
+    && subdivisionArea > 0;
+  const shouldSwapByRole = parcelRole === 'subdivision'
+    && subdivisionRole === 'parcel'
+    && hasComparableAreas
     && parcelArea >= subdivisionArea;
-  if (parcelRole === 'subdivision' && subdivisionRole === 'parcel' && shouldSwapByArea) {
+  const shouldSwapByAreaHeuristic = hasComparableAreas
+    && (parcelRole !== 'parcel' || subdivisionRole !== 'subdivision')
+    && parcelArea > (subdivisionArea * 1.05);
+  if (shouldSwapByRole || shouldSwapByAreaHeuristic) {
     resolvedParcelFeature = subdivisionFeature2243;
     resolvedSubdivisionFeature = parcelFeature2243;
   }

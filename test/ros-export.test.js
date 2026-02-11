@@ -68,19 +68,19 @@ test('buildPointMarkerCsvRowsPNEZD emits arbitrary marker points', () => {
 
 
 
-test('buildPowerUtilityMarkersForPointForge links the first power point to exported junction points', () => {
+test('buildPowerUtilityMarkersForPointForge keeps JPN references on the PM connection point only', () => {
   const utilities = [
-    { projected: { east: 100, north: 200 }, code: 'OH PWR BEG' },
-    { projected: { east: 110, north: 210 }, code: 'UG PWR END' },
-    { projected: { east: 120, north: 220 }, code: 'OH PWR END' },
+    { projected: { east: 110, north: 210 }, code: 'UP', serviceTypeId: 2 },
+    { projected: { east: 100, north: 200 }, code: 'PM', serviceTypeId: 1 },
+    { projected: { east: 120, north: 220 }, code: 'OH', serviceTypeId: 3 },
   ];
 
   const markers = buildPowerUtilityMarkersForPointForge(utilities, 25);
 
   assert.deepEqual(markers, [
     { east: 100, north: 200, code: 'PM JPN26 JPN27' },
-    { east: 110, north: 210, code: 'JPN26' },
-    { east: 120, north: 220, code: 'JPN27' },
+    { east: 120, north: 220, code: 'OH' },
+    { east: 110, north: 210, code: 'UP' },
   ]);
 });
 
@@ -304,4 +304,30 @@ test('filterParcelFeatureForExport honors parcel include toggle', () => {
   assert.equal(filterParcelFeatureForExport(parcel, true), parcel);
   assert.equal(filterParcelFeatureForExport(parcel, false), null);
   assert.equal(filterParcelFeatureForExport(null, true), null);
+});
+
+
+test('buildRosBoundaryCsvRowsPNEZD corrects swapped parcel/subdivision slots when attributes are missing', () => {
+  const parcelShape = {
+    geometry: { rings: [[[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]]] },
+  };
+  const subdivisionShape = {
+    geometry: { rings: [[[-50, -50], [80, -50], [80, 80], [-50, 80], [-50, -50]]] },
+  };
+
+  const { csv } = buildRosBoundaryCsvRowsPNEZD({
+    // Intentionally swapped with ambiguous attributes.
+    parcelFeature2243: subdivisionShape,
+    subdivisionFeature2243: parcelShape,
+    startPoint: 1,
+  });
+
+  const lines = csv.trim().split('\n');
+  const parcelLines = lines.filter((line) => line.includes(',0.000,0.000,') || line.includes(',20.000,20.000,'));
+  const subdivisionLines = lines.filter((line) => line.includes(',-50.000,-50.000,') || line.includes(',80.000,80.000,'));
+
+  assert.ok(parcelLines.length > 0, 'should include parcel geometry rows');
+  assert.ok(subdivisionLines.length > 0, 'should include subdivision geometry rows');
+  assert.ok(parcelLines.every((line) => /,COR,$/.test(line)), 'parcel points should be labeled COR');
+  assert.ok(subdivisionLines.every((line) => /,SUB,$/.test(line)), 'subdivision points should be labeled SUB');
 });
