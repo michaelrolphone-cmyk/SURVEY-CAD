@@ -13,7 +13,7 @@ function createMockServer(options = {}) {
     includeServiceLines = false,
   } = options;
   const requests = [];
-  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBody: null };
+  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [] };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
@@ -46,7 +46,7 @@ function createMockServer(options = {}) {
       req.on('end', () => {
         const raw = form.getAll('__chunk').join('');
         const body = new URLSearchParams(raw);
-        headers.estimateCalculateBody = raw;
+        headers.estimateCalculateBodies.push(raw);
         res.setHeader('Content-Type', 'application/json');
         const response = {
           estimateDetail: {
@@ -56,14 +56,14 @@ function createMockServer(options = {}) {
             beginLatitude: Number(body.get('beginLatitude')),
           },
           transformers: [{
-            id: 'tx-1',
+            id: `tx-${body.get('serviceEstimateServiceTypeId') || '1'}`,
             provider: 'Idaho Power',
-            name: 'Transformer 1',
-            longitude: Number(body.get('beginLongitude')),
-            latitude: Number(body.get('beginLatitude')),
+            name: `Transformer ${body.get('serviceEstimateServiceTypeId') || '1'}`,
+            longitude: Number(body.get('beginLongitude')) + (Number(body.get('serviceEstimateServiceTypeId') || '1') * 0.001),
+            latitude: Number(body.get('beginLatitude')) + (Number(body.get('serviceEstimateServiceTypeId') || '1') * 0.001),
           }],
         };
-        if (includeServiceLines) {
+        if (includeServiceLines && body.get('serviceEstimateServiceTypeId') === '1') {
           response.estimateDetail.overheadLines = [{
             id: 'oh-line-1',
             geometry: {
@@ -516,22 +516,33 @@ test('lookupUtilitiesByAddress uses Idaho Power EstimateDetail Calculate API and
 
   try {
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
-    assert.equal(utilities.length, 1);
-    assert.equal(utilities[0].provider, 'Idaho Power');
-    assert.deepEqual(utilities[0].location, { lon: -116.2, lat: 43.61 });
-    assert.deepEqual(utilities[0].projected, {
-      east: 999883.8,
-      north: 1000043.61,
-      spatialReference: { wkid: 2243 },
-    });
+    assert.equal(utilities.length, 3);
+    assert.ok(utilities.every((utility) => utility.provider === 'Idaho Power'));
 
-    const form = new URLSearchParams(headers.estimateCalculateBody || '');
-    assert.equal(form.get('phaseId'), '3');
-    assert.equal(form.get('primaryVoltageId'), '4');
-    assert.equal(form.get('serviceEstimateCustomerTypeId'), '1');
-    assert.equal(form.get('serviceEstimateServiceTypeId'), '1');
-    assert.equal(form.get('beginLongitude'), '-116.2');
-    assert.equal(form.get('beginLatitude'), '43.61');
+    const serviceTypeIds = headers.estimateCalculateBodies
+      .map((raw) => new URLSearchParams(raw).get('serviceEstimateServiceTypeId'))
+      .sort();
+    assert.deepEqual(serviceTypeIds, ['1', '2', '3']);
+
+    const firstForm = new URLSearchParams(headers.estimateCalculateBodies[0] || '');
+    assert.equal(firstForm.get('phaseId'), '3');
+    assert.equal(firstForm.get('primaryVoltageId'), '4');
+    assert.equal(firstForm.get('serviceEstimateCustomerTypeId'), '1');
+    assert.equal(firstForm.get('beginLongitude'), '-116.2');
+    assert.equal(firstForm.get('beginLatitude'), '43.61');
+
+    const sortedLocations = utilities
+      .map((utility) => ({
+        lon: Number(utility.location.lon.toFixed(3)),
+        lat: Number(utility.location.lat.toFixed(3)),
+      }))
+      .sort((a, b) => a.lon - b.lon);
+    assert.deepEqual(sortedLocations, [
+      { lon: -116.199, lat: 43.611 },
+      { lon: -116.198, lat: 43.612 },
+      { lon: -116.197, lat: 43.613 },
+    ]);
+    assert.ok(utilities.every((utility) => Number.isFinite(utility?.projected?.east) && Number.isFinite(utility?.projected?.north)));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -552,7 +563,7 @@ test('lookupUtilitiesByAddress emits OH/UG line endpoint points with BEG/END cod
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     const codes = new Set(utilities.map((utility) => utility.code));
 
-    assert.equal(utilities.length, 5);
+    assert.equal(utilities.length, 7);
     assert.ok(codes.has('OH PWR BEG'));
     assert.ok(codes.has('OH PWR END'));
     assert.ok(codes.has('UG PWR BEG'));
