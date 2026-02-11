@@ -2,6 +2,7 @@
 import { SurveyCadClient } from "./survey-api.js";
 import { buildProjectArchivePlan, createProjectFile } from "./project-file.js";
 import { loadFldConfig } from "./fld-config.js";
+import { translateLocalPointsToStatePlane } from "./georeference-transform.js";
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -33,7 +34,8 @@ async function main() {
   node src/cli.js section --lat 43.61 --lon -116.20
   node src/cli.js aliquots --lat 43.61 --lon -116.20
   node src/cli.js project-file --projectName "Demo" --client "Ada County" --address "100 Main St, Boise"
-  node src/cli.js fld-config --file config/MLS.fld`);
+  node src/cli.js fld-config --file config/MLS.fld
+  node src/cli.js pointforge-localize --points '[{"name":"P1","x":1000,"y":1000}]' --anchorX 1000 --anchorY 1000 --lat 43.61 --lon -116.20`);
     process.exit(0);
   }
 
@@ -73,6 +75,62 @@ async function main() {
 
     const archivePlan = await buildProjectArchivePlan(projectFile);
     console.log(JSON.stringify({ projectFile, archivePlan }, null, 2));
+    return;
+  }
+
+
+  if (cmd === "pointforge-localize") {
+    if (!args.points) throw new Error("--points is required (JSON array of point objects containing x/y)");
+
+    let points = [];
+    try {
+      points = JSON.parse(String(args.points));
+    } catch {
+      throw new Error("--points must be valid JSON");
+    }
+
+    if (!Array.isArray(points) || !points.length) {
+      throw new Error("--points must be a non-empty JSON array");
+    }
+
+    const anchorLocalX = Number(args.anchorX);
+    const anchorLocalY = Number(args.anchorY);
+    const outSR = args.outSR == null ? 2243 : Number(args.outSR);
+
+    if (!Number.isFinite(anchorLocalX) || !Number.isFinite(anchorLocalY)) {
+      throw new Error("--anchorX and --anchorY are required numeric values");
+    }
+
+    if (args.anchorEast != null || args.anchorNorth != null) {
+      const anchorEast = Number(args.anchorEast);
+      const anchorNorth = Number(args.anchorNorth);
+      if (!Number.isFinite(anchorEast) || !Number.isFinite(anchorNorth)) {
+        throw new Error("--anchorEast and --anchorNorth must be numeric when provided");
+      }
+
+      console.log(JSON.stringify(translateLocalPointsToStatePlane(points, {
+        anchorLocalX,
+        anchorLocalY,
+        anchorEast,
+        anchorNorth,
+      }), null, 2));
+      return;
+    }
+
+    const lat = Number(args.lat);
+    const lon = Number(args.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      throw new Error("--lat and --lon are required numeric values unless --anchorEast/--anchorNorth are provided");
+    }
+
+    const localized = await client.localizePointforgePointsToStatePlane(points, {
+      anchorLocalX,
+      anchorLocalY,
+      lat,
+      lon,
+      outSR,
+    });
+    console.log(JSON.stringify(localized, null, 2));
     return;
   }
 

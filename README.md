@@ -182,6 +182,7 @@ Optional endpoint overrides:
 - `loadSectionAtPoint(lon, lat)`
 - `loadAliquotsInSection(sectionFeature)`
 - `lookupByAddress(address)` (accepts addresses like `5707 W Castle Dr, Boise ID`; trailing state in the city segment is normalized before querying Ada County address records)
+- `localizePointforgePointsToStatePlane(points, { anchorLocalX, anchorLocalY, lat, lon, outSR? })` (projects a single anchor GPS lat/lon into state-plane and translates all local PointForge points so the selected local anchor point lands on that projected coordinate)
 
 ### Utility exports
 
@@ -560,10 +561,17 @@ npm run cli -- --help
 node src/cli.js lookup --address "1600 W Front St, Boise"
 node src/cli.js section --lat 43.61 --lon -116.20
 node src/cli.js aliquots --lat 43.61 --lon -116.20
-node src/cli.js parcel --lat 43.61 --lon -116.20 --outSR 2243
+node src/cli.js pointforge-localize --points '[{"name":"P1","x":1000,"y":1000},{"name":"P2","x":1012,"y":998}]' --anchorX 1000 --anchorY 1000 --lat 43.61 --lon -116.20
 ```
 
 All CLI commands print JSON to stdout.
+
+`pointforge-localize` output includes:
+- `projectedAnchor` (when `--lat/--lon` are used): the anchor lat/lon projected into `outSR` state-plane coordinates.
+- `translation`: east/north offsets applied to every source local point.
+- `points[]`: original local `x/y` plus translated `east/north` values.
+
+For offline/manual workflows you can skip geodetic projection and provide `--anchorEast/--anchorNorth` directly.
 
 No API endpoints or CLI commands changed for this LineSmith JPN auto-connect update.
 

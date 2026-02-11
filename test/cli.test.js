@@ -50,3 +50,36 @@ test('cli fld-config command parses a field-to-finish file', () => {
   assert.equal(payload.ruleCount, 103);
   assert.ok(payload.codes.includes('CURB'));
 });
+
+test('cli pointforge-localize command translates points using explicit state-plane anchor', () => {
+  const points = JSON.stringify([
+    { name: 'P1', x: 1000, y: 1000 },
+    { name: 'P2', x: 1012, y: 998 },
+  ]);
+
+  const result = spawnSync(process.execPath, [
+    'src/cli.js',
+    'pointforge-localize',
+    '--points',
+    points,
+    '--anchorX',
+    '1000',
+    '--anchorY',
+    '1000',
+    '--anchorEast',
+    '2500000',
+    '--anchorNorth',
+    '1200000',
+  ], {
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.points[0].east, 2500000);
+  assert.equal(payload.points[0].north, 1200000);
+  assert.equal(payload.points[1].east, 2500012);
+  assert.equal(payload.points[1].north, 1199998);
+});

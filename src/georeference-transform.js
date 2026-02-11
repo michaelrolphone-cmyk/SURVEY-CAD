@@ -48,3 +48,48 @@ export function latLngToWorldAffine(lat, lng, georef) {
 
   return { x, y };
 }
+
+export function translateLocalPointsToStatePlane(points, anchor) {
+  if (!Array.isArray(points) || !points.length) {
+    throw new Error('points must be a non-empty array');
+  }
+
+  const anchorLocalX = Number(anchor?.anchorLocalX);
+  const anchorLocalY = Number(anchor?.anchorLocalY);
+  const anchorEast = Number(anchor?.anchorEast);
+  const anchorNorth = Number(anchor?.anchorNorth);
+
+  if (
+    !Number.isFinite(anchorLocalX) ||
+    !Number.isFinite(anchorLocalY) ||
+    !Number.isFinite(anchorEast) ||
+    !Number.isFinite(anchorNorth)
+  ) {
+    throw new Error('anchorLocalX, anchorLocalY, anchorEast, and anchorNorth are required numeric values');
+  }
+
+  const eastOffset = anchorEast - anchorLocalX;
+  const northOffset = anchorNorth - anchorLocalY;
+
+  const localizedPoints = points.map((point, index) => {
+    const localX = Number(point?.x);
+    const localY = Number(point?.y);
+    if (!Number.isFinite(localX) || !Number.isFinite(localY)) {
+      throw new Error(`point at index ${index} is missing numeric x/y coordinates`);
+    }
+
+    return {
+      ...point,
+      x: localX,
+      y: localY,
+      east: localX + eastOffset,
+      north: localY + northOffset,
+    };
+  });
+
+  return {
+    translation: { eastOffset, northOffset },
+    anchor: { anchorLocalX, anchorLocalY, anchorEast, anchorNorth },
+    points: localizedPoints,
+  };
+}
