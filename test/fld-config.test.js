@@ -42,3 +42,18 @@ test('parseFldConfig creates unique keys for duplicate column names', () => {
   assert.equal(duplicateKeys.length, 2);
   assert.deepEqual(duplicateKeys, ['distinct_pt_layer', 'distinct_pt_layer_2']);
 });
+
+test('parseFldConfig captures companion codes for linework-only sequencing', () => {
+  const parsed = parseFldConfig(loadFixture());
+  const waterLineRule = parsed.rulesByCode.WL;
+  const waterMeterRule = parsed.rulesByCode.WM;
+
+  assert.ok(waterLineRule);
+  assert.deepEqual(waterLineRule.companionCodes, ['FH', 'WV', 'WM']);
+  assert.equal(waterLineRule.entityType, '2');
+
+  assert.ok(waterMeterRule);
+  assert.equal(waterMeterRule.entityType, '0');
+  assert.deepEqual(waterMeterRule.companionCodes, []);
+});
+

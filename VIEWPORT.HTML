@@ -2345,6 +2345,8 @@
   const fieldToFinishRuleState = {
     lineworkCodes: new Set(),
     symbolCodes: new Set(),
+    lineworkCompanionCodes: new Map(),
+    companionToLineworkCodes: new Map(),
     source: null,
     loaded: false,
     attempted: false,
@@ -2353,6 +2355,8 @@
   function deriveFieldToFinishCodeSetsFromConfig(config) {
     const lineworkCodes = new Set();
     const symbolCodes = new Set();
+    const lineworkCompanionCodes = new Map();
+    const companionToLineworkCodes = new Map();
     const rules = Array.isArray(config?.rules) ? config.rules : [];
     for (const rule of rules) {
       if (!rule?.processingOn || !rule.code) continue;
@@ -2361,8 +2365,21 @@
       if (!code) continue;
       if (entityType === "2") lineworkCodes.add(code);
       if (entityType === "0") symbolCodes.add(code);
+
+      if (entityType !== "2") continue;
+      const companionCodes = Array.isArray(rule.companionCodes) ? rule.companionCodes : [];
+      const normalizedCompanions = companionCodes
+        .map((companionCode) => String(companionCode ?? "").trim().toUpperCase())
+        .filter(Boolean);
+      if (!normalizedCompanions.length) continue;
+
+      lineworkCompanionCodes.set(code, new Set(normalizedCompanions));
+      for (const companionCode of normalizedCompanions) {
+        if (!companionToLineworkCodes.has(companionCode)) companionToLineworkCodes.set(companionCode, new Set());
+        companionToLineworkCodes.get(companionCode).add(code);
+      }
     }
-    return { lineworkCodes, symbolCodes };
+    return { lineworkCodes, symbolCodes, lineworkCompanionCodes, companionToLineworkCodes };
   }
 
   async function loadFieldToFinishRulesFromFld(path = defaultFldConfigPath) {
@@ -2371,9 +2388,11 @@
       const response = await fetch(`/api/fld-config?file=${encodeURIComponent(path)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const config = await response.json();
-      const { lineworkCodes, symbolCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
+      const { lineworkCodes, symbolCodes, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
       fieldToFinishRuleState.lineworkCodes = lineworkCodes;
       fieldToFinishRuleState.symbolCodes = symbolCodes;
+      fieldToFinishRuleState.lineworkCompanionCodes = lineworkCompanionCodes;
+      fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
       fieldToFinishRuleState.source = path;
       fieldToFinishRuleState.loaded = true;
       return true;
@@ -2381,8 +2400,20 @@
       fieldToFinishRuleState.loaded = false;
       fieldToFinishRuleState.lineworkCodes = new Set();
       fieldToFinishRuleState.symbolCodes = new Set();
+      fieldToFinishRuleState.lineworkCompanionCodes = new Map();
+      fieldToFinishRuleState.companionToLineworkCodes = new Map();
       return false;
     }
+  }
+
+  function pointSupportsLineworkSequenceToken(tokenSet, lineCode) {
+    if (tokenSet.has(lineCode)) return true;
+    const companionCodes = fieldToFinishRuleState.lineworkCompanionCodes.get(lineCode);
+    if (!companionCodes?.size) return false;
+    for (const companionCode of companionCodes) {
+      if (tokenSet.has(companionCode)) return true;
+    }
+    return false;
   }
 
   const fieldToFinishCommandParsers = [
@@ -2590,7 +2621,7 @@
       // also carries join directives (e.g. "FNL JPN131 ...").
       for (const baseCode of [...activeSequences.keys()]) {
         if (explicitActions.has(baseCode)) continue;
-        if (pointLineworkCodes.includes(baseCode)) continue;
+        if (pointSupportsLineworkSequenceToken(tokenSet, baseCode)) continue;
         activeSequences.delete(baseCode);
       }
 
@@ -2603,7 +2634,7 @@
 
       for (const [baseCode, active] of activeSequences.entries()) {
         if (explicitActions.has(baseCode)) continue;
-        if (!tokenSet.has(baseCode)) continue;
+        if (!pointSupportsLineworkSequenceToken(tokenSet, baseCode)) continue;
         if (point.id === active.lastPointId) continue;
         lineCommands.push({ a: active.lastPointId, b: point.id });
         active.lastPointId = point.id;
