@@ -735,3 +735,15 @@ test('VIEWPORT.HTML points manager supports grouping and layer-tinted rows', asy
   assert.match(html, /function\s+colorToRgba\(color, alpha = 0\.1\)[\s\S]*return\s+`rgba\(\$\{r\},\$\{g\},\$\{b\},\$\{clamp\(alpha, 0, 1\)\}\)`;/, 'points manager should derive faint row tint colors from layer hex values');
   assert.match(html, /const\s+tint\s*=\s*colorToRgba\(getLayerById\(p\.layerId\)\?\.color,\s*0\.12\);[\s\S]*if\s*\(tint\)\s*tr\.style\.background\s*=\s*tint;/, 'points manager rows should apply a faint background tint from the point layer color');
 });
+
+
+test('VIEWPORT.HTML exposes an FLD editor with local override save/reset and downloads', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="openFldEditor"/, 'LineSmith should expose a toolbar section button for opening the FLD editor');
+  assert.match(html, /id="fldModal"/, 'LineSmith should render an FLD editor modal container');
+  assert.match(html, /const\s+FLD_CONFIG_LOCAL_STORAGE_KEY\s*=\s*"lineSmithFldConfigLocal";/, 'LineSmith should keep local FLD overrides in localStorage');
+  assert.match(html, /function\s+saveFldEditorLocalOverride\(\)\s*\{[\s\S]*saveLocalFldOverride\(fldEditorState\.activeConfig\);[\s\S]*applyFieldToFinishConfig\(fldEditorState\.activeConfig, "localStorage"\);/, 'FLD editor save action should persist local overrides and apply them to active linework rules');
+  assert.match(html, /function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*clearLocalFldOverride\(\);[\s\S]*fldEditorState\.activeConfig = cloneFldConfig\(fldEditorState\.serverConfig\);/, 'FLD editor reset action should clear local override and restore the server FLD rules');
+  assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-LocalOverride\.fld", serializeFieldToFinishConfig\(local\)\);/, 'FLD editor should support downloading local override FLD files');
+});

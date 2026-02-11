@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseFldConfig } from '../src/fld-config.js';
+import { parseFldConfig, serializeFldConfig } from '../src/fld-config.js';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -15,7 +15,7 @@ test('parseFldConfig parses version tag, columns, and rules', () => {
 
   assert.equal(parsed.versionTag, '2010V');
   assert.ok(parsed.columns.length >= 205);
-  assert.equal(parsed.rules.length, 103);
+  assert.equal(parsed.rules.length, 105);
   assert.ok(parsed.rulesByCode.CPAD);
   assert.equal(parsed.rulesByCode.CPAD.layer, 'EX_CONC');
   assert.equal(parsed.rulesByCode.CPAD.entityType, '2');
@@ -57,3 +57,35 @@ test('parseFldConfig captures companion codes for linework-only sequencing', () 
   assert.deepEqual(waterMeterRule.companionCodes, []);
 });
 
+test('serializeFldConfig round-trips parsed FLD data while keeping unknown columns', () => {
+  const parsed = parseFldConfig(loadFixture());
+  const serialized = serializeFldConfig(parsed);
+  const reparsed = parseFldConfig(serialized);
+
+  assert.equal(reparsed.versionTag, parsed.versionTag);
+  assert.equal(reparsed.columns.length, parsed.columns.length);
+  assert.equal(reparsed.rules.length, parsed.rules.length);
+  assert.equal(reparsed.rulesByCode.CPAD.raw.allow_annotative, parsed.rulesByCode.CPAD.raw.allow_annotative);
+  assert.equal(reparsed.rulesByCode.WL.raw.companion_codes, parsed.rulesByCode.WL.raw.companion_codes);
+});
+
+test('serializeFldConfig preserves newly-added rules with template fields', () => {
+  const parsed = parseFldConfig(loadFixture());
+  const template = parsed.rules[0].raw;
+  const newRaw = {};
+  for (const column of parsed.columns) newRaw[column.key] = template[column.key] ?? '';
+  newRaw.code = 'ZZTOP';
+  newRaw.description = 'ZZTOP';
+  newRaw.full_name = 'ZZTOP';
+  newRaw.layer = 'EX_TEST';
+  newRaw.entity_type = '2';
+  newRaw.processing_on = '1';
+  newRaw.companion_codes = 'AA,BB';
+  parsed.rules.push({ rowNumber: parsed.rules.length + 2, code: 'ZZTOP', raw: newRaw });
+
+  const serialized = serializeFldConfig(parsed);
+  const reparsed = parseFldConfig(serialized);
+  assert.ok(reparsed.rulesByCode.ZZTOP);
+  assert.equal(reparsed.rulesByCode.ZZTOP.raw.allow_annotative, template.allow_annotative);
+  assert.equal(reparsed.rulesByCode.ZZTOP.raw.companion_codes, 'AA,BB');
+});

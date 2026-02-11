@@ -220,6 +220,17 @@ Returns parsed FLD data:
 - `rules`
 - `rulesByCode`
 
+LineSmith (`VIEWPORT.HTML`) now also includes an FLD editor workflow:
+
+- Open **Field-to-Finish → Open FLD Editor**.
+- Add, edit, and remove FLD code rows.
+- Click **Save Local** to store a browser-local override (`localStorage` key: `lineSmithFldConfigLocal`) and immediately apply those rules to auto linework/layer behavior.
+- Click **Download Local FLD** (panel button or modal button) to export your saved local override as an `.fld` file.
+- Click **Download Current FLD** to export the currently-loaded editor state.
+- Click **Reset to Server** to clear local override storage and restore the server-sourced FLD file.
+
+When saving/downloading, unknown columns from the FLD header are preserved and new entries are created using template-backed raw fields so extra properties are retained.
+
 ### Local storage sync
 
 - `GET /api/localstorage-sync`
