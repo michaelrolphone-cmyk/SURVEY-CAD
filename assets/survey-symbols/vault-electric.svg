@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Vault Electric</title>
+  <desc id="desc">Survey symbol for Vault Electric.</desc>
+  <rect x="16" y="16" width="68" height="68" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><text x="50" y="56" text-anchor="middle" font-family="Arial" font-size="20" fill="#111">EV</text>
+</svg>

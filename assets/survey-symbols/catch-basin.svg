@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Catch Basin</title>
+  <desc id="desc">Survey symbol for Catch Basin.</desc>
+  <rect x="18" y="18" width="64" height="64" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><line x1="26" y1="26" x2="74" y2="74" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><line x1="74" y1="26" x2="26" y2="74" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

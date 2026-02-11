@@ -74,6 +74,16 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 - `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
 
+## Survey Symbol SVG Library
+
+A dedicated library of surveying map symbols is available in `assets/survey-symbols/` for use with point-file symbol rendering workflows (property pins, cap types, meters, manholes, control points, poles, signs, and related utility marks). A machine-readable manifest is also included at `assets/survey-symbols/index.json`.
+
+Quick command to inspect symbols:
+
+```bash
+find assets/survey-symbols -maxdepth 1 -name '*.svg' | sort
+```
+
 ## Test
 
 ```bash
@@ -87,6 +97,7 @@ npm run cli -- --help
 npm run ros:cli -- --help
 curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/apps"
+find assets/survey-symbols -maxdepth 1 -name '*.svg' | wc -l
 ```
 
 ---
