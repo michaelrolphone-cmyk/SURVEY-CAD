@@ -512,6 +512,7 @@ Current apps in the catalog:
 - **SurveyFoundry Launcher** (`index.html`): Projects, evidence, and outputs—end to end.
 - **LineSmith** (`VIEWPORT.HTML`): Turns points into boundaries, alignments, and structure; now supports mobile-first canvas gestures (pinch-zoom, drag-pan, long-press select/box-select), plus long-press add-point placement when the Add Point tool is active, with a slide-out tools drawer. Desktop blank-canvas left-drag marquee selection remains enabled (Shift adds to selection). On desktop, the inspector/controls drawer now has a left-edge collapse tab (hanging over the canvas boundary) and a right-screen cutout expand tab for quick hide/show toggling. The drawer panel allows horizontal overflow so the collapse tab remains visible instead of being clipped. Collaboration now broadcasts live cursor updates for touch/pointer movement and continuously syncs drag edits (point/line moves) so remote peers see in-progress and committed geometry movement in real time. Collaboration state sync now intentionally excludes viewport pan/zoom (including Zoom to Extents) so each connected user keeps their own local view while shared geometry and selections still sync.
   - Point-code auto-connect now recognizes `JPN` references with or without a space (for example `JPN123`, `JPN 123`, `JPN321G`, `JPN 321G`) during CSV import and automatically creates missing lines between the source point and referenced point numbers.
+  - Field-to-finish parsing now uses an extensible command-parser pipeline: sequential line commands like `COR BEG`, `COR END`, and `COR CLO` are interpreted during import/editor updates to build `COR` linework in point order (including close-to-begin behavior), and this parser registry is designed for adding future point-code directives without rewriting import flow.
 
 Mobile launch command:
 
@@ -621,3 +622,5 @@ No API endpoints or CLI commands changed in this iOS 13 permission-prompt compat
 No API endpoints or CLI commands changed in this iOS geolocation/rendering reliability fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 No API endpoints or CLI commands changed for the PointForge point-editor passthrough preservation and LineSmith JPN editor auto-connect fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed for this LineSmith field-to-finish command parsing update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).

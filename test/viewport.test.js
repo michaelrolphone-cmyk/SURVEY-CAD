@@ -213,9 +213,21 @@ test('VIEWPORT.HTML parses JPN references and auto-connects matching point numbe
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.ok(html.includes('const regex = /\\bJPN\\s*([A-Za-z0-9]+)\\b/gi;'), 'LineSmith should parse JPN code tokens with optional whitespace and alphanumeric suffixes');
-  assert.match(html, /while\s*\(match\)\s*\{[\s\S]*targets\.push\(target\);[\s\S]*match\s*=\s*regex\.exec\(raw\);/, 'JPN parser should collect each code reference in a point code string');
+  assert.match(html, /while\s*\(match\)\s*\{[\s\S]*commands\.push\(\{ type: "join-point-number", targetPointNumber: target \}\);[\s\S]*match\s*=\s*regex\.exec\(raw\);/, 'JPN parser should collect each code reference in a point code string');
   assert.match(html, /function\s+connectJpnReferencedPoints\(\)\s*\{[\s\S]*const\s+targets\s*=\s*extractJpnTargetPointNumbers\(sourcePoint\.code\);[\s\S]*if \(!targetPointId \|\| targetPointId === sourcePoint\.id\) continue;[\s\S]*addLine\(sourcePoint\.id, targetPointId, false\);/, 'LineSmith should create linework between the source point and each JPN target point when it exists');
-  assert.match(html, /const\s+jpnLinesAdded\s*=\s*connectJpnReferencedPoints\(\);[\s\S]*JPN lines added: \$\{jpnLinesAdded\}/, 'CSV import completion status should report JPN-generated line counts');
+  assert.match(html, /function\s+connectFieldToFinishLinework\(\)\s*\{[\s\S]*connectJpnReferencedPoints\(\);[\s\S]*connectFieldToFinishSequentialLines\(\);/, 'LineSmith should route linework command execution through a generic field-to-finish linework connector');
+  assert.match(html, /const\s+jpnLinesAdded\s*=\s*connectJpnReferencedPoints\(\);[\s\S]*const\s+sequentialLinesAdded\s*=\s*connectFieldToFinishSequentialLines\(\);[\s\S]*JPN lines added: \$\{jpnLinesAdded\}[\s\S]*Field-to-finish sequential lines added: \$\{sequentialLinesAdded\}/, 'CSV import completion status should report both JPN and field-to-finish sequential line counts');
+});
+
+test('VIEWPORT.HTML parses generic field-to-finish commands for sequential BEG/END/CLO workflows', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+fieldToFinishCommandParsers\s*=\s*\[/, 'LineSmith should maintain a registry of field-to-finish command parsers for extensible code-token handling');
+  assert.match(html, /\{\s*type:\s*"sequential-line",[\s\S]*const\s+directives\s*=\s*new\s+Set\(\["BEG",\s*"END",\s*"CLO"\]\)/, 'field-to-finish parser should recognize sequential line directives BEG, END, and CLO');
+  assert.match(html, /function\s+parseFieldToFinishCommands\(code\s*=\s*""\)\s*\{[\s\S]*for \(const parser of fieldToFinishCommandParsers\)/, 'LineSmith should parse point-code tokens through the command-parser registry so new directives can be added without rewriting import logic');
+  assert.match(html, /function\s+buildFieldToFinishSequentialLineCommands\(\)\s*\{[\s\S]*activeSequences\s*=\s*new\s+Map\(\)/, 'LineSmith should build sequential field-to-finish line commands using tracked active code sequences');
+  assert.match(html, /if \(action === "CLO" && active\.startPointId !== active\.lastPointId\) \{[\s\S]*lineCommands\.push\(\{ a: active\.lastPointId, b: active\.startPointId \}\);/, 'CLO directives should close sequential linework by connecting the current point back to the BEG point');
+  assert.match(html, /const\s+sequentialLinesAdded\s*=\s*connectFieldToFinishSequentialLines\(\);/, 'code edits should apply sequential field-to-finish line commands immediately so new BEG/END/CLO tokens generate linework');
 });
 
 test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out drawer controls', async () => {
@@ -452,5 +464,5 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
 
   assert.match(html, /function\s+connectJpnReferencedPointsForSource\(sourcePointId\)\s*\{/, 'LineSmith should provide a source-point JPN connector helper for editor updates');
   assert.match(html, /if \(field === "code"\) \{[\s\S]*const\s+jpnLinesAdded\s*=\s*connectJpnReferencedPointsForSource\(pid\);/, 'editing point code in the point editor should attempt JPN auto-connect for that point immediately');
-  assert.match(html, /Auto-connected \$\{jpnLinesAdded\} JPN line\$\{jpnLinesAdded === 1 \? "" : "s"\} for point \$\{p\.num\}\./, 'LineSmith should report successful JPN auto-connections triggered by point editor code edits');
+  assert.match(html, /Auto-connected \$\{jpnLinesAdded\} JPN line\$\{jpnLinesAdded === 1 \? "" : "s"\} and \$\{sequentialLinesAdded\} field-to-finish sequential line\$\{sequentialLinesAdded === 1 \? "" : "s"\} for point \$\{p\.num\}\./, 'LineSmith should report successful JPN and field-to-finish auto-connections triggered by point editor code edits');
 });

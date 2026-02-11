@@ -2336,26 +2336,147 @@
     return false;
   }
 
-  function extractJpnTargetPointNumbers(code = "") {
+  const fieldToFinishCommandParsers = [
+    {
+      type: "join-point-number",
+      parse(raw, tokensUpper) {
+        const commands = [];
+        const regex = /\bJPN\s*([A-Za-z0-9]+)\b/gi;
+        let match = regex.exec(raw);
+        const seen = new Set();
+        while (match) {
+          const target = String(match[1] ?? "").trim();
+          if (target && !seen.has(target)) {
+            seen.add(target);
+            commands.push({ type: "join-point-number", targetPointNumber: target });
+          }
+          match = regex.exec(raw);
+        }
+        return commands;
+      }
+    },
+    {
+      type: "sequential-line",
+      parse(_raw, tokensUpper) {
+        const commands = [];
+        const directives = new Set(["BEG", "END", "CLO"]);
+        for (let i = 0; i < tokensUpper.length - 1; i++) {
+          const baseCode = tokensUpper[i];
+          const action = tokensUpper[i + 1];
+          if (!baseCode || directives.has(baseCode) || !directives.has(action)) continue;
+          commands.push({ type: "sequential-line", baseCode, action });
+        }
+        return commands;
+      }
+    }
+  ];
+
+  function tokenizePointCode(rawCode = "") {
+    const raw = String(rawCode ?? "");
+    return raw
+      .split(/[^A-Za-z0-9]+/)
+      .map(token => token.trim().toUpperCase())
+      .filter(Boolean);
+  }
+
+  function parseFieldToFinishCommands(code = "") {
     const raw = String(code ?? "");
+    const tokensUpper = tokenizePointCode(raw);
+    const commands = [];
+    for (const parser of fieldToFinishCommandParsers) {
+      const parsed = parser.parse(raw, tokensUpper) || [];
+      for (const cmd of parsed) commands.push(cmd);
+    }
+    return { tokensUpper, commands };
+  }
+
+  function extractJpnTargetPointNumbers(code = "") {
     const targets = [];
     const seen = new Set();
-    const regex = /\bJPN\s*([A-Za-z0-9]+)\b/gi;
-    let match = regex.exec(raw);
-    while (match) {
-      const target = String(match[1] ?? "").trim();
+    const { commands } = parseFieldToFinishCommands(code);
+    for (const cmd of commands) {
+      if (cmd.type !== "join-point-number") continue;
+      const target = String(cmd.targetPointNumber ?? "").trim();
       if (target && !seen.has(target)) {
         seen.add(target);
         targets.push(target);
       }
-      match = regex.exec(raw);
     }
     return targets;
   }
 
-  function connectJpnReferencedPoints() {
+  function buildPointIdByNumberMap() {
     const byNum = new Map();
     for (const p of points.values()) byNum.set(String(p.num), p.id);
+    return byNum;
+  }
+
+  function buildFieldToFinishSequentialLineCommands() {
+    const pointsInOrder = [...points.values()].sort((a, b) => {
+      const aNum = Number(a.num);
+      const bNum = Number(b.num);
+      if (Number.isFinite(aNum) && Number.isFinite(bNum) && aNum !== bNum) return aNum - bNum;
+      return a.id - b.id;
+    });
+    const lineCommands = [];
+    const activeSequences = new Map();
+
+    for (const point of pointsInOrder) {
+      const { tokensUpper, commands } = parseFieldToFinishCommands(point.code);
+      const tokenSet = new Set(tokensUpper);
+
+      for (const baseCode of [...activeSequences.keys()]) {
+        if (!tokenSet.has(baseCode)) activeSequences.delete(baseCode);
+      }
+
+      const explicitActions = new Set();
+      for (const cmd of commands) {
+        if (cmd.type !== "sequential-line") continue;
+        const baseCode = cmd.baseCode;
+        const action = cmd.action;
+        explicitActions.add(baseCode);
+        if (action === "BEG") {
+          activeSequences.set(baseCode, { startPointId: point.id, lastPointId: point.id });
+          continue;
+        }
+        const active = activeSequences.get(baseCode);
+        if (!active) continue;
+        if (point.id !== active.lastPointId) {
+          lineCommands.push({ a: active.lastPointId, b: point.id });
+          active.lastPointId = point.id;
+        }
+        if (action === "CLO" && active.startPointId !== active.lastPointId) {
+          lineCommands.push({ a: active.lastPointId, b: active.startPointId });
+        }
+        activeSequences.delete(baseCode);
+      }
+
+      for (const [baseCode, active] of activeSequences.entries()) {
+        if (explicitActions.has(baseCode)) continue;
+        if (!tokenSet.has(baseCode)) continue;
+        if (point.id === active.lastPointId) continue;
+        lineCommands.push({ a: active.lastPointId, b: point.id });
+        active.lastPointId = point.id;
+      }
+    }
+
+    return lineCommands;
+  }
+
+  function connectFieldToFinishSequentialLines() {
+    const lineCommands = buildFieldToFinishSequentialLineCommands();
+    let created = 0;
+    for (const cmd of lineCommands) {
+      if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
+      if (arePointsDirectlyConnected(cmd.a, cmd.b)) continue;
+      addLine(cmd.a, cmd.b, false);
+      created++;
+    }
+    return created;
+  }
+
+  function connectJpnReferencedPoints() {
+    const byNum = buildPointIdByNumberMap();
 
     let created = 0;
     for (const sourcePoint of points.values()) {
@@ -2375,8 +2496,7 @@
     const sourcePoint = points.get(sourcePointId);
     if (!sourcePoint) return 0;
 
-    const byNum = new Map();
-    for (const p of points.values()) byNum.set(String(p.num), p.id);
+    const byNum = buildPointIdByNumberMap();
 
     let created = 0;
     const targets = extractJpnTargetPointNumbers(sourcePoint.code);
@@ -2388,6 +2508,12 @@
       created++;
     }
     return created;
+  }
+
+  function connectFieldToFinishLinework() {
+    const jpnLinesAdded = connectJpnReferencedPoints();
+    const sequentialLinesAdded = connectFieldToFinishSequentialLines();
+    return { jpnLinesAdded, sequentialLinesAdded };
   }
 
   function moveSelectionByDelta(dx, dy) {
@@ -3892,7 +4018,7 @@
       added++;
     }
 
-    const jpnLinesAdded = connectJpnReferencedPoints();
+    const { jpnLinesAdded, sequentialLinesAdded } = connectFieldToFinishLinework();
 
     setStatus(`${sourceLabel} done.
 Added: ${added}
@@ -3900,7 +4026,8 @@ Updated: ${updated}
 Renamed: ${renamed}
 Skipped: ${skipped}
 Coord-swap applied (headerless only): ${swappedApplied}
-JPN lines added: ${jpnLinesAdded}`, "ok");
+JPN lines added: ${jpnLinesAdded}
+Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
     schedulePointsTableRender();
     if ($("#autoZoomAfterImport").checked) zoomExtents();
@@ -4524,9 +4651,10 @@ JPN lines added: ${jpnLinesAdded}`, "ok");
       }
       if (field === "code") {
         const jpnLinesAdded = connectJpnReferencedPointsForSource(pid);
-        if (jpnLinesAdded > 0) {
+        const sequentialLinesAdded = connectFieldToFinishSequentialLines();
+        if (jpnLinesAdded > 0 || sequentialLinesAdded > 0) {
           schedulePointsTableRender();
-          setStatus(`Auto-connected ${jpnLinesAdded} JPN line${jpnLinesAdded === 1 ? "" : "s"} for point ${p.num}.`, "ok");
+          setStatus(`Auto-connected ${jpnLinesAdded} JPN line${jpnLinesAdded === 1 ? "" : "s"} and ${sequentialLinesAdded} field-to-finish sequential line${sequentialLinesAdded === 1 ? "" : "s"} for point ${p.num}.`, "ok");
         }
       }
       return;
