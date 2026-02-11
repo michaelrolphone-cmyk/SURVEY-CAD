@@ -241,6 +241,15 @@ test('VIEWPORT.HTML draws a light leader line from a single selected point to th
   assert.match(html, /ctx\.moveTo\(selectedPointScreen\.x, selectedPointScreen\.y\);[\s\S]*ctx\.lineTo\(mouse\.x, mouse\.y\);/, 'leader line should connect the selected point to the current cursor location');
 });
 
+test('VIEWPORT.HTML right-click marquee zoom uses the latest cursor position and includes window padding', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+\{\s*skipHistory\s*=\s*false,\s*silent\s*=\s*false,\s*extentPaddingFraction\s*=\s*0\.06\s*\}\s*=\s*options;/, 'zoom-window helper should expose a configurable extent padding amount so window zoom keeps geometry comfortably in frame');
+  assert.match(html, /const\s+padX\s*=\s*Math\.max\(EPS,\s*\(maxX - minX\) \* extentPaddingFraction\);[\s\S]*const\s+paddedMinX\s*=\s*minX - padX;[\s\S]*const\s+paddedMaxX\s*=\s*maxX \+ padX;/, 'zoom-window helper should expand X extents before computing zoom scale');
+  assert.match(html, /const\s+padY\s*=\s*Math\.max\(EPS,\s*\(maxY - minY\) \* extentPaddingFraction\);[\s\S]*const\s+paddedMinY\s*=\s*minY - padY;[\s\S]*const\s+paddedMaxY\s*=\s*maxY \+ padY;/, 'zoom-window helper should expand Y extents before computing zoom scale');
+  assert.match(html, /canvas\.addEventListener\("contextmenu",\s*\(e\)\s*=>\s*\{[\s\S]*if \(mouse\.dragObj\?\.type === "marquee"\) \{[\s\S]*mouse\.dragObj\.x1 = mouse\.x;[\s\S]*mouse\.dragObj\.y1 = mouse\.y;[\s\S]*zoomToScreenRect\(windowRect\);/, 'right-click marquee zoom should commit the current cursor endpoint before computing window extents');
+});
+
 test('VIEWPORT.HTML includes line inspector card for selected line or two points', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
