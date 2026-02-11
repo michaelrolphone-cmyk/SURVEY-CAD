@@ -4379,7 +4379,7 @@
     const query = normalized.toLowerCase();
     const matches = [];
     for (const point of points.values()) {
-      const layer = getLayer(point.layerId);
+      const layer = getLayerById(point.layerId);
       const searchable = [
         String(point.num || ""),
         String(point.code || ""),

@@ -388,6 +388,8 @@ No API endpoints or CLI commands changed in this map overzoom fallback update; e
 The Selection section now also includes a point inspector card that shows selected point fields and parses CP&F instrument references from point notes (`CPNFS:` with `...` delimiters), with one-click links to open each CP&F PDF by instrument number.
 The drawing version restore prompt now renders each saved revision on its own line, preventing script parse errors when opening project-linked drawing history.
 When saving drawing metadata back into a project file, LineSmith now ignores malformed/null drawing index entries before updating IDs, preventing `Cannot read properties of null (reading 'id')` runtime errors for older or hand-edited project snapshots.
+LineSmith quick-toolbar search now resolves each point's layer metadata through the existing `getLayerById` helper, preventing `ReferenceError: getLayer is not defined` crashes while typing non-command search text in `VIEWPORT.HTML`.
+No API endpoints or CLI commands changed in this quick-search regression fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 When dragging a LineSmith selection window, right-click now zooms to that marquee window instead of triggering cancel/clear behavior, making fast window zoom-in available directly from select mode.
 No API endpoints or CLI commands changed in this LineSmith marquee-zoom interaction update; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).

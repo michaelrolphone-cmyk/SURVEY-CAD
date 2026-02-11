@@ -128,6 +128,7 @@ test('VIEWPORT.HTML uses quick toolbar search for point lookup and command autoc
   assert.match(html, /function\s+runCommandLine\(rawCommand\)/, 'LineSmith should parse and execute command input from the toolbar search field');
   assert.match(html, /const\s+COMMAND_AUTOCOMPLETE\s*=\s*\[[\s\S]*command:\s*"line"[\s\S]*command:\s*"move"[\s\S]*command:\s*"rotate"[\s\S]*command:\s*"inverse"/, 'toolbar command entry should publish command autocomplete metadata');
   assert.match(html, /function\s+buildQuickCommandSearchResults\(rawValue = ""\)\s*\{[\s\S]*isLikelyCommandQuery\(normalized\)/, 'search should route command-intent input to command autocomplete suggestions first');
+  assert.match(html, /for \(const point of points\.values\(\)\) \{[\s\S]*const layer = getLayerById\(point\.layerId\);/, 'point search should resolve layer metadata via getLayerById helper to avoid undefined layer lookups');
   assert.match(html, /for \(const point of points\.values\(\)\) \{[\s\S]*String\(point\.num \|\| ""\),[\s\S]*String\(point\.code \|\| ""\),[\s\S]*String\(point\.notes \|\| ""\)/, 'search should support point lookup by number, code, and notes text');
   assert.match(html, /btn\.style\.borderLeftColor = result\.layerColor;/, 'point search result rows should be color-coded by owning layer');
   assert.match(html, /function\s+selectPointFromQuickSearch\(pointId\)/, 'point search selections should route through a dedicated helper');
