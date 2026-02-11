@@ -85,6 +85,9 @@ test('POINT_TRANSFORMER.HTML supports Project Browser point-file imports and poi
   assert.match(html, /id="inputTableWrap"/, 'PointForge should render a tabular input point editor container');
   assert.match(html, /id="outputTableWrap"/, 'PointForge should render a tabular output points container');
   assert.match(html, /function\s+setPointEditorView\(enabled\)/, 'PointForge should define a helper to switch between textarea and point editor modes');
+  assert.match(html, /function\s+parsePointEditorDocument\(text\)/, 'PointForge point editor should parse full source documents so non-point rows can be preserved while editing');
+  assert.match(html, /function\s+pointEditorDocumentToCsv\(documentModel\)/, 'PointForge point editor should serialize edited rows back into the full document with passthrough lines intact');
+  assert.match(html, /if \(entry\.type === "raw"\) \{[\s\S]*lines\.push\(entry\.raw \?\? ""\);/, 'PointForge point editor serialization should preserve non-point raw rows when saving edits');
 });
 
 

@@ -446,3 +446,11 @@ test('VIEWPORT.HTML continuously syncs ArrowHead handoff payload while LineSmith
   assert.match(html, /syncArrowHeadPayloadToStorage\(\{\s*force:\s*true\s*\}\);/, 'opening ArrowHead should force-sync the latest geometry before navigation');
   assert.match(html, /updateUndoRedoHUD\(\);[\s\S]*syncArrowHeadPayloadToStorage\(\);[\s\S]*requestAnimationFrame\(draw\);/, 'draw loop should keep syncing ArrowHead payload so point\/line edits appear in AR without reopening');
 });
+
+test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+connectJpnReferencedPointsForSource\(sourcePointId\)\s*\{/, 'LineSmith should provide a source-point JPN connector helper for editor updates');
+  assert.match(html, /if \(field === "code"\) \{[\s\S]*const\s+jpnLinesAdded\s*=\s*connectJpnReferencedPointsForSource\(pid\);/, 'editing point code in the point editor should attempt JPN auto-connect for that point immediately');
+  assert.match(html, /Auto-connected \$\{jpnLinesAdded\} JPN line\$\{jpnLinesAdded === 1 \? "" : "s"\} for point \$\{p\.num\}\./, 'LineSmith should report successful JPN auto-connections triggered by point editor code edits');
+});

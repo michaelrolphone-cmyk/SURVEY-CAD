@@ -984,13 +984,26 @@
     const elOutputPointsBody = document.getElementById("outputPointsBody");
     const elToggleInputView = document.getElementById("btnToggleInputView");
 
-    function parsePointRows(text){
+    function parsePointEditorDocument(text){
       const lines = String(text || "").split(/\r?\n/);
+      const entries = [];
       const rows = [];
-      for (const line of lines){
-        if (!line.trim()) continue;
+
+      for (let idx = 0; idx < lines.length; idx += 1){
+        const line = lines[idx];
+        if (!line.trim()) {
+          entries.push({ type: "blank", raw: line });
+          continue;
+        }
+
         const fields = parseCSVLine(line);
-        if (fields.length < 4) continue;
+        if (fields.length < 4) {
+          entries.push({ type: "raw", raw: line });
+          continue;
+        }
+
+        while (fields.length < 6) fields.push("");
+        const rowIndex = rows.length;
         rows.push({
           number: trimOrEmpty(fields[0]),
           x: trimOrEmpty(fields[1]),
@@ -999,19 +1012,49 @@
           code: trimOrEmpty(fields[4]),
           notes: trimOrEmpty(fields[5]),
         });
+        entries.push({ type: "point", fields, rowIndex });
       }
-      return rows;
+
+      return { rows, entries };
     }
 
-    function rowsToCsv(rows){
-      return rows
-        .map((row)=>[
-          csvEscape(row.number), csvEscape(row.x), csvEscape(row.y), csvEscape(row.z), csvEscape(row.code), csvEscape(row.notes)
-        ].join(","))
-        .join("\n");
+    function pointEditorDocumentToCsv(documentModel){
+      const rows = Array.isArray(documentModel?.rows) ? documentModel.rows : [];
+      const entries = Array.isArray(documentModel?.entries) ? documentModel.entries : [];
+      const lines = [];
+
+      for (const entry of entries){
+        if (entry.type === "point") {
+          const row = rows[entry.rowIndex] || {};
+          const fields = Array.isArray(entry.fields) ? [...entry.fields] : [];
+          while (fields.length < 6) fields.push("");
+          fields[0] = row.number ?? "";
+          fields[1] = row.x ?? "";
+          fields[2] = row.y ?? "";
+          fields[3] = row.z ?? "";
+          fields[4] = row.code ?? "";
+          fields[5] = row.notes ?? "";
+          lines.push(fields.map(csvEscape).join(","));
+          continue;
+        }
+
+        if (entry.type === "blank") {
+          lines.push(entry.raw ?? "");
+          continue;
+        }
+
+        if (entry.type === "raw") {
+          lines.push(entry.raw ?? "");
+          continue;
+        }
+
+        lines.push(entry.raw ?? "");
+      }
+
+      return lines.join("\n");
     }
 
-    function renderPointRows(rows, tbody, editable){
+    function renderPointRows(rows, tbody, editable, documentModel = null){
       tbody.innerHTML = "";
       if (!rows.length){
         const tr = document.createElement("tr");
@@ -1032,7 +1075,15 @@
             input.addEventListener("input", (event)=>{
               const target = event.target;
               rows[Number(target.dataset.index)][target.dataset.field] = target.value;
-              elIn.value = rowsToCsv(rows);
+              if (documentModel) {
+                elIn.value = pointEditorDocumentToCsv(documentModel);
+              } else {
+                elIn.value = rows
+                  .map((row)=>[
+                    csvEscape(row.number), csvEscape(row.x), csvEscape(row.y), csvEscape(row.z), csvEscape(row.code), csvEscape(row.notes)
+                  ].join(","))
+                  .join("\n");
+              }
               if (elAuto.checked) processNow();
             });
             td.appendChild(input);
@@ -1047,8 +1098,10 @@
 
     function refreshPointEditorTables(){
       if (!usePointEditorView) return;
-      renderPointRows(parsePointRows(elIn.value), elInputPointsBody, true);
-      renderPointRows(parsePointRows(elOut.value), elOutputPointsBody, false);
+      const inputDocument = parsePointEditorDocument(elIn.value);
+      const outputDocument = parsePointEditorDocument(elOut.value);
+      renderPointRows(inputDocument.rows, elInputPointsBody, true, inputDocument);
+      renderPointRows(outputDocument.rows, elOutputPointsBody, false, outputDocument);
     }
 
     function setPointEditorView(enabled){
