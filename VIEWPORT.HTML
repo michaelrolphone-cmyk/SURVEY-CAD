@@ -378,7 +378,75 @@
       border:1px solid rgba(255,255,255,0.3);
       flex:0 0 auto;
     }
-    .quickToolLayerToggles{
+    .quickLayerDropdown{
+      position:relative;
+      flex:1 1 auto;
+      min-width:150px;
+    }
+    .quickLayerDropdownBtn{
+      width:100%;
+      min-height:24px;
+      border:1px solid #2c2c2c;
+      border-radius:6px;
+      background:#0d0d0d;
+      color:var(--text);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:2px 8px;
+      font-size:12px;
+    }
+    .quickLayerDropdownBtnText{
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .quickLayerDropdownMenu{
+      position:absolute;
+      top:calc(100% + 4px);
+      left:0;
+      right:0;
+      border:1px solid #2f2f2f;
+      border-radius:8px;
+      background:#121212;
+      box-shadow:0 8px 24px rgba(0,0,0,0.4);
+      max-height:320px;
+      overflow-y:auto;
+      z-index:20;
+      padding:4px;
+    }
+    .quickLayerDropdownMenu.hidden{
+      display:none;
+    }
+    .quickLayerDropdownItem{
+      width:100%;
+      min-height:30px;
+      border:0;
+      background:transparent;
+      color:var(--text);
+      border-radius:6px;
+      padding:6px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      text-align:left;
+    }
+    .quickLayerDropdownItem.active{
+      background:#1b2534;
+    }
+    .quickLayerDropdownItem:hover{
+      background:#1a1a1a;
+    }
+    .quickLayerItemName{
+      min-width:0;
+      flex:1 1 auto;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:12px;
+    }
+    .quickLayerItemFlags{
       display:inline-flex;
       align-items:center;
       gap:4px;
@@ -1015,8 +1083,13 @@
       <label class="quickToolField" title="Toggle point notes labels"><input id="quickShowPointNotes" type="checkbox" /> Notes</label>
       <div class="quickToolField quickToolLayer" title="Active layer">
         <span id="quickLayerColor" class="quickToolLayerSwatch" aria-hidden="true"></span>
-        <select id="quickLayerSelect" aria-label="Active Layer"></select>
-        <span id="quickLayerToggles" class="quickToolLayerToggles"></span>
+        <div id="quickLayerDropdown" class="quickLayerDropdown">
+          <button id="quickLayerDropdownButton" class="quickLayerDropdownBtn" aria-label="Active Layer" aria-haspopup="listbox" aria-expanded="false">
+            <span id="quickLayerDropdownLabel" class="quickLayerDropdownBtnText">Layer</span>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+          </button>
+          <div id="quickLayerDropdownMenu" class="quickLayerDropdownMenu hidden" role="listbox" aria-label="Layer options"></div>
+        </div>
       </div>
       <button id="quickLayerManager" class="quickToolBtn" title="Layer Manager" aria-label="Layer Manager"><i class="fa-solid fa-layer-group"></i></button>
       <span class="quickToolDivider" aria-hidden="true"></span>
@@ -1620,9 +1693,11 @@
   const showPointNotesInput = $("#showPointNotes");
   const quickShowPointCodesInput = $("#quickShowPointCodes");
   const quickShowPointNotesInput = $("#quickShowPointNotes");
-  const quickLayerSelect = $("#quickLayerSelect");
+  const quickLayerDropdown = $("#quickLayerDropdown");
+  const quickLayerDropdownButton = $("#quickLayerDropdownButton");
+  const quickLayerDropdownLabel = $("#quickLayerDropdownLabel");
+  const quickLayerDropdownMenu = $("#quickLayerDropdownMenu");
   const quickLayerColor = $("#quickLayerColor");
-  const quickLayerToggles = $("#quickLayerToggles");
   const quickLayerManagerBtn = $("#quickLayerManager");
   const clusterTooltip = $("#clusterTooltip");
 
@@ -1667,6 +1742,7 @@
   var layersTableDirty = true;
   const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable,layerId}
   const lines = new Map();  // id -> {id,a,b,movable,layerId}
+  let quickLayerDropdownOpen = false;
 
   // Selection
   let selectedPointId = null;   // primary point
@@ -4155,9 +4231,16 @@
   $("#quickRotateSelection")?.addEventListener("click", () => startRotateSelectionSession());
   $("#quickPointManager")?.addEventListener("click", () => openPointsManagerBtn?.click());
 
-  quickLayerSelect?.addEventListener("change", () => {
-    if (layers.has(quickLayerSelect.value)) selectedLayerId = quickLayerSelect.value;
-    renderLayerControls();
+  quickLayerDropdownButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    setQuickLayerDropdownOpen(!quickLayerDropdownOpen);
+  });
+  document.addEventListener("mousedown", (event) => {
+    if (!quickLayerDropdown || !quickLayerDropdownOpen) return;
+    if (!quickLayerDropdown.contains(event.target)) setQuickLayerDropdownOpen(false);
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setQuickLayerDropdownOpen(false);
   });
   quickLayerManagerBtn?.addEventListener("click", () => openLayersModal());
   layersModalClose?.addEventListener("click", () => closeLayersModal());
@@ -6620,44 +6703,78 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     renderLayersTable();
   }
 
+  function setQuickLayerDropdownOpen(open) {
+    quickLayerDropdownOpen = !!open;
+    if (quickLayerDropdownMenu) quickLayerDropdownMenu.classList.toggle("hidden", !quickLayerDropdownOpen);
+    if (quickLayerDropdownButton) quickLayerDropdownButton.setAttribute("aria-expanded", quickLayerDropdownOpen ? "true" : "false");
+  }
+
+  function toggleLayerFlag(layer, key) {
+    if (!layer) return;
+    if (key === "visible") layer.visible = !(layer.visible !== false);
+    else layer[key] = !layer[key];
+    renderLayerControls();
+    scheduleLayersTableRender();
+    const enabled = key === "visible" ? layer.visible !== false : layer[key] === true;
+    setStatus(`Layer ${layer.name}: ${key} ${enabled ? "on" : "off"}.`, "ok");
+  }
+
   function renderLayerControls() {
-    if (!quickLayerSelect) return;
-    const previous = selectedLayerId;
-    quickLayerSelect.innerHTML = "";
-    for (const layer of layers.values()) {
-      const option = document.createElement("option");
-      option.value = layer.id;
-      option.textContent = layer.name;
-      quickLayerSelect.appendChild(option);
-    }
-    if (!layers.has(previous)) selectedLayerId = layers.keys().next().value;
-    quickLayerSelect.value = selectedLayerId;
+    if (!quickLayerDropdownButton || !quickLayerDropdownMenu) return;
+    if (!layers.has(selectedLayerId)) selectedLayerId = layers.keys().next().value;
     const selectedLayer = activeLayer();
     if (quickLayerColor && selectedLayer) quickLayerColor.style.background = selectedLayer.color;
-    if (quickLayerToggles && selectedLayer) {
-      quickLayerToggles.innerHTML = "";
+    if (quickLayerDropdownLabel) quickLayerDropdownLabel.textContent = selectedLayer?.name || "Layer";
+
+    quickLayerDropdownMenu.innerHTML = "";
+    for (const layer of layers.values()) {
+      const rowBtn = document.createElement("button");
+      rowBtn.className = `quickLayerDropdownItem${layer.id === selectedLayerId ? " active" : ""}`;
+      rowBtn.type = "button";
+      rowBtn.setAttribute("role", "option");
+      rowBtn.setAttribute("aria-selected", layer.id === selectedLayerId ? "true" : "false");
+
+      const swatch = document.createElement("span");
+      swatch.className = "quickToolLayerSwatch";
+      swatch.style.background = layer.color;
+
+      const name = document.createElement("span");
+      name.className = "quickLayerItemName";
+      name.textContent = layer.name;
+
+      const flags = document.createElement("span");
+      flags.className = "quickLayerItemFlags";
       const toggles = [
         { key: "locked", icon: "fa-lock", offIcon: "fa-lock-open", title: "Toggle lock" },
         { key: "visible", icon: "fa-eye", offIcon: "fa-eye-slash", title: "Toggle visibility" },
         { key: "fill", icon: "fa-fill-drip", offIcon: "fa-fill-drip", title: "Toggle polygon fill" }
       ];
       for (const toggle of toggles) {
-        const enabled = toggle.key === "visible" ? selectedLayer.visible !== false : selectedLayer[toggle.key] === true;
+        const enabled = toggle.key === "visible" ? layer.visible !== false : layer[toggle.key] === true;
         const btn = document.createElement("button");
+        btn.type = "button";
         btn.className = `quickToolIconBtn${enabled ? " active" : ""}`;
-        btn.title = `${toggle.title} (${selectedLayer.name})`;
+        btn.title = `${toggle.title} (${layer.name})`;
         btn.innerHTML = `<i class="fa-solid ${enabled ? toggle.icon : toggle.offIcon}"></i>`;
-        btn.addEventListener("click", () => {
-          if (toggle.key === "visible") selectedLayer.visible = !(selectedLayer.visible !== false);
-          else selectedLayer[toggle.key] = !selectedLayer[toggle.key];
-          renderLayerControls();
-          scheduleLayersTableRender();
-          setStatus(`Layer ${selectedLayer.name}: ${toggle.key} ${selectedLayer[toggle.key] === true || (toggle.key === "visible" && selectedLayer.visible !== false) ? "on" : "off"}.`, "ok");
+        btn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleLayerFlag(layer, toggle.key);
+          setQuickLayerDropdownOpen(true);
         });
-        quickLayerToggles.appendChild(btn);
+        flags.appendChild(btn);
       }
+
+      rowBtn.append(swatch, name, flags);
+      rowBtn.addEventListener("click", () => {
+        selectedLayerId = layer.id;
+        renderLayerControls();
+        setQuickLayerDropdownOpen(false);
+      });
+      quickLayerDropdownMenu.appendChild(rowBtn);
     }
   }
+
 
   function renderLayersTable() {
     if (!layersTbody) return;
