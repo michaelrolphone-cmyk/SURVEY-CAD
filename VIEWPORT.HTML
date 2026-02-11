@@ -4351,7 +4351,7 @@
         ctx.arc(sc.x, sc.y, radiusPixels, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.strokeStyle = layer.color;
+        ctx.strokeStyle = colorToRgba(layer.color, 0.35) || "rgba(255,255,255,0.35)";
         ctx.lineWidth = circleStrokeWidth;
         ctx.beginPath();
         ctx.arc(sc.x, sc.y, radiusPixels, 0, Math.PI * 2);

@@ -408,6 +408,7 @@ test('VIEWPORT.HTML parses generic field-to-finish commands for sequential BEG/E
   assert.match(html, /function\s+buildFieldToFinishCircleCommands\(\)\s*\{[\s\S]*if \(cmd\.type !== "circle"\) continue;[\s\S]*circles\.push\(\{ centerPointId: point\.id, radius: cmd\.radius \}\);/, 'LineSmith should derive circle draw directives from CIR point-code commands using the current point as the center');
   assert.match(html, /const\s+circleCommands\s*=\s*buildFieldToFinishCircleCommands\(\);[\s\S]*ctx\.arc\(sc\.x, sc\.y, radiusPixels, 0, Math\.PI \* 2\);/, 'LineSmith should render CIR commands as circles centered on each matching point with world-space radius scaling');
   assert.match(html, /Draw a dark under-stroke first so CIR geometry remains visible on aerial basemaps\.[\s\S]*ctx\.strokeStyle = "rgba\(0,0,0,0\.6\)";[\s\S]*ctx\.lineWidth = circleStrokeWidth \+ 1;/, 'CIR rendering should add a dark under-stroke so circles stay visible against mixed map backgrounds');
+  assert.match(html, /ctx\.strokeStyle = colorToRgba\(layer\.color, 0\.35\) \|\| "rgba\(255,255,255,0\.35\)";/, 'CIR rendering should draw the primary circle stroke at 35% opacity for better basemap visibility');
   assert.match(html, /if \(field === "code"\) \{[\s\S]*syncFieldToFinishLinework\(\);/, 'code edits should apply field-to-finish linework synchronization immediately so BEG/END/CLO changes update linework');
 });
 

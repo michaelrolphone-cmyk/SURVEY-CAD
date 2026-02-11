@@ -57,6 +57,7 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 - `JPN <pointNumber>`: connect this point to another point by point number (e.g. `JPN 102`).
 - `<code> BEG/END/CLO`: start/end/close sequential linework for a linework code.
 - `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
+  - CIR circles render with a 35% opacity primary stroke so geometry remains visible without overpowering basemap imagery.
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
 
 ### LineSmith Field-to-Finish commands
