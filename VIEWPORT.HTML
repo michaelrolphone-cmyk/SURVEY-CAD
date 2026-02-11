@@ -2371,6 +2371,25 @@
     return created;
   }
 
+  function connectJpnReferencedPointsForSource(sourcePointId) {
+    const sourcePoint = points.get(sourcePointId);
+    if (!sourcePoint) return 0;
+
+    const byNum = new Map();
+    for (const p of points.values()) byNum.set(String(p.num), p.id);
+
+    let created = 0;
+    const targets = extractJpnTargetPointNumbers(sourcePoint.code);
+    for (const targetNum of targets) {
+      const targetPointId = byNum.get(String(targetNum));
+      if (!targetPointId || targetPointId === sourcePoint.id) continue;
+      if (arePointsDirectlyConnected(sourcePoint.id, targetPointId)) continue;
+      addLine(sourcePoint.id, targetPointId, false);
+      created++;
+    }
+    return created;
+  }
+
   function moveSelectionByDelta(dx, dy) {
     const ids = getRotatablePointIdsFromSelection();
     if (!ids.length) return 0;
@@ -4502,6 +4521,13 @@ JPN lines added: ${jpnLinesAdded}`, "ok");
       if (selectedPointId === pid) {
         if (field === "code") $("#ptCode").value = p.code;
         if (field === "notes") $("#ptNotes").value = p.notes;
+      }
+      if (field === "code") {
+        const jpnLinesAdded = connectJpnReferencedPointsForSource(pid);
+        if (jpnLinesAdded > 0) {
+          schedulePointsTableRender();
+          setStatus(`Auto-connected ${jpnLinesAdded} JPN line${jpnLinesAdded === 1 ? "" : "s"} for point ${p.num}.`, "ok");
+        }
       }
       return;
     }

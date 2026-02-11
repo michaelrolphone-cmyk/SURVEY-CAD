@@ -619,3 +619,5 @@ CLI prints the same JSON payload returned by `/extract`.
 No API endpoints or CLI commands changed in this iOS 13 permission-prompt compatibility fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 No API endpoints or CLI commands changed in this iOS geolocation/rendering reliability fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+No API endpoints or CLI commands changed for the PointForge point-editor passthrough preservation and LineSmith JPN editor auto-connect fix; existing commands remain unchanged (`npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`).
