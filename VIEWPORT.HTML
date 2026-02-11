@@ -791,7 +791,7 @@
   </style>
 </head>
 <body>
-<div class="app" id="appShell">
+<div class="app panelCollapsed" id="appShell">
   <div class="panel">
     <button id="panelCollapseHandle" class="panelCollapseHandle" aria-label="Collapse controls drawer" title="Collapse controls drawer">→</button>
     <h1>LineSmith — Points & Bearings</h1>
@@ -808,7 +808,7 @@
       <div id="pointInspector" class="inspectorCard">Select one point to inspect point details.</div>
     </div>
 
-    <details id="panelToolsCollapse" class="panelToolsCollapse" open>
+    <details id="panelToolsCollapse" class="panelToolsCollapse">
       <summary>Tool drawer sections</summary>
       <div class="panelToolsCollapseBody">
 
@@ -4261,8 +4261,7 @@
   }
 
   window.addEventListener("resize", () => {
-    if (!isMobileViewport()) setDrawerOpen(false);
-    setPanelCollapsed(false);
+    syncPanelCollapseWithSelection();
   });
 
   $("#undoBtn").addEventListener("click", ()=>history.undoAction());
@@ -4671,6 +4670,7 @@
       $("#ptY").value = "";
     }
     updatePointInspectorFromSelection();
+    syncPanelCollapseWithSelection();
   }
 
   $("#applyPoint").addEventListener("click", () => {
@@ -6114,6 +6114,17 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       resize();
       if (mapLayerState.enabled) syncMapToView(true);
     });
+  }
+
+  function syncPanelCollapseWithSelection() {
+    const hasSelection = selectedPointIds.length > 0 || selectedLines.length > 0;
+    if (isMobileViewport()) {
+      setDrawerOpen(hasSelection);
+      setPanelCollapsed(false);
+      return;
+    }
+    setDrawerOpen(false);
+    setPanelCollapsed(!hasSelection);
   }
 
   function isMobileViewport() {
