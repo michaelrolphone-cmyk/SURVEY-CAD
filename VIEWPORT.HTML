@@ -1238,7 +1238,7 @@
     </div>
     <div class="hud">
       <span class="pill"><b>Tool</b> <span id="hudTool">Select/Move</span></span>
-      <span class="pill"><b>Mouse</b> <span id="hudMouse">x: 0, y: 0</span></span>
+      <span class="pill"><b>Mouse (State Plane)</b> <span id="hudMouse">x: 0.000, y: 0.000</span></span>
       <span class="pill"><b>Scale</b> <span id="hudZoom">1.00</span></span>
       <span class="pill"><b>Sel</b> <span id="hudSel" class="clip">none</span></span>
       <span class="pill"><b>Undo</b> <span id="hudUndo">0</span></span>
@@ -1351,6 +1351,9 @@
   const dist2 = (ax,ay,bx,by)=>{ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; };
   const dist = (ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
   const fmt = (n)=> (Number.isFinite(n) ? (Math.abs(n) < 1e6 ? n.toFixed(3) : n.toExponential(6)) : "NaN");
+  const fmtPlainCoordinate = (n)=> (Number.isFinite(n)
+    ? n.toLocaleString("en-US", { useGrouping:false, minimumFractionDigits:3, maximumFractionDigits:3 })
+    : "NaN");
   const POINTFORGE_IMPORT_STORAGE_KEY = "lineSmithPointforgeImport";
   const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
   const PROJECT_DRAWING_STORAGE_PREFIX = "surveyfoundryLineSmithDrawing";
@@ -4154,7 +4157,7 @@
     drawRemoteCursors();
 
     // HUD
-    hudMouse.textContent = `x: ${fmt(mouse.wx)}, y: ${fmt(mouse.wy)}`;
+    hudMouse.textContent = `x: ${fmtPlainCoordinate(mouse.wx)}, y: ${fmtPlainCoordinate(mouse.wy)}`;
     hudZoom.textContent = `${view.scale.toFixed(4)} px/unit`;
     updateSelectionHUD();
     updateUndoRedoHUD();
