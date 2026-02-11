@@ -80,6 +80,9 @@ LineSmith now loads field-to-finish behavior rules from the server-provided FLD 
 - Companion-code sequencing: for active linework rules, LineSmith also honors each rule's `companionCodes` list during sequential connectivity (for example, `WL` can continue through `WM` points when `WM` is configured as a companion code for `WL`, while `WM` remains a symbol code on its own).
 - Point code label filtering: when drawing point-code labels, LineSmith now removes non-leading Field-to-Finish command tokens that are already applied (for example `BEG`, `END`, `CLO`, `JPN###`, configured linework codes, and companion linework tokens), while preserving the first code token for readability (`WL BEG JPN123 57G` renders as `WL 57G`).
 - Layer assignment during point parsing: when an imported point code matches an FLD rule that defines `layer`, LineSmith now auto-assigns the point to that named drawing layer and creates the layer on-the-fly if it does not exist yet.
+- Layer assignment during auto linework generation: if an FTF-generated segment connects two points on the same layer, the line is created on that shared layer.
+- Companion-code cross-layer precedence: when a sequential segment crosses layers via companion-code continuity (for example `WL` through `WM`), the line is assigned to the FLD layer configured for the owning linework code (`WL` in that case).
+- JPN cross-layer precedence: JPN-generated lines always inherit the source point's layer (the point containing `JPN...`), not the referenced target point's layer.
 - API/CLI surface impact: no new endpoints or commands were introduced for this behavior; use existing `GET /api/fld-config` and existing CLI entrypoints (`npm run cli`, `npm run ros:cli`).
 
 
