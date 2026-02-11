@@ -625,7 +625,9 @@
       position:absolute;
       top:calc(100% + 6px);
       left:0;
-      right:0;
+      right:auto;
+      width:max(100%, 420px);
+      max-width:min(70vw, 680px);
       border:1px solid #2f2f2f;
       border-radius:8px;
       background:#121212;
@@ -655,6 +657,7 @@
     .quickSearchResultLine{ display:flex; justify-content:space-between; gap:8px; }
     .quickSearchResultTitle{ font-size:12px; font-weight:600; }
     .quickSearchResultMeta{ color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .quickSearchResultDescription{ color:var(--muted); font-size:11px; white-space:normal; overflow-wrap:anywhere; }
 
     .kbd{
       display:grid;
@@ -4730,14 +4733,14 @@
 
       if (result.type === "point") {
         btn.style.borderLeftColor = result.layerColor;
-        btn.innerHTML = `<span class="quickSearchResultLine"><span class="quickSearchResultTitle" style="color:${escapeHtml(result.layerColor)}">P${escapeHtml(result.pointNumber)}</span><span class="quickSearchResultMeta">${escapeHtml(result.layerName)}</span></span><span class="quickSearchResultMeta">${escapeHtml(result.pointCode || "(no code)")} · ${escapeHtml(result.pointNotes || "No notes")}</span>`;
+        btn.innerHTML = `<span class="quickSearchResultLine"><span class="quickSearchResultTitle" style="color:${escapeHtml(result.layerColor)}">${escapeHtml(result.pointNumber)}</span><span class="quickSearchResultMeta">${escapeHtml(result.layerName)}</span></span><span class="quickSearchResultDescription">${escapeHtml(result.pointCode || "(no code)")} · ${escapeHtml(result.pointNotes || "No notes")}</span>`;
         btn.addEventListener("click", () => {
           selectPointFromQuickSearch(result.pointId);
           clearQuickCommandSearchResults();
         });
       } else {
         btn.style.borderLeftColor = "#5c4b14";
-        btn.innerHTML = `<span class="quickSearchResultLine"><span class="quickSearchResultTitle">${escapeHtml(result.command.toUpperCase())}</span><span class="quickSearchResultMeta">Command</span></span><span class="quickSearchResultMeta">${escapeHtml(result.usage)} · ${escapeHtml(result.detail)}</span>`;
+        btn.innerHTML = `<span class="quickSearchResultLine"><span class="quickSearchResultTitle">${escapeHtml(result.command.toUpperCase())}</span><span class="quickSearchResultMeta">Command</span></span><span class="quickSearchResultDescription">${escapeHtml(result.usage)} · ${escapeHtml(result.detail)}</span>`;
         btn.addEventListener("click", () => {
           if (quickCommandSearchInput) quickCommandSearchInput.value = result.command;
           renderQuickCommandSearchResults(result.command);
