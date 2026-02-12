@@ -64,7 +64,7 @@
       border-left:none;
       padding:0;
       overflow:hidden;
-      pointer-events:none;
+      pointer-events:auto;
     }
     .panelCollapseHandle{
       position:absolute;
@@ -380,7 +380,7 @@
       color:var(--text);
       font-size:11px;
       line-height:1.4;
-      pointer-events:none;
+      pointer-events:auto;
       padding:8px;
       white-space:normal;
     }
@@ -396,6 +396,17 @@
       padding:1px 4px;
       margin-left:-4px;
       margin-right:-4px;
+    }
+    .clusterTooltip .clusterTooltipAction{
+      width:100%;
+      text-align:left;
+      background:transparent;
+      border:0;
+      color:inherit;
+      padding:0;
+      margin:0;
+      cursor:pointer;
+      font:inherit;
     }
     .pointHoverTooltipRow{ margin:2px 0; }
     .pointHoverTooltipLabel{
@@ -1272,6 +1283,18 @@
       </div>
     </div>
 
+    <div class="section">
+      <div class="title">
+        <b>Field-to-Finish</b>
+        <span>FLD rules</span>
+      </div>
+      <div class="grid2">
+        <button id="openFldEditor" class="primary">Open FLD Editor</button>
+        <button id="downloadFldLocal" title="Download locally-overridden FLD config">Download Local FLD</button>
+      </div>
+      <div class="hint">Edit/add/remove FLD codes, keep a local override copy, or reset back to the server file.</div>
+    </div>
+
       </div>
     </details>
 
@@ -1448,6 +1471,47 @@
   </div>
 </div>
 
+<div id="fldModal" class="modalOverlay hidden" aria-hidden="true">
+  <div id="fldModalWindow" class="modalWindow" style="width:min(1200px,95vw);height:min(680px,84vh);">
+    <div id="fldModalHeader" class="modalHeader">
+      <b>Field-to-Finish (FLD) Editor</b>
+      <div class="right">
+        <span class="pill"><b>Source</b> <span id="fldSourceLabel">Server</span></span>
+        <button id="fldAddRule" class="cellBtn">Add Code</button>
+        <button id="fldDownloadLocal" class="cellBtn">Download Local FLD</button>
+        <button id="fldDownloadCurrent" class="cellBtn">Download Current FLD</button>
+        <button id="fldResetServer" class="cellBtn">Reset to Server</button>
+        <button id="fldSaveLocal" class="cellBtn">Save Local</button>
+        <button id="fldModalClose" class="cellBtn">Close</button>
+      </div>
+    </div>
+    <div class="modalBody">
+      <div class="tableWrap">
+        <div class="tableTools">
+          <input id="fldFilter" placeholder="Filter codes" />
+          <span class="pill"><b>Tip</b> <span class="clip">Edits are stored in browser localStorage until reset.</span></span>
+        </div>
+        <div class="scrollBody">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:120px;">Code</th>
+                <th style="width:110px;">Entity</th>
+                <th style="width:110px;">Process</th>
+                <th style="width:180px;">Layer</th>
+                <th style="width:220px;">Description</th>
+                <th style="width:220px;">Companion Codes</th>
+                <th style="width:100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fldTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script
   src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -1472,6 +1536,7 @@
   const PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = "lineSmithProjectBrowserDrawingImport";
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = "surveyfoundryLastLineSmithDrawing";
   const ARROWHEAD_IMPORT_STORAGE_KEY = "lineSmithArrowHeadImport";
+  const FLD_CONFIG_LOCAL_STORAGE_KEY = "lineSmithFldConfigLocal";
   const ARROWHEAD_SYNC_INTERVAL_MS = 1000;
   let lastArrowHeadPayloadJson = "";
   let lastArrowHeadPayloadSyncAt = 0;
@@ -1981,6 +2046,20 @@
   const layersModalClose = $("#layersModalClose");
   const layersAddBtn = $("#layersAdd");
   const layersTbody = $("#layersTbody");
+  const openFldEditorBtn = $("#openFldEditor");
+  const downloadFldLocalBtn = $("#downloadFldLocal");
+  const fldModal = $("#fldModal");
+  const fldModalWindow = $("#fldModalWindow");
+  const fldModalHeader = $("#fldModalHeader");
+  const fldModalClose = $("#fldModalClose");
+  const fldFilterInput = $("#fldFilter");
+  const fldTbody = $("#fldTbody");
+  const fldSourceLabel = $("#fldSourceLabel");
+  const fldAddRuleBtn = $("#fldAddRule");
+  const fldSaveLocalBtn = $("#fldSaveLocal");
+  const fldResetServerBtn = $("#fldResetServer");
+  const fldDownloadLocalInlineBtn = $("#fldDownloadLocal");
+  const fldDownloadCurrentBtn = $("#fldDownloadCurrent");
 
   // -------------------------
   // Model
@@ -2081,8 +2160,15 @@
   const POINT_CLUSTER_POLYGON_AREA_RATIO_TARGET = 0.5;
   const POINT_CLUSTER_POLYGON_AREA_RATIO_TOLERANCE = 0.15;
   const POINT_CLUSTER_POLYGON_MIN_WIDTH_TO_HEIGHT_RATIO = 1 / 3;
+  const POINT_CLUSTER_TOOLTIP_HIDE_DELAY_MS = 180;
   let cachedPointClusters = [];
   let hoveredClusterPointId = null;
+  let activeClusterTooltip = {
+    cluster: null,
+    expandedLayerId: null
+  };
+  let clusterTooltipHovering = false;
+  let clusterTooltipHideTimer = null;
 
   const mapLayerState = {
     enabled: false,
@@ -2970,6 +3056,11 @@
     loaded: false,
     attempted: false,
   };
+  const fldEditorState = {
+    serverConfig: null,
+    activeConfig: null,
+    source: "server",
+  };
 
   function deriveFieldToFinishCodeSetsFromConfig(config) {
     const lineworkCodes = new Set();
@@ -3004,20 +3095,78 @@
     return { lineworkCodes, symbolCodes, codeLayers, lineworkCompanionCodes, companionToLineworkCodes };
   }
 
+  function cloneFldConfig(config) {
+    if (!config || typeof config !== "object") return null;
+    return JSON.parse(JSON.stringify(config));
+  }
+
+  function loadLocalFldOverride() {
+    try {
+      const raw = localStorage.getItem(FLD_CONFIG_LOCAL_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed?.columns) || !Array.isArray(parsed?.rules)) return null;
+      return parsed;
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function saveLocalFldOverride(config) {
+    localStorage.setItem(FLD_CONFIG_LOCAL_STORAGE_KEY, JSON.stringify(config));
+  }
+
+  function clearLocalFldOverride() {
+    localStorage.removeItem(FLD_CONFIG_LOCAL_STORAGE_KEY);
+  }
+
+  function serializeFieldToFinishConfig(config) {
+    const columns = Array.isArray(config?.columns) ? config.columns : [];
+    const rules = Array.isArray(config?.rules) ? config.rules : [];
+    if (!columns.length) return "";
+    const header = `#${String(config?.versionTag || "2010V").trim()}# ${columns.map((col, idx) => String(col?.name || `Column ${idx + 1}`).trim()).join("|")}`;
+    const lines = [header];
+    for (const rule of rules) {
+      const raw = rule?.raw && typeof rule.raw === "object" ? rule.raw : {};
+      lines.push(columns.map((col) => String(raw[col.key] ?? "").replace(/[\r\n|]/g, " ").trim()).join("|"));
+    }
+    return `${lines.join("\n")}\n`;
+  }
+
+  function downloadTextFile(filename, content) {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function applyFieldToFinishConfig(config, sourceLabel = defaultFldConfigPath) {
+    const { lineworkCodes, symbolCodes, codeLayers, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
+    fieldToFinishRuleState.lineworkCodes = lineworkCodes;
+    fieldToFinishRuleState.symbolCodes = symbolCodes;
+    fieldToFinishRuleState.codeLayers = codeLayers;
+    fieldToFinishRuleState.lineworkCompanionCodes = lineworkCompanionCodes;
+    fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
+    fieldToFinishRuleState.source = sourceLabel;
+    fieldToFinishRuleState.loaded = true;
+  }
+
   async function loadFieldToFinishRulesFromFld(path = defaultFldConfigPath) {
     fieldToFinishRuleState.attempted = true;
     try {
       const response = await fetch(`/api/fld-config?file=${encodeURIComponent(path)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const config = await response.json();
-      const { lineworkCodes, symbolCodes, codeLayers, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
-      fieldToFinishRuleState.lineworkCodes = lineworkCodes;
-      fieldToFinishRuleState.symbolCodes = symbolCodes;
-      fieldToFinishRuleState.codeLayers = codeLayers;
-      fieldToFinishRuleState.lineworkCompanionCodes = lineworkCompanionCodes;
-      fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
-      fieldToFinishRuleState.source = path;
-      fieldToFinishRuleState.loaded = true;
+      const serverConfig = await response.json();
+      fldEditorState.serverConfig = cloneFldConfig(serverConfig);
+      const localOverride = loadLocalFldOverride();
+      fldEditorState.activeConfig = cloneFldConfig(localOverride || serverConfig);
+      fldEditorState.source = localOverride ? "local" : "server";
+      applyFieldToFinishConfig(fldEditorState.activeConfig, localOverride ? "localStorage" : path);
       return true;
     } catch (_err) {
       fieldToFinishRuleState.loaded = false;
@@ -4103,39 +4252,75 @@
     return closest;
   }
 
-  function showClusterTooltip(cluster, screenX = mouse.x, screenY = mouse.y) {
-    if (!clusterTooltip || !cluster) return;
-    const hoveredMember = getClusterMemberClosestToScreen(cluster, screenX, screenY);
-    hoveredClusterPointId = hoveredMember?.id ?? null;
-    const listHtml = cluster.members.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT
-      ? (() => {
-        const countsByLayer = new Map();
-        for (const entry of cluster.members) {
-          const point = entry.point;
-          const layer = getLayerById(point.layerId);
-          const layerName = String(layer?.name || "Unassigned").trim() || "Unassigned";
-          const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
-          const existing = countsByLayer.get(layerName);
-          if (existing) {
-            existing.count += 1;
-          } else {
-            countsByLayer.set(layerName, { count: 1, color: layerColor });
-          }
-        }
-        return Array.from(countsByLayer.entries())
-          .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
-          .map(([layerName, meta]) => `<li><b class="clusterTooltipLayerName" style="color:${escapeHtml(meta.color)}">${escapeHtml(layerName)}</b>: ${meta.count} point${meta.count === 1 ? "" : "s"}</li>`)
-          .join("");
-      })()
-      : cluster.members.map((entry) => {
+
+  function isLineDrawingToolActive() {
+    return tool === "line2pt" || tool === "lineDB";
+  }
+
+  function clearClusterTooltipHideTimer() {
+    if (clusterTooltipHideTimer == null) return;
+    window.clearTimeout(clusterTooltipHideTimer);
+    clusterTooltipHideTimer = null;
+  }
+
+  function scheduleClusterTooltipHide() {
+    clearClusterTooltipHideTimer();
+    clusterTooltipHideTimer = window.setTimeout(() => {
+      clusterTooltipHideTimer = null;
+      if (clusterTooltipHovering) return;
+      hideClusterTooltip();
+    }, POINT_CLUSTER_TOOLTIP_HIDE_DELAY_MS);
+  }
+
+  function renderClusterTooltipMembers(cluster, expandedLayerId = null) {
+    const showLayerGroups = cluster.members.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT && !expandedLayerId;
+    if (showLayerGroups) {
+      const countsByLayer = new Map();
+      for (const entry of cluster.members) {
         const point = entry.point;
         const layer = getLayerById(point.layerId);
+        const layerId = String(point.layerId || "");
+        const layerName = String(layer?.name || "Unassigned").trim() || "Unassigned";
         const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
-        const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
-        const activeClass = point.id === hoveredClusterPointId ? " class=\"active\"" : "";
-        return `<li${activeClass}><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</li>`;
-      }).join("");
-    clusterTooltip.innerHTML = `<div><b>${cluster.members.length} clustered points</b></div><ul>${listHtml}</ul>`;
+        const existing = countsByLayer.get(layerId);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          countsByLayer.set(layerId, { count: 1, name: layerName, color: layerColor });
+        }
+      }
+      return Array.from(countsByLayer.entries())
+        .sort((a, b) => b[1].count - a[1].count || a[1].name.localeCompare(b[1].name))
+        .map(([layerId, meta]) => `<li><button type="button" class="clusterTooltipAction" data-cluster-action="expand-layer" data-layer-id="${escapeHtml(layerId)}"><b class="clusterTooltipLayerName" style="color:${escapeHtml(meta.color)}">${escapeHtml(meta.name)}</b>: ${meta.count} point${meta.count === 1 ? "" : "s"}</button></li>`)
+        .join("");
+    }
+
+    const members = expandedLayerId
+      ? cluster.members.filter((entry) => String(entry.point?.layerId || "") === String(expandedLayerId))
+      : cluster.members;
+    return members.map((entry) => {
+      const point = entry.point;
+      const layer = getLayerById(point.layerId);
+      const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
+      const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
+      const activeClass = point.id === hoveredClusterPointId ? " class=\"active\"" : "";
+      return `<li${activeClass}><button type="button" class="clusterTooltipAction" data-cluster-action="select-point" data-point-id="${escapeHtml(point.id)}"><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</button></li>`;
+    }).join("");
+  }
+
+  function showClusterTooltip(cluster, screenX = mouse.x, screenY = mouse.y, options = {}) {
+    if (!clusterTooltip || !cluster) return;
+    clearClusterTooltipHideTimer();
+    const expandedLayerId = Object.prototype.hasOwnProperty.call(options, "expandedLayerId") ? options.expandedLayerId : activeClusterTooltip.expandedLayerId;
+    const hoveredMember = getClusterMemberClosestToScreen(cluster, screenX, screenY);
+    hoveredClusterPointId = hoveredMember?.id ?? null;
+    activeClusterTooltip = { cluster, expandedLayerId };
+
+    const membersHtml = renderClusterTooltipMembers(cluster, expandedLayerId);
+    const backButtonHtml = expandedLayerId
+      ? `<div><button type="button" class="clusterTooltipAction" data-cluster-action="show-layer-groups">← Back to layers</button></div>`
+      : "";
+    clusterTooltip.innerHTML = `${backButtonHtml}<div><b>${cluster.members.length} clustered points</b></div><ul>${membersHtml}</ul>`;
     clusterTooltip.classList.remove("hidden");
 
     const rect = canvas.getBoundingClientRect();
@@ -4151,10 +4336,13 @@
 
   function hideClusterTooltip() {
     if (!clusterTooltip) return;
+    clearClusterTooltipHideTimer();
+    activeClusterTooltip = { cluster: null, expandedLayerId: null };
     hoveredClusterPointId = null;
     clusterTooltip.classList.add("hidden");
     clusterTooltip.textContent = "";
   }
+
 
   function shouldShowPointHoverTooltip() {
     return !pointDisplayVisibility.names || !pointDisplayVisibility.codes || selectedPointIds.length === 1;
@@ -5314,6 +5502,16 @@
   quickLayerManagerBtn?.addEventListener("click", () => openLayersModal());
   layersModalClose?.addEventListener("click", () => closeLayersModal());
   layersModal?.addEventListener("mousedown", (e) => { if (e.target === layersModal) closeLayersModal(); });
+  openFldEditorBtn?.addEventListener("click", () => openFldEditor());
+  downloadFldLocalBtn?.addEventListener("click", () => downloadFldLocalOverride());
+  fldModalClose?.addEventListener("click", () => closeFldEditor());
+  fldModal?.addEventListener("mousedown", (e) => { if (e.target === fldModal) closeFldEditor(); });
+  fldFilterInput?.addEventListener("input", () => renderFldEditorTable());
+  fldAddRuleBtn?.addEventListener("click", () => addFldRule());
+  fldSaveLocalBtn?.addEventListener("click", () => saveFldEditorLocalOverride());
+  fldResetServerBtn?.addEventListener("click", () => resetFldEditorToServer());
+  fldDownloadLocalInlineBtn?.addEventListener("click", () => downloadFldLocalOverride());
+  fldDownloadCurrentBtn?.addEventListener("click", () => downloadFldCurrentConfig());
   layersAddBtn?.addEventListener("click", () => {
     const id = `layer-${Date.now()}`;
     layers.set(id, sanitizeLayer({ id, name: `Layer ${layers.size + 1}`, color: "#00a6ff", lineWeight: 1.5 }, id));
@@ -5548,7 +5746,10 @@
   // Modal (Points Manager)
   // -------------------------
   function modalIsOpen(){
-    return !modal.classList.contains("hidden") || !connectLinesModal.classList.contains("hidden");
+    return !modal.classList.contains("hidden")
+      || !connectLinesModal.classList.contains("hidden")
+      || (layersModal && !layersModal.classList.contains("hidden"))
+      || (fldModal && !fldModal.classList.contains("hidden"));
   }
 
   function askConnectLinesOrder() {
@@ -5618,6 +5819,14 @@
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && modalIsOpen() && !isEditableTarget(e.target)) {
       e.preventDefault();
+      if (fldModal && !fldModal.classList.contains("hidden")) {
+        closeFldEditor();
+        return;
+      }
+      if (layersModal && !layersModal.classList.contains("hidden")) {
+        closeLayersModal();
+        return;
+      }
       closeModal();
     }
   });
@@ -7590,8 +7799,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     }
   });
 
-  function handleCanvasPrimaryAction({ additive = false } = {}) {
-    const pid = pickPoint(mouse.x, mouse.y, 10);
+  function handleCanvasPrimaryAction({ additive = false, forcedPointId = null } = {}) {
+    const pid = forcedPointId != null ? forcedPointId : pickPoint(mouse.x, mouse.y, 10);
     const lpick = pid ? null : pickLine(mouse.x, mouse.y, 8);
 
     if (rotateSelectionSession.active && !rotateSelectionSession.awaitingSelection) {
@@ -7964,7 +8173,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         showClusterTooltip(cluster);
         hidePointHoverTooltip();
       } else {
-        hideClusterTooltip();
+        if (isLineDrawingToolActive() && activeClusterTooltip.cluster) {
+          scheduleClusterTooltipHide();
+        } else {
+          hideClusterTooltip();
+        }
         const pid = pointDisplayVisibility.points ? pickPoint(mouse.x, mouse.y, 10) : null;
         if (pid != null && points.has(pid) && shouldShowPointHoverTooltip()) {
           showPointHoverTooltip(points.get(pid), mouse.x, mouse.y);
@@ -8139,10 +8352,50 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     handleMouseUpCommon();
   });
 
+  clusterTooltip?.addEventListener("mouseenter", () => {
+    clusterTooltipHovering = true;
+    clearClusterTooltipHideTimer();
+  });
+
+  clusterTooltip?.addEventListener("mouseleave", () => {
+    clusterTooltipHovering = false;
+    if (!isLineDrawingToolActive()) {
+      hideClusterTooltip();
+      return;
+    }
+    scheduleClusterTooltipHide();
+  });
+
+  clusterTooltip?.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-cluster-action]");
+    if (!target) return;
+    const action = target.dataset.clusterAction;
+    if (action === "expand-layer") {
+      const layerId = String(target.dataset.layerId || "");
+      if (!activeClusterTooltip.cluster) return;
+      showClusterTooltip(activeClusterTooltip.cluster, mouse.x, mouse.y, { expandedLayerId: layerId });
+      return;
+    }
+    if (action === "show-layer-groups") {
+      if (!activeClusterTooltip.cluster) return;
+      showClusterTooltip(activeClusterTooltip.cluster, mouse.x, mouse.y, { expandedLayerId: null });
+      return;
+    }
+    if (action !== "select-point") return;
+    const pointId = String(target.dataset.pointId || "");
+    if (!points.has(pointId)) return;
+    handleCanvasPrimaryAction({ forcedPointId: pointId });
+    if (!isLineDrawingToolActive()) hideClusterTooltip();
+  });
+
   canvas.addEventListener("mouseleave", () => {
     mouse.down = false;
     endDrag();
-    hideClusterTooltip();
+    if (isLineDrawingToolActive() && activeClusterTooltip.cluster) {
+      scheduleClusterTooltipHide();
+    } else {
+      hideClusterTooltip();
+    }
     hidePointHoverTooltip();
   });
 
@@ -8338,6 +8591,161 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (!layersModal) return;
     layersModal.classList.add("hidden");
     layersModal.setAttribute("aria-hidden", "true");
+  }
+
+  function getFldRuleTemplateRaw(config) {
+    const columns = Array.isArray(config?.columns) ? config.columns : [];
+    const source = config?.rules?.[0]?.raw || {};
+    const base = {};
+    for (const column of columns) base[column.key] = source[column.key] ?? "";
+    return base;
+  }
+
+  function syncFldRuleDerivedFields(rule) {
+    const raw = rule.raw || {};
+    rule.code = String(raw.code || "").trim();
+    rule.description = String(raw.description || "").trim();
+    rule.fullName = String(raw.full_name || "").trim();
+    rule.layer = String(raw.layer || "").trim();
+    rule.entityType = String(raw.entity_type || "").trim();
+    rule.processingOn = String(raw.processing_on || "") === "1";
+    rule.companionCodes = String(raw.companion_codes || "").split(",").map((item) => item.trim()).filter(Boolean);
+  }
+
+  function updateFldSourceLabel() {
+    if (!fldSourceLabel) return;
+    fldSourceLabel.textContent = fldEditorState.source === "local" ? "Local Override" : "Server";
+  }
+
+  function renderFldEditorTable() {
+    if (!fldTbody) return;
+    const config = fldEditorState.activeConfig;
+    const rules = Array.isArray(config?.rules) ? config.rules : [];
+    const filter = String(fldFilterInput?.value || "").trim().toUpperCase();
+    fldTbody.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    rules.forEach((rule) => {
+      const code = String(rule?.raw?.code || "").trim();
+      const description = String(rule?.raw?.description || "").trim();
+      if (filter && !code.toUpperCase().includes(filter) && !description.toUpperCase().includes(filter)) return;
+      const tr = document.createElement("tr");
+      const mkInputCell = (key, { width = "", onInput = null, type = "text" } = {}) => {
+        const td = document.createElement("td");
+        const input = document.createElement("input");
+        input.className = "cellInput";
+        if (width) input.style.width = width;
+        input.type = type;
+        input.value = String(rule.raw?.[key] ?? "");
+        input.addEventListener("input", () => {
+          if (!rule.raw) rule.raw = {};
+          rule.raw[key] = input.type === "checkbox" ? (input.checked ? "1" : "0") : input.value;
+          syncFldRuleDerivedFields(rule);
+          if (typeof onInput === "function") onInput(input);
+        });
+        td.appendChild(input);
+        return td;
+      };
+
+      const codeCell = mkInputCell("code");
+      const entityCell = mkInputCell("entity_type");
+      const processTd = document.createElement("td");
+      const processInput = document.createElement("input");
+      processInput.type = "checkbox";
+      processInput.checked = String(rule.raw?.processing_on || "") === "1";
+      processInput.addEventListener("change", () => {
+        rule.raw.processing_on = processInput.checked ? "1" : "0";
+        syncFldRuleDerivedFields(rule);
+      });
+      processTd.appendChild(processInput);
+      const layerCell = mkInputCell("layer");
+      const descCell = mkInputCell("description");
+      const companionsCell = mkInputCell("companion_codes");
+
+      const actionTd = document.createElement("td");
+      const delBtn = document.createElement("button");
+      delBtn.className = "cellBtn danger";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", () => {
+        const idx = config.rules.indexOf(rule);
+        if (idx >= 0) config.rules.splice(idx, 1);
+        renderFldEditorTable();
+      });
+      actionTd.appendChild(delBtn);
+
+      tr.append(codeCell, entityCell, processTd, layerCell, descCell, companionsCell, actionTd);
+      frag.appendChild(tr);
+    });
+    fldTbody.appendChild(frag);
+    updateFldSourceLabel();
+  }
+
+  function openFldEditor() {
+    if (!fldModal) return;
+    fldModal.classList.remove("hidden");
+    fldModal.setAttribute("aria-hidden", "false");
+    if (fldModalWindow && (!fldModalWindow.style.left || !fldModalWindow.style.top)) {
+      const w = Math.min(window.innerWidth - 36, 1200);
+      const h = Math.min(window.innerHeight - 36, 680);
+      fldModalWindow.style.width = `${w}px`;
+      fldModalWindow.style.height = `${h}px`;
+      fldModalWindow.style.left = `${Math.max(18, (window.innerWidth - w) / 2)}px`;
+      fldModalWindow.style.top = `${Math.max(18, (window.innerHeight - h) / 2)}px`;
+    }
+    renderFldEditorTable();
+  }
+
+  function closeFldEditor() {
+    if (!fldModal) return;
+    fldModal.classList.add("hidden");
+    fldModal.setAttribute("aria-hidden", "true");
+  }
+
+  function addFldRule() {
+    const config = fldEditorState.activeConfig;
+    if (!config || !Array.isArray(config.rules)) return;
+    const template = getFldRuleTemplateRaw(config);
+    const raw = { ...template, code: "", description: "", full_name: "", layer: "", entity_type: "0", processing_on: "1", companion_codes: "" };
+    const rule = { rowNumber: config.rules.length + 2, raw };
+    syncFldRuleDerivedFields(rule);
+    config.rules.push(rule);
+    renderFldEditorTable();
+  }
+
+  function saveFldEditorLocalOverride() {
+    if (!fldEditorState.activeConfig) return;
+    fldEditorState.source = "local";
+    saveLocalFldOverride(fldEditorState.activeConfig);
+    applyFieldToFinishConfig(fldEditorState.activeConfig, "localStorage");
+    const { addedJpn, addedSequential, removed } = syncFieldToFinishLinework();
+    if (addedJpn || addedSequential || removed) redraw();
+    setStatus("Saved FLD local override.", "ok");
+    renderFldEditorTable();
+  }
+
+  function resetFldEditorToServer() {
+    if (!fldEditorState.serverConfig) return;
+    clearLocalFldOverride();
+    fldEditorState.activeConfig = cloneFldConfig(fldEditorState.serverConfig);
+    fldEditorState.source = "server";
+    applyFieldToFinishConfig(fldEditorState.activeConfig, defaultFldConfigPath);
+    const { addedJpn, addedSequential, removed } = syncFieldToFinishLinework();
+    if (addedJpn || addedSequential || removed) redraw();
+    setStatus("Reset FLD config to server version.", "ok");
+    renderFldEditorTable();
+  }
+
+  function downloadFldLocalOverride() {
+    const local = loadLocalFldOverride();
+    if (!local) {
+      setStatus("No local FLD override found to download.", "warn");
+      return;
+    }
+    downloadTextFile("LineSmith-LocalOverride.fld", serializeFieldToFinishConfig(local));
+  }
+
+  function downloadFldCurrentConfig() {
+    if (!fldEditorState.activeConfig) return;
+    downloadTextFile("LineSmith-Current.fld", serializeFieldToFinishConfig(fldEditorState.activeConfig));
   }
 
   // -------------------------

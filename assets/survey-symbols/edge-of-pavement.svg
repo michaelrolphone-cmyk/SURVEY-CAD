@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Edge Of Pavement</title>
+  <desc id="desc">Survey symbol for Edge Of Pavement.</desc>
+  <line x1="16" y1="26" x2="84" y2="74" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><line x1="16" y1="42" x2="84" y2="90" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

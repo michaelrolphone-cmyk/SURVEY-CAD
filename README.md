@@ -54,6 +54,13 @@ Quick command support in LineSmith:
 ```text
 printview
 ```
+## LineSmith Cluster Tooltip During Line Drawing
+
+When point clustering is enabled in `VIEWPORT.HTML` while drawing lines:
+
+- Hovering a point cluster keeps the cluster tooltip open long enough to move from the canvas marker onto the tooltip and choose a specific point.
+- For large clusters that collapse to layer-group counts, clicking a layer group drills into the points from that layer in-place.
+- Moving off the cluster and not onto the tooltip closes the tooltip after a short delay (normal behavior).
 
 ## LineSmith Quick Search
 
@@ -89,6 +96,16 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 - `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
 
+## Survey Symbol SVG Library
+
+A dedicated library of surveying map symbols is available in `assets/survey-symbols/` for use with point-file symbol rendering workflows (property pins, cap types, meters, manholes, control points, poles, signs, and related utility marks). A machine-readable manifest is also included at `assets/survey-symbols/index.json`.
+
+Quick command to inspect symbols:
+
+```bash
+find assets/survey-symbols -maxdepth 1 -name '*.svg' | sort
+```
+
 ## Test
 
 ```bash
@@ -102,6 +119,7 @@ npm run cli -- --help
 npm run ros:cli -- --help
 curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/apps"
+find assets/survey-symbols -maxdepth 1 -name '*.svg' | wc -l
 ```
 
 ---
@@ -234,6 +252,17 @@ Returns parsed FLD data:
 - `columns`
 - `rules`
 - `rulesByCode`
+
+LineSmith (`VIEWPORT.HTML`) now also includes an FLD editor workflow:
+
+- Open **Field-to-Finish → Open FLD Editor**.
+- Add, edit, and remove FLD code rows.
+- Click **Save Local** to store a browser-local override (`localStorage` key: `lineSmithFldConfigLocal`) and immediately apply those rules to auto linework/layer behavior.
+- Click **Download Local FLD** (panel button or modal button) to export your saved local override as an `.fld` file.
+- Click **Download Current FLD** to export the currently-loaded editor state.
+- Click **Reset to Server** to clear local override storage and restore the server-sourced FLD file.
+
+When saving/downloading, unknown columns from the FLD header are preserved and new entries are created using template-backed raw fields so extra properties are retained.
 
 ### Local storage sync
 

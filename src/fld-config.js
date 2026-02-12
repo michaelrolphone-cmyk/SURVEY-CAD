@@ -126,6 +126,32 @@ export function parseFldConfig(content) {
   };
 }
 
+function escapeFldValue(value) {
+  return String(value ?? '').replace(/[\r\n|]/g, ' ').trim();
+}
+
+export function serializeFldConfig(config) {
+  const columns = Array.isArray(config?.columns) ? config.columns : [];
+  const rules = Array.isArray(config?.rules) ? config.rules : [];
+  if (!columns.length) return '';
+
+  const headerLabels = columns.map((column) => String(column?.name || '').trim() || `Column ${Number(column?.index ?? 0) + 1}`);
+  const headerVersion = String(config?.versionTag || '').trim();
+  const headerLine = `#${headerVersion || headerLabels[0]}# ${headerLabels.join('|')}`;
+
+  const lines = [headerLine];
+  for (const rule of rules) {
+    const raw = rule?.raw && typeof rule.raw === 'object' ? rule.raw : {};
+    const row = columns.map((column) => {
+      const key = String(column?.key || '').trim();
+      return escapeFldValue(key ? raw[key] : '');
+    });
+    lines.push(row.join('|'));
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
 export async function loadFldConfig(filePath) {
   const content = await fs.readFile(filePath, 'utf8');
   return parseFldConfig(content);

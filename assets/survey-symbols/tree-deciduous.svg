@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Tree Deciduous</title>
+  <desc id="desc">Survey symbol for Tree Deciduous.</desc>
+  <circle cx="50" cy="42" r="26" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" /><line x1="50" y1="68" x2="50" y2="88" stroke="#111" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
