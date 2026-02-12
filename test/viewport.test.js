@@ -939,11 +939,13 @@ test('VIEWPORT.HTML supports record basis bearing rotation without modifying wor
 });
 
 
-test('VIEWPORT.HTML surfaces mapped SVG symbols in quick search, point editor, cluster tooltip, and point inspector', async () => {
+test('VIEWPORT.HTML surfaces mapped SVG symbols in quick search, point manager, point editor, cluster tooltip, and point inspector', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+getPointSymbolPreviewUrl\(pointCode = ""\)\s*\{[\s\S]*getPointSymbolMapFile\(pointCode\)[\s\S]*`\/assets\/survey-symbols\/\$\{encodeURIComponent\(symbolMapFile\)\}`;/, 'LineSmith should expose a shared helper that resolves mapped point symbols to survey-symbol asset URLs');
+  assert.match(html, /\.pointSymbolBadge\s*\{[\s\S]*background:#ffffff;/, 'mapped symbol badges should render on a white background so black SVG artwork remains visible in UI surfaces');
   assert.match(html, /result\.type === "point"[\s\S]*const pointSymbolUrl = getPointSymbolPreviewUrl\(result\.pointCode\);[\s\S]*quickSearchResultWithSymbol/, 'quick search point suggestions should render mapped symbol thumbnails when a point code has an SVG mapping');
+  assert.match(html, /const pointSymbolUrl = getPointSymbolPreviewUrl\(p\.code\);[\s\S]*numberCellWrap\.className = "pointNumberCell"[\s\S]*symbolBadge\.className = "pointSymbolBadge"/, 'point manager rows should render mapped symbol badges next to point numbers when the code has an SVG mapping');
   assert.match(html, /id="pointEditorSymbolRow"[\s\S]*function\s+updatePointEditorFromSelection\(\)\s*\{[\s\S]*pointEditorSymbolRow\.innerHTML = `<img class="pointSymbolBadge"/, 'Add/Edit point panel should show a mapped symbol preview row for the selected point code');
   assert.match(html, /getPointSymbolPreviewUrl\(point\.code\)[\s\S]*class="clusterTooltipPointRow"/, 'cluster tooltip point rows should include mapped symbol badges for each point');
   assert.match(html, /className = "inspectorPointHeader"[\s\S]*symbolBadge\.className = "pointSymbolBadge large"/, 'point inspector should render a large profile-style mapped symbol badge for the selected point');
