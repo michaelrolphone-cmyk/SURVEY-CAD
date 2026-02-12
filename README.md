@@ -40,6 +40,8 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 
 When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** zooms out to the next map zoom level at the cursor position.
 
+When using the **Line by 2 points** tool, LineSmith now treats only `null`/`undefined` as "no start point" so legacy drawings that include point id `0` can still complete on the second click.
+
 ## LineSmith Print View (Record of Survey placeholder)
 
 `VIEWPORT.HTML` now includes a **Print View** panel for generating black-on-white print-ready excerpts from a drawn print window:
