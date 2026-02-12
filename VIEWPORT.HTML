@@ -329,6 +329,14 @@
       color:#ffe7a0;
     }
     .quickToolBtn i{ pointer-events:none; }
+    .quickToolBtn.saveSuccessPulse{
+      animation:quickSaveSuccessPulse 420ms ease-out;
+    }
+    @keyframes quickSaveSuccessPulse{
+      0%{ transform:scale(1); box-shadow:0 0 0 0 rgba(110,231,183,0.45); }
+      45%{ transform:scale(1.14); box-shadow:0 0 0 8px rgba(110,231,183,0.18); }
+      100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(110,231,183,0); }
+    }
     .quickToolDivider{
       width:1px;
       margin:2px 1px;
@@ -7045,8 +7053,19 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     });
     if (hint) hint.textContent = `Saved ${record.versions.length} version(s) for "${drawingName}" in project ${activeProjectId}.`;
     setStatus(`Saved drawing "${drawingName}" to project history (${record.versions.length} version${record.versions.length === 1 ? "" : "s"}).`, "ok");
+    triggerQuickSaveSuccessPulse();
     markDrawingAsSaved();
     return true;
+  }
+
+  function triggerQuickSaveSuccessPulse() {
+    const quickSaveBtn = $("#quickSave");
+    if (!quickSaveBtn) return;
+    quickSaveBtn.classList.remove("saveSuccessPulse");
+    void quickSaveBtn.offsetWidth;
+    quickSaveBtn.classList.add("saveSuccessPulse");
+    const removePulseClass = () => quickSaveBtn.classList.remove("saveSuccessPulse");
+    quickSaveBtn.addEventListener("animationend", removePulseClass, { once: true });
   }
 
   function promptRestoreDrawingVersion() {
