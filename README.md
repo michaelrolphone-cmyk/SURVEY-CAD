@@ -137,7 +137,7 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 
 ## LineSmith Symbol Point Markers
 
-LineSmith now renders configured survey symbol SVGs directly as map point markers when a point code maps to an FLD symbol rule (`entity_type = 0`) with `symbol_name_2` set. SVG markers are tinted to the active point layer color and include an opaque marker footprint so linework does not show through the symbol. When no SVG mapping is found (or while the SVG is still loading), LineSmith falls back to the existing `x` marker. SVG markers render at the same on-screen size as the legacy `x` marker footprint.
+LineSmith now renders configured survey symbol SVGs directly as map point markers when a point code maps to an FLD symbol rule (`entity_type = 0`) with `symbol_name_2` set. SVG markers are tinted to the active point layer color using the SVG symbol footprint (so the symbol shape is shaded without flooding the full marker square). When no SVG mapping is found (or while the SVG is still loading), LineSmith falls back to the existing `x` marker. SVG markers render at the same on-screen size as the legacy `x` marker footprint.
 
 Symbol marker refresh now relies on the existing continuous canvas animation loop (`requestAnimationFrame(draw)`) rather than legacy one-off `redraw()` callbacks.
 

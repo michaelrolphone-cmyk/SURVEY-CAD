@@ -3807,9 +3807,7 @@
     const markerCtx = markerCanvas.getContext("2d");
     if (!markerCtx) return null;
 
-    // keep linework from showing through symbol transparency and then tint to layer color
-    markerCtx.fillStyle = "#000";
-    markerCtx.fillRect(0, 0, markerCanvas.width, markerCanvas.height);
+    // tint only the symbol footprint (avoid flooding the full marker square)
     markerCtx.drawImage(image, 0, 0, markerCanvas.width, markerCanvas.height);
     markerCtx.globalCompositeOperation = "source-in";
     markerCtx.fillStyle = tint;
