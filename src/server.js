@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import SurveyCadClient from './survey-api.js';
@@ -26,6 +26,9 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
 };
+
+const SMALL_ASSET_CACHE_MAX_BYTES = 4 * 1024;
+const smallStaticAssetCache = new Map();
 
 function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -140,14 +143,45 @@ async function serveStaticFile(urlPath, staticDir, res) {
   }
 
   try {
-    const body = await readFile(absPath);
+    const body = await readStaticAsset(absPath);
     const ext = path.extname(absPath).toLowerCase();
     res.statusCode = 200;
     res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
+    res.setHeader('Cache-Control', resolveStaticCacheControl(absPath));
     res.end(body);
   } catch {
     sendJson(res, 404, { error: 'Not found.' });
   }
+}
+
+function isSmallStaticAsset(absPath) {
+  const normalized = absPath.replace(/\\/g, '/').toLowerCase();
+  return normalized.includes('/assets/icons/') || normalized.includes('/assets/survey-symbols/');
+}
+
+function resolveStaticCacheControl(absPath) {
+  if (isSmallStaticAsset(absPath)) {
+    return 'public, max-age=31536000, immutable';
+  }
+
+  const ext = path.extname(absPath).toLowerCase();
+  if (ext === '.html') {
+    return 'no-cache';
+  }
+  return 'public, max-age=300';
+}
+
+async function readStaticAsset(absPath) {
+  const cached = smallStaticAssetCache.get(absPath);
+  if (cached) {
+    return cached;
+  }
+
+  const body = await readFile(absPath);
+  if (isSmallStaticAsset(absPath) && body.byteLength <= SMALL_ASSET_CACHE_MAX_BYTES) {
+    smallStaticAssetCache.set(absPath, body);
+  }
+  return body;
 }
 
 async function resolveStaticPath(staticDir, safePath) {
@@ -156,7 +190,7 @@ async function resolveStaticPath(staticDir, safePath) {
 
   if (initialPath.startsWith(base)) {
     try {
-      await readFile(initialPath);
+      await access(initialPath);
       return initialPath;
     } catch {
       // Fall through and attempt case-insensitive matching.
