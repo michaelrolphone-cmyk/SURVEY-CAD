@@ -100,7 +100,7 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /<a href="\/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<span id="launcherBackChevron" class="launcher-back-chevron" aria-hidden="true">‹<\/span>[\s\S]*<img id="launcherHeaderIcon" src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon" \/>/);
   assert.match(launcherHtml, /<header>[\s\S]*<a href="\/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<\/a>[\s\S]*<h1 id="launcherHeaderTitle">SurveyFoundry App Launcher<\/h1>/, 'header should place launcher icon link before app title text on the left');
   assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;[\s\S]*background:\s*linear-gradient\(135deg, #f9d18f, #e8974a\);[\s\S]*border-radius:\s*999px;/i, 'header active project should render as a standout pill');
-  assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
+  assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="assets\/icons\/StoneLogo\.png" alt="SurveyFoundry logo" class="footer-logo"/);
   assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
   assert.match(launcherHtml, /\.launcher-icon\s*\{[\s\S]*width:\s*84px;[\s\S]*height:\s*84px;/i, 'header launcher icon should render at twice the previous size');
   assert.match(launcherHtml, /\.footer-logo-wrap\s*\{[\s\S]*justify-content:\s*center;/i);
@@ -227,27 +227,13 @@ test('launcher project manager enforces sequential project status progression', 
   assert.match(launcherHtml, /const\s+knownStatus\s*=\s*PROJECT_STATUS_SEQUENCE\.includes\(project\?\.status\)\s*\?\s*project\.status\s*:\s*'Proposed';/, 'loaded projects should normalize missing/unknown statuses to Proposed');
 });
 
-test('launcher syncs localStorage to server with versioning and stale refresh handling', async () => {
+test('launcher delegates localStorage synchronization to websocket wrapper', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
-  assert.match(launcherHtml, /async\s+function\s+syncLocalStorageWithServer\(\{\s*force\s*=\s*false\s*\}\s*=\s*\{\}\)/, 'launcher sync helper should support a force option for initial startup sync');
-  assert.match(launcherHtml, /const\s+LOCAL_STORAGE_SYNC_VERSION_KEY\s*=\s*'surveyfoundryLocalStorageVersion';/, 'launcher should define a stable localStorage version key');
-  assert.match(launcherHtml, /async\s+function\s+pullServerSnapshotIfNewer\(localVersion\)/, 'launcher should define a helper that pulls server snapshots when local state is unchanged');
-  assert.match(launcherHtml, /fetch\('\/api\/localstorage-sync'\);/, 'launcher should poll server localStorage state for remote updates when no local changes are pending');
-  assert.match(launcherHtml, /if \(!force && serializedSnapshot === localStorageSyncSnapshot\) \{\s*await pullServerSnapshotIfNewer\(getLocalStorageVersion\(\)\);\s*return;\s*\}/, 'launcher should pull newer server snapshots before returning when local snapshot is unchanged');
-  assert.match(launcherHtml, /fetch\('\/api\/localstorage-sync',\s*\{[\s\S]*method:\s*'POST'/, 'launcher should post localStorage snapshots to the sync API');
-  assert.match(launcherHtml, /if \(payload\?\.status === 'client-stale' && payload\?\.state\?\.snapshot\)/, 'launcher should detect stale local state from sync response');
-  assert.match(launcherHtml, /const\s+serverSnapshotSerialized\s*=\s*JSON\.stringify\(payload\.state\.snapshot\);/, 'launcher should compare stale server snapshots before replacing local data');
-  assert.match(launcherHtml, /function\s+applyServerSnapshot\(snapshot = \{\}, version = 0\)/, 'launcher should support applying server version metadata with stale snapshots');
-  assert.match(launcherHtml, /entries\.forEach\(\(\[key, value\]\) => \{[\s\S]*localStorage\.setItem\(key, String\(value\)\);/, 'launcher should merge stale server snapshots into localStorage keys without clearing unrelated data');
-  assert.doesNotMatch(launcherHtml, /function\s+applyServerSnapshot\([\s\S]*localStorage\.clear\(/, 'launcher should not clear all localStorage when applying stale sync snapshots');
-  assert.doesNotMatch(launcherHtml, /function\s+refreshOpenApp\(/, 'launcher should not force iframe refreshes when stale snapshots are applied');
-  assert.match(launcherHtml, /function\s+queueLocalStorageSyncPoll\(delayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS\)/, 'launcher should schedule background sync with a single timeout poller');
-  assert.match(launcherHtml, /if \(localStorageSyncInFlight\) \{[\s\S]*return;[\s\S]*\}/, 'launcher should avoid overlapping sync requests while one is in flight');
-  assert.match(launcherHtml, /runLocalStorageSyncCycle\(\{ force: true \}\);/,
-    'launcher should force the first startup sync via the guarded sync cycle');
-  assert.doesNotMatch(launcherHtml, /setInterval\(/,
-    'launcher should no longer use an unbounded interval that can stack pending sync requests');
+  assert.match(launcherHtml, /<script type="module" src="\/src\/browser-localstorage-sync\.js"><\/script>/, 'launcher should include the shared localStorage websocket sync wrapper');
+  assert.doesNotMatch(launcherHtml, /LOCAL_STORAGE_SYNC_INTERVAL_MS/, 'launcher should no longer maintain polling interval constants');
+  assert.doesNotMatch(launcherHtml, /runLocalStorageSyncCycle\(/, 'launcher should no longer invoke the old polling sync cycle');
+  assert.match(launcherHtml, /window\.addEventListener\('storage',\s*syncLauncherStateFromStorageEvent\);/, 'launcher should reactively re-render project lists when storage changes are applied');
 });
 
 test('launcher back-button navigation is wired through browser history state', async () => {

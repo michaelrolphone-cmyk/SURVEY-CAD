@@ -72,6 +72,8 @@ export function createLineforgeCollabService() {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, {
         latestState: null,
+        revision: 0,
+        locks: new Map(),
         clients: new Map(),
       });
     }
@@ -142,6 +144,13 @@ export function createLineforgeCollabService() {
       color,
       peers,
       state: room.latestState,
+      revision: room.revision,
+      locks: Array.from(room.locks.values()).map((lock) => ({
+        entityType: lock.entityType,
+        entityId: lock.entityId,
+        ownerClientId: lock.ownerClientId,
+        ownerColor: lock.ownerColor,
+      })),
     });
 
     broadcast(room, { type: 'peer-joined', clientId, color }, clientId);
@@ -177,13 +186,122 @@ export function createLineforgeCollabService() {
       }
 
       if (message?.type === 'state' && message.state) {
+        const baseRevision = Number(message.baseRevision);
+        if (!Number.isInteger(baseRevision) || baseRevision !== room.revision) {
+          send(client, {
+            type: 'state-rejected',
+            requestId: message.requestId || null,
+            reason: 'revision-mismatch',
+            expectedRevision: room.revision,
+            state: room.latestState,
+            revision: room.revision,
+            at: Date.now(),
+          });
+          return;
+        }
+
         room.latestState = message.state;
+        room.revision += 1;
+
+        send(client, {
+          type: 'state-ack',
+          requestId: message.requestId || null,
+          revision: room.revision,
+          state: room.latestState,
+          at: Date.now(),
+        });
+
         broadcast(room, {
           type: 'state',
           clientId,
           state: message.state,
+          revision: room.revision,
+          requestId: message.requestId || null,
           at: Date.now(),
         }, clientId);
+        return;
+      }
+
+
+      if (message?.type === 'lock-request' && message.entityType && message.entityId) {
+        const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
+        const entityId = String(message.entityId || '').trim();
+        if (!entityType || !entityId) {
+          send(client, {
+            type: 'lock-denied',
+            requestId: message.requestId || null,
+            reason: 'invalid-entity',
+            at: Date.now(),
+          });
+          return;
+        }
+
+        const lockKey = `${entityType}:${entityId}`;
+        const existing = room.locks.get(lockKey);
+        if (existing && existing.ownerClientId !== clientId) {
+          send(client, {
+            type: 'lock-denied',
+            requestId: message.requestId || null,
+            reason: 'already-locked',
+            entityType,
+            entityId,
+            ownerClientId: existing.ownerClientId,
+            ownerColor: existing.ownerColor,
+            at: Date.now(),
+          });
+          return;
+        }
+
+        const lock = {
+          entityType,
+          entityId,
+          ownerClientId: clientId,
+          ownerColor: color,
+          at: Date.now(),
+        };
+        room.locks.set(lockKey, lock);
+
+        send(client, {
+          type: 'lock-granted',
+          requestId: message.requestId || null,
+          entityType,
+          entityId,
+          ownerClientId: clientId,
+          ownerColor: color,
+          at: Date.now(),
+        });
+
+        broadcast(room, {
+          type: 'lock-updated',
+          action: 'locked',
+          entityType,
+          entityId,
+          ownerClientId: clientId,
+          ownerColor: color,
+          at: Date.now(),
+        }, clientId);
+        return;
+      }
+
+      if (message?.type === 'lock-release' && message.entityType && message.entityId) {
+        const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
+        const entityId = String(message.entityId || '').trim();
+        if (!entityType || !entityId) return;
+
+        const lockKey = `${entityType}:${entityId}`;
+        const existing = room.locks.get(lockKey);
+        if (!existing || existing.ownerClientId !== clientId) return;
+
+        room.locks.delete(lockKey);
+        broadcast(room, {
+          type: 'lock-updated',
+          action: 'released',
+          entityType,
+          entityId,
+          ownerClientId: clientId,
+          ownerColor: color,
+          at: Date.now(),
+        });
         return;
       }
 
@@ -219,7 +337,28 @@ export function createLineforgeCollabService() {
 
     socket.on('close', () => {
       room.clients.delete(clientId);
+
+      const releasedLocks = [];
+      for (const [lockKey, lock] of room.locks.entries()) {
+        if (lock.ownerClientId === clientId) {
+          room.locks.delete(lockKey);
+          releasedLocks.push(lock);
+        }
+      }
+
       broadcast(room, { type: 'peer-left', clientId }, clientId);
+      releasedLocks.forEach((lock) => {
+        broadcast(room, {
+          type: 'lock-updated',
+          action: 'released',
+          entityType: lock.entityType,
+          entityId: lock.entityId,
+          ownerClientId: clientId,
+          ownerColor: lock.ownerColor,
+          at: Date.now(),
+        }, clientId);
+      });
+
       if (room.clients.size === 0) rooms.delete(roomId);
     });
 

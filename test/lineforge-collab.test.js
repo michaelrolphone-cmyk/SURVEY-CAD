@@ -78,10 +78,16 @@ test('lineforge websocket handshake and broadcast keeps state/cursor in-room', (
   assert.equal(peerJoined.type, 'peer-joined');
   assert.equal(peerJoined.clientId, welcome2.clientId);
 
-  s1.emit('data', clientFrame({ type: 'state', state: '{"points":[123]}' }));
+  s1.emit('data', clientFrame({ type: 'state', requestId: 'req-1', baseRevision: welcome1.revision, state: '{\"points\":[123]}' }));
+  const stateAck = parseServerTextMessage(s1);
+  assert.equal(stateAck.type, 'state-ack');
+  assert.equal(stateAck.requestId, 'req-1');
+  assert.equal(stateAck.revision, 1);
+
   const stateMsg = parseServerTextMessage(s2);
   assert.equal(stateMsg.type, 'state');
-  assert.equal(stateMsg.state, '{"points":[123]}');
+  assert.equal(stateMsg.state, '{\"points\":[123]}');
+  assert.equal(stateMsg.revision, 1);
 
   s1.emit('data', clientFrame({ type: 'cursor', cursor: { x: 7, y: 9 } }));
   const cursorMsg = parseServerTextMessage(s2);
@@ -106,4 +112,111 @@ test('lineforge websocket rejects non-collab upgrade path', () => {
   const handled = collab.handleUpgrade({ url: '/health', headers: { upgrade: 'websocket', 'sec-websocket-key': 'k' } }, socket, Buffer.alloc(0));
   assert.equal(handled, false);
   assert.equal(socket.destroyed, true);
+});
+
+
+test('lineforge rejects stale state revisions and returns canonical room state', () => {
+  const collab = createLineforgeCollabService();
+
+  const s1 = new FakeSocket();
+  const s2 = new FakeSocket();
+
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?room=beta',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'key-a==' },
+  }, s1, Buffer.alloc(0)), true);
+
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?room=beta',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'key-b==' },
+  }, s2, Buffer.alloc(0)), true);
+
+  const welcome1 = parseServerTextMessage(s1, 1);
+  const welcome2 = parseServerTextMessage(s2, 1);
+
+  s1.emit('data', clientFrame({
+    type: 'state',
+    requestId: 's1-1',
+    baseRevision: welcome1.revision,
+    state: '{"points":[1]}',
+  }));
+
+  const ack = parseServerTextMessage(s1);
+  assert.equal(ack.type, 'state-ack');
+  assert.equal(ack.revision, 1);
+
+  // stale write: client 2 still tries base revision 0 after room moved to revision 1
+  s2.emit('data', clientFrame({
+    type: 'state',
+    requestId: 's2-stale',
+    baseRevision: welcome2.revision,
+    state: '{"points":[2]}',
+  }));
+
+  const rejected = parseServerTextMessage(s2);
+  assert.equal(rejected.type, 'state-rejected');
+  assert.equal(rejected.requestId, 's2-stale');
+  assert.equal(rejected.expectedRevision, 1);
+  assert.equal(rejected.state, '{"points":[1]}');
+});
+
+
+test('lineforge lock handshake grants, denies, and releases object edit locks', () => {
+  const collab = createLineforgeCollabService();
+  const s1 = new FakeSocket();
+  const s2 = new FakeSocket();
+
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?room=locks',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'lock-a==' },
+  }, s1, Buffer.alloc(0)), true);
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?room=locks',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'lock-b==' },
+  }, s2, Buffer.alloc(0)), true);
+
+  const welcome1 = parseServerTextMessage(s1, 1);
+  const welcome2 = parseServerTextMessage(s2, 1);
+  assert.deepEqual(welcome1.locks, []);
+  assert.deepEqual(welcome2.locks, []);
+
+  s1.emit('data', clientFrame({
+    type: 'lock-request',
+    requestId: 'l1',
+    entityType: 'point',
+    entityId: 'p-1',
+  }));
+
+  const granted = parseServerTextMessage(s1);
+  assert.equal(granted.type, 'lock-granted');
+  assert.equal(granted.entityType, 'point');
+  assert.equal(granted.entityId, 'p-1');
+
+  const broadcastLocked = parseServerTextMessage(s2);
+  assert.equal(broadcastLocked.type, 'lock-updated');
+  assert.equal(broadcastLocked.action, 'locked');
+
+  s2.emit('data', clientFrame({
+    type: 'lock-request',
+    requestId: 'l2',
+    entityType: 'point',
+    entityId: 'p-1',
+  }));
+
+  const denied = parseServerTextMessage(s2);
+  assert.equal(denied.type, 'lock-denied');
+  assert.equal(denied.reason, 'already-locked');
+
+  s1.emit('data', clientFrame({
+    type: 'lock-release',
+    entityType: 'point',
+    entityId: 'p-1',
+  }));
+
+  const released1 = parseServerTextMessage(s1);
+  const released2 = parseServerTextMessage(s2);
+  assert.equal(released1.type, 'lock-updated');
+  assert.equal(released1.action, 'released');
+  assert.equal(released2.type, 'lock-updated');
+  assert.equal(released2.action, 'released');
 });
