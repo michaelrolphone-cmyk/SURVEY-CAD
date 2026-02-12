@@ -54,6 +54,17 @@ test('VIEWPORT.HTML double right-click zooms out one map zoom level when nothing
   assert.match(html, /function\s+zoomOutToNextMapLevelAtScreenPoint\(screenX, screenY\)\s*\{[\s\S]*setStatus\(`Zoomed out to map zoom \$\{targetZoom\.toFixed\(0\)\}\.`, "ok"\);/, 'shortcut should anchor zoom-out at cursor location and confirm the zoom step');
   assert.match(html, /canvas\.addEventListener\("contextmenu",\s*\(e\)\s*=>\s*\{[\s\S]*const\s+isDoubleRightClick\s*=\s*now - lastRightClickAtMs <= DOUBLE_RIGHT_CLICK_ZOOM_OUT_MS;[\s\S]*if \(isDoubleRightClick && !hasSelection\(\) && !modalIsOpen\(\)\)\s*\{[\s\S]*zoomOutToNextMapLevelAtScreenPoint\(mouse\.x, mouse\.y\);/, 'right-click handler should zoom out on a double right-click only when nothing is selected');
 });
+
+test('VIEWPORT.HTML anchors pinch zoom to the initial touch midpoint so mobile map zoom does not drift', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+touchGesture\s*=\s*\{[\s\S]*startWorldAtCenter:\s*null,/, 'mobile touch gesture state should track the world coordinate under the initial pinch midpoint');
+  assert.match(html, /touchGesture\.startWorldAtCenter\s*=\s*touchGesture\.startCenter[\s\S]*screenToWorld\(touchGesture\.startCenter\.x,\s*touchGesture\.startCenter\.y\)/, 'pinch start should capture the world position beneath the midpoint at gesture begin');
+  assert.match(html, /if \(touchGesture\.points\.size === 2 && touchGesture\.mode === "pinch"\) \{[\s\S]*!touchGesture\.startWorldAtCenter\) return;/, 'pinch move should require a captured midpoint anchor before applying zoom math');
+  assert.match(html, /const\s+rotatedAnchor\s*=\s*rotateWorldPointAroundBasis\(touchGesture\.startWorldAtCenter\.x,\s*touchGesture\.startWorldAtCenter\.y\);[\s\S]*view\.panX = center\.x - rotatedAnchor\.x \* view\.scale;[\s\S]*view\.panY = center\.y \+ rotatedAnchor\.y \* view\.scale;/, 'pinch transform should keep the anchored world midpoint under the moving gesture center while scaling');
+  assert.match(html, /touchGesture\.mode = null;[\s\S]*touchGesture\.startWorldAtCenter = null;/, 'pinch anchor state should reset when touch gesture ends');
+});
+
 test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmith actions', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
@@ -483,7 +494,7 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
   assert.match(html, /id="drawerToggle"\s+class="drawerToggle"/, 'canvas area should expose a drawer toggle button for mobile controls');
   assert.match(html, /canvas\{[\s\S]*touch-action:none;/, 'canvas should disable native touch actions so custom pinch\/pan gestures can run');
   assert.match(html, /canvas\.addEventListener\("pointerdown"[\s\S]*touchGesture\.mode = "pinch"/, 'touch pointer down should initialize pinch mode for two-finger zoom');
-  assert.match(html, /canvas\.addEventListener\("pointermove"[\s\S]*view\.scale = newScale;[\s\S]*view\.panX = touchGesture\.startPanX/, 'touch pointer move should apply pinch zoom scale and drag pan updates');
+  assert.match(html, /canvas\.addEventListener\("pointermove"[\s\S]*view\.scale = newScale;[\s\S]*view\.panX = center\.x - rotatedAnchor\.x \* view\.scale;[\s\S]*view\.panY = center\.y \+ rotatedAnchor\.y \* view\.scale;/, 'touch pointer move should apply pinch zoom and anchored pan updates');
   assert.match(html, /window\.setTimeout\([\s\S]*pickPoint\(mouse\.x, mouse\.y, 14\)[\s\S]*pickLine\(mouse\.x, mouse\.y, 12\)/, 'long-press should attempt selection of points or lines');
   assert.match(html, /function\s+handleCanvasPrimaryAction\(\{ additive = false, forcedPointId = null \} = \{\}\)/, 'canvas primary action logic should be reusable across mouse and touch input paths');
   assert.match(html, /function\s+handlePointerUp\(e\)\s*\{[\s\S]*const\s+shouldTreatAsTap\s*=\s*touchGesture\.mode === "pending" && !mobileInteraction\.moved;[\s\S]*if \(shouldTreatAsTap\) \{[\s\S]*handleCanvasPrimaryAction\(\);/, 'single-finger touch tap should trigger the same canvas action handler used by desktop clicks');
