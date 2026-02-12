@@ -74,6 +74,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickCommandSearchInput"[\s\S]*id="quickMapLayerEnabled"/, 'quick toolbar should move map controls to the end of the primary row');
   assert.doesNotMatch(html, /id="quickCommandSearchRun"/, 'quick toolbar search should remove the separate run/play button');
   assert.match(html, /id="quickMapLayerEnabled"\s+class="quickToggleBtn"[\s\S]*fa-map/, 'quick toolbar should include an icon-based map layer toggle');
+  assert.match(html, /#quickMapLayerEnabled\{[\s\S]*width:34px;[\s\S]*height:34px;[\s\S]*padding:0;/, 'map layer toggle button should match the icon button dimensions used by the toolbar');
   assert.match(html, /\.quickLayerDropdownBtnText\{[\s\S]*text-overflow:clip;[\s\S]*white-space:nowrap;/, 'active layer dropdown label should render full layer names without ellipsis truncation');
   assert.match(html, /\.quickLayerItemName\{[\s\S]*text-overflow:clip;[\s\S]*white-space:nowrap;/, 'layer dropdown rows should render full layer names without ellipsis truncation');
   assert.match(html, /<div class="quickToolField" title="Map tiles">\s*<select id="quickMapTileType"/, 'quick toolbar should include unlabeled inline map tile type dropdown');
