@@ -38,6 +38,14 @@ When `VIEWPORT.HTML` (LineSmith) opens, a modern non-blocking loading indicator 
 - A live stage message updates as LineSmith initializes map controls, restores project drawings, and joins collaboration.
 - The indicator card floats above the LineSmith UI so you can still see the editor behind it, then auto-dismisses once boot is complete (or after recovery from a startup error).
 
+## Collaboration WebSocket resilience
+
+LineSmith (`VIEWPORT.HTML`) and ArrowHead (`ArrowHead.html`) now auto-retry collaboration room connections when a websocket disconnects:
+
+- Both apps reconnect to `/ws/lineforge?room=...` on a short timer (every few seconds) after an unexpected close.
+- Presence/cursor overlays are cleared when a disconnect occurs, then restored as peers rejoin.
+- This reconnect loop helps collaboration recover from transient network drops without requiring a manual page refresh.
+
 ## LineSmith Point Inspector Editing
 
 When you click a point in `VIEWPORT.HTML`, you can now edit point properties directly inside the **Point Inspector** card:
@@ -305,6 +313,7 @@ Base URL (local): `http://localhost:3000`
 
 - `GET /health`
 - `GET /api/apps`
+- `GET /ws/lineforge?room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration)
 - Static asset delivery: `/assets/icons/*` and `/assets/survey-symbols/*` now return long-lived immutable caching headers (`Cache-Control: public, max-age=31536000, immutable`) for faster repeat icon/SVG loads.
 
 ### Survey and geospatial

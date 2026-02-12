@@ -64,6 +64,8 @@ test('ArrowHead mobile AR app reads LineSmith payload and projects using bearing
   assert.doesNotMatch(html, /params\.get\('source'\) !== 'linesmith'/, 'ArrowHead should no longer require a strict LineSmith source query parameter to load geometry');
   assert.match(html, /window\.addEventListener\('storage',\s*\(event\)\s*=>\s*\{[\s\S]*event\.key\s*!==\s*ARROWHEAD_IMPORT_STORAGE_KEY/, 'ArrowHead should watch localStorage events for live LineSmith geometry updates');
   assert.match(html, /state\.payloadSyncIntervalId\s*=\s*window\.setInterval\(\(\)\s*=>\s*\{[\s\S]*refreshPayloadFromStorage\(\);[\s\S]*\},\s*1000\);/, 'ArrowHead should poll localStorage to pick up payload changes when storage events are unavailable');
+  assert.match(html, /collabReconnectDelayMs:\s*3000,\s*collabConnectToken:\s*0,/, 'ArrowHead should track websocket reconnect cadence and active connection generation');
+  assert.match(html, /socket\.addEventListener\('close',\s*\(\)\s*=>\s*\{[\s\S]*state\.collabReconnectTimerId = window\.setTimeout\(\(\)\s*=>\s*\{[\s\S]*connectCollaboration\(\);[\s\S]*\}, state\.collabReconnectDelayMs\);/, 'ArrowHead should retry websocket connection after disconnect events');
   assert.match(html, /type:\s*'ar-presence'/, 'ArrowHead should publish AR user position and orientation to websocket peers');
   assert.match(html, /worldToLatLngAffine\(/, 'ArrowHead should project LineSmith world coordinates to lat\/lon for AR cursor overlays');
   assert.match(html, /latLngToWorldAffine\(/, 'ArrowHead should convert GPS lat\/lon into state-plane coordinates before publishing presence');

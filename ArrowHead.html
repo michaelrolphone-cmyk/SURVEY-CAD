@@ -98,6 +98,10 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     started: false,
     collabRoomId: "",
     collabSocket: null,
+    collabWsUrl: "",
+    collabReconnectTimerId: 0,
+    collabReconnectDelayMs: 3000,
+    collabConnectToken: 0,
     remoteCursors: new Map(),
     remotePresence: new Map(),
     ownWorld: null,
@@ -581,12 +585,32 @@ import { latLngToWorldAffine, worldToLatLngAffine } from "./src/georeference-tra
     if (!state.collabRoomId) return;
     const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = `${scheme}://${window.location.host}/ws/lineforge?room=${encodeURIComponent(state.collabRoomId)}`;
+    state.collabWsUrl = wsUrl;
+    if (state.collabReconnectTimerId) {
+      window.clearTimeout(state.collabReconnectTimerId);
+      state.collabReconnectTimerId = 0;
+    }
+    const connectToken = ++state.collabConnectToken;
     const socket = new WebSocket(wsUrl);
     state.collabSocket = socket;
 
+    socket.addEventListener('open', () => {
+      if (connectToken !== state.collabConnectToken) {
+        socket.close();
+      }
+    });
+
     socket.addEventListener('close', () => {
+      if (connectToken !== state.collabConnectToken) return;
+      if (state.collabSocket === socket) state.collabSocket = null;
       state.remoteCursors.clear();
       state.remotePresence.clear();
+      if (!state.collabReconnectTimerId && state.collabRoomId) {
+        state.collabReconnectTimerId = window.setTimeout(() => {
+          state.collabReconnectTimerId = 0;
+          connectCollaboration();
+        }, state.collabReconnectDelayMs);
+      }
     });
 
     socket.addEventListener('message', (event) => {
