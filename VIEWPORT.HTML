@@ -4232,7 +4232,7 @@
       x: Number(x),
       y: Number(y),
       z: Number(z),
-      code: String(code ?? ""),
+      code: normalizePointCode(String(code ?? "")),
       notes: String(notes ?? ""),
       movable: !!movable,
       layerId: layers.has(layerId) ? layerId : (selectedLayerId || DEFAULT_LAYER_ID)
@@ -4251,12 +4251,104 @@
     return tokens.filter(Boolean).join(" ").trim();
   }
 
+  function normalizePointCode(rawCode = "") {
+    const tokens = splitCodeTokens(rawCode);
+    if (!tokens.length) return "";
+
+    const directives = new Set(["BEG", "END", "CLO"]);
+    const directivePriority = new Map([["END", 0], ["BEG", 1], ["CLO", 2]]);
+    const compactJpnRegex = /^JPN([A-Z0-9]+)$/i;
+    const parsedJpnTargets = [];
+    const seenJpnTargets = new Set();
+    const sequentialByBaseCode = new Map();
+    const passthroughTokens = [];
+
+    for (let i = 0; i < tokens.length; i++) {
+      const tokenRaw = tokens[i];
+      const tokenUpper = tokenRaw.toUpperCase();
+
+      const compactJpnMatch = tokenRaw.match(compactJpnRegex);
+      if (compactJpnMatch) {
+        const target = String(compactJpnMatch[1] ?? "").trim().toUpperCase();
+        if (target && !seenJpnTargets.has(target)) {
+          seenJpnTargets.add(target);
+          parsedJpnTargets.push(target);
+        }
+        continue;
+      }
+
+      if (tokenUpper === "JPN") {
+        const targetRaw = String(tokens[i + 1] ?? "").trim();
+        const target = targetRaw.toUpperCase();
+        if (/^[A-Z0-9]+$/.test(target) && !seenJpnTargets.has(target)) {
+          seenJpnTargets.add(target);
+          parsedJpnTargets.push(target);
+        }
+        if (targetRaw) i += 1;
+        continue;
+      }
+
+      const nextUpper = String(tokens[i + 1] ?? "").toUpperCase();
+      if (nextUpper && directives.has(nextUpper) && !directives.has(tokenUpper)) {
+        const existing = sequentialByBaseCode.get(tokenUpper);
+        if (!existing || (directivePriority.get(nextUpper) ?? 99) < (directivePriority.get(existing.action) ?? 99)) {
+          sequentialByBaseCode.set(tokenUpper, { baseCode: tokenUpper, action: nextUpper });
+        }
+        i += 1;
+        continue;
+      }
+
+      if (directives.has(tokenUpper)) continue;
+
+      passthroughTokens.push(tokenRaw);
+    }
+
+    const seenOutput = new Set();
+    const output = [];
+    const pushUnique = (token) => {
+      const normalized = String(token ?? "").trim();
+      if (!normalized) return;
+      const key = normalized.toUpperCase();
+      if (seenOutput.has(key)) return;
+      seenOutput.add(key);
+      output.push(normalized);
+    };
+
+    const firstToken = String(tokens[0] ?? "").trim();
+    const lineCode = firstToken.toUpperCase();
+    if (firstToken) pushUnique(firstToken);
+
+    if (lineCode && sequentialByBaseCode.has(lineCode)) {
+      const cmd = sequentialByBaseCode.get(lineCode);
+      pushUnique(cmd.baseCode);
+      pushUnique(cmd.action);
+      sequentialByBaseCode.delete(lineCode);
+    }
+
+    for (const cmd of sequentialByBaseCode.values()) {
+      pushUnique(cmd.baseCode);
+      pushUnique(cmd.action);
+    }
+
+    for (const target of parsedJpnTargets) pushUnique(`JPN${target}`);
+    for (const token of passthroughTokens) pushUnique(token);
+
+    return joinCodeTokens(output);
+  }
+
+  function setPointCode(point, rawCode = "") {
+    if (!point) return false;
+    const nextCode = normalizePointCode(rawCode);
+    const changed = nextCode !== String(point.code ?? "");
+    point.code = nextCode;
+    return changed;
+  }
+
   function appendTokensToPointCode(pointId, tokens = []) {
     const point = points.get(pointId);
     if (!point || !tokens.length) return false;
     const currentTokens = splitCodeTokens(point.code);
-    point.code = joinCodeTokens([...currentTokens, ...tokens]);
-    return true;
+    return setPointCode(point, joinCodeTokens([...currentTokens, ...tokens]));
   }
 
   function removeJpnDirectiveFromPointCode(pointId, targetPointNumber) {
@@ -6629,7 +6721,7 @@
       point.x = parseNum(values.x, point.x);
       point.y = parseNum(values.y, point.y);
       point.z = parseNum(values.z, point.z);
-      point.code = String(values.code ?? point.code);
+      setPointCode(point, String(values.code ?? point.code));
       point.notes = String(values.notes ?? point.notes);
     }
 
@@ -6651,7 +6743,9 @@
     for (const point of selectedPoints) {
       if (key === "x" || key === "y" || key === "z") {
         point[key] = parseNum(rawValue, point[key]);
-      } else if (key === "code" || key === "notes") {
+      } else if (key === "code") {
+        setPointCode(point, String(rawValue ?? point[key]));
+      } else if (key === "notes") {
         point[key] = String(rawValue ?? point[key]);
       }
     }
@@ -8032,7 +8126,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
     if (field === "code" || field === "notes") {
       inp.classList.remove("bad");
-      p[field] = String(inp.value);
+      if (field === "code") setPointCode(p, String(inp.value));
+      else p[field] = String(inp.value);
       if (selectedPointId === pid) {
         if (field === "code") $("#ptCode").value = p.code;
         if (field === "notes") $("#ptNotes").value = p.notes;

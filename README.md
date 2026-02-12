@@ -120,6 +120,10 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
   - When a user manually connects two points, LineSmith appends `JPN<targetPointNumber>` to the source point unless that pair is already connected by sequential linework rules.
   - Deleting a line removes matching `JPN` directives when present.
   - Deleting a sequentially generated connection inserts `<code> END` and `<code> BEG` break directives on the connected points so the removed segment stays removed.
+- Point code normalization rules (applies to point editor, inspector edits, and auto-inserted linework commands):
+  - Duplicate tokens are removed case-insensitively.
+  - Sequential directives are de-duplicated per base code with `END` taking precedence over `BEG`, then `CLO`.
+  - Tokens are ordered as: primary line code, sequential directives, `JPN` directives, then unrecognized passthrough tokens (for example `154G`).
 
 ### LineSmith Field-to-Finish commands
 
