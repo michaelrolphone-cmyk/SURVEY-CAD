@@ -741,6 +741,17 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
 });
 
 
+test('VIEWPORT.HTML normalizes point code token ordering and deduplicates linework directives', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+normalizePointCode\(rawCode = ""\)\s*\{[\s\S]*directivePriority\s*=\s*new\s+Map\(\[\["END",\s*0\],\s*\["BEG",\s*1\],\s*\["CLO",\s*2\]\]\)/, 'point-code normalization should prioritize END before BEG/CLO when duplicate sequential directives are present for the same base code');
+  assert.match(html, /for \(const target of parsedJpnTargets\) pushUnique\(`JPN\$\{target\}`\);[\s\S]*for \(const token of passthroughTokens\) pushUnique\(token\);/, 'point-code normalization should keep JPN directives ahead of unknown passthrough tokens like ad-hoc utility IDs');
+  assert.match(html, /function\s+appendTokensToPointCode\(pointId, tokens = \[\]\)\s*\{[\s\S]*return\s+setPointCode\(point, joinCodeTokens\(\[\.\.\.currentTokens, \.\.\.tokens\]\)\);/, 'line-edit token appends should flow through point-code normalization so duplicates are removed and ordering stays consistent');
+  assert.match(html, /if \(field === "code"\) setPointCode\(p, String\(inp\.value\)\);/, 'point editor code typing should normalize BEG\/END\/JPN token layout immediately on edit');
+});
+
+
+
 test('VIEWPORT.HTML filters applied field-to-finish tokens from rendered point labels', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
