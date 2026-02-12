@@ -30,6 +30,10 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 See **API Endpoints** and **CLI Commands** below for the complete endpoint and command reference used by this release.
 
+## API and CLI Notes for this change
+
+The launcher icon/layout refresh (2.5x icons, centered names, description tooltips, and reduced nested framing) is a UI-only update and does not add, remove, or modify any server API endpoints or CLI commands. The endpoint and command references below remain current for this release.
+
 ## LineSmith Loading Experience
 
 When `VIEWPORT.HTML` (LineSmith) opens, a modern non-blocking loading indicator appears while startup tasks run:

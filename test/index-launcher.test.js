@@ -4,12 +4,17 @@ import { readFile } from 'node:fs/promises';
 
 const indexHtmlPath = new URL('../index.html', import.meta.url);
 
-test('launcher cards show app name, description, and larger icons', async () => {
+test('launcher cards show 2.5x icons, centered names, and descriptions via tooltip', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
-  assert.match(launcherHtml, /\.app-icon\s*\{[\s\S]*width:\s*56px;[\s\S]*height:\s*56px;/i);
-  assert.match(launcherHtml, /<p class=\"app-description\">\$\{app\.description \|\| ''\}<\/p>/);
-  assert.match(launcherHtml, /\.app-card\s*\{[\s\S]*align-items:\s*flex-start;/i);
+  assert.match(launcherHtml, /\.app-icon\s*\{[\s\S]*width:\s*140px;[\s\S]*height:\s*140px;/i);
+  assert.match(launcherHtml, /\.app-card\s*\{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*center;/i);
+  assert.match(launcherHtml, /\.app-card\s+strong\s*\{[\s\S]*text-align:\s*center;/i);
+  assert.match(launcherHtml, /\.app-icon\s*\{[\s\S]*object-fit:\s*contain;[\s\S]*flex:\s*none;[\s\S]*\}/i);
+  assert.doesNotMatch(launcherHtml, /\.app-icon\s*\{[^}]*border:/i, 'launcher should avoid framed icon-in-card styling');
+  assert.doesNotMatch(launcherHtml, /\.app-icon\s*\{[^}]*background:/i, 'launcher icon should not add an extra boxed background');
+  assert.match(launcherHtml, /card\.title\s*=\s*app\.description\s*\|\|\s*'';/, 'launcher should expose app description in native tooltip text');
+  assert.doesNotMatch(launcherHtml, /class=\"app-description\"/, 'launcher should not render visible description text under icon');
   assert.doesNotMatch(launcherHtml, /<span>\$\{app\.entryHtml\}<\/span>/);
 });
 
