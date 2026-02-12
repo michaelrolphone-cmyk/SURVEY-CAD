@@ -12,6 +12,7 @@ test('VIEWPORT.HTML supports print-ready black and white survey excerpts with ne
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="printPaperSize"/, 'print panel should allow choosing standard paper sizes');
+  assert.match(html, /<option value="A4" selected>A4<\/option>/, 'print panel should default paper size to A4');
   assert.match(html, /id="printCustomWidthMm"/, 'print panel should allow entering custom paper width');
   assert.match(html, /id="printCustomHeightMm"/, 'print panel should allow entering custom paper height');
   assert.match(html, /id="generatePrintView"/, 'print panel should include a generate print view action');
@@ -20,7 +21,7 @@ test('VIEWPORT.HTML supports print-ready black and white survey excerpts with ne
   assert.match(html, /const\s+printableWidthInches\s*=\s*Math\.max\(EPS,\s*paper\.widthIn - \(marginIn \* 2\)\);[\s\S]*const\s+targetScale\s*=\s*Math\.max\(worldWidthFeet \/ printableWidthInches,\s*worldHeightFeet \/ printableHeightInches\);/, 'print scale conversion should treat engineering scales as 1 inch = N feet without converting page inches into feet first');
   assert.match(html, /function\s+beginPrintWindowCapture\(\)/, 'print panel should support an explicit draw-window capture workflow before generating preview output');
   assert.match(html, /pendingPrintWindowCapture\s*=\s*true;[\s\S]*Draw a selection window over the area to print/, 'print workflow should arm a window-capture mode and prompt the user to drag the print bounds');
-  assert.match(html, /if \(pendingPrintWindowCapture\) \{[\s\S]*worldBoundsFromScreenRect\(marqueeRect\);[\s\S]*generatePrintViewFromBounds\(printBounds\);/, 'marquee mouseup should convert the drawn window bounds into print extents and generate a preview');
+  assert.match(html, /if \(pendingPrintWindowCapture\) \{[\s\S]*worldBoundsFromScreenRect\(marqueeRect\);[\s\S]*generatePrintViewFromBounds\(printBounds\);[\s\S]*applySelectionSnapshot\(selectionSnapshot\);/, 'marquee mouseup should generate print preview from drawn bounds while preserving the existing selection');
   assert.match(html, /function\s+generatePrintViewFromSelection\(\)\s*\{[\s\S]*generatePrintViewFromBounds\(getSelectionWorldBounds\(\)\);/, 'command-driven print generation should continue supporting selection-based print previews');
   assert.match(html, /Record of Survey Template \(Landscape Placeholder\)/, 'print generation should render selected geometry into a landscape record-of-survey placeholder template');
   assert.match(html, /window\.open\("", "_blank"\);[\s\S]*printWindow\.document\.open\(\);[\s\S]*printWindow\.document\.write\([\s\S]*window\.print\(\)/, 'print preview should open in a dedicated writable window and render printable output directly');
@@ -56,6 +57,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /\.quickToolsRow\{[\s\S]*flex-wrap:wrap;/, 'each quick toolbar row should preserve wrapping behavior on narrow widths');
   assert.match(html, /\.quickToolSearch\{[\s\S]*flex:0 1 170px;[\s\S]*min-width:140px;/, 'quick toolbar search field should be compact and roughly half-width of the prior design');
   assert.match(html, /id="quickSave"[\s\S]*fa-floppy-disk/, 'quick toolbar should include Save icon shortcut');
+  assert.match(html, /id="quickPrintView"[\s\S]*fa-print/, 'quick toolbar should include Print icon shortcut next to Save');
   assert.match(html, /id="quickOpenArrowHead"[\s\S]*fa-vr-cardboard/, 'quick toolbar should include Open ArrowHead shortcut');
   assert.match(html, /id="quickOpenArrowHead"[\s\S]*id="quickLayerManager"[\s\S]*id="quickLayerDropdown"/, 'quick toolbar should place the layer manager button to the left of the layer dropdown');
   assert.match(html, /id="quickShowPoints"[\s\S]*id="quickCommandSearchInput"/, 'quick toolbar should place the search-first command field after point visibility toggles');
@@ -93,6 +95,7 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /function\s+startLineByPointsFromToolbar\(\)\s*\{[\s\S]*if \(selectedPointIds\.length >= 2\) \{[\s\S]*runLineBetweenSelectedPoints\(\{ returnToSelectionTool: true \}\);[\s\S]*setTool\("line2pt"\);/, 'quick Line by Points should run line-between-selected when points are preselected and otherwise enter two-point draw mode');
   assert.match(html, /async\s+function\s+runLineBetweenSelectedPoints\(\{ returnToSelectionTool = false \} = \{\}\)[\s\S]*if \(returnToSelectionTool\) setTool\("select"\);/, 'line-between-selected workflow should optionally return to selection tool after completion');
   assert.match(html, /\$\("#quickSave"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#saveDrawingToProject"\)\.click\(\)\)/, 'quick Save should trigger the existing save drawing workflow');
+  assert.match(html, /\$\("#quickPrintView"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#generatePrintView"\)\?\.click\(\)\)/, 'quick Print should trigger the existing draw-print-window workflow');
   assert.match(html, /\$\("#quickOpenArrowHead"\)\?\.addEventListener\("click",\s*openArrowHeadFromLineSmith\)/, 'quick Open ArrowHead should trigger existing ArrowHead handoff workflow');
   assert.match(html, /\$\("#quickExtend"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#extendToIntersect"\)\.click\(\)\)/, 'quick Extend should delegate to existing extend action');
   assert.match(html, /\$\("#quickTrimIntersect"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#trimToIntersect"\)\.click\(\)\)/, 'quick Trim\/Intersect should delegate to existing trim action');
