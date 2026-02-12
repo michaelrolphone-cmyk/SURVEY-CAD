@@ -5581,6 +5581,59 @@
     return selectedPointIds.length > 0 || selectedLines.length > 0;
   }
 
+  function moveSelectionToLayer(layerId) {
+    if (!layers.has(layerId)) return { moved: 0, skippedLocked: 0, total: 0 };
+    const targetLayerId = String(layerId);
+    const uniqueLineIds = [...new Set(selectedLines.map((entry) => entry.lineId))];
+    let moved = 0;
+    let skippedLocked = 0;
+
+    for (const pointId of selectedPointIds) {
+      const point = points.get(pointId);
+      if (!point) continue;
+      if (isLayerLocked(point.layerId)) {
+        skippedLocked++;
+        continue;
+      }
+      if (point.layerId === targetLayerId) continue;
+      point.layerId = targetLayerId;
+      moved++;
+    }
+
+    for (const lineId of uniqueLineIds) {
+      const line = lines.get(lineId);
+      if (!line) continue;
+      if (isLayerLocked(line.layerId)) {
+        skippedLocked++;
+        continue;
+      }
+      if (line.layerId === targetLayerId) continue;
+      line.layerId = targetLayerId;
+      moved++;
+    }
+
+    return { moved, skippedLocked, total: selectedPointIds.length + uniqueLineIds.length };
+  }
+
+  function applyLayerChoice(layerId, { closeDropdown = false } = {}) {
+    if (!layers.has(layerId)) return;
+    const layer = getLayerById(layerId);
+    if (hasSelection()) {
+      history.push("move selection to layer");
+      const { moved, skippedLocked, total } = moveSelectionToLayer(layerId);
+      const lockSuffix = skippedLocked ? ` (${skippedLocked} locked item(s) skipped)` : "";
+      if (moved > 0) {
+        setStatus(`Moved ${moved} selected item(s) to layer ${layer?.name || layerId}.${lockSuffix}`, skippedLocked ? "warn" : "ok");
+      } else if (total > 0) {
+        setStatus(`Selection already on layer ${layer?.name || layerId}.${lockSuffix}`, skippedLocked ? "warn" : "ok");
+      }
+    }
+    selectedLayerId = layerId;
+    renderLayerControls();
+    scheduleLayersTableRender();
+    if (closeDropdown) setQuickLayerDropdownOpen(false);
+  }
+
   function cancelActiveCanvasCommand() {
     let canceled = false;
 
@@ -8485,9 +8538,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
       rowBtn.append(swatch, name, flags);
       rowBtn.addEventListener("click", () => {
-        selectedLayerId = layer.id;
-        renderLayerControls();
-        setQuickLayerDropdownOpen(false);
+        applyLayerChoice(layer.id, { closeDropdown: true });
       });
       quickLayerDropdownMenu.appendChild(rowBtn);
     }
@@ -8546,7 +8597,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       const useBtn = document.createElement("button");
       useBtn.className = "cellBtn";
       useBtn.textContent = "Use";
-      useBtn.addEventListener("click", () => { selectedLayerId = layer.id; renderLayerControls(); });
+      useBtn.addEventListener("click", () => { applyLayerChoice(layer.id); });
       actTd.appendChild(useBtn);
 
       if (layer.id !== DEFAULT_LAYER_ID) {

@@ -209,6 +209,15 @@ test('VIEWPORT.HTML restores persisted movable flags as strict booleans', async 
   assert.match(html, /lines\.set\(l\.id,\s*\{\s*\.\.\.l,\s*movable:\s*isMovable\(l\.movable\),\s*layerId:\s*String\(l\.layerId \|\| selectedLayerId \|\| DEFAULT_LAYER_ID\)\s*\}\)/, 'restored lines should normalize movable flags and layer ownership');
 });
 
+test('VIEWPORT.HTML moves current selection to the chosen toolbar layer', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+moveSelectionToLayer\(layerId\)\s*\{[\s\S]*point\.layerId = targetLayerId;[\s\S]*line\.layerId = targetLayerId;/, 'layer switch should include a helper that reassigns selected points and selected lines to the chosen layer');
+  assert.match(html, /function\s+applyLayerChoice\(layerId,\s*\{\s*closeDropdown = false\s*\}\s*=\s*\{\}\)\s*\{[\s\S]*if \(hasSelection\(\)\) \{[\s\S]*moveSelectionToLayer\(layerId\);/, 'layer selection should route through a shared handler that moves selected entities before setting active layer');
+  assert.match(html, /rowBtn\.addEventListener\("click",\s*\(\)\s*=>\s*\{\s*applyLayerChoice\(layer\.id,\s*\{\s*closeDropdown:\s*true\s*\}\);\s*\}\);/, 'quick toolbar layer picker should use the layer application handler so selected entities move immediately');
+  assert.match(html, /useBtn\.addEventListener\("click",\s*\(\)\s*=>\s*\{\s*applyLayerChoice\(layer\.id\);\s*\}\);/, 'layer manager Use action should use the same selection-moving layer handler for consistent behavior');
+});
+
 
 test('VIEWPORT.HTML preserves unchanged array entries in drawing diffs', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');

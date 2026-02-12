@@ -40,6 +40,10 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 
 When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** zooms out to the next map zoom level at the cursor position.
 
+## LineSmith Layer Reassignment Shortcut
+
+When points/lines are selected in `VIEWPORT.HTML`, choosing a layer from the quick layer toolbar dropdown (or clicking **Use** in Layer Manager) now moves the current selection to that chosen layer in one step.
+
 ## LineSmith Print View (Record of Survey placeholder)
 
 `VIEWPORT.HTML` now includes a **Print View** panel for generating black-on-white print-ready excerpts from selected geometry:
