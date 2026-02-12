@@ -219,6 +219,14 @@ test('VIEWPORT.HTML maps OS-native print shortcuts to the draw print window work
   assert.match(html, /if \(\(e\.ctrlKey \|\| e\.metaKey\) && !e\.altKey && key === "p"\) \{[\s\S]*e\.preventDefault\(\);[\s\S]*\$\("#generatePrintView"\)\?\.click\(\);[\s\S]*return;/, 'Ctrl+P and Cmd+P should trigger the existing generate print view action instead of browser default print behavior');
 });
 
+test('VIEWPORT.HTML routes global typing into quick command search when no editable field is focused', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+maybeRouteKeystrokeToQuickCommandSearch\(event\)\s*\{[\s\S]*event\.key\.length !== 1[\s\S]*isEditableTarget\(event\.target\) \|\| isEditableTarget\(document\.activeElement\)/, 'global keystroke routing should only capture printable keys and skip active editable targets');
+  assert.match(html, /const\s+nextValue\s*=\s*`\$\{currentValue\.slice\(0, start\)\}\$\{event\.key\}\$\{currentValue\.slice\(end\)\}`;[\s\S]*quickCommandSearchInput\.focus\(\);[\s\S]*renderQuickCommandSearchResults\(nextValue\);/, 'captured keystrokes should be inserted into quick command search and immediately show suggestions');
+  assert.match(html, /window\.addEventListener\("keydown",\s*\(e\) => \{[\s\S]*if \(maybeRouteKeystrokeToQuickCommandSearch\(e\)\) return;/, 'main keydown handler should route typing to quick command search before canvas shortcuts execute');
+});
+
 
 test('VIEWPORT.HTML shows footer mouse coordinates in plain state-plane format', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');

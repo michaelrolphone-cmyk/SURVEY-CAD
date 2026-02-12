@@ -88,6 +88,11 @@ Quick command support in LineSmith:
 ```text
 printview
 ```
+
+LineSmith command search keyboard behavior:
+
+- When no text field is focused, typing any printable key anywhere in `VIEWPORT.HTML` now auto-focuses the quick command search input and inserts that character there.
+- This keeps command discovery/entry fast without requiring a mouse click into the search field first.
 ## LineSmith Basis of Bearing
 
 `VIEWPORT.HTML` (LineSmith) now supports defining a **Basis of Bearing** directly in the drawing by selecting two existing point numbers/names:
