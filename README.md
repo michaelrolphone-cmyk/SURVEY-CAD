@@ -42,12 +42,12 @@ When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** z
 
 ## LineSmith Print View (Record of Survey placeholder)
 
-`VIEWPORT.HTML` now includes a **Print View** panel for generating black-on-white print-ready excerpts from selected geometry:
+`VIEWPORT.HTML` now includes a **Print View** panel for generating black-on-white print-ready excerpts from a drawn print window:
 
-- Select points/lines first (window select or click select).
+- Click **Draw Print Window**, then drag/release a selection window around the area you want to print.
 - Choose paper size: `A0`, `A1`, `A2`, `A3`, `A4`, or `Custom` dimensions in millimeters.
 - The print scale automatically snaps to the closest supported ratio: `1:1`, `1:5`, `1:10`, `1:20`, `1:30`, `1:40`, `1:50`, `1:100`, `1:200`, `1:500`, `1:1000`.
-- Output opens in a new print preview window with a landscape **Record of Survey template placeholder** and a print button.
+- Output opens in a new print preview window with a landscape **Record of Survey template placeholder** and a print button (no blank popup fallback page).
 
 Quick command support in LineSmith:
 

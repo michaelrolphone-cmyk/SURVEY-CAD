@@ -17,9 +17,12 @@ test('VIEWPORT.HTML supports print-ready black and white survey excerpts with ne
   assert.match(html, /id="generatePrintView"/, 'print panel should include a generate print view action');
   assert.match(html, /const\s+PRINT_SCALES\s*=\s*\[1,\s*5,\s*10,\s*20,\s*30,\s*40,\s*50,\s*100,\s*200,\s*500,\s*1000\]/, 'print workflow should support the requested set of survey scales');
   assert.match(html, /function\s+chooseClosestPrintScale\(bounds, paper, marginIn = 0\.5\)/, 'print workflow should compute nearest supported survey scale from selected window bounds and paper size');
-  assert.match(html, /function\s+generatePrintViewFromSelection\(\)/, 'print generation should include a selection-based print preview workflow');
+  assert.match(html, /function\s+beginPrintWindowCapture\(\)/, 'print panel should support an explicit draw-window capture workflow before generating preview output');
+  assert.match(html, /pendingPrintWindowCapture\s*=\s*true;[\s\S]*Draw a selection window over the area to print/, 'print workflow should arm a window-capture mode and prompt the user to drag the print bounds');
+  assert.match(html, /if \(pendingPrintWindowCapture\) \{[\s\S]*worldBoundsFromScreenRect\(marqueeRect\);[\s\S]*generatePrintViewFromBounds\(printBounds\);/, 'marquee mouseup should convert the drawn window bounds into print extents and generate a preview');
+  assert.match(html, /function\s+generatePrintViewFromSelection\(\)\s*\{[\s\S]*generatePrintViewFromBounds\(getSelectionWorldBounds\(\)\);/, 'command-driven print generation should continue supporting selection-based print previews');
   assert.match(html, /Record of Survey Template \(Landscape Placeholder\)/, 'print generation should render selected geometry into a landscape record-of-survey placeholder template');
-  assert.match(html, /printWindow\.document\.write\([\s\S]*window\.print\(\)/, 'print preview should open in a dedicated window that can be printed directly');
+  assert.match(html, /window\.open\("", "_blank"\);[\s\S]*printWindow\.document\.open\(\);[\s\S]*printWindow\.document\.write\([\s\S]*window\.print\(\)/, 'print preview should open in a dedicated writable window and render printable output directly');
 });
 test('VIEWPORT.HTML allows map tile rendering to continue zooming past native tile limits', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
