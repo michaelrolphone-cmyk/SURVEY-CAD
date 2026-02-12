@@ -206,6 +206,15 @@ find assets/survey-symbols -maxdepth 1 -name '*.svg' | sort
 node -e "const m=require('./assets/survey-symbols/index.json'); console.table(m.symbols.map(({id,code,file})=>({id,code,file})))"
 ```
 
+
+## UtilitiesPack Export Control
+
+`UtilitiesPack.html` now uses an icon-based export control for power CSV downloads: a CSV document glyph with a download-arrow overlay and an **Export** subtitle for compact action labeling.
+
+## API and CLI Notes for this change
+
+This UtilitiesPack export-control UI update does not add, remove, or modify server API endpoints or CLI commands; the endpoint and command references in this README remain current.
+
 ## Test
 
 ```bash
