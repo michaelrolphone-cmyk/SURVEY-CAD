@@ -2503,7 +2503,7 @@
     for (const candidate of candidates) {
       const right = Math.cos(candidate);
       const up = -Math.sin(candidate);
-      const score = (right * 3) + up;
+      const score = (right * 2) + (up * 2) + ((right > 0 && up > 0) ? 1 : 0);
       if (score > bestScore) {
         best = candidate;
         bestScore = score;
