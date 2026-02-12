@@ -49,6 +49,8 @@ LineSmith (`VIEWPORT.HTML`) and ArrowHead (`ArrowHead.html`) now auto-retry coll
 - Both apps reconnect to `/ws/lineforge?room=...` on a short timer (every few seconds) after an unexpected close.
 - Presence/cursor overlays are cleared when a disconnect occurs, then restored as peers rejoin.
 - This reconnect loop helps collaboration recover from transient network drops without requiring a manual page refresh.
+- LineSmith now uses object-level edit locks for the most common simultaneous-edit collision: client sends `lock-request`, waits for `lock-granted`, and sends `lock-release` when edit is complete. If lock is denied (`lock-denied`), the UI flashes red/blue and blocks the edit attempt.
+- Lock state (`lock-updated`) is broadcast to peers and rendered as flashing red/blue overlays on locked points/lines (including connected geometry).
 
 ## LineSmith Point Inspector Editing
 
@@ -344,7 +346,8 @@ Base URL (local): `http://localhost:3000`
 
 - `GET /health`
 - `GET /api/apps`
-- `GET /ws/lineforge?room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration)
+- `GET /ws/lineforge?room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration; includes `state-ack`/`state-rejected` optimistic concurrency and object lock handshake messages: `lock-request`, `lock-granted`, `lock-denied`, `lock-release`, `lock-updated`)
+- `GET /ws/localstorage-sync` (WebSocket upgrade endpoint used for launcher/app localStorage differential synchronization)
 - Static asset delivery: `/assets/icons/*` and `/assets/survey-symbols/*` now return long-lived immutable caching headers (`Cache-Control: public, max-age=31536000, immutable`) for faster repeat icon/SVG loads.
 
 ### Survey and geospatial
@@ -394,9 +397,14 @@ When saving/downloading, unknown columns from the FLD header are preserved and n
 ### Local storage sync
 
 - `GET /api/localstorage-sync`
+  - Returns authoritative server state: `{ version, snapshot, checksum, updatedAt }`.
 - `POST /api/localstorage-sync`
-  - JSON body: `{ "version": number, "snapshot": object }`
-  - Launcher sync behavior: browser client now runs a single in-flight polling loop (default 2s cadence, capped exponential retry backoff to 30s) so slow sync requests do not stack into dozens of pending calls.
+  - JSON body: `{ "version": number, "snapshot": object }` for full-state bootstrap/compatibility sync writes.
+- `GET /ws/localstorage-sync`
+  - WebSocket differential sync channel used by launcher apps that read/write `localStorage`.
+  - Clients wrap `localStorage` writes, emit differentials (`set`/`remove`/`clear`) with a base checksum, and queue pending differentials while offline.
+  - Server applies valid patches to the in-memory localStorage store, then broadcasts the accepted differential + canonical checksum to all connected clients.
+  - Clients validate checksum after patch apply; on mismatch, they fetch `/api/localstorage-sync`, hydrate the full server snapshot, then rebase pending offline edits into a fresh differential so queued changes can still be replayed instead of stalling on the first mismatch.
 
 ### ROS and OCR
 

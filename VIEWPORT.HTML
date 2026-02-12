@@ -1359,7 +1359,19 @@
         width:auto;
       }
     }
+
+    @keyframes lockDeniedFlash {
+      0%, 100% { box-shadow: inset 0 0 0 0 rgba(0,0,0,0); }
+      25%, 75% { box-shadow: inset 0 0 0 9999px rgba(239, 68, 68, 0.18); }
+      50% { box-shadow: inset 0 0 0 9999px rgba(59, 130, 246, 0.2); }
+    }
+
+    body.lock-denied-flash {
+      animation: lockDeniedFlash 0.8s linear 1;
+    }
+
   </style>
+  <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 <body>
 <div id="lineSmithLoadingOverlay" class="linesmith-loading-overlay" role="status" aria-live="polite" aria-label="LineSmith loading animation">
@@ -2097,7 +2109,14 @@
     enabled: false,
     reconnectDelayMs: 3000,
     reconnectTimer: null,
-    connectToken: 0
+    connectToken: 0,
+    stateInFlight: null,
+    pendingState: "",
+    lastKnownRevision: 0,
+    latestServerState: "",
+    objectLocks: new Map(),
+    pendingLockRequests: new Map(),
+    activeDragLock: null
   };
 
   function setStatus(msg, kind="") {
@@ -3645,12 +3664,150 @@
     collab.socket.send(JSON.stringify(payload));
   }
 
+
+  function lockEntityKey(entityType, entityId) {
+    return `${entityType}:${String(entityId)}`;
+  }
+
+  function triggerLockDeniedFlash() {
+    document.body.classList.remove('lock-denied-flash');
+    void document.body.offsetWidth;
+    document.body.classList.add('lock-denied-flash');
+    window.setTimeout(() => document.body.classList.remove('lock-denied-flash'), 850);
+  }
+
+  function upsertObjectLock(lockPayload = {}) {
+    const entityType = lockPayload.entityType === 'point' ? 'point' : lockPayload.entityType === 'line' ? 'line' : null;
+    const entityId = String(lockPayload.entityId || '').trim();
+    if (!entityType || !entityId) return;
+    collab.objectLocks.set(lockEntityKey(entityType, entityId), {
+      entityType,
+      entityId,
+      ownerClientId: String(lockPayload.ownerClientId || ''),
+      ownerColor: String(lockPayload.ownerColor || '#ffffff'),
+      at: Number(lockPayload.at) || Date.now(),
+    });
+  }
+
+  function releaseObjectLock(entityType, entityId) {
+    collab.objectLocks.delete(lockEntityKey(entityType, entityId));
+  }
+
+  function isObjectLockedByOther(entityType, entityId) {
+    const lock = collab.objectLocks.get(lockEntityKey(entityType, entityId));
+    if (!lock) return false;
+    return lock.ownerClientId && lock.ownerClientId !== collab.clientId;
+  }
+
+  function sendLockRelease(lockPayload = {}) {
+    const entityType = lockPayload.entityType;
+    const entityId = lockPayload.entityId;
+    if (!entityType || entityId == null) return;
+    sendCollabMessage({
+      type: 'lock-release',
+      entityType,
+      entityId: String(entityId),
+    });
+    releaseObjectLock(entityType, entityId);
+  }
+
+  function requestObjectEditLock({ entityType, entityId, onGranted } = {}) {
+    if (!entityType || entityId == null) return false;
+    if (!collab.enabled || !collab.socket || collab.socket.readyState !== WebSocket.OPEN) {
+      onGranted?.();
+      return true;
+    }
+
+    const entityIdString = String(entityId);
+    if (isObjectLockedByOther(entityType, entityIdString)) {
+      setStatus(`${entityType} ${entityIdString} is locked by another collaborator.`, 'warn');
+      triggerLockDeniedFlash();
+      return false;
+    }
+
+    const requestId = `lock-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    collab.pendingLockRequests.set(requestId, {
+      entityType,
+      entityId: entityIdString,
+      onGranted,
+      at: Date.now(),
+    });
+
+    sendCollabMessage({
+      type: 'lock-request',
+      requestId,
+      entityType,
+      entityId: entityIdString,
+    });
+
+    return true;
+  }
+
+  function buildLockVisualState() {
+    const flashColor = Math.floor(performance.now() / 260) % 2 === 0 ? '#ef4444' : '#3b82f6';
+    const lockedLineIds = new Set();
+    const lockedPointIds = new Set();
+
+    for (const lock of collab.objectLocks.values()) {
+      if (lock.entityType === 'line') {
+        lockedLineIds.add(lock.entityId);
+        const line = lines.get(lock.entityId);
+        if (line) {
+          lockedPointIds.add(line.a);
+          lockedPointIds.add(line.b);
+        }
+      }
+      if (lock.entityType === 'point') {
+        lockedPointIds.add(lock.entityId);
+        for (const line of lines.values()) {
+          if (line.a === lock.entityId || line.b === lock.entityId) {
+            lockedLineIds.add(line.id);
+          }
+        }
+      }
+    }
+
+    return { flashColor, lockedLineIds, lockedPointIds };
+  }
+
+  function parseSerializedCollabState(serialized) {
+    if (typeof serialized !== "string" || !serialized.trim()) return {};
+    try {
+      return JSON.parse(serialized);
+    } catch {
+      return {};
+    }
+  }
+
+  function flushCollabStateSync() {
+    if (!collab.enabled || collab.applyingRemoteState) return;
+    if (collab.stateInFlight || !collab.pendingState) return;
+
+    const requestId = `state-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const statePayload = collab.pendingState;
+    collab.pendingState = "";
+    collab.stateInFlight = {
+      requestId,
+      baseRevision: collab.lastKnownRevision,
+      baseState: collab.latestServerState || "",
+      localState: statePayload,
+    };
+
+    sendCollabMessage({
+      type: "state",
+      requestId,
+      baseRevision: collab.lastKnownRevision,
+      state: statePayload,
+    });
+  }
+
   function scheduleCollabStateSync() {
     if (!collab.enabled || collab.applyingRemoteState) return;
     if (collab.stateDebounce) clearTimeout(collab.stateDebounce);
     collab.stateDebounce = setTimeout(() => {
       collab.stateDebounce = null;
-      sendCollabMessage({ type: "state", state: serializeState({ includeView: false }) });
+      collab.pendingState = serializeState({ includeView: false });
+      flushCollabStateSync();
     }, 120);
   }
 
@@ -3679,7 +3836,8 @@
       }
       setCollabStatus(`connected (${roomId})`);
       if (syncLocalStateOnConnect) {
-        sendCollabMessage({ type: "state", state: serializeState({ includeView: false }) });
+        collab.pendingState = serializeState({ includeView: false });
+        flushCollabStateSync();
       }
     });
 
@@ -3690,6 +3848,9 @@
       collab.remoteCursors.clear();
       collab.remoteArPresence.clear();
       collab.peers.clear();
+      collab.stateInFlight = null;
+      collab.pendingLockRequests.clear();
+      collab.objectLocks.clear();
       clearMapArPresence();
       if (collab.enabled && collab.roomId && !collab.reconnectTimer) {
         collab.reconnectTimer = setTimeout(() => {
@@ -3710,15 +3871,22 @@
       if (message.type === "welcome") {
         collab.clientId = message.clientId || "";
         collab.color = message.color || "#ffffff";
+        collab.lastKnownRevision = Number.isInteger(Number(message.revision)) ? Number(message.revision) : 0;
+        collab.latestServerState = typeof message.state === "string" ? message.state : "";
         collab.peers.clear();
         for (const peer of (message.peers || [])) {
           collab.peers.set(peer.clientId, { color: peer.color || "#ffffff" });
+        }
+        collab.objectLocks.clear();
+        for (const lock of (message.locks || [])) {
+          upsertObjectLock(lock);
         }
         if (message.state && !skipInitialStateHydration) {
           collab.applyingRemoteState = true;
           restoreState(message.state, { skipSync: true, applyView: false });
           collab.applyingRemoteState = false;
         }
+        flushCollabStateSync();
         return;
       }
 
@@ -3746,6 +3914,75 @@
       }
 
 
+      if (message.type === "lock-granted") {
+        upsertObjectLock(message);
+        const pending = collab.pendingLockRequests.get(message.requestId);
+        if (pending) {
+          collab.pendingLockRequests.delete(message.requestId);
+          pending.onGranted?.();
+        }
+        return;
+      }
+
+      if (message.type === "lock-denied") {
+        const pending = collab.pendingLockRequests.get(message.requestId);
+        if (pending) {
+          collab.pendingLockRequests.delete(message.requestId);
+          setStatus(`${pending.entityType} ${pending.entityId} is locked by another collaborator.`, "warn");
+          triggerLockDeniedFlash();
+        }
+        return;
+      }
+
+      if (message.type === "lock-updated") {
+        if (message.action === "released") {
+          releaseObjectLock(message.entityType, message.entityId);
+        } else {
+          upsertObjectLock(message);
+        }
+        return;
+      }
+
+      if (message.type === "state-ack") {
+        if (collab.stateInFlight && message.requestId === collab.stateInFlight.requestId) {
+          collab.lastKnownRevision = Number.isInteger(Number(message.revision)) ? Number(message.revision) : collab.lastKnownRevision;
+          collab.latestServerState = typeof message.state === "string" ? message.state : collab.stateInFlight.localState;
+          collab.stateInFlight = null;
+        }
+        flushCollabStateSync();
+        return;
+      }
+
+      if (message.type === "state-rejected") {
+        const rejectedState = typeof message.state === "string" ? message.state : "";
+        if (rejectedState) {
+          collab.lastKnownRevision = Number.isInteger(Number(message.revision)) ? Number(message.revision) : collab.lastKnownRevision;
+          collab.latestServerState = rejectedState;
+          collab.applyingRemoteState = true;
+          restoreState(rejectedState, { skipSync: true, applyView: false });
+          collab.applyingRemoteState = false;
+        }
+
+        if (collab.stateInFlight && message.requestId === collab.stateInFlight.requestId) {
+          const baseObj = parseSerializedCollabState(collab.stateInFlight.baseState);
+          const localObj = parseSerializedCollabState(collab.stateInFlight.localState);
+          const serverObj = parseSerializedCollabState(rejectedState);
+          const localDiff = diffState(baseObj, localObj);
+          const rebasedState = localDiff === undefined ? serverObj : applyStateDiff(serverObj, localDiff);
+          const rebasedSerialized = JSON.stringify(rebasedState);
+          if (rebasedSerialized && rebasedSerialized !== rejectedState) {
+            collab.pendingState = rebasedSerialized;
+            collab.applyingRemoteState = true;
+            restoreState(rebasedSerialized, { skipSync: true, applyView: false });
+            collab.applyingRemoteState = false;
+          }
+          collab.stateInFlight = null;
+        }
+
+        flushCollabStateSync();
+        return;
+      }
+
       if (message.type === "ar-presence" && message.presence) {
         const presence = {
           color: message.color || collab.peers.get(message.clientId)?.color || "#f97316",
@@ -3761,9 +3998,12 @@
         return;
       }
       if (message.type === "state" && message.state) {
+        collab.lastKnownRevision = Number.isInteger(Number(message.revision)) ? Number(message.revision) : collab.lastKnownRevision;
+        collab.latestServerState = message.state;
         collab.applyingRemoteState = true;
         restoreState(message.state, { skipSync: true, applyView: false });
         collab.applyingRemoteState = false;
+        flushCollabStateSync();
       }
     });
   }
@@ -5961,6 +6201,7 @@
 
     // lines
     const lineLabelCandidates = [];
+    const lockVisualState = buildLockVisualState();
     if (pointDisplayVisibility.lines) {
       ctx.lineWidth = 1;
       for (const ln of lines.values()) {
@@ -5972,8 +6213,13 @@
         if (!isLayerVisible(a.layerId) || !isLayerVisible(b.layerId)) continue;
         const sa = worldToScreen(a.x,a.y);
         const sb = worldToScreen(b.x,b.y);
+        const isCollabLockedLine = lockVisualState.lockedLineIds.has(ln.id);
         ctx.strokeStyle = isMovable(ln.movable) ? "#800000" : layer.color;
         ctx.lineWidth = Math.max(0.5, layer.lineWeight);
+        if (isCollabLockedLine) {
+          ctx.strokeStyle = lockVisualState.flashColor;
+          ctx.lineWidth = Math.max(2, layer.lineWeight + 0.5);
+        }
         ctx.beginPath();
         ctx.moveTo(sa.x, sa.y);
         ctx.lineTo(sb.x, sb.y);
@@ -6063,7 +6309,8 @@
           ctx.drawImage(symbolImage, sp.x - SYMBOL_MARKER_HALF_SIZE_PX, sp.y - SYMBOL_MARKER_HALF_SIZE_PX, SYMBOL_MARKER_SIZE_PX, SYMBOL_MARKER_SIZE_PX);
         } else {
           // marker
-          ctx.strokeStyle = layer?.color || "#ff2b2b";
+          const isCollabLockedPoint = lockVisualState.lockedPointIds.has(p.id);
+          ctx.strokeStyle = isCollabLockedPoint ? lockVisualState.flashColor : (layer?.color || "#ff2b2b");
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(sp.x-5, sp.y-5);
@@ -9494,6 +9741,10 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   function endDrag() {
     mouse.drag = false;
     mouse.dragObj = null;
+    if (collab.activeDragLock) {
+      sendLockRelease(collab.activeDragLock);
+      collab.activeDragLock = null;
+    }
   }
 
   const keys = { space:false, shift:false };
@@ -9712,7 +9963,18 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         const p = points.get(pid);
         if (selectedPointId === pid && isMovable(p?.movable) && !isPointLockedByLayer(pid)) {
           history.push("move point");
-          beginDrag({type:"point", id: pid, _moved:false});
+          const lockRequested = requestObjectEditLock({
+            entityType: "point",
+            entityId: pid,
+            onGranted: () => {
+              collab.activeDragLock = { entityType: "point", entityId: pid };
+              beginDrag({type:"point", id: pid, _moved:false});
+            }
+          });
+          if (!lockRequested) {
+            history.undo.pop();
+            updateUndoRedoHUD();
+          }
         }
         return;
       }
@@ -9752,7 +10014,18 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         const ln = lines.get(lpick.lineId);
         if (isMovable(ln?.movable) && !isLineLockedByLayer(lpick.lineId)) {
           history.push("move line");
-          beginDrag({type:"line", id: lpick.lineId, _moved:false});
+          const lockRequested = requestObjectEditLock({
+            entityType: "line",
+            entityId: lpick.lineId,
+            onGranted: () => {
+              collab.activeDragLock = { entityType: "line", entityId: lpick.lineId };
+              beginDrag({type:"line", id: lpick.lineId, _moved:false});
+            }
+          });
+          if (!lockRequested) {
+            history.undo.pop();
+            updateUndoRedoHUD();
+          }
         }
         return;
       }
@@ -9970,9 +10243,16 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
           schedulePointsTableRender();
           const p = points.get(pid);
           if (isMovable(p?.movable)) {
-            history.push("move point");
-            beginDrag({type:"point", id: pid, _moved:false});
-            touchGesture.mode = "drag-selection";
+            requestObjectEditLock({
+              entityType: "point",
+              entityId: pid,
+              onGranted: () => {
+                history.push("move point");
+                collab.activeDragLock = { entityType: "point", entityId: pid };
+                beginDrag({type:"point", id: pid, _moved:false});
+                touchGesture.mode = "drag-selection";
+              }
+            });
           }
         } else if (lpick) {
           selectedPointIds = [];
@@ -9983,9 +10263,16 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
           schedulePointsTableRender();
           const ln = lines.get(lpick.lineId);
           if (isMovable(ln?.movable)) {
-            history.push("move line");
-            beginDrag({type:"line", id: lpick.lineId, _moved:false});
-            touchGesture.mode = "drag-selection";
+            requestObjectEditLock({
+              entityType: "line",
+              entityId: lpick.lineId,
+              onGranted: () => {
+                history.push("move line");
+                collab.activeDragLock = { entityType: "line", entityId: lpick.lineId };
+                beginDrag({type:"line", id: lpick.lineId, _moved:false});
+                touchGesture.mode = "drag-selection";
+              }
+            });
           }
         } else {
           touchGesture.boxSelectActive = true;

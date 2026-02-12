@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LocalStorageSyncStore } from '../src/localstorage-sync-store.js';
+import { LocalStorageSyncStore, computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
 test('local storage sync store accepts newer client snapshots', () => {
   const store = new LocalStorageSyncStore();
@@ -11,6 +11,7 @@ test('local storage sync store accepts newer client snapshots', () => {
 
   assert.equal(result.status, 'server-updated');
   assert.equal(result.state.version, 10);
+  assert.equal(result.state.checksum, computeSnapshotChecksum({ foo: 'bar' }));
   assert.deepEqual(result.state.snapshot, { foo: 'bar' });
 });
 
@@ -28,4 +29,32 @@ test('local storage sync store returns server snapshot when client is stale', ()
   assert.equal(result.status, 'client-stale');
   assert.equal(result.state.version, 20);
   assert.deepEqual(result.state.snapshot, { newer: 'state' });
+});
+
+test('local storage sync store applies differentials when base checksum matches', () => {
+  const store = new LocalStorageSyncStore({
+    version: 1,
+    snapshot: { alpha: '1' },
+  });
+  const before = store.getState();
+
+  const result = store.applyDifferential({
+    baseChecksum: before.checksum,
+    operations: [{ type: 'set', key: 'beta', value: '2' }],
+  });
+
+  assert.equal(result.status, 'applied');
+  assert.deepEqual(result.state.snapshot, { alpha: '1', beta: '2' });
+  assert.equal(result.state.version, 2);
+});
+
+test('local storage sync store rejects differentials when base checksum mismatches', () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: { alpha: '1' } });
+  const result = store.applyDifferential({
+    baseChecksum: 'bad-checksum',
+    operations: [{ type: 'set', key: 'beta', value: '2' }],
+  });
+
+  assert.equal(result.status, 'checksum-mismatch');
+  assert.deepEqual(result.state.snapshot, { alpha: '1' });
 });

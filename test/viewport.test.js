@@ -720,7 +720,7 @@ test('VIEWPORT.HTML keeps PointForge imports from being overwritten by prior col
   assert.match(html, /const\s+launchSource\s*=\s*queryParams\.get\("source"\)\s*\|\|\s*"";/, 'LineSmith should cache launch source for import-aware boot decisions');
   assert.match(html, /function\s+connectCollaboration\(\{\s*skipInitialStateHydration\s*=\s*false,\s*syncLocalStateOnConnect\s*=\s*false\s*\}\s*=\s*\{\}\)\s*\{/, 'collaboration boot should accept options for initial-state hydration and local-state push');
   assert.match(html, /if \(message\.state && !skipInitialStateHydration\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'PointForge imports should be able to skip applying stale welcome state from collaboration room');
-  assert.match(html, /if \(syncLocalStateOnConnect\) \{[\s\S]*sendCollabMessage\(\{ type: "state", state: serializeState\(\{ includeView: false \}\) \}\);/, 'PointForge imports should publish freshly imported geometry once collaboration connects');
+  assert.match(html, /if \(syncLocalStateOnConnect\) \{[\s\S]*collab\.pendingState = serializeState\(\{ includeView: false \}\);[\s\S]*flushCollabStateSync\(\);/, 'PointForge imports should publish freshly imported geometry once collaboration connects');
   assert.match(html, /reconnectDelayMs:\s*3000,\s*reconnectTimer:\s*null,\s*connectToken:\s*0/, 'collaboration state should track reconnect timing and active connection generation');
   assert.match(html, /socket\.addEventListener\("close",\s*\(\)\s*=>\s*\{[\s\S]*setCollabStatus\(`reconnecting \(\$\{roomId\}\)…`\);[\s\S]*collab\.reconnectTimer = setTimeout\(\(\) => \{[\s\S]*connectCollaboration\(\{ skipInitialStateHydration, syncLocalStateOnConnect \}\);[\s\S]*\}, collab\.reconnectDelayMs\);/, 'LineSmith should automatically retry websocket collaboration after disconnects');
   assert.match(html, /const\s+importedFromPointforge\s*=\s*tryImportPointforgePayload\(\);[\s\S]*if \(importedFromPointforge\) \{[\s\S]*connectCollaboration\(\{ skipInitialStateHydration: true, syncLocalStateOnConnect: true \}\);[\s\S]*return;[\s\S]*\}/, 'boot should connect collaboration after PointForge import using import-safe options');
@@ -734,8 +734,24 @@ test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch 
   assert.match(html, /if \(mouse\.dragObj\?\.type === "line"\) \{[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'line drag should debounce-send collaboration state updates while dragging');
   assert.match(html, /if \(mouse\.dragObj && mouse\.dragObj\.type !== "pan"\) \{[\s\S]*if \(!mouse\.dragObj\._moved\) \{[\s\S]*\} else \{[\s\S]*scheduleCollabStateSync\(\);/, 'drag commit should force a final collaboration state sync after movement');
 
-  assert.match(html, /sendCollabMessage\(\{ type: "state", state: serializeState\(\{ includeView: false \}\) \}\);/, 'collaboration state sync should exclude local view pan and zoom from websocket payloads');
+  assert.match(html, /sendCollabMessage\(\{[\s\S]*type: "state",[\s\S]*baseRevision: collab\.lastKnownRevision,[\s\S]*state: statePayload,[\s\S]*\}\);/, 'collaboration state sync should include base revision and state payload for optimistic concurrency');
   assert.match(html, /if \(message\.type === "state" && message\.state\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'remote collaboration state restores should not overwrite local user view pan/zoom');
+  assert.match(html, /if \(message\.type === "state-rejected"\) \{[\s\S]*const\s+localDiff\s*=\s*diffState\(baseObj, localObj\);[\s\S]*applyStateDiff\(serverObj, localDiff\);/, 'LineSmith should rebase unsent local edits on top of canonical server state when revisions conflict');
+});
+
+
+
+test('VIEWPORT.HTML collaboration includes object lock handshake and lock flash visuals', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /type:\s*'lock-request'/, 'LineSmith should request a collaboration lock before dragging editable objects');
+  assert.match(html, /if \(message\.type === "lock-granted"\)/, 'LineSmith should handle lock-granted responses');
+  assert.match(html, /if \(message\.type === "lock-denied"\)/, 'LineSmith should handle lock-denied responses');
+  assert.match(html, /if \(message\.type === "lock-updated"\)/, 'LineSmith should apply lock updates from other collaborators');
+  assert.match(html, /@keyframes lockDeniedFlash/, 'LineSmith should define red\/blue flash animation for lock denials');
+  assert.match(html, /const\s+lockVisualState\s*=\s*buildLockVisualState\(\);/, 'draw loop should compute lock visual state each frame');
+  assert.match(html, /isCollabLockedLine\s*=\s*lockVisualState\.lockedLineIds\.has\(ln\.id\)/, 'locked lines should flash in the canvas renderer');
+  assert.match(html, /isCollabLockedPoint\s*=\s*lockVisualState\.lockedPointIds\.has\(p\.id\)/, 'locked points should flash in the canvas renderer');
 });
 
 test('VIEWPORT.HTML renders ArrowHead collaborator position on map and canvas with directional cone', async () => {

@@ -6,24 +6,30 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const launcherHtmlPath = path.resolve(__dirname, '..', 'index.html');
+const browserSyncModulePath = path.resolve(__dirname, '..', 'src', 'browser-localstorage-sync.js');
 
 async function loadLauncherHtml() {
   return readFile(launcherHtmlPath, 'utf8');
 }
 
-test('launcher localStorage sync uses a single-flight poller instead of setInterval overlap', async () => {
+test('launcher loads websocket-based localStorage sync module', async () => {
   const html = await loadLauncherHtml();
 
-  assert.match(html, /let\s+localStorageSyncInFlight\s*=\s*false\s*;/, 'should track whether a sync request is already running');
-  assert.match(html, /if\s*\(localStorageSyncInFlight\)\s*\{[\s\S]*return\s*;[\s\S]*\}/, 'should bail out when another sync is in flight');
-  assert.doesNotMatch(html, /setInterval\s*\(\s*\(\)\s*=>\s*\{[\s\S]*syncLocalStorageWithServer\(/, 'should no longer fire syncs on fixed interval regardless of in-flight requests');
+  assert.match(html, /<script type="module" src="\/src\/browser-localstorage-sync\.js"><\/script>/, 'launcher should load the shared browser localStorage sync module');
+  assert.doesNotMatch(html, /setInterval\(/, 'launcher should not use polling interval localStorage sync loops');
 });
 
-test('launcher localStorage sync backs off after failures and re-queues forced sync requests', async () => {
-  const html = await loadLauncherHtml();
+test('browser localStorage sync module patches localStorage and queues offline differentials', async () => {
+  const source = await readFile(browserSyncModulePath, 'utf8');
 
-  assert.match(html, /LOCAL_STORAGE_SYNC_MAX_RETRY_MS\s*=\s*30000/, 'should cap retry delay to avoid unbounded backoff');
-  assert.match(html, /localStorageSyncPollDelayMs\s*=\s*Math\.min\(localStorageSyncPollDelayMs\s*\*\s*2,\s*LOCAL_STORAGE_SYNC_MAX_RETRY_MS\)/, 'should exponentially back off on failures');
-  assert.match(html, /if\s*\(localStorageSyncForceQueued\)\s*\{[\s\S]*queueLocalStorageSyncPoll\(0\);/, 'should immediately process forced syncs queued during an in-flight request');
+  assert.match(source, /storageProto\.setItem\s*=\s*function patchedSetItem/, 'sync module should wrap localStorage.setItem writes');
+  assert.match(source, /storageProto\.removeItem\s*=\s*function patchedRemoveItem/, 'sync module should wrap localStorage.removeItem writes');
+  assert.match(source, /if \(!navigator\.onLine\) return;/, 'sync module should defer sync while offline');
+  assert.match(source, /surveyfoundryLocalStoragePendingDiffs/, 'sync module should persist pending differentials locally while offline');
+  assert.match(source, /type:\s*'sync-differential'/, 'sync module should send differential websocket messages');
+  assert.match(source, /baseChecksum:\s*next\.baseChecksum/, 'sync module should replay queued differentials with their original base checksums');
+  assert.match(source, /#rebasePendingQueue\(serverSnapshot = \{\}\)/, 'sync module should rebase queued differentials onto server state after mismatch');
+  assert.match(source, /fetch\('\/api\/localstorage-sync'\)/, 'sync module should fall back to server API snapshot fetch for checksum recovery');
 });

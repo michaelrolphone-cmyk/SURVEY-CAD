@@ -451,6 +451,7 @@
       }
     }
   </style>
+  <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 <body>
   <header>
@@ -554,7 +555,6 @@
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
     const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
-    const LOCAL_STORAGE_SYNC_VERSION_KEY = 'surveyfoundryLocalStorageVersion';
     const LAUNCHER_VIEW_STATE_KEY = 'surveyfoundryLauncherViewState';
     const PROJECT_STATUS_SEQUENCE = [
       'Proposed',
@@ -576,14 +576,6 @@
     let activeProjectId = null;
     const backgroundMapUrlCache = new Map();
     let backgroundRequestToken = 0;
-    let localStorageSyncSnapshot = '';
-    let localStorageSyncLock = false;
-    const LOCAL_STORAGE_SYNC_INTERVAL_MS = 2000;
-    const LOCAL_STORAGE_SYNC_MAX_RETRY_MS = 30000;
-    let localStorageSyncInFlight = false;
-    let localStorageSyncForceQueued = false;
-    let localStorageSyncPollTimer = null;
-    let localStorageSyncPollDelayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS;
     let resolveLeaveLineSmithChoice = null;
 
     function requestAppFrameMessage(messageType, extraPayload = {}) {
@@ -699,138 +691,11 @@
     }
 
 
-    function getLocalStorageVersion() {
-      const version = Number(localStorage.getItem(LOCAL_STORAGE_SYNC_VERSION_KEY) || 0);
-      return Number.isFinite(version) ? Math.trunc(version) : 0;
-    }
 
-    function buildLocalStorageSnapshot() {
-      const snapshot = {};
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const key = localStorage.key(index);
-        if (!key) continue;
-        const value = localStorage.getItem(key);
-        if (value !== null) {
-          snapshot[key] = value;
-        }
-      }
-      return snapshot;
-    }
-
-    function applyServerSnapshot(snapshot = {}, version = 0) {
-      localStorageSyncLock = true;
-      const entries = Object.entries(snapshot || {});
-      entries.forEach(([key, value]) => {
-        localStorage.setItem(key, String(value));
-      });
-      if (Number.isFinite(version) && version > 0) {
-        localStorage.setItem(LOCAL_STORAGE_SYNC_VERSION_KEY, String(Math.trunc(version)));
-      }
-      localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
-      localStorageSyncLock = false;
-    }
-
-    async function pullServerSnapshotIfNewer(localVersion) {
-      const response = await fetch('/api/localstorage-sync');
-      if (!response.ok) {
-        throw new Error(`localStorage sync fetch failed (${response.status})`);
-      }
-
-      const payload = await response.json();
-      const serverVersion = Number(payload?.version || 0);
-      if (!Number.isFinite(serverVersion) || serverVersion <= localVersion) {
-        return;
-      }
-
-      const serverSnapshot = payload?.snapshot || {};
-      const serverSnapshotSerialized = JSON.stringify(serverSnapshot);
-      const localSnapshotSerialized = JSON.stringify(buildLocalStorageSnapshot());
-      if (serverSnapshotSerialized !== localSnapshotSerialized) {
-        applyServerSnapshot(serverSnapshot, serverVersion);
-        loadProjects();
-        loadActiveProject();
-        renderProjects();
-      }
-    }
-
-    async function syncLocalStorageWithServer({ force = false } = {}) {
-      if (localStorageSyncLock) return;
-
-      const currentSnapshot = buildLocalStorageSnapshot();
-      const serializedSnapshot = JSON.stringify(currentSnapshot);
-      if (!force && serializedSnapshot === localStorageSyncSnapshot) {
-        await pullServerSnapshotIfNewer(getLocalStorageVersion());
-        return;
-      }
-
-      const nextVersion = Date.now();
-      localStorage.setItem(LOCAL_STORAGE_SYNC_VERSION_KEY, String(nextVersion));
-
-      const snapshot = buildLocalStorageSnapshot();
-      const version = getLocalStorageVersion();
-      const response = await fetch('/api/localstorage-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ version, snapshot }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`localStorage sync failed (${response.status})`);
-      }
-
-      const payload = await response.json();
-      localStorageSyncSnapshot = JSON.stringify(buildLocalStorageSnapshot());
-
-      if (payload?.status === 'client-stale' && payload?.state?.snapshot) {
-        const serverSnapshotSerialized = JSON.stringify(payload.state.snapshot);
-        if (serverSnapshotSerialized !== localStorageSyncSnapshot) {
-          applyServerSnapshot(payload.state.snapshot, Number(payload?.state?.version || 0));
-          loadProjects();
-          loadActiveProject();
-          renderProjects();
-        }
-      }
-    }
-
-    function queueLocalStorageSyncPoll(delayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS) {
-      if (localStorageSyncPollTimer !== null) {
-        return;
-      }
-
-      localStorageSyncPollTimer = window.setTimeout(async () => {
-        localStorageSyncPollTimer = null;
-        await runLocalStorageSyncCycle();
-      }, Math.max(0, delayMs));
-    }
-
-    async function runLocalStorageSyncCycle({ force = false } = {}) {
-      if (localStorageSyncInFlight) {
-        if (force) {
-          localStorageSyncForceQueued = true;
-        }
-        return;
-      }
-
-      localStorageSyncInFlight = true;
-      try {
-        await syncLocalStorageWithServer({ force });
-        localStorageSyncPollDelayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS;
-      } catch (err) {
-        console.warn('localStorage sync unavailable', err);
-        localStorageSyncPollDelayMs = Math.min(localStorageSyncPollDelayMs * 2, LOCAL_STORAGE_SYNC_MAX_RETRY_MS);
-      } finally {
-        localStorageSyncInFlight = false;
-      }
-
-      if (localStorageSyncForceQueued) {
-        localStorageSyncForceQueued = false;
-        queueLocalStorageSyncPoll(0);
-        return;
-      }
-
-      queueLocalStorageSyncPoll(localStorageSyncPollDelayMs);
+    function syncLauncherStateFromStorageEvent() {
+      loadProjects();
+      loadActiveProject();
+      renderProjects();
     }
 
     function loadProjects() {
@@ -1265,6 +1130,8 @@
       }
     });
 
+
+    window.addEventListener('storage', syncLauncherStateFromStorageEvent);
     window.addEventListener('message', (event) => {
       if (event.origin !== window.location.origin) return;
 
@@ -1286,14 +1153,12 @@
     loadActiveProject();
     renderProjects();
 
-    queueLocalStorageSyncPoll(localStorageSyncPollDelayMs);
 
     loadApps().then(() => {
       restoreLauncherViewState();
       if (!window.history.state?.[LAUNCHER_HISTORY_STATE_KEY]) {
         writeHistoryState(buildHomeHistoryState(), 'replace');
       }
-      runLocalStorageSyncCycle({ force: true });
     }).catch((err) => {
       appSections.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
       console.error(err);
