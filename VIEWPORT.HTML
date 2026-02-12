@@ -870,79 +870,86 @@
       width:100%;
       min-width:0;
     }
-    .fldSymbolGallery{
-      border-top:1px solid var(--border);
-      background:#0a0a0a;
-      padding:8px;
-      overflow:auto;
-      max-height:220px;
-    }
-    .fldSymbolGalleryGrid{
-      display:grid;
-      grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
-      gap:8px;
-    }
-    .fldSymbolCard{
-      border:1px solid #262626;
-      border-radius:10px;
-      padding:6px;
-      background:#101010;
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-      align-items:center;
-      text-align:center;
-      font-size:11px;
-    }
-    .fldSymbolCard img{
-      width:36px;
-      height:36px;
-      object-fit:contain;
-      filter:invert(1);
-    }
-    .fldSymbolCard .muted{ color:var(--muted); }
     .fldSymbolPicker{
-      grid-column:1 / -1;
       border:1px solid #2a2a2a;
       border-radius:8px;
-      padding:6px;
+      padding:0;
       background:#0e0e0e;
-      display:grid;
-      gap:6px;
+      position:relative;
+      overflow:visible;
     }
-    .fldSymbolPickerHeader{
+    .fldSymbolPickerButton{
+      width:100%;
+      border:0;
+      background:transparent;
+      color:var(--fg);
+      border-radius:8px;
+      padding:6px;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:8px;
-      font-size:11px;
-      color:var(--muted);
-    }
-    .fldSymbolPickerGrid{
-      display:grid;
-      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-      gap:6px;
-      max-height:170px;
-      overflow:auto;
-    }
-    .fldSymbolChoiceBtn{
-      border:1px solid #2d2d2d;
-      background:#141414;
-      color:var(--fg);
-      border-radius:8px;
-      padding:4px;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:3px;
-      font-size:10px;
       cursor:pointer;
     }
+    .fldSymbolPickerCurrent{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+    }
+    .fldSymbolPickerCurrent img,
     .fldSymbolChoiceBtn img{
       width:26px;
       height:26px;
       object-fit:contain;
       filter:invert(1);
+      flex-shrink:0;
+    }
+    .fldSymbolPickerCurrentLabel{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+      gap:2px;
+      text-align:left;
+      font-size:11px;
+    }
+    .fldSymbolPickerMenu{
+      position:absolute;
+      top:calc(100% + 4px);
+      left:0;
+      right:0;
+      z-index:50;
+      border:1px solid #2a2a2a;
+      border-radius:8px;
+      background:#0e0e0e;
+      padding:4px;
+      box-shadow:0 8px 16px rgba(0,0,0,.4);
+      max-height:220px;
+      overflow:auto;
+    }
+    .fldSymbolPickerMenu.hidden{ display:none; }
+    .fldSymbolChoiceBtn{
+      width:100%;
+      border:1px solid #2d2d2d;
+      background:#141414;
+      color:var(--fg);
+      border-radius:8px;
+      padding:5px 6px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:11px;
+      text-align:left;
+      cursor:pointer;
+      margin-bottom:4px;
+    }
+    .fldSymbolChoiceBtn:last-child{ margin-bottom:0; }
+    .fldSymbolChoiceLabel{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:2px;
     }
     .fldSymbolChoiceBtn.active{
       border-color:#5ea2ff;
@@ -1749,9 +1756,6 @@
             <tbody id="fldTbody"></tbody>
           </table>
         </div>
-        <div id="fldSymbolGallery" class="fldSymbolGallery">
-          <div id="fldSymbolGalleryGrid" class="fldSymbolGalleryGrid"></div>
-        </div>
       </div>
     </div>
   </div>
@@ -2318,7 +2322,6 @@
   const fldModalClose = $("#fldModalClose");
   const fldFilterInput = $("#fldFilter");
   const fldTbody = $("#fldTbody");
-  const fldSymbolGalleryGrid = $("#fldSymbolGalleryGrid");
   const fldSourceLabel = $("#fldSourceLabel");
   const fldAddRuleBtn = $("#fldAddRule");
   const fldSaveLocalBtn = $("#fldSaveLocal");
@@ -3388,77 +3391,91 @@
     return choices;
   }
 
+  function symbolChoicePreviewUrl(value) {
+    const file = String(value || "").trim();
+    if (file) return `/assets/survey-symbols/${encodeURIComponent(file)}`;
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Crect x='2' y='2' width='22' height='22' rx='4' fill='none' stroke='%23bbbbbb' stroke-dasharray='2 2'/%3E%3C/svg%3E";
+  }
+
   function buildFldSymbolPreviewPicker({ symbolMapChoices, currentValue, onPick }) {
     const pickerWrap = document.createElement("div");
     pickerWrap.className = "fldSymbolPicker";
 
-    const header = document.createElement("div");
-    header.className = "fldSymbolPickerHeader";
-    header.innerHTML = '<span>Symbol preview picker (choose by symbol name/code, then map SVG)</span><span>Click preview to select</span>';
+    const selectedChoice = symbolMapChoices.find((choice) => choice.value === currentValue) || null;
+    const pickerButton = document.createElement("button");
+    pickerButton.type = "button";
+    pickerButton.className = "fldSymbolPickerButton";
 
-    const grid = document.createElement("div");
-    grid.className = "fldSymbolPickerGrid";
-    symbolMapChoices.slice(0, 48).forEach((choice) => {
+    const currentWrap = document.createElement("div");
+    currentWrap.className = "fldSymbolPickerCurrent";
+
+    const currentPreview = document.createElement("img");
+    currentPreview.src = symbolChoicePreviewUrl(selectedChoice?.value);
+    currentPreview.alt = "Selected symbol preview";
+    if (!selectedChoice?.value) currentPreview.style.opacity = "0.5";
+
+    const currentLabel = document.createElement("div");
+    currentLabel.className = "fldSymbolPickerCurrentLabel";
+
+    const currentName = document.createElement("b");
+    currentName.textContent = selectedChoice?.code || selectedChoice?.id || selectedChoice?.value || "No SVG mapping";
+
+    const currentFile = document.createElement("span");
+    currentFile.className = "muted";
+    currentFile.textContent = selectedChoice?.file || selectedChoice?.value || "Click to choose an SVG";
+
+    currentLabel.append(currentName, currentFile);
+    currentWrap.append(currentPreview, currentLabel);
+
+    const chevron = document.createElement("span");
+    chevron.className = "muted";
+    chevron.textContent = "▾";
+
+    pickerButton.append(currentWrap, chevron);
+
+    const menu = document.createElement("div");
+    menu.className = "fldSymbolPickerMenu hidden";
+    symbolMapChoices.forEach((choice) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "fldSymbolChoiceBtn";
       if (choice.value === currentValue) btn.classList.add("active");
 
       const img = document.createElement("img");
-      img.src = `/assets/survey-symbols/${encodeURIComponent(choice.value)}`;
-      img.alt = `${choice.code || choice.id || choice.value} preview`;
+      img.src = symbolChoicePreviewUrl(choice.value);
+      img.alt = `${choice.code || choice.id || choice.value || "No SVG mapping"} preview`;
       img.loading = "lazy";
+      if (!choice.value) img.style.opacity = "0.5";
 
-      const name = document.createElement("div");
-      name.textContent = choice.code || choice.id || choice.value;
+      const labelWrap = document.createElement("div");
+      labelWrap.className = "fldSymbolChoiceLabel";
 
-      const file = document.createElement("div");
+      const name = document.createElement("b");
+      name.textContent = choice.code || choice.id || choice.value || "No SVG mapping";
+
+      const file = document.createElement("span");
       file.className = "muted";
-      file.textContent = choice.file || choice.value;
+      file.textContent = choice.file || choice.value || "Clear SVG mapping";
 
-      btn.append(img, name, file);
-      btn.addEventListener("click", () => onPick(choice.value));
-      grid.appendChild(btn);
+      labelWrap.append(name, file);
+      btn.append(img, labelWrap);
+      btn.addEventListener("click", () => {
+        menu.classList.add("hidden");
+        onPick(choice.value);
+      });
+      menu.appendChild(btn);
     });
-    pickerWrap.append(header, grid);
+
+    pickerButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      menu.classList.toggle("hidden");
+    });
+    document.addEventListener("click", () => {
+      menu.classList.add("hidden");
+    });
+
+    pickerWrap.append(pickerButton, menu);
     return pickerWrap;
-  }
-
-  function renderFldSymbolGallery(config) {
-    if (!fldSymbolGalleryGrid) return;
-    const rules = Array.isArray(config?.rules) ? config.rules : [];
-    fldSymbolGalleryGrid.innerHTML = "";
-    const symbolRules = rules
-      .filter((rule) => String(rule?.raw?.entity_type || "") === "0")
-      .filter((rule) => String(rule?.raw?.symbol || "").trim() || String(rule?.raw?.symbol_name_2 || "").trim());
-    if (!symbolRules.length) {
-      fldSymbolGalleryGrid.innerHTML = '<div class="muted">No symbol-type FLD rules yet. Add one using Entity = Symbol.</div>';
-      return;
-    }
-
-    const frag = document.createDocumentFragment();
-    for (const rule of symbolRules) {
-      const card = document.createElement("div");
-      card.className = "fldSymbolCard";
-      const symbolId = String(rule?.raw?.symbol || "").trim() || "(none)";
-      const symbolFile = String(rule?.raw?.symbol_name_2 || "").trim();
-      if (symbolFile) {
-        const img = document.createElement("img");
-        img.src = `/assets/survey-symbols/${encodeURIComponent(symbolFile)}`;
-        img.alt = `${symbolId} symbol preview`;
-        card.appendChild(img);
-      }
-      const codeLabel = document.createElement("b");
-      codeLabel.textContent = String(rule?.raw?.code || "").trim() || "(no code)";
-      const symbolLabel = document.createElement("div");
-      symbolLabel.textContent = `ID: ${symbolId}`;
-      const fileLabel = document.createElement("div");
-      fileLabel.className = "muted";
-      fileLabel.textContent = symbolFile || "No SVG mapping";
-      card.append(codeLabel, symbolLabel, fileLabel);
-      frag.appendChild(card);
-    }
-    fldSymbolGalleryGrid.appendChild(frag);
   }
 
   function deriveFieldToFinishCodeSetsFromConfig(config) {
@@ -9392,7 +9409,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         });
         const helper = document.createElement("div");
         helper.className = "muted";
-        helper.textContent = "Linework rule: pick linetype from FLD values.";
+        helper.textContent = " ";
         typeConfigStack.append(lineTypeSelect, helper);
       } else {
         const symbolIdInput = document.createElement("input");
@@ -9402,35 +9419,14 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
         symbolIdInput.addEventListener("input", () => {
           rule.raw.symbol = symbolIdInput.value;
           syncFldRuleDerivedFields(rule);
-          renderFldSymbolGallery(config);
-        });
-
-        const symbolMapSelect = document.createElement("select");
-        symbolMapSelect.className = "cellInput";
-        const blankOption = document.createElement("option");
-        blankOption.value = "";
-        blankOption.textContent = "SVG mapping (optional)";
-        symbolMapSelect.appendChild(blankOption);
-        symbolMapChoices.forEach((choice) => {
-          const option = document.createElement("option");
-          option.value = choice.value;
-          option.textContent = choice.label;
-          symbolMapSelect.appendChild(option);
-        });
-        symbolMapSelect.value = String(rule.raw?.symbol_name_2 || "");
-        symbolMapSelect.addEventListener("change", () => {
-          rule.raw.symbol_name_2 = symbolMapSelect.value;
-          renderFldSymbolGallery(config);
-          renderFldEditorTable();
         });
 
         const symbolPreviewPicker = buildFldSymbolPreviewPicker({
-          symbolMapChoices,
+          symbolMapChoices: [{ value: "", label: "No SVG mapping" }, ...symbolMapChoices],
           currentValue: String(rule.raw?.symbol_name_2 || ""),
           onPick: (value) => {
-            symbolMapSelect.value = value;
             rule.raw.symbol_name_2 = value;
-            renderFldSymbolGallery(config);
+            syncFldRuleDerivedFields(rule);
             renderFldEditorTable();
           },
         });
@@ -9445,10 +9441,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
           rule.raw.symbol_size = symbolScaleInput.value;
           syncFldRuleDerivedFields(rule);
         });
-        const helper = document.createElement("div");
-        helper.className = "muted";
-        helper.textContent = "Symbol rule: set FLD Symbol name (e.g., SPT10), choose mapped SVG, and set symbol scale.";
-        typeConfigStack.append(symbolIdInput, symbolMapSelect, symbolScaleInput, symbolPreviewPicker, helper);
+        typeConfigStack.append(symbolIdInput, symbolScaleInput, symbolPreviewPicker);
       }
       typeConfigTd.appendChild(typeConfigStack);
       const companionsCell = mkInputCell("companion_codes");
@@ -9468,7 +9461,6 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       frag.appendChild(tr);
     });
     fldTbody.appendChild(frag);
-    renderFldSymbolGallery(config);
     updateFldSourceLabel();
   }
 
