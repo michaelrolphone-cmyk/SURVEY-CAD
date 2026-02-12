@@ -873,9 +873,11 @@ test('VIEWPORT.HTML renders configured survey symbol SVG markers for point codes
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /codeSymbolMapFiles:\s*new Map\(\)/, 'field-to-finish state should track symbol SVG mappings per point code');
+  assert.match(html, /function\s+applyFieldToFinishConfig\(config, sourceLabel = defaultFldConfigPath\)\s*\{[\s\S]*fieldToFinishRuleState\.symbolSvgOverrides = loadFldSymbolMapOverrides\(\);[\s\S]*deriveFieldToFinishCodeSetsFromConfig\(config\)/, 'field-to-finish config should load symbol-name SVG overrides before deriving per-code symbol mappings');
   assert.match(html, /if \(entityType === "0" && symbolMapFile\) codeSymbolMapFiles\.set\(code, symbolMapFile\);/, 'FLD symbol rendering should map point codes through symbol-to-SVG mappings');
   assert.match(html, /function\s+getPointSymbolMapFile\(pointCode = ""\)\s*\{[\s\S]*codeSymbolMapFiles\.get\(token\)/, 'point marker rendering should resolve mapped symbol files from point code tokens');
   assert.match(html, /function\s+getSymbolMarkerImage\(symbolMapFile = ""\)\s*\{[\s\S]*image\.src = `\/assets\/survey-symbols\/\$\{encodeURIComponent\(file\)\}`;/, 'marker renderer should load symbol SVG assets from the survey-symbols library');
+  assert.match(html, /image\.addEventListener\("load", \(\) => \{[\s\S]*cacheKey\.startsWith\(`\$\{file\}::`\)[\s\S]*draw\(\);[\s\S]*\}, \{ once: true \}\);/, 'marker renderer should redraw automatically after symbol SVG assets finish loading');
   assert.match(html, /const\s+SYMBOL_MARKER_SIZE_PX\s*=\s*60;[\s\S]*const\s+SYMBOL_BOLD_OFFSET_PX\s*=\s*1;/, 'symbol marker rendering should define a 60px marker footprint and explicit bold-pass offsets');
   assert.match(html, /function\s+getTintedSymbolMarker\(symbolMapFile = ""\, layerColor = ""\)\s*\{[\s\S]*markerCanvas\.width = SYMBOL_MARKER_SIZE_PX;[\s\S]*markerCtx\.drawImage\(image, SYMBOL_BOLD_OFFSET_PX, 0, markerCanvas\.width, markerCanvas\.height\);[\s\S]*markerCtx\.globalCompositeOperation = "source-in";[\s\S]*markerCtx\.fillStyle = tint;/, 'point marker rendering should bold thin SVG strokes before applying layer tint');
   assert.match(html, /const pointSymbolMapFile = getPointSymbolMapFile\(p\.code\);[\s\S]*getTintedSymbolMarker\(pointSymbolMapFile, layer\?\.color\);[\s\S]*ctx\.drawImage\(symbolImage, sp\.x - SYMBOL_MARKER_HALF_SIZE_PX, sp\.y - SYMBOL_MARKER_HALF_SIZE_PX, SYMBOL_MARKER_SIZE_PX, SYMBOL_MARKER_SIZE_PX\);[\s\S]*ctx\.moveTo\(sp\.x-5, sp\.y-5\)/, 'point marker draw should use larger centered SVG symbols before falling back to x markers');
@@ -929,4 +931,3 @@ test('VIEWPORT.HTML keeps FLD manager in quick toolbar and triples symbol marker
   assert.match(html, /\$\("#quickFtfManager"\)\?\.addEventListener\("click", \(\) => openFldEditorBtn\?\.click\(\)\);/, 'FLD quick button should route to the existing FLD editor launcher');
   assert.match(html, /const\s+SYMBOL_MARKER_SIZE_PX\s*=\s*60\s*;/, 'point symbol SVG markers should render at 3x the prior 20px footprint');
 });
-

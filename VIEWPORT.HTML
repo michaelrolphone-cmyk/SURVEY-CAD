@@ -4113,6 +4113,7 @@
   }
 
   function applyFieldToFinishConfig(config, sourceLabel = defaultFldConfigPath) {
+    fieldToFinishRuleState.symbolSvgOverrides = loadFldSymbolMapOverrides();
     const { lineworkCodes, symbolCodes, codeLayers, codeSymbolMapFiles, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
     fieldToFinishRuleState.lineworkCodes = lineworkCodes;
     fieldToFinishRuleState.symbolCodes = symbolCodes;
@@ -4120,7 +4121,6 @@
     fieldToFinishRuleState.codeSymbolMapFiles = codeSymbolMapFiles;
     fieldToFinishRuleState.lineworkCompanionCodes = lineworkCompanionCodes;
     fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
-    fieldToFinishRuleState.symbolSvgOverrides = loadFldSymbolMapOverrides();
     fieldToFinishRuleState.source = sourceLabel;
     fieldToFinishRuleState.loaded = true;
   }
@@ -4168,6 +4168,12 @@
     const image = new Image();
     image.decoding = "async";
     image.src = `/assets/survey-symbols/${encodeURIComponent(file)}`;
+    image.addEventListener("load", () => {
+      for (const cacheKey of tintedSymbolMarkerCache.keys()) {
+        if (cacheKey.startsWith(`${file}::`)) tintedSymbolMarkerCache.delete(cacheKey);
+      }
+      draw();
+    }, { once: true });
     image.addEventListener("error", () => {
       symbolMarkerImageCache.set(file, null);
     }, { once: true });
