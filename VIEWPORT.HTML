@@ -3598,7 +3598,7 @@
     }
     const rules = Array.isArray(config?.rules) ? config.rules : [];
     for (const rule of rules) {
-      const existingFile = String(rule?.raw?.symbol_name_2 || "").trim();
+      const existingFile = getRuleSymbolMapFile(rule?.raw);
       if (!existingFile || seen.has(existingFile)) continue;
       seen.add(existingFile);
       choices.push({ value: existingFile, label: existingFile });
@@ -3698,10 +3698,22 @@
     return normalized === "2" || normalized === "1";
   }
 
+  function getRuleSymbolMapFile(raw = {}) {
+    return String(raw?.symbol_name_2 || raw?.symbol_block_id || raw?.symbol_map_file || "").trim();
+  }
+
+  function setRuleSymbolMapFile(raw, value) {
+    if (!raw || typeof raw !== "object") return;
+    const normalized = String(value || "").trim();
+    raw.symbol_name_2 = normalized;
+    if (Object.hasOwn(raw, "symbol_block_id")) raw.symbol_block_id = normalized;
+    if (Object.hasOwn(raw, "symbol_map_file")) raw.symbol_map_file = normalized;
+  }
+
   function normalizeLineworkRuleDefaults(rule) {
     if (!rule?.raw || !isLineworkEntityType(rule.raw.entity_type)) return;
     rule.raw.symbol = "SPT10";
-    rule.raw.symbol_name_2 = "";
+    setRuleSymbolMapFile(rule.raw, "");
   }
 
   function deriveFieldToFinishCodeSetsFromConfig(config) {
@@ -3717,7 +3729,7 @@
       const code = String(rule.code).trim().toUpperCase();
       const entityType = String(rule.entityType ?? "").trim();
       const layerName = String(rule.layer ?? "").trim();
-      const symbolMapFile = String(rule.raw?.symbol_name_2 || "").trim();
+      const symbolMapFile = getRuleSymbolMapFile(rule.raw);
       if (!code) continue;
       if (isLineworkEntityType(entityType)) lineworkCodes.add(code);
       if (entityType === "0") symbolCodes.add(code);
@@ -9908,9 +9920,9 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
         const symbolPreviewPicker = buildFldSymbolPreviewPicker({
           symbolMapChoices: [{ value: "", label: "No SVG mapping" }, ...symbolMapChoices],
-          currentValue: String(rule.raw?.symbol_name_2 || ""),
+          currentValue: getRuleSymbolMapFile(rule.raw),
           onPick: (value) => {
-            rule.raw.symbol_name_2 = value;
+            setRuleSymbolMapFile(rule.raw, value);
             syncFldRuleDerivedFields(rule);
             renderFldEditorTable();
           },

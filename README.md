@@ -324,6 +324,7 @@ LineSmith (`VIEWPORT.HTML`) now also includes an FLD editor workflow:
 - Click **Download Local FLD** (panel button or modal button) to export your saved local override as an `.fld` file.
 - Click **Download Current FLD** to export the currently-loaded editor state.
 - Click **Reset to Server** to clear local override storage and restore the server-sourced FLD file.
+- Symbol SVG mappings now recognize both FLD column names **Symbol Name 2** and **Symbol Block Id** so saved mappings persist across code sets that use either header naming convention.
 
 When saving/downloading, unknown columns from the FLD header are preserved and new entries are created using template-backed raw fields so extra properties are retained.
 

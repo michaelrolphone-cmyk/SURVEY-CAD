@@ -100,3 +100,15 @@ test('serializeFldConfig preserves newly-added rules with template fields', () =
   assert.equal(reparsed.rulesByCode.ZZTOP.raw.allow_annotative, template.allow_annotative);
   assert.equal(reparsed.rulesByCode.ZZTOP.raw.companion_codes, 'AA,BB');
 });
+
+
+test('parseFldConfig supports Symbol Block Id alias for symbol SVG mappings', () => {
+  const content = `#2010V# Code|Description|Entity Type|Processing On|Symbol Block Id
+WM|Water Meter|0|1|water-meter.svg
+`;
+  const parsed = parseFldConfig(content);
+
+  assert.equal(parsed.rules.length, 1);
+  assert.equal(parsed.rules[0].symbolMapFile, 'water-meter.svg');
+  assert.equal(parsed.rules[0].raw.symbol_block_id, 'water-meter.svg');
+});
