@@ -64,7 +64,7 @@ export const APP_CATALOG = [
     name: 'UtilitiesPack',
     description: 'Fetches utility records, keeps state-plane coordinates, and exports power utility CSV bundles.',
     entryHtml: 'UtilitiesPack.html',
-    iconPath: '/assets/icons/UtilitiesPack.svg',
+    iconPath: '/assets/icons/UtilitiesPack.png',
     color: '#1D4ED8',
     accent: '#DBEAFE',
     glyph: 'UP',
