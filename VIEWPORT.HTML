@@ -8478,6 +8478,12 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && key === "p") {
+      e.preventDefault();
+      $("#generatePrintView")?.click();
+      return;
+    }
+
     if (e.code === "Space") {
       keys.space = true;
       if (!typing) e.preventDefault();

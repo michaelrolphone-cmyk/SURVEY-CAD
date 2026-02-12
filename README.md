@@ -79,6 +79,7 @@ When points/lines are selected in `VIEWPORT.HTML`, choosing a layer from the qui
 - Paper size defaults to `A4` and can be changed to `A0`, `A1`, `A2`, `A3`, or `Custom` dimensions in millimeters.
 - The print scale automatically snaps to the closest supported ratio: `1:1`, `1:5`, `1:10`, `1:20`, `1:30`, `1:40`, `1:50`, `1:100`, `1:200`, `1:500`, `1:1000` (engineering interpretation: `1" = N'`, e.g. `1:50` means 1 inch = 50 feet).
 - Output opens in a new print preview window with a landscape **Record of Survey template placeholder** and a print button (no blank popup fallback page).
+- `Ctrl+P` / `Cmd+P` now invoke the same in-app **Draw Print Window** workflow so OS-native print shortcuts kick off LineSmith print capture directly.
 
 Quick command support in LineSmith:
 

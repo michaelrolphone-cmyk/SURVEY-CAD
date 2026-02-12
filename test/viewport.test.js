@@ -203,6 +203,12 @@ test('VIEWPORT.HTML supports reference-angle rotation of selected geometry from 
   assert.match(html, /if \(rotateSelectionSession\.active && !rotateSelectionSession\.awaitingSelection\) \{[\s\S]*handleRotateSelectionCanvasPick\(mouse\.x, mouse\.y\);[\s\S]*return;/, 'canvas clicks should route to rotate pick stages while rotate mode is active and selection has been captured');
 });
 
+test('VIEWPORT.HTML maps OS-native print shortcuts to the draw print window workflow', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /if \(\(e\.ctrlKey \|\| e\.metaKey\) && !e\.altKey && key === "p"\) \{[\s\S]*e\.preventDefault\(\);[\s\S]*\$\("#generatePrintView"\)\?\.click\(\);[\s\S]*return;/, 'Ctrl+P and Cmd+P should trigger the existing generate print view action instead of browser default print behavior');
+});
+
 
 test('VIEWPORT.HTML shows footer mouse coordinates in plain state-plane format', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
