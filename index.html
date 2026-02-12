@@ -555,6 +555,12 @@
     let backgroundRequestToken = 0;
     let localStorageSyncSnapshot = '';
     let localStorageSyncLock = false;
+    const LOCAL_STORAGE_SYNC_INTERVAL_MS = 2000;
+    const LOCAL_STORAGE_SYNC_MAX_RETRY_MS = 30000;
+    let localStorageSyncInFlight = false;
+    let localStorageSyncForceQueued = false;
+    let localStorageSyncPollTimer = null;
+    let localStorageSyncPollDelayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS;
     let resolveLeaveLineSmithChoice = null;
 
     function requestAppFrameMessage(messageType, extraPayload = {}) {
@@ -763,6 +769,45 @@
           renderProjects();
         }
       }
+    }
+
+    function queueLocalStorageSyncPoll(delayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS) {
+      if (localStorageSyncPollTimer !== null) {
+        return;
+      }
+
+      localStorageSyncPollTimer = window.setTimeout(async () => {
+        localStorageSyncPollTimer = null;
+        await runLocalStorageSyncCycle();
+      }, Math.max(0, delayMs));
+    }
+
+    async function runLocalStorageSyncCycle({ force = false } = {}) {
+      if (localStorageSyncInFlight) {
+        if (force) {
+          localStorageSyncForceQueued = true;
+        }
+        return;
+      }
+
+      localStorageSyncInFlight = true;
+      try {
+        await syncLocalStorageWithServer({ force });
+        localStorageSyncPollDelayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS;
+      } catch (err) {
+        console.warn('localStorage sync unavailable', err);
+        localStorageSyncPollDelayMs = Math.min(localStorageSyncPollDelayMs * 2, LOCAL_STORAGE_SYNC_MAX_RETRY_MS);
+      } finally {
+        localStorageSyncInFlight = false;
+      }
+
+      if (localStorageSyncForceQueued) {
+        localStorageSyncForceQueued = false;
+        queueLocalStorageSyncPoll(0);
+        return;
+      }
+
+      queueLocalStorageSyncPoll(localStorageSyncPollDelayMs);
     }
 
     function loadProjects() {
@@ -1214,20 +1259,14 @@
     loadActiveProject();
     renderProjects();
 
-    setInterval(() => {
-      syncLocalStorageWithServer().catch((err) => {
-        console.warn('localStorage sync unavailable', err);
-      });
-    }, 2000);
+    queueLocalStorageSyncPoll(localStorageSyncPollDelayMs);
 
     loadApps().then(() => {
       restoreLauncherViewState();
       if (!window.history.state?.[LAUNCHER_HISTORY_STATE_KEY]) {
         writeHistoryState(buildHomeHistoryState(), 'replace');
       }
-      syncLocalStorageWithServer({ force: true }).catch((err) => {
-        console.warn('initial localStorage sync failed', err);
-      });
+      runLocalStorageSyncCycle({ force: true });
     }).catch((err) => {
       appSections.innerHTML = `<p class="subtitle">Unable to load apps: ${err.message}</p>`;
       console.error(err);
