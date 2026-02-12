@@ -3459,6 +3459,7 @@
     lineworkCodes: new Set(),
     symbolCodes: new Set(),
     codeLayers: new Map(),
+    codeSymbolMapFiles: new Map(),
     lineworkCompanionCodes: new Map(),
     companionToLineworkCodes: new Map(),
     source: null,
@@ -3475,6 +3476,7 @@
     byFile: new Map(),
     loaded: false,
   };
+  const symbolMarkerImageCache = new Map();
 
   async function loadSurveySymbolLibrary() {
     try {
@@ -3633,6 +3635,7 @@
     const lineworkCodes = new Set();
     const symbolCodes = new Set();
     const codeLayers = new Map();
+    const codeSymbolMapFiles = new Map();
     const lineworkCompanionCodes = new Map();
     const companionToLineworkCodes = new Map();
     const rules = Array.isArray(config?.rules) ? config.rules : [];
@@ -3641,9 +3644,11 @@
       const code = String(rule.code).trim().toUpperCase();
       const entityType = String(rule.entityType ?? "").trim();
       const layerName = String(rule.layer ?? "").trim();
+      const symbolMapFile = String(rule.raw?.symbol_name_2 || "").trim();
       if (!code) continue;
       if (isLineworkEntityType(entityType)) lineworkCodes.add(code);
       if (entityType === "0") symbolCodes.add(code);
+      if (entityType === "0" && symbolMapFile) codeSymbolMapFiles.set(code, symbolMapFile);
       if (layerName) codeLayers.set(code, layerName);
 
       if (!isLineworkEntityType(entityType)) continue;
@@ -3659,7 +3664,7 @@
         companionToLineworkCodes.get(companionCode).add(code);
       }
     }
-    return { lineworkCodes, symbolCodes, codeLayers, lineworkCompanionCodes, companionToLineworkCodes };
+    return { lineworkCodes, symbolCodes, codeLayers, codeSymbolMapFiles, lineworkCompanionCodes, companionToLineworkCodes };
   }
 
   function cloneFldConfig(config) {
@@ -3713,10 +3718,11 @@
   }
 
   function applyFieldToFinishConfig(config, sourceLabel = defaultFldConfigPath) {
-    const { lineworkCodes, symbolCodes, codeLayers, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
+    const { lineworkCodes, symbolCodes, codeLayers, codeSymbolMapFiles, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
     fieldToFinishRuleState.lineworkCodes = lineworkCodes;
     fieldToFinishRuleState.symbolCodes = symbolCodes;
     fieldToFinishRuleState.codeLayers = codeLayers;
+    fieldToFinishRuleState.codeSymbolMapFiles = codeSymbolMapFiles;
     fieldToFinishRuleState.lineworkCompanionCodes = lineworkCompanionCodes;
     fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
     fieldToFinishRuleState.source = sourceLabel;
@@ -3741,10 +3747,37 @@
       fieldToFinishRuleState.lineworkCodes = new Set();
       fieldToFinishRuleState.symbolCodes = new Set();
       fieldToFinishRuleState.codeLayers = new Map();
+      fieldToFinishRuleState.codeSymbolMapFiles = new Map();
       fieldToFinishRuleState.lineworkCompanionCodes = new Map();
       fieldToFinishRuleState.companionToLineworkCodes = new Map();
       return false;
     }
+  }
+
+  function getPointSymbolMapFile(pointCode = "") {
+    const tokensUpper = tokenizePointCode(pointCode);
+    for (const token of tokensUpper) {
+      const mappedFile = String(fieldToFinishRuleState.codeSymbolMapFiles.get(token) || "").trim();
+      if (mappedFile) return mappedFile;
+    }
+    return "";
+  }
+
+  function getSymbolMarkerImage(symbolMapFile = "") {
+    const file = String(symbolMapFile || "").trim();
+    if (!file) return null;
+    const cached = symbolMarkerImageCache.get(file);
+    if (cached) return cached;
+    const image = new Image();
+    image.decoding = "async";
+    image.src = `/assets/survey-symbols/${encodeURIComponent(file)}`;
+    image.addEventListener("load", () => redraw());
+    image.addEventListener("error", () => {
+      symbolMarkerImageCache.set(file, null);
+      redraw();
+    }, { once: true });
+    symbolMarkerImageCache.set(file, image);
+    return image;
   }
 
   function pointSupportsLineworkSequenceToken(tokenSet, lineCode) {
@@ -5312,15 +5345,21 @@
       const sp = worldToScreen(p.x,p.y);
 
       if (pointDisplayVisibility.points) {
-        // marker
-        ctx.strokeStyle = layer?.color || "#ff2b2b";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(sp.x-5, sp.y-5);
-        ctx.lineTo(sp.x+5, sp.y+5);
-        ctx.moveTo(sp.x-5, sp.y+5);
-        ctx.lineTo(sp.x+5, sp.y-5);
-        ctx.stroke();
+        const pointSymbolMapFile = getPointSymbolMapFile(p.code);
+        const symbolImage = getSymbolMarkerImage(pointSymbolMapFile);
+        if (symbolImage?.complete && symbolImage.naturalWidth > 0 && symbolImage.naturalHeight > 0) {
+          ctx.drawImage(symbolImage, sp.x - 5, sp.y - 5, 10, 10);
+        } else {
+          // marker
+          ctx.strokeStyle = layer?.color || "#ff2b2b";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(sp.x-5, sp.y-5);
+          ctx.lineTo(sp.x+5, sp.y+5);
+          ctx.moveTo(sp.x-5, sp.y+5);
+          ctx.lineTo(sp.x+5, sp.y-5);
+          ctx.stroke();
+        }
 
         // movable hint ring
         if (isMovable(p.movable)) {
