@@ -140,6 +140,7 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
   - Duplicate tokens are removed case-insensitively.
   - Sequential directives are de-duplicated per base code with `END` taking precedence over `BEG`, then `CLO`.
   - Tokens are ordered as: primary line code, sequential directives, `JPN` directives, then unrecognized passthrough tokens (for example `154G`).
+  - Point Inspector code edits and multi-point "Varied" code updates now immediately re-run field-to-finish linework synchronization so BEG/END/CLO/JPN drawing changes appear without requiring a point-table edit.
 
 ### LineSmith Field-to-Finish commands
 

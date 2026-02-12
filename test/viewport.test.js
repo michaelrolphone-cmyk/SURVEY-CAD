@@ -622,6 +622,8 @@ test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected
   assert.match(html, /function\s+getSelectedPoints\(\)/, 'point inspector should expose a selected-point helper for multi-edit workflows');
   assert.match(html, /function\s+summarizeSelectedPointValues\(selectedPoints,\s*keys\)/, 'point inspector should summarize shared values across selected points');
   assert.match(html, /function\s+applySharedFieldToSelectedPoints\(key,\s*rawValue,\s*sourceLabel\s*=\s*"point inspector"\)/, 'point inspector should support bulk edits from varied pills');
+  assert.match(html, /function\s+applyEditsToMultiplePoints\(fields,\s*sourceLabel\s*=\s*"inspector"\)\s*\{[\s\S]*if \(pointCodeChanged\) \{[\s\S]*ensureLegacyAutoFieldToFinishLineMetadata\(\);[\s\S]*syncFieldToFinishLinework\(\);[\s\S]*\}/, 'point inspector apply should re-sync field-to-finish linework when point code edits change draw commands');
+  assert.match(html, /function\s+applySharedFieldToSelectedPoints\(key,\s*rawValue,\s*sourceLabel\s*=\s*"point inspector"\)\s*\{[\s\S]*if \(pointCodeChanged\) \{[\s\S]*ensureLegacyAutoFieldToFinishLineMetadata\(\);[\s\S]*syncFieldToFinishLinework\(\);[\s\S]*\}/, 'multi-point Varied code edits from inspector should re-sync field-to-finish linework immediately');
   assert.match(html, /if \(selectedPoints\.length > 1\) \{[\s\S]*buildSharedPointInspector\(selectedPoints\);/, 'point inspector should render shared multi-point values before the per-point editor');
   assert.match(html, /variedButton\.textContent\s*=\s*"Varied";/, 'point inspector should render a red Varied pill for non-shared values');
   assert.match(html, /window\.prompt\(`Set \$\{label\} for \$\{selectedPoints\.length\} selected points:`,\s*""\);/, 'clicking a Varied pill should prompt for a shared replacement value');
@@ -929,4 +931,3 @@ test('VIEWPORT.HTML keeps FLD manager in quick toolbar and triples symbol marker
   assert.match(html, /\$\("#quickFtfManager"\)\?\.addEventListener\("click", \(\) => openFldEditorBtn\?\.click\(\)\);/, 'FLD quick button should route to the existing FLD editor launcher');
   assert.match(html, /const\s+SYMBOL_MARKER_SIZE_PX\s*=\s*60\s*;/, 'point symbol SVG markers should render at 3x the prior 20px footprint');
 });
-
