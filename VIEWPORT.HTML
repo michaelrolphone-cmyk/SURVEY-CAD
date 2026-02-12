@@ -2413,6 +2413,8 @@
 
     const startTokens = splitCodeTokens(startPoint?.code).map((token) => token.toUpperCase());
     const endTokens = splitCodeTokens(endPoint?.code).map((token) => token.toUpperCase());
+    if (startTokens.some((token) => BEARING_LABEL_ALLOWED_LINE_CODES.has(token))) return true;
+    if (endTokens.some((token) => BEARING_LABEL_ALLOWED_LINE_CODES.has(token))) return true;
     return startTokens.includes("BEAR") || endTokens.includes("BEAR");
   }
 
