@@ -63,3 +63,15 @@ test('generated icon files exist for every app', async () => {
     await access(iconFsPath);
   }
 });
+
+
+test('utilities pack uses CSV download icon override and height metadata', () => {
+  const utilitiesPack = APP_CATALOG.find((app) => app.id === 'utilities-pack');
+  assert.ok(utilitiesPack);
+  assert.equal(utilitiesPack.iconPath, '/assets/icons/download/Download-CSV.png');
+  assert.equal(utilitiesPack.iconHeight, 125);
+
+  const publicUtilitiesPack = listApps().find((app) => app.id === 'utilities-pack');
+  assert.ok(publicUtilitiesPack);
+  assert.equal(publicUtilitiesPack.iconHeight, 125);
+});
