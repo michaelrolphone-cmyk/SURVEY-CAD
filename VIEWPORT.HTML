@@ -1075,31 +1075,79 @@
     .linesmith-loading-network-graph{
       mask:url(#linesmithLoadingEdgeFade);
     }
-    .linesmith-loading-node{
-      fill:#78e4ff;
-      filter:drop-shadow(0 0 8px rgba(120, 228, 255, 0.75));
-      animation:linesmithNodePulse 1.5s ease-in-out infinite;
+    .linesmith-loading-link,
+    .linesmith-loading-route-outline{
+      fill:none;
+      stroke-linecap:round;
+      stroke-linejoin:round;
     }
-    .linesmith-loading-node:nth-child(2){ animation-delay:.2s; }
-    .linesmith-loading-node:nth-child(3){ animation-delay:.4s; }
-    .linesmith-loading-node:nth-child(4){ animation-delay:.6s; }
-    .linesmith-loading-node:nth-child(5){ animation-delay:.8s; }
+    .linesmith-loading-route-outline{
+      stroke:rgba(114, 144, 220, 0.28);
+      stroke-width:8;
+    }
     .linesmith-loading-link{
       stroke:url(#linesmithLoadingLinkFade);
       stroke-width:3;
-      fill:none;
-      stroke-linecap:round;
       stroke-dasharray:7 9;
-      animation:linesmithLinkFlow 2s linear infinite;
-      opacity:.9;
+      animation:linesmithLinkFlow 1.9s linear infinite;
+      opacity:.95;
     }
-    @keyframes linesmithNodePulse{
-      0%, 100% { transform:scale(0.92); opacity:.65; }
-      50% { transform:scale(1.16); opacity:1; }
+    .linesmith-loading-node{
+      fill:#78e4ff;
+      filter:drop-shadow(0 0 8px rgba(120, 228, 255, 0.75));
+      animation:linesmithNodeIdle 2.4s ease-in-out infinite;
+      transform-origin:center;
+    }
+    .linesmith-loading-node.is-origin{
+      fill:#ffe48b;
+      filter:drop-shadow(0 0 10px rgba(255, 228, 139, 0.8));
+      animation-duration:2.8s;
+    }
+    .linesmith-loading-node.is-target{
+      fill:#8ff2b1;
+      filter:drop-shadow(0 0 10px rgba(143, 242, 177, 0.82));
+      animation-duration:2s;
+    }
+    .linesmith-loading-node-ping{
+      fill:none;
+      stroke:rgba(120, 228, 255, 0.5);
+      stroke-width:2;
+      opacity:0;
+      transform-origin:center;
+      animation:linesmithNodePing 2.6s ease-out infinite;
+    }
+    .linesmith-loading-node-ping.origin{ animation-delay:.25s; }
+    .linesmith-loading-node-ping.target{ animation-delay:1.5s; }
+    .linesmith-loading-traverse-dot{
+      fill:#ffffff;
+      stroke:#8bd6ff;
+      stroke-width:1.5;
+      filter:drop-shadow(0 0 12px rgba(139, 214, 255, 0.9));
+    }
+    .linesmith-loading-bearing-arm{
+      stroke:rgba(255,255,255,0.8);
+      stroke-width:2;
+      stroke-linecap:round;
+      opacity:.85;
+      animation:linesmithBearingSweep 2.2s ease-in-out infinite;
+      transform-origin:48px 96px;
+    }
+    @keyframes linesmithNodeIdle{
+      0%, 100% { transform:scale(0.95); opacity:.72; }
+      50% { transform:scale(1.06); opacity:1; }
+    }
+    @keyframes linesmithNodePing{
+      0% { transform:scale(0.65); opacity:0; }
+      15% { opacity:.75; }
+      100% { transform:scale(2.15); opacity:0; }
     }
     @keyframes linesmithLinkFlow{
       from { stroke-dashoffset:0; }
       to { stroke-dashoffset:-48; }
+    }
+    @keyframes linesmithBearingSweep{
+      0%, 100% { transform:rotate(-36deg); opacity:.35; }
+      50% { transform:rotate(24deg); opacity:1; }
     }
 
     @media (max-width: 960px) {
@@ -1160,13 +1208,22 @@
         </mask>
       </defs>
       <g class="linesmith-loading-network-graph">
+        <path id="linesmithLoadingTraversePath" class="linesmith-loading-route-outline" d="M48 96 L140 62 L248 104 L344 48 L452 90" />
         <path class="linesmith-loading-link" d="M48 96 L140 62 L248 104 L344 48 L452 90" />
-        <path class="linesmith-loading-link" d="M140 62 L250 24 L344 48" style="animation-delay:.35s" />
-        <circle class="linesmith-loading-node" cx="48" cy="96" r="7" />
+        <path class="linesmith-loading-link" d="M140 62 L250 24 L344 48" style="animation-delay:.4s" />
+        <line class="linesmith-loading-bearing-arm" x1="48" y1="96" x2="78" y2="76" />
+        <circle class="linesmith-loading-node-ping origin" cx="48" cy="96" r="8" />
+        <circle class="linesmith-loading-node-ping target" cx="452" cy="90" r="8" />
+        <circle class="linesmith-loading-node is-origin" cx="48" cy="96" r="7" />
         <circle class="linesmith-loading-node" cx="140" cy="62" r="7" />
         <circle class="linesmith-loading-node" cx="248" cy="104" r="7" />
         <circle class="linesmith-loading-node" cx="344" cy="48" r="7" />
-        <circle class="linesmith-loading-node" cx="452" cy="90" r="7" />
+        <circle class="linesmith-loading-node is-target" cx="452" cy="90" r="7" />
+        <circle class="linesmith-loading-traverse-dot" cx="48" cy="96" r="4.5">
+          <animateMotion dur="2.9s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#linesmithLoadingTraversePath" />
+          </animateMotion>
+        </circle>
       </g>
     </svg>
     <span id="lineSmithLoadingStage" class="linesmith-loading-stage">Preparing drawing canvas…</span>
