@@ -3782,18 +3782,11 @@
     const image = new Image();
     image.decoding = "async";
     image.src = `/assets/survey-symbols/${encodeURIComponent(file)}`;
-    image.addEventListener("load", () => redraw());
     image.addEventListener("error", () => {
       symbolMarkerImageCache.set(file, null);
-      redraw();
     }, { once: true });
     symbolMarkerImageCache.set(file, image);
     return image;
-  }
-
-  function redraw() {
-    // Compatibility shim for async callbacks that still call redraw();
-    // the primary canvas loop is continuously scheduled by requestAnimationFrame(draw).
   }
 
   function pointSupportsLineworkSequenceToken(tokenSet, lineCode) {
@@ -9742,8 +9735,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     fldEditorState.source = "local";
     saveLocalFldOverride(fldEditorState.activeConfig);
     applyFieldToFinishConfig(fldEditorState.activeConfig, "localStorage");
-    const { addedJpn, addedSequential, removed } = syncFieldToFinishLinework();
-    if (addedJpn || addedSequential || removed) redraw();
+    syncFieldToFinishLinework();
     setStatus("Saved FLD local override.", "ok");
     renderFldEditorTable();
   }
@@ -9754,8 +9746,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     fldEditorState.activeConfig = cloneFldConfig(fldEditorState.serverConfig);
     fldEditorState.source = "server";
     applyFieldToFinishConfig(fldEditorState.activeConfig, defaultFldConfigPath);
-    const { addedJpn, addedSequential, removed } = syncFieldToFinishLinework();
-    if (addedJpn || addedSequential || removed) redraw();
+    syncFieldToFinishLinework();
     setStatus("Reset FLD config to server version.", "ok");
     renderFldEditorTable();
   }
