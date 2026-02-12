@@ -3618,6 +3618,17 @@
     return pickerWrap;
   }
 
+  function isLineworkEntityType(entityType) {
+    const normalized = String(entityType ?? "").trim();
+    return normalized === "2" || normalized === "1";
+  }
+
+  function normalizeLineworkRuleDefaults(rule) {
+    if (!rule?.raw || !isLineworkEntityType(rule.raw.entity_type)) return;
+    rule.raw.symbol = "SPT10";
+    rule.raw.symbol_name_2 = "";
+  }
+
   function deriveFieldToFinishCodeSetsFromConfig(config) {
     const lineworkCodes = new Set();
     const symbolCodes = new Set();
@@ -3631,11 +3642,11 @@
       const entityType = String(rule.entityType ?? "").trim();
       const layerName = String(rule.layer ?? "").trim();
       if (!code) continue;
-      if (entityType === "2") lineworkCodes.add(code);
+      if (isLineworkEntityType(entityType)) lineworkCodes.add(code);
       if (entityType === "0") symbolCodes.add(code);
       if (layerName) codeLayers.set(code, layerName);
 
-      if (entityType !== "2") continue;
+      if (!isLineworkEntityType(entityType)) continue;
       const companionCodes = Array.isArray(rule.companionCodes) ? rule.companionCodes : [];
       const normalizedCompanions = companionCodes
         .map((companionCode) => String(companionCode ?? "").trim().toUpperCase())
@@ -9503,6 +9514,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       entitySelect.className = "cellInput";
       const entityOptions = [
         { value: "2", label: "Linework" },
+        { value: "1", label: "2D Polyline (Linework)" },
         { value: "0", label: "Symbol" },
       ];
       entityOptions.forEach((item) => {
@@ -9514,6 +9526,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       entitySelect.value = String(rule.raw?.entity_type || "0");
       entitySelect.addEventListener("change", () => {
         rule.raw.entity_type = entitySelect.value;
+        normalizeLineworkRuleDefaults(rule);
         syncFldRuleDerivedFields(rule);
         renderFldEditorTable();
       });
@@ -9533,7 +9546,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       typeConfigTd.className = "fldTypeConfigCell";
       const typeConfigStack = document.createElement("div");
       typeConfigStack.className = "fldTypeConfigStack";
-      const isLinework = String(rule.raw?.entity_type || "") === "2";
+      const isLinework = isLineworkEntityType(rule.raw?.entity_type);
       if (isLinework) {
         const lineTypeSelect = document.createElement("select");
         lineTypeSelect.className = "cellInput";
@@ -9640,6 +9653,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     const template = getFldRuleTemplateRaw(config);
     const raw = { ...template, code: "", description: "", full_name: "", layer: "", entity_type: "0", symbol: "", symbol_size: "0.1000", symbol_name_2: "", linetype: "BYLAYER", processing_on: "1", companion_codes: "" };
     const rule = { rowNumber: config.rules.length + 2, raw };
+    normalizeLineworkRuleDefaults(rule);
     syncFldRuleDerivedFields(rule);
     config.rules.push(rule);
     renderFldEditorTable();
