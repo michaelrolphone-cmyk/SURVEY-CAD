@@ -333,13 +333,15 @@
       border: 1px solid rgba(148, 163, 184, 0.25);
       border-radius: 14px;
       padding: 0.95rem;
-      text-align: left;
+      text-align: center;
       color: var(--text);
       cursor: pointer;
       transition: background 0.15s ease, transform 0.15s ease;
       display: flex;
-      gap: 0.8rem;
-      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.7rem;
+      align-items: center;
+      justify-content: flex-start;
     }
 
     .app-card:hover,
@@ -349,31 +351,21 @@
     }
 
     .app-icon {
-      width: 56px;
-      height: 56px;
-      border-radius: 10px;
+      width: 140px;
+      height: 140px;
       object-fit: contain;
       flex: none;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      background: rgba(15, 23, 42, 0.5);
-      padding: 0.35rem;
     }
 
     .app-meta {
       min-width: 0;
+      width: 100%;
     }
 
     .app-card strong {
       display: block;
       font-size: 1rem;
-      margin-bottom: 0.2rem;
-    }
-
-    .app-description {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.86rem;
-      line-height: 1.35;
+      text-align: center;
     }
 
     .viewer {
@@ -1129,11 +1121,11 @@
       const card = document.createElement('button');
       card.className = 'app-card';
       card.type = 'button';
+      card.title = app.description || '';
       card.innerHTML = `
         <img class="app-icon" src="${app.iconPath}" alt="${app.name} icon" loading="lazy" />
         <div class="app-meta">
           <strong>${app.name}</strong>
-          <p class="app-description">${app.description || ''}</p>
         </div>
       `;
       card.addEventListener('click', () => openApp(app.entryHtml));
