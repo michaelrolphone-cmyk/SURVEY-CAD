@@ -250,9 +250,17 @@ test('server exposes survey APIs and static html', async () => {
 
     const caseInsensitiveStaticRes = await fetch(`http://127.0.0.1:${app.port}/cpnf.html`);
     assert.equal(caseInsensitiveStaticRes.status, 200);
+    assert.equal(caseInsensitiveStaticRes.headers.get('cache-control'), 'no-cache');
     const cpnfHtml = await caseInsensitiveStaticRes.text();
     assert.match(cpnfHtml, /<html/i);
     assert.match(cpnfHtml, /browser-survey-client\.js/);
+
+    const symbolSvgRes = await fetch(`http://127.0.0.1:${app.port}/assets/survey-symbols/monument.svg`);
+    assert.equal(symbolSvgRes.status, 200);
+    assert.match(symbolSvgRes.headers.get('content-type') || '', /image\/svg\+xml/i);
+    assert.equal(symbolSvgRes.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    const symbolSvgBody = await symbolSvgRes.text();
+    assert.match(symbolSvgBody, /<svg/i);
 
     const launcherRes = await fetch(`http://127.0.0.1:${app.port}/`);
     assert.equal(launcherRes.status, 200);

@@ -305,6 +305,7 @@ Base URL (local): `http://localhost:3000`
 
 - `GET /health`
 - `GET /api/apps`
+- Static asset delivery: `/assets/icons/*` and `/assets/survey-symbols/*` now return long-lived immutable caching headers (`Cache-Control: public, max-age=31536000, immutable`) for faster repeat icon/SVG loads.
 
 ### Survey and geospatial
 
@@ -369,6 +370,7 @@ curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/section?lon=-116.20&lat=43.61"
 curl "http://localhost:3000/api/fld-config?file=config/MLS.fld"
+curl -I "http://localhost:3000/assets/survey-symbols/monument.svg"
 ```
 
 ## Heroku notes
