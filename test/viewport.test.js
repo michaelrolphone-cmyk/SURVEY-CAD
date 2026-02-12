@@ -888,7 +888,7 @@ test('VIEWPORT.HTML formats bearings in DMS symbols and groups shared-bearing se
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /let\s+sRound\s*=\s*Math\.round\(s\);[\s\S]*if\s*\(sRound\s*>?=\s*60\)\s*\{[\s\S]*m\s*\+=\s*1;[\s\S]*if\s*\(m\s*>?=\s*60\)\s*\{[\s\S]*d\s*\+=\s*1;[\s\S]*return `\$\{q1\}\$\{d\}°\$\{String\(m\)\.padStart\(2,"0"\)\}'\$\{String\(sRound\)\.padStart\(2,"0"\)\}"\$\{q2\}`;/, 'quadrant bearing formatting should round seconds to whole values and carry overflow through minutes/degrees');
-  assert.match(html, /function\s+orientAzimuthClockwiseFromBasis\(az\)\s*\{[\s\S]*const\s+basisAz\s*=\s*basisAzimuthRad\(\);[\s\S]*return\s+fDelta\s*<=\s*rDelta\s*\?\s*forward\s*:\s*reverse;/, 'bearing azimuth should orient clockwise from basis-of-bearing when one is set');
+  assert.match(html, /function\s+orientAzimuthClockwiseFromBasis\(az\)\s*\{[\s\S]*const\s+basisAzRaw\s*=\s*basisAzimuthRad\(\);[\s\S]*geometryAzimuthToDrawingAzimuth\(az\)[\s\S]*return\s+fDelta\s*<=\s*rDelta\s*\?\s*forward\s*:\s*reverse;/, 'bearing azimuth should orient clockwise from basis-of-bearing when one is set');
   assert.match(html, /const\s+BEARING_LABEL_ALLOWED_LINE_CODES\s*=\s*new\s+Set\(\["BDY",\s*"BDRY",\s*"BOUNDARY",\s*"SEC",\s*"SECTION",\s*"COR",\s*"SUB",\s*"CL",\s*"ROW",\s*"BEAR"\]\);/, 'bearing labels should restrict rendered linework to the approved code list plus BEAR');
   assert.match(html, /function\s+lineIsEligibleForBearingLabels\(line,\s*startPoint,\s*endPoint\)\s*\{[\s\S]*line\.fieldToFinishBaseCode[\s\S]*splitCodeTokens\(startPoint\?\.code\)[\s\S]*splitCodeTokens\(endPoint\?\.code\)[\s\S]*startTokens\.includes\("BEAR"\)[\s\S]*endTokens\.includes\("BEAR"\)/, 'bearing labels should allow listed linework codes and BEAR point-code overrides');
   assert.match(html, /startTokens\.some\([\s\S]*BEARING_LABEL_ALLOWED_LINE_CODES\.has\(token\)\)[\s\S]*endTokens\.some\([\s\S]*BEARING_LABEL_ALLOWED_LINE_CODES\.has\(token\)\)/, 'bearing labels should also allow approved linework codes detected directly on endpoint point-code tokens');
@@ -910,3 +910,14 @@ test('VIEWPORT.HTML supports defining and rendering a labeled basis of bearing f
   assert.match(html, /setBasisOfBearingBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*resolvePointByNumberOrName\(startRef\);[\s\S]*history\.push\("set basis of bearing"\);[\s\S]*setStatus\("Basis of bearing set from selected points and labeled on the drawing\.", "ok"\);/, 'setting basis-of-bearing should resolve user point refs, create undo history, and show user feedback');
   assert.match(html, /const basisEndpoints = resolveBasisOfBearingEndpoints\(\);[\s\S]*ctx\.setLineDash\(\[8, 6\]\);[\s\S]*ctx\.fillText\("BASIS OF BEARING", 0, 0\);/, 'draw loop should render a dashed basis line and explicit BASIS OF BEARING label using resolved basis endpoints');
 });
+test('VIEWPORT.HTML supports record basis bearing rotation without modifying world coordinates', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="basisBearingRecordBearing"[\s\S]*id="basisBearingRecordDistance"/, 'basis-of-bearing UI should include record basis bearing and distance inputs');
+  assert.match(html, /let\s+recordBasisBearing\s*=\s*"";[\s\S]*let\s+recordBasisDistance\s*=\s*"";/, 'drawing state should track record basis bearing and distance values');
+  assert.match(html, /function\s+drawingRotationRad\(\)\s*\{[\s\S]*bearingToAzimuthRad\(recordBasisBearing\)[\s\S]*normalizedSignedAngleDelta\(recordAz, basisAz\);/, 'drawing rotation should be derived from measured basis azimuth and record basis bearing');
+  assert.match(html, /function\s+worldToScreen\(x,y\)\s*\{[\s\S]*rotateWorldPointAroundBasis\(x, y\)[\s\S]*\};[\s\S]*function\s+screenToWorld\(x,y\)\s*\{[\s\S]*rotateDrawingPointToWorld\(rotatedX, rotatedY\);/, 'view transforms should rotate rendering around the basis start point while preserving world coordinates');
+  assert.match(html, /function\s+lineMeasurement\(a, b\)\s*\{[\s\S]*orientAzimuthClockwiseFromBasis\(Math\.atan2\(dx, dy\)\)/, 'line measurements should report rotated drawing bearings for inspectors and labels');
+  assert.match(html, /basisOfBearing:\s*basisOfBearing \?[\s\S]*recordBasisBearing,[\s\S]*recordBasisDistance,/, 'state serialization should persist record basis inputs');
+});
+

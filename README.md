@@ -93,7 +93,10 @@ printview
 `VIEWPORT.HTML` (LineSmith) now supports defining a **Basis of Bearing** directly in the drawing by selecting two existing point numbers/names:
 
 - Enter a **Start point #/name** and **End point #/name** under the **Basis of Bearing** section (for example `101` and `102`).
+- Optionally enter a **Record basis bearing** and **Record basis distance** from the plat/ROS.
 - Click **Set Basis of Bearing** to draw a dashed reference line between those two points.
+- If a record bearing is entered, LineSmith compares the measured basis bearing to the record bearing and rotates the rendered drawing view (pivoted at the basis start point) so displayed bearings align to record.
+- Point coordinates are not modified by this basis-record rotation; inspectors, inverse point-to-point bearings, and drawing bearing labels report the rotated (record-aligned) bearings.
 - The reference is clearly labeled **BASIS OF BEARING** on-canvas for plan readability.
 - Click **Clear Basis of Bearing** to remove it.
 

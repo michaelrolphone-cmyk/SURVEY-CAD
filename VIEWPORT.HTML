@@ -1613,7 +1613,15 @@
           <input id="basisBearingEndPoint" placeholder="102" />
         </label>
       </div>
-            <div class="grid2" style="margin-top:8px;">
+      <div class="grid2" style="margin-top:8px;">
+        <label>Record basis bearing
+          <input id="basisBearingRecordBearing" placeholder='N89°59\'59"E' />
+        </label>
+        <label>Record basis distance
+          <input id="basisBearingRecordDistance" placeholder="123.456" />
+        </label>
+      </div>
+      <div class="grid2" style="margin-top:8px;">
         <button id="setBasisOfBearing" class="ok">Set Basis of Bearing</button>
         <button id="clearBasisOfBearing">Clear Basis of Bearing</button>
       </div>
@@ -2354,11 +2362,55 @@
     return normalizeAzimuthRad(Math.atan2(dx, dy));
   }
 
-  function orientAzimuthClockwiseFromBasis(az) {
+  function basisStartPointForRotation() {
+    const endpoints = resolveBasisOfBearingEndpoints();
+    if (!endpoints) return null;
+    return endpoints.start;
+  }
+
+  function normalizedSignedAngleDelta(targetAz, sourceAz) {
+    const diff = targetAz - sourceAz;
+    return Math.atan2(Math.sin(diff), Math.cos(diff));
+  }
+
+  function drawingRotationRad() {
     const basisAz = basisAzimuthRad();
-    if (basisAz == null) return normalizeAzimuthRad(az);
-    const forward = normalizeAzimuthRad(az);
-    const reverse = normalizeAzimuthRad(az + Math.PI);
+    const recordAz = bearingToAzimuthRad(recordBasisBearing);
+    if (basisAz == null || recordAz == null) return 0;
+    return normalizedSignedAngleDelta(recordAz, basisAz);
+  }
+
+  function geometryAzimuthToDrawingAzimuth(az) {
+    return normalizeAzimuthRad(az + drawingRotationRad());
+  }
+
+  function drawingAzimuthToGeometryAzimuth(az) {
+    return normalizeAzimuthRad(az - drawingRotationRad());
+  }
+
+  function rotateWorldPointAroundBasis(x, y, rotationRad = drawingRotationRad()) {
+    const basisStart = basisStartPointForRotation();
+    if (!basisStart || Math.abs(rotationRad) <= 1e-12) return { x, y };
+    const ox = x - basisStart.x;
+    const oy = y - basisStart.y;
+    const c = Math.cos(rotationRad);
+    const ss = Math.sin(rotationRad);
+    return {
+      x: basisStart.x + (ox * c - oy * ss),
+      y: basisStart.y + (ox * ss + oy * c)
+    };
+  }
+
+  function rotateDrawingPointToWorld(x, y, rotationRad = drawingRotationRad()) {
+    return rotateWorldPointAroundBasis(x, y, -rotationRad);
+  }
+
+  function orientAzimuthClockwiseFromBasis(az) {
+    const basisAzRaw = basisAzimuthRad();
+    const basisAz = basisAzRaw == null ? null : geometryAzimuthToDrawingAzimuth(basisAzRaw);
+    const forward = geometryAzimuthToDrawingAzimuth(az);
+    if (basisAz == null) return forward;
+    const reverse = normalizeAzimuthRad(forward + Math.PI);
     const fDelta = (forward - basisAz + Math.PI * 2) % (Math.PI * 2);
     const rDelta = (reverse - basisAz + Math.PI * 2) % (Math.PI * 2);
     return fDelta <= rDelta ? forward : reverse;
@@ -2613,6 +2665,8 @@
   const showPointNotesInput = $("#showPointNotes");
   const basisBearingStartPointInput = $("#basisBearingStartPoint");
   const basisBearingEndPointInput = $("#basisBearingEndPoint");
+  const basisBearingRecordBearingInput = $("#basisBearingRecordBearing");
+  const basisBearingRecordDistanceInput = $("#basisBearingRecordDistance");
   const setBasisOfBearingBtn = $("#setBasisOfBearing");
   const clearBasisOfBearingBtn = $("#clearBasisOfBearing");
   
@@ -2696,6 +2750,8 @@
   const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable,layerId}
   const lines = new Map();  // id -> {id,a,b,movable,layerId}
   let basisOfBearing = null; // {startPointId, endPointId}
+  let recordBasisBearing = "";
+  let recordBasisDistance = "";
   let quickLayerDropdownOpen = false;
 
   // Selection
@@ -3327,6 +3383,9 @@
   }
 
   function syncBasisOfBearingInputs() {
+    if (basisBearingRecordBearingInput) basisBearingRecordBearingInput.value = recordBasisBearing;
+    if (basisBearingRecordDistanceInput) basisBearingRecordDistanceInput.value = recordBasisDistance;
+
     if (!basisOfBearing) {
       if (basisBearingStartPointInput) basisBearingStartPointInput.value = "";
       if (basisBearingEndPointInput) basisBearingEndPointInput.value = "";
@@ -3363,6 +3422,8 @@
       },
       construction: {...construction},
       basisOfBearing: basisOfBearing ? { ...basisOfBearing } : null,
+      recordBasisBearing,
+      recordBasisDistance,
       mapGeoreference: mapGeoreference ? {
         lat: { ...mapGeoreference.lat },
         lng: { ...mapGeoreference.lng }
@@ -3404,6 +3465,8 @@
 
     construction = s.construction ?? { startPointId:null };
     basisOfBearing = sanitizeBasisOfBearing(s.basisOfBearing);
+    recordBasisBearing = String(s.recordBasisBearing ?? "").trim();
+    recordBasisDistance = String(s.recordBasisDistance ?? "").trim();
     syncBasisOfBearingInputs();
 
     if (applyView && s.view) {
@@ -3654,16 +3717,16 @@
   // Transform helpers
   // -------------------------
   function worldToScreen(x,y){
+    const rotated = rotateWorldPointAroundBasis(x, y);
     return {
-      x: (x * view.scale) + view.panX,
-      y: (-y * view.scale) + view.panY
+      x: (rotated.x * view.scale) + view.panX,
+      y: (-rotated.y * view.scale) + view.panY
     };
   }
   function screenToWorld(x,y){
-    return {
-      x: (x - view.panX) / view.scale,
-      y: -((y - view.panY) / view.scale)
-    };
+    const rotatedX = (x - view.panX) / view.scale;
+    const rotatedY = -((y - view.panY) / view.scale);
+    return rotateDrawingPointToWorld(rotatedX, rotatedY);
   }
 
   // -------------------------
@@ -8606,6 +8669,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   setBasisOfBearingBtn?.addEventListener("click", () => {
     const startRef = String(basisBearingStartPointInput?.value ?? "").trim();
     const endRef = String(basisBearingEndPointInput?.value ?? "").trim();
+    const recordBearingInput = String(basisBearingRecordBearingInput?.value ?? "").trim();
+    const recordDistanceInput = String(basisBearingRecordDistanceInput?.value ?? "").trim();
     const startPoint = resolvePointByNumberOrName(startRef);
     const endPoint = resolvePointByNumberOrName(endRef);
     const value = sanitizeBasisOfBearing({
@@ -8616,20 +8681,38 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       setStatus("Basis of bearing requires two existing, distinct points by point number/name.", "warn");
       return;
     }
+
+    const parsedRecordAz = recordBearingInput ? bearingToAzimuthRad(recordBearingInput) : null;
+    if (recordBearingInput && parsedRecordAz == null) {
+      setStatus("Record basis bearing format is not recognized.", "warn");
+      return;
+    }
+
     history.push("set basis of bearing");
     basisOfBearing = value;
+    recordBasisBearing = recordBearingInput;
+    recordBasisDistance = recordDistanceInput;
     syncBasisOfBearingInputs();
     scheduleCollabStateSync();
+
+    const basisAz = basisAzimuthRad();
+    const measuredBearing = basisAz == null ? null : azimuthRadToQuadrantString(geometryAzimuthToDrawingAzimuth(basisAz));
+    if (recordBearingInput && measuredBearing) {
+      setStatus(`Basis of bearing set. Measured ${measuredBearing} vs record ${recordBasisBearing}. Drawing rotation applied from start point.`, "ok");
+      return;
+    }
     setStatus("Basis of bearing set from selected points and labeled on the drawing.", "ok");
   });
 
   clearBasisOfBearingBtn?.addEventListener("click", () => {
-    if (!basisOfBearing) {
+    if (!basisOfBearing && !recordBasisBearing && !recordBasisDistance) {
       setStatus("No basis of bearing is currently defined.", "warn");
       return;
     }
     history.push("clear basis of bearing");
     basisOfBearing = null;
+    recordBasisBearing = "";
+    recordBasisDistance = "";
     syncBasisOfBearingInputs();
     scheduleCollabStateSync();
     setStatus("Basis of bearing cleared.", "ok");
@@ -8651,9 +8734,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       return;
     }
     const d = parseNum($("#dist").value, NaN);
-    const az = bearingToAzimuthRad($("#bearing").value);
+    const azInput = bearingToAzimuthRad($("#bearing").value);
     if (!Number.isFinite(d) || d <= 0) { setStatus("Distance must be a positive number.", "warn"); return; }
-    if (az == null) { setStatus("Bearing/Azimuth not recognized.", "warn"); return; }
+    if (azInput == null) { setStatus("Bearing/Azimuth not recognized.", "warn"); return; }
+
+    const az = drawingAzimuthToGeometryAzimuth(azInput);
 
     history.push("line dist/bearing");
 
@@ -8677,7 +8762,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
     updatePointEditorFromSelection();
     clearPointNumberField();
-    setStatus(`Created point ${points.get(pid2).num} and line from ${sp.num}.\nAz: ${azimuthRadToQuadrantString(az)}  Dist: ${d}`, "ok");
+    setStatus(`Created point ${points.get(pid2).num} and line from ${sp.num}.\nAz: ${azimuthRadToQuadrantString(azInput)}  Dist: ${d}`, "ok");
     syncToolWorkflowToast();
   });
 
