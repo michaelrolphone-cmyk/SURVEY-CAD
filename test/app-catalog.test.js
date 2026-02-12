@@ -43,7 +43,7 @@ test('app catalog publishes updated core app descriptions', () => {
   assert.equal(byName.get('PointForge'), 'Builds the canonical point set (coords + provenance + weights).');
   assert.equal(byName.get('LineSmith'), 'Turns points into boundaries, alignments, and structure.');
   assert.equal(byName.get('ArrowHead'), 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.');
-  assert.equal(byName.get('Project Browser'), 'Browse the symbolic project-file folder structure as a standalone app.');
+  assert.equal(byName.get('EvidenceDesk'), 'Browse the symbolic project-file folder structure as a standalone app.');
   assert.equal(byName.get('UtilitiesPack'), 'Fetches utility records, keeps state-plane coordinates, and exports power utility CSV bundles.');
 });
 

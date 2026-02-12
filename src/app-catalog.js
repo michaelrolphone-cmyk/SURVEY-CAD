@@ -51,10 +51,10 @@ export const APP_CATALOG = [
   },
   {
     id: 'project-browser',
-    name: 'Project Browser',
+    name: 'EvidenceDesk',
     description: 'Browse the symbolic project-file folder structure as a standalone app.',
     entryHtml: 'PROJECT_BROWSER.html',
-    iconPath: '/assets/icons/project-browser.svg',
+    iconPath: '/assets/icons/EvidenceDesk.png',
     color: '#64748B',
     accent: '#E2E8F0',
     glyph: 'PB',
