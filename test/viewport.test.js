@@ -876,3 +876,16 @@ test('VIEWPORT.HTML renders configured survey symbol SVG markers for point codes
   assert.match(html, /function\s+getTintedSymbolMarker\(symbolMapFile = ""\, layerColor = ""\)\s*\{[\s\S]*markerCtx\.fillStyle = "#000";[\s\S]*markerCtx\.globalCompositeOperation = "source-in";[\s\S]*markerCtx\.fillStyle = tint;/, 'point marker rendering should tint SVG symbols to the point layer color and mask linework behind the symbol footprint');
   assert.match(html, /const pointSymbolMapFile = getPointSymbolMapFile\(p\.code\);[\s\S]*getTintedSymbolMarker\(pointSymbolMapFile, layer\?\.color\);[\s\S]*ctx\.drawImage\(symbolImage, sp\.x - 5, sp\.y - 5, 10, 10\);[\s\S]*ctx\.moveTo\(sp\.x-5, sp\.y-5\)/, 'point marker draw should use tinted SVG markers before falling back to x markers');
 });
+
+
+test('VIEWPORT.HTML supports defining and rendering a labeled basis of bearing from two coordinate pairs', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /<b>Basis of Bearing<\/b>[\s\S]*id="basisBearingX1"[\s\S]*id="basisBearingY1"[\s\S]*id="basisBearingX2"[\s\S]*id="basisBearingY2"/, 'LineSmith should expose inputs for two basis-of-bearing coordinates');
+  assert.match(html, /id="setBasisOfBearing"[\s\S]*id="clearBasisOfBearing"/, 'LineSmith should include set and clear controls for basis-of-bearing');
+  assert.match(html, /let\s+basisOfBearing\s*=\s*null;\s*\/\/ \{start:\{x,y\}, end:\{x,y\}\}/, 'drawing model should store basis-of-bearing coordinates');
+  assert.match(html, /function\s+sanitizeBasisOfBearing\(value\)\s*\{[\s\S]*Math\.hypot\(endX - startX, endY - startY\) < EPS/, 'basis-of-bearing parser should validate finite coordinates and reject zero-length definitions');
+  assert.match(html, /basisOfBearing:\s*basisOfBearing \?[\s\S]*basisOfBearing = sanitizeBasisOfBearing\(s\.basisOfBearing\);/, 'basis-of-bearing should be serialized and restored with drawing state');
+  assert.match(html, /setBasisOfBearingBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*history\.push\("set basis of bearing"\);[\s\S]*setStatus\("Basis of bearing set and labeled on the drawing\.", "ok"\);/, 'setting basis-of-bearing should create undo history and user feedback');
+  assert.match(html, /if \(basisOfBearing\) \{[\s\S]*ctx\.setLineDash\(\[8, 6\]\);[\s\S]*ctx\.fillText\("BASIS OF BEARING", 0, 0\);/, 'draw loop should render a dashed basis line and explicit BASIS OF BEARING label');
+});
