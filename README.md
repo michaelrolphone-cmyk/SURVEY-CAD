@@ -99,7 +99,7 @@ printview
 
 The basis-of-bearing definition is saved/restored with drawing state (local save, project drawing versions, and collaboration state sync).
 
-Bearing annotations now render in DMS using degree/minute/second symbols (`°`, `'`, `"`) and orient clockwise from the active basis-of-bearing when one is set. Consecutive shared-bearing segments are grouped by a single bearing + total distance label on the left side of travel, while individual segment lengths are placed on the opposite side.
+Bearing annotations now render in DMS using degree/minute/second symbols (`°`, `'`, `"`), round to the nearest whole second for map labels/layout grouping, and orient clockwise from the active basis-of-bearing when one is set. Bearing/distance labels are rendered only for eligible linework codes (`BDY`, `BDRY`, `BOUNDARY`, `SEC`, `SECTION`, `COR`, `SUB`, `CL`, `ROW`) or when either endpoint code includes `BEAR`. Consecutive shared-bearing segments are grouped by a single bearing + total distance label on the left side of travel only when they connect through sequential degree-2 points (no extra branch connections), while individual segment lengths are placed on the opposite side.
 
 ## LineSmith Cluster Tooltip During Line Drawing
 

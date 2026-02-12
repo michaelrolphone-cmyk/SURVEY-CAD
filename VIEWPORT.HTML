@@ -2263,12 +2263,27 @@
     else if (deg >= 180 && deg < 270) { q1="S"; q2="W"; ang=deg-180; }
     else { q1="N"; q2="W"; ang=360-deg; }
 
-    const d = Math.floor(ang + 1e-10);
+    let d = Math.floor(ang + 1e-10);
     const mFloat = (ang - d) * 60;
-    const m = Math.floor(mFloat + 1e-10);
+    let m = Math.floor(mFloat + 1e-10);
     const s = (mFloat - m) * 60;
-    const sRound = Math.round(s*1000)/1000;
-    return `${q1}${d}°${String(m).padStart(2,"0")}'${String(sRound.toFixed(3)).padStart(6,"0")}"${q2}`;
+    let sRound = Math.round(s);
+
+    if (sRound >= 60) {
+      sRound = 0;
+      m += 1;
+    }
+    if (m >= 60) {
+      m = 0;
+      d += 1;
+    }
+    if (d > 90) {
+      d = 90;
+      m = 0;
+      sRound = 0;
+    }
+
+    return `${q1}${d}°${String(m).padStart(2,"0")}'${String(sRound).padStart(2,"0")}"${q2}`;
   }
 
   function normalizeAzimuthRad(az) {
@@ -2388,6 +2403,19 @@
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
   }
 
+  const BEARING_LABEL_ALLOWED_LINE_CODES = new Set(["BDY", "BDRY", "BOUNDARY", "SEC", "SECTION", "COR", "SUB", "CL", "ROW", "BEAR"]);
+
+  function lineIsEligibleForBearingLabels(line, startPoint, endPoint) {
+    if (!line) return false;
+
+    const lineCode = String(line.fieldToFinishBaseCode || "").trim().toUpperCase();
+    if (lineCode && BEARING_LABEL_ALLOWED_LINE_CODES.has(lineCode)) return true;
+
+    const startTokens = splitCodeTokens(startPoint?.code).map((token) => token.toUpperCase());
+    const endTokens = splitCodeTokens(endPoint?.code).map((token) => token.toUpperCase());
+    return startTokens.includes("BEAR") || endTokens.includes("BEAR");
+  }
+
   function buildBearingLabelGroups(lineCandidates) {
     const withMeasure = lineCandidates
       .map((candidate, index) => {
@@ -2397,6 +2425,15 @@
       })
       .filter(Boolean);
 
+    const idForPoint = (point) => `${point?.id ?? "xy"}:${point?.x ?? 0},${point?.y ?? 0}`;
+    const pointDegree = new Map();
+    for (const candidate of lineCandidates) {
+      const aid = idForPoint(candidate.a);
+      const bid = idForPoint(candidate.b);
+      pointDegree.set(aid, (pointDegree.get(aid) || 0) + 1);
+      pointDegree.set(bid, (pointDegree.get(bid) || 0) + 1);
+    }
+
     const signatureMap = new Map();
     for (const item of withMeasure) {
       const sig = item.measure.bearing;
@@ -2405,7 +2442,6 @@
     }
 
     const groups = [];
-    const idForPoint = (point) => `${point?.id ?? "xy"}:${point?.x ?? 0},${point?.y ?? 0}`;
     for (const [bearing, items] of signatureMap.entries()) {
       const pointToSegmentIndices = new Map();
       for (let i = 0; i < items.length; i++) {
@@ -2418,6 +2454,12 @@
         pointToSegmentIndices.get(bid).push(i);
       }
 
+      const sharedEndpointCanChain = (endpointId) => {
+        const totalDegree = pointDegree.get(endpointId) || 0;
+        const sameBearingDegree = (pointToSegmentIndices.get(endpointId) || []).length;
+        return totalDegree === 2 && sameBearingDegree === 2;
+      };
+
       const visited = new Set();
       for (let i = 0; i < items.length; i++) {
         if (visited.has(i)) continue;
@@ -2429,6 +2471,7 @@
           component.push(items[current]);
           const endpoints = [idForPoint(items[current].a), idForPoint(items[current].b)];
           for (const endpoint of endpoints) {
+            if (!sharedEndpointCanChain(endpoint)) continue;
             for (const next of pointToSegmentIndices.get(endpoint) || []) {
               if (!visited.has(next)) {
                 visited.add(next);
@@ -4361,6 +4404,7 @@
     if (line) {
       line.generatedBy = "field-to-finish";
       line.fieldToFinishType = type;
+      line.fieldToFinishBaseCode = String(baseCode || "").trim().toUpperCase();
     }
     return lineId;
   }
@@ -5694,7 +5738,9 @@
           ctx.restore();
         }
 
-        lineLabelCandidates.push({ a, b, sa, sb });
+        if (lineIsEligibleForBearingLabels(ln, a, b)) {
+          lineLabelCandidates.push({ a, b, sa, sb });
+        }
       }
 
       const circleCommands = buildFieldToFinishCircleCommands();
