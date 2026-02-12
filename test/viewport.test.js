@@ -765,6 +765,12 @@ test('VIEWPORT.HTML exposes an FLD editor with local override save/reset and dow
   assert.match(html, /id="openFldEditor"/, 'LineSmith should expose a toolbar section button for opening the FLD editor');
   assert.match(html, /id="fldModal"/, 'LineSmith should render an FLD editor modal container');
   assert.match(html, /const\s+FLD_CONFIG_LOCAL_STORAGE_KEY\s*=\s*"lineSmithFldConfigLocal";/, 'LineSmith should keep local FLD overrides in localStorage');
+  assert.match(html, /id="fldSymbolGallery"/, 'FLD editor should include a symbol gallery region for field-to-finish symbol previews');
+  assert.match(html, /function\s+loadSurveySymbolLibrary\(\)\s*\{[\s\S]*fetch\("\/assets\/survey-symbols\/index\.json"\)/, 'FLD editor should load survey SVG symbol manifest data for symbol mapping choices');
+  assert.match(html, /function\s+renderFldSymbolGallery\(config\)\s*\{[\s\S]*entity_type[\s\S]*symbol_name_2[\s\S]*assets\/survey-symbols/, 'FLD editor should render symbol-type FLD rows in a gallery and map them to SVG files');
+  assert.match(html, /const\s+entityOptions\s*=\s*\[[\s\S]*value:\s*"2", label:\s*"Linework"[\s\S]*value:\s*"0", label:\s*"Symbol"/, 'FLD editor should allow choosing linework vs symbol entity types when editing FLD codes');
+  assert.match(html, /symbolScaleInput\.type\s*=\s*"number"[\s\S]*rule\.raw\.symbol_size\s*=\s*symbolScaleInput\.value/, 'FLD editor should expose symbol scale editing backed by the FLD symbol_size column');
+  assert.match(html, /lineTypeSelect\.addEventListener\("change", \(\) => \{[\s\S]*rule\.raw\.linetype\s*=\s*lineTypeSelect\.value;/, 'FLD editor should expose linetype selection for linework entity rows');
   assert.match(html, /function\s+saveFldEditorLocalOverride\(\)\s*\{[\s\S]*saveLocalFldOverride\(fldEditorState\.activeConfig\);[\s\S]*applyFieldToFinishConfig\(fldEditorState\.activeConfig, "localStorage"\);/, 'FLD editor save action should persist local overrides and apply them to active linework rules');
   assert.match(html, /function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*clearLocalFldOverride\(\);[\s\S]*fldEditorState\.activeConfig = cloneFldConfig\(fldEditorState\.serverConfig\);/, 'FLD editor reset action should clear local override and restore the server FLD rules');
   assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-LocalOverride\.fld", serializeFieldToFinishConfig\(local\)\);/, 'FLD editor should support downloading local override FLD files');

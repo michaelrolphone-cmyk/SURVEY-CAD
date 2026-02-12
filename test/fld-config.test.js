@@ -20,6 +20,9 @@ test('parseFldConfig parses version tag, columns, and rules', () => {
   assert.equal(parsed.rulesByCode.CPAD.layer, 'EX_CONC');
   assert.equal(parsed.rulesByCode.CPAD.entityType, '2');
   assert.equal(parsed.rulesByCode.CPAD.processingOn, true);
+  assert.equal(parsed.rulesByCode.CPAD.lineType, 'BYLAYER');
+  assert.equal(parsed.rulesByCode.GM.symbol, 'SPT139');
+  assert.equal(parsed.rulesByCode.GM.symbolSize, '0.1000');
 });
 
 test('parseFldConfig keeps raw columns and captures code sequence', () => {
@@ -55,6 +58,14 @@ test('parseFldConfig captures companion codes for linework-only sequencing', () 
   assert.ok(waterMeterRule);
   assert.equal(waterMeterRule.entityType, '0');
   assert.deepEqual(waterMeterRule.companionCodes, []);
+});
+
+test('parseFldConfig exposes symbol SVG mapping column when present', () => {
+  const parsed = parseFldConfig(loadFixture());
+  const wlRule = parsed.rulesByCode.WL;
+  assert.ok(wlRule);
+  assert.equal(typeof wlRule.symbolMapFile, 'string');
+  assert.equal(wlRule.symbolMapFile, String(wlRule.raw.symbol_name_2 || '').trim());
 });
 
 test('serializeFldConfig round-trips parsed FLD data while keeping unknown columns', () => {
