@@ -1782,6 +1782,7 @@
         <button id="quickOffsetLine" class="quickToolBtn" title="Offset Selected Line" aria-label="Offset Selected Line"><i class="fa-solid fa-arrows-left-right"></i></button>
         <button id="quickRotateSelection" class="quickToolBtn" title="Rotate Selection (Reference)" aria-label="Rotate Selection"><i class="fa-solid fa-rotate"></i></button>
         <button id="quickPointManager" class="quickToolBtn" title="Open Points Manager" aria-label="Point Manager"><i class="fa-solid fa-list"></i></button>
+        <button id="quickFtfManager" class="quickToolBtn" title="Open FLD Editor" aria-label="Field-to-Finish Manager"><i class="fa-solid fa-diagram-project"></i></button>
       </div>
     </div>
     <div id="mapBackdrop" class="mapBackdrop"><div id="mapLayer"></div></div>
@@ -3804,7 +3805,7 @@
   };
   const symbolMarkerImageCache = new Map();
   const tintedSymbolMarkerCache = new Map();
-  const SYMBOL_MARKER_SIZE_PX = 20;
+  const SYMBOL_MARKER_SIZE_PX = 60;
   const SYMBOL_MARKER_HALF_SIZE_PX = SYMBOL_MARKER_SIZE_PX / 2;
   const SYMBOL_BOLD_OFFSET_PX = 1;
 
@@ -6705,6 +6706,7 @@
   $("#quickOffsetLine")?.addEventListener("click", () => $("#offsetSelectedLine")?.click());
   $("#quickRotateSelection")?.addEventListener("click", () => startRotateSelectionSession());
   $("#quickPointManager")?.addEventListener("click", () => openPointsManagerBtn?.click());
+  $("#quickFtfManager")?.addEventListener("click", () => openFldEditorBtn?.click());
 
   quickLayerDropdownButton?.addEventListener("click", (event) => {
     event.preventDefault();
