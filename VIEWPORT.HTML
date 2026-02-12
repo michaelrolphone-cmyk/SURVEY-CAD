@@ -3488,6 +3488,7 @@
     loaded: false,
   };
   const symbolMarkerImageCache = new Map();
+  const tintedSymbolMarkerCache = new Map();
 
   async function loadSurveySymbolLibrary() {
     try {
@@ -3787,6 +3788,36 @@
     }, { once: true });
     symbolMarkerImageCache.set(file, image);
     return image;
+  }
+
+  function getTintedSymbolMarker(symbolMapFile = "", layerColor = "") {
+    const file = String(symbolMapFile || "").trim();
+    const tint = String(layerColor || "").trim() || "#ff2b2b";
+    if (!file) return null;
+    const cacheKey = `${file}::${tint}`;
+    if (tintedSymbolMarkerCache.has(cacheKey)) {
+      return tintedSymbolMarkerCache.get(cacheKey);
+    }
+    const image = getSymbolMarkerImage(file);
+    if (!(image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0)) return null;
+
+    const markerCanvas = document.createElement("canvas");
+    markerCanvas.width = 10;
+    markerCanvas.height = 10;
+    const markerCtx = markerCanvas.getContext("2d");
+    if (!markerCtx) return null;
+
+    // keep linework from showing through symbol transparency and then tint to layer color
+    markerCtx.fillStyle = "#000";
+    markerCtx.fillRect(0, 0, markerCanvas.width, markerCanvas.height);
+    markerCtx.drawImage(image, 0, 0, markerCanvas.width, markerCanvas.height);
+    markerCtx.globalCompositeOperation = "source-in";
+    markerCtx.fillStyle = tint;
+    markerCtx.fillRect(0, 0, markerCanvas.width, markerCanvas.height);
+    markerCtx.globalCompositeOperation = "source-over";
+
+    tintedSymbolMarkerCache.set(cacheKey, markerCanvas);
+    return markerCanvas;
   }
 
   function pointSupportsLineworkSequenceToken(tokenSet, lineCode) {
@@ -5447,8 +5478,8 @@
 
       if (pointDisplayVisibility.points) {
         const pointSymbolMapFile = getPointSymbolMapFile(p.code);
-        const symbolImage = getSymbolMarkerImage(pointSymbolMapFile);
-        if (symbolImage?.complete && symbolImage.naturalWidth > 0 && symbolImage.naturalHeight > 0) {
+        const symbolImage = getTintedSymbolMarker(pointSymbolMapFile, layer?.color);
+        if (symbolImage) {
           ctx.drawImage(symbolImage, sp.x - 5, sp.y - 5, 10, 10);
         } else {
           // marker
