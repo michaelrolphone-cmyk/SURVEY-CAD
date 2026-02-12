@@ -729,7 +729,7 @@
       z-index:0;
       pointer-events:none;
       opacity:0;
-      transition:opacity .15s ease;
+      transition:opacity .28s ease;
     }
     .mapBackdrop.on{ opacity:1; }
     .mapBackdrop .leaflet-container{
@@ -1120,12 +1120,14 @@
       inset:0;
       z-index:1200;
       display:flex;
-      align-items:flex-start;
+      align-items:center;
       justify-content:center;
-      padding-top:18px;
+      padding:20px;
       background:transparent;
       pointer-events:none;
       transition:opacity .35s ease, visibility .35s ease;
+      opacity:1;
+      visibility:visible;
     }
     .linesmith-loading-overlay.hidden{
       opacity:0;
@@ -1141,6 +1143,13 @@
       padding:18px 22px 14px;
       backdrop-filter: blur(6px);
       pointer-events:auto;
+      transition:opacity .3s ease, transform .3s ease;
+      transform:translateY(0);
+      opacity:1;
+    }
+    .linesmith-loading-overlay.hidden .linesmith-loading-card{
+      opacity:0;
+      transform:translateY(8px) scale(0.985);
     }
     .linesmith-loading-title{
       margin:0;
@@ -1341,7 +1350,7 @@
       .mobileToolbarToggle{ display:block; }
       .app.mobileToolbarsHidden .quickTools,
       .app.mobileToolbarsHidden .drawerToggle{ display:none; }
-      .linesmith-loading-overlay{ padding-top:10px; }
+      .linesmith-loading-overlay{ padding:10px; }
       .workflowToast{
         top:auto;
         right:8px;
@@ -3345,12 +3354,17 @@
   }
 
   function applyMapOpacity() {
-    if (mapBackdrop) {
-      mapBackdrop.style.opacity = String(mapLayerState.opacity);
-    }
+    syncMapBackdropVisibility();
     if (mapOpacityValue) {
       mapOpacityValue.textContent = `${Math.round(mapLayerState.opacity * 100)}%`;
     }
+  }
+
+  function syncMapBackdropVisibility() {
+    if (!mapBackdrop) return;
+    const targetOpacity = mapLayerState.enabled ? mapLayerState.opacity : 0;
+    mapBackdrop.style.opacity = String(clamp(targetOpacity, 0, 1));
+    mapBackdrop.classList.toggle("on", mapLayerState.enabled);
   }
 
   function syncMapToView(force=false) {
@@ -3434,7 +3448,7 @@
     if (mapLayerState.enabled) {
       ensureMapLayer();
     }
-    mapBackdrop.classList.toggle("on", mapLayerState.enabled);
+    syncMapBackdropVisibility();
     if (mapLayerState.enabled) {
       syncMapToView(true);
     }

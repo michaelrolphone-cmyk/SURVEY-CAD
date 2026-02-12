@@ -440,3 +440,7 @@ heroku create <your-app-name>
 git push heroku <your-branch>:main
 heroku open
 ```
+
+## API and CLI Notes for this change
+
+LineSmith map-layer and loading-modal animation polish is a visual UX update in `VIEWPORT.HTML` only. No API endpoints or CLI commands changed in this release; use the existing endpoint and command references in this README.
