@@ -212,6 +212,15 @@ test('VIEWPORT.HTML restores persisted movable flags as strict booleans', async 
   assert.match(html, /lines\.set\(l\.id,\s*\{\s*\.\.\.l,\s*movable:\s*isMovable\(l\.movable\),\s*layerId:\s*String\(l\.layerId \|\| selectedLayerId \|\| DEFAULT_LAYER_ID\)\s*\}\)/, 'restored lines should normalize movable flags and layer ownership');
 });
 
+test('VIEWPORT.HTML moves current selection to the chosen toolbar layer', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+moveSelectionToLayer\(layerId\)\s*\{[\s\S]*point\.layerId = targetLayerId;[\s\S]*line\.layerId = targetLayerId;/, 'layer switch should include a helper that reassigns selected points and selected lines to the chosen layer');
+  assert.match(html, /function\s+applyLayerChoice\(layerId,\s*\{\s*closeDropdown = false\s*\}\s*=\s*\{\}\)\s*\{[\s\S]*if \(hasSelection\(\)\) \{[\s\S]*moveSelectionToLayer\(layerId\);/, 'layer selection should route through a shared handler that moves selected entities before setting active layer');
+  assert.match(html, /rowBtn\.addEventListener\("click",\s*\(\)\s*=>\s*\{\s*applyLayerChoice\(layer\.id,\s*\{\s*closeDropdown:\s*true\s*\}\);\s*\}\);/, 'quick toolbar layer picker should use the layer application handler so selected entities move immediately');
+  assert.match(html, /useBtn\.addEventListener\("click",\s*\(\)\s*=>\s*\{\s*applyLayerChoice\(layer\.id\);\s*\}\);/, 'layer manager Use action should use the same selection-moving layer handler for consistent behavior');
+});
+
 
 test('VIEWPORT.HTML preserves unchanged array entries in drawing diffs', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
@@ -584,6 +593,10 @@ test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected
   assert.match(html, /ADA_CPF_PDF_BASE\s*=\s*"https:\/\/gisprod\.adacounty\.id\.gov\/apps\/acdscpf\/CpfPdfs\/"/, 'point inspector should use the Ada CP&F PDF base path');
   assert.match(html, /cpfLabel\.textContent\s*=\s*`CP&F \(≤\$\{CPNF_NEARBY_DISTANCE_FEET\}ft\)`/, 'point inspector should label CP&F row with nearby radius context');
   assert.match(html, /a\.textContent\s*=\s*`Open\s+\$\{instrument\}`/, 'point inspector should render quick-open CP&F links per instrument');
+  assert.match(html, /function\s+applySelectedPointEdits\(fields,\s*sourceLabel\s*=\s*"inspector"\)/, 'point inspector and point editor should share a single apply helper for point property updates');
+  assert.match(html, /const\s+fieldSpecs\s*=\s*\[[\s\S]*\["Point",\s*"num",\s*p\.num\][\s\S]*\["Notes",\s*"notes",\s*p\.notes \|\| ""\]/, 'point inspector should render editable fields for number, coordinates, code, and notes');
+  assert.match(html, /applyBtn\.id\s*=\s*"pointInspectorApply";/, 'point inspector should render an apply button for saving point property edits directly from inspector');
+  assert.match(html, /applySelectedPointEdits\(inspectorFields,\s*"point inspector"\);/, 'point inspector apply action should commit edits through the shared point update helper');
 });
 
 

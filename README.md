@@ -28,6 +28,14 @@ npm start
 
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
+## LineSmith Point Inspector Editing
+
+When you click a point in `VIEWPORT.HTML`, you can now edit point properties directly inside the **Point Inspector** card:
+
+- Editable fields: point number, X, Y, Z, code, and notes.
+- Click **Apply Inspector Edits** to save updates to the selected point.
+- The classic **Add / Edit Point** panel remains available and uses the same update workflow.
+
 ## LineSmith Save Shortcuts
 
 When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the same project-linked save workflow as the **Save Drawing to Project** button:
@@ -41,6 +49,9 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** zooms out to the next map zoom level at the cursor position.
 
 When using the **Line by 2 points** tool, LineSmith now treats only `null`/`undefined` as "no start point" so legacy drawings that include point id `0` can still complete on the second click.
+## LineSmith Layer Reassignment Shortcut
+
+When points/lines are selected in `VIEWPORT.HTML`, choosing a layer from the quick layer toolbar dropdown (or clicking **Use** in Layer Manager) now moves the current selection to that chosen layer in one step.
 
 ## LineSmith Print View (Record of Survey placeholder)
 
@@ -124,6 +135,7 @@ npm run cli -- --help
 npm run ros:cli -- --help
 curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/apps"
+node --test test/viewport.test.js
 find assets/survey-symbols -maxdepth 1 -name '*.svg' | wc -l
 ```
 
