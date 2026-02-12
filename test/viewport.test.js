@@ -948,6 +948,15 @@ test('VIEWPORT.HTML surfaces mapped SVG symbols in quick search, point editor, c
   assert.match(html, /className = "inspectorPointHeader"[\s\S]*symbolBadge\.className = "pointSymbolBadge large"/, 'point inspector should render a large profile-style mapped symbol badge for the selected point');
 });
 
+
+
+test('VIEWPORT.HTML preloads mapped SVG marker assets and retries failed symbol image fetches', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+preloadMappedPointSymbolMarkers\(\)\s*\{[\s\S]*codeSymbolMapFiles\.values\(\)[\s\S]*Promise\.allSettled\(pendingLoads\)\.then\(\(\) => draw\(\)\);/, 'LineSmith should proactively preload mapped point symbol SVG marker assets and redraw when preloading completes');
+  assert.match(html, /function\s+applyFieldToFinishConfig\(config, sourceLabel = defaultFldConfigPath\)\s*\{[\s\S]*preloadMappedPointSymbolMarkers\(\);/, 'LineSmith should trigger symbol marker preloads whenever FLD rules are applied');
+  assert.match(html, /image\.addEventListener\("error", \(\) => \{[\s\S]*symbolMarkerImageCache\.delete\(file\);/, 'LineSmith should clear failed image cache entries so symbol SVG fetches can be retried');
+});
 test('VIEWPORT.HTML keeps FLD manager in quick toolbar and triples symbol marker size', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

@@ -4203,6 +4203,7 @@
     fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
     fieldToFinishRuleState.source = sourceLabel;
     fieldToFinishRuleState.loaded = true;
+    preloadMappedPointSymbolMarkers();
   }
 
   async function loadFieldToFinishRulesFromFld(path = defaultFldConfigPath) {
@@ -4261,10 +4262,29 @@
       draw();
     }, { once: true });
     image.addEventListener("error", () => {
-      symbolMarkerImageCache.set(file, null);
+      symbolMarkerImageCache.delete(file);
     }, { once: true });
     symbolMarkerImageCache.set(file, image);
     return image;
+  }
+
+  function preloadMappedPointSymbolMarkers() {
+    const pendingLoads = [];
+    const uniqueFiles = new Set(fieldToFinishRuleState.codeSymbolMapFiles.values());
+    for (const file of uniqueFiles) {
+      const normalizedFile = String(file || "").trim();
+      if (!normalizedFile) continue;
+      const image = getSymbolMarkerImage(normalizedFile);
+      if (!(image instanceof HTMLImageElement)) continue;
+      if (image.complete) continue;
+      pendingLoads.push(new Promise((resolve) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", resolve, { once: true });
+      }));
+    }
+    if (pendingLoads.length) {
+      Promise.allSettled(pendingLoads).then(() => draw());
+    }
   }
 
   function getTintedSymbolMarker(symbolMapFile = "", layerColor = "") {
