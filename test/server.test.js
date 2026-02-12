@@ -197,7 +197,7 @@ test('server exposes survey APIs and static html', async () => {
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();
-    assert.equal(appsPayload.apps.length, 8);
+    assert.equal(appsPayload.apps.length, 9);
     assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/SurveyFoundry\.png$/i);
 
@@ -225,6 +225,7 @@ test('server exposes survey APIs and static html', async () => {
     const utilitiesRes = await fetch(`http://127.0.0.1:${app.port}/api/utilities?address=${encodeURIComponent('100 Main St, Boise')}`);
     assert.equal(utilitiesRes.status, 200);
     const utilitiesPayload = await utilitiesRes.json();
+    assert.deepEqual(utilitiesPayload.sources, ['power']);
     assert.equal(utilitiesPayload.utilities.length, 3);
     assert.ok(utilitiesPayload.utilities.every((utility) => utility.provider === 'Idaho Power'));
     assert.deepEqual(
@@ -296,7 +297,7 @@ test('server returns empty utility payload when upstream utility endpoint is una
     const utilitiesRes = await fetch(`http://127.0.0.1:${app.port}/api/utilities?address=${encodeURIComponent('100 Main St, Boise')}`);
     assert.equal(utilitiesRes.status, 200);
     const utilitiesPayload = await utilitiesRes.json();
-    assert.deepEqual(utilitiesPayload, { utilities: [] });
+    assert.deepEqual(utilitiesPayload, { utilities: [], sources: ['power'] });
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));

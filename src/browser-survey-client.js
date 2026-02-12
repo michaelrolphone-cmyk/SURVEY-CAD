@@ -43,8 +43,15 @@ export async function loadSubdivisionAtPoint(lon, lat, outSR = 4326) {
   return payload.subdivision || null;
 }
 
-export async function loadUtilitiesByAddress(address, outSR = 2243) {
-  const payload = await requestJson('/api/utilities', { address, outSR });
+export async function loadUtilitiesByAddress(address, outSROrOptions = 2243) {
+  const options = typeof outSROrOptions === 'object' && outSROrOptions !== null
+    ? outSROrOptions
+    : { outSR: outSROrOptions };
+  const payload = await requestJson('/api/utilities', {
+    address,
+    outSR: options.outSR ?? 2243,
+    sources: Array.isArray(options.sources) ? options.sources.join(',') : options.sources,
+  });
   return payload.utilities || [];
 }
 

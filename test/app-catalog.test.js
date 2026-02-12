@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 test('app catalog exposes one icon entry for each app', () => {
-  assert.equal(APP_CATALOG.length, 8);
+  assert.equal(APP_CATALOG.length, 9);
 
   const ids = new Set(APP_CATALOG.map((app) => app.id));
   assert.equal(ids.size, APP_CATALOG.length);
@@ -44,6 +44,7 @@ test('app catalog publishes updated core app descriptions', () => {
   assert.equal(byName.get('LineSmith'), 'Turns points into boundaries, alignments, and structure.');
   assert.equal(byName.get('ArrowHead'), 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.');
   assert.equal(byName.get('Project Browser'), 'Browse the symbolic project-file folder structure as a standalone app.');
+  assert.equal(byName.get('UtilitiesPack'), 'Fetches utility records, keeps state-plane coordinates, and exports power utility CSV bundles.');
 });
 
 

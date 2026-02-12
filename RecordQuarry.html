@@ -2158,13 +2158,11 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
 
       const rosFromLookup = normalizeRosFeatures(lookup.ros || []);
       const ros = filterRosFeaturesForSection(rosFromLookup, section);
-      let utilityLocations = Array.isArray(lookup?.utilities) ? lookup.utilities : [];
-      if (!utilityLocations.length) {
-        try {
-          utilityLocations = await loadUtilitiesByAddress(rawAddr, EXPORT_OUT_SR);
-        } catch (utilityError) {
-          log(`Utility lookup failed: ${utilityError.message || utilityError}`, 'warn');
-        }
+      let utilityLocations = [];
+      try {
+        utilityLocations = await loadUtilitiesByAddress(rawAddr, { outSR: EXPORT_OUT_SR, sources: ['power'] });
+      } catch (utilityError) {
+        log(`Utility lookup failed: ${utilityError.message || utilityError}`, 'warn');
       }
       state.utilityLocations = utilityLocations;
       drawUtilityLocations(state.utilityLocations);

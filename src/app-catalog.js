@@ -60,6 +60,16 @@ export const APP_CATALOG = [
     glyph: 'PB',
   },
   {
+    id: 'utilities-pack',
+    name: 'UtilitiesPack',
+    description: 'Fetches utility records, keeps state-plane coordinates, and exports power utility CSV bundles.',
+    entryHtml: 'UtilitiesPack.html',
+    iconPath: '/assets/icons/UtilitiesPack.svg',
+    color: '#1D4ED8',
+    accent: '#DBEAFE',
+    glyph: 'UP',
+  },
+  {
     id: 'cpnf-corners',
     name: 'PLSS + CP&F Explorer',
     description: 'Map tool for PLSS aliquots, corner geometry labels, and nearby Ada County CP&F records.',

@@ -19,11 +19,12 @@ test('loadUtilitiesByAddress requests /api/utilities and returns parsed utilitie
   };
 
   try {
-    const utilities = await loadUtilitiesByAddress('100 Main St, Boise', 2243);
+    const utilities = await loadUtilitiesByAddress('100 Main St, Boise', { outSR: 2243, sources: ['power'] });
     assert.equal(utilities.length, 1);
     assert.match(calls[0], /\/api\/utilities\?/);
     assert.match(calls[0], /address=100\+Main\+St%2C\+Boise/);
     assert.match(calls[0], /outSR=2243/);
+    assert.match(calls[0], /sources=power/);
   } finally {
     global.fetch = originalFetch;
     global.window = originalWindow;

@@ -322,6 +322,13 @@ Base URL (local): `http://localhost:3000`
 
 ### Health and app metadata
 
+
+### Launcher apps
+
+- `RecordQuarry.html` — full research bundle harvest workflow (plats, ROS, parcels, subdivision, and utility overlays).
+- `UtilitiesPack.html` — utilities-only workflow that fetches utility records for an address, stores state-plane coordinates in app state, and exports power utility CSV rows.
+
+
 - `GET /health`
 - `GET /api/apps`
 - `GET /ws/lineforge?room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration)
@@ -331,7 +338,8 @@ Base URL (local): `http://localhost:3000`
 
 - `GET /api/lookup?address=...`
 - `GET /api/geocode?address=...`
-- `GET /api/utilities?address=...&outSR=2243`
+- `GET /api/utilities?address=...&outSR=2243&sources=power`
+  - `sources` accepts a comma-separated list (for example `power,water`) so utility providers can be added incrementally. Current implementation returns Idaho Power records for `power`.
 - `GET /api/parcel?lon=...&lat=...&outSR=4326&searchMeters=40`
 - `GET /api/section?lon=...&lat=...`
 - `GET /api/aliquots?lon=...&lat=...&outSR=4326`
