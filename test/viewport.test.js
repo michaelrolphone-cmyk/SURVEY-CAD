@@ -6,6 +6,21 @@ import { readFile } from 'node:fs/promises';
 
 
 
+
+
+test('VIEWPORT.HTML supports print-ready black and white survey excerpts with nearest standard scale selection', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="printPaperSize"/, 'print panel should allow choosing standard paper sizes');
+  assert.match(html, /id="printCustomWidthMm"/, 'print panel should allow entering custom paper width');
+  assert.match(html, /id="printCustomHeightMm"/, 'print panel should allow entering custom paper height');
+  assert.match(html, /id="generatePrintView"/, 'print panel should include a generate print view action');
+  assert.match(html, /const\s+PRINT_SCALES\s*=\s*\[1,\s*5,\s*10,\s*20,\s*30,\s*40,\s*50,\s*100,\s*200,\s*500,\s*1000\]/, 'print workflow should support the requested set of survey scales');
+  assert.match(html, /function\s+chooseClosestPrintScale\(bounds, paper, marginIn = 0\.5\)/, 'print workflow should compute nearest supported survey scale from selected window bounds and paper size');
+  assert.match(html, /function\s+generatePrintViewFromSelection\(\)/, 'print generation should include a selection-based print preview workflow');
+  assert.match(html, /Record of Survey Template \(Landscape Placeholder\)/, 'print generation should render selected geometry into a landscape record-of-survey placeholder template');
+  assert.match(html, /printWindow\.document\.write\([\s\S]*window\.print\(\)/, 'print preview should open in a dedicated window that can be printed directly');
+});
 test('VIEWPORT.HTML allows map tile rendering to continue zooming past native tile limits', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

@@ -1066,6 +1066,40 @@
 
     <div class="section">
       <div class="title">
+        <b>Print View</b>
+        <span>record of survey template (landscape)</span>
+      </div>
+      <div class="grid2">
+        <label>Paper size
+          <select id="printPaperSize">
+            <option value="A0">A0</option>
+            <option value="A1">A1</option>
+            <option value="A2">A2</option>
+            <option value="A3" selected>A3</option>
+            <option value="A4">A4</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label>Scale (auto)
+          <input id="printScalePreview" value="Auto" readonly />
+        </label>
+      </div>
+      <div class="grid2" style="margin-top:8px;">
+        <label>Custom width (mm)
+          <input id="printCustomWidthMm" type="number" min="100" step="1" value="420" />
+        </label>
+        <label>Custom height (mm)
+          <input id="printCustomHeightMm" type="number" min="100" step="1" value="297" />
+        </label>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="generatePrintView" class="ok" style="flex:1;">Generate Print View from Selection</button>
+      </div>
+      <div class="hint mini">Select points/lines with window or clicks, then generate a black-on-white print-ready excerpt. Scale snaps to nearest supported ratio: 1:1, 1:5, 1:10, 1:20, 1:30, 1:40, 1:50, 1:100, 1:200, 1:500, 1:1000.</div>
+    </div>
+
+    <div class="section">
+      <div class="title">
         <b>Add / Edit Point</b>
         <span>click canvas in Add Point</span>
       </div>
@@ -1989,6 +2023,11 @@
   const toolHint = $("#toolHint");
   const quickCommandSearchInput = $("#quickCommandSearchInput");
   const quickCommandSearchResults = $("#quickCommandSearchResults");
+  const printPaperSizeInput = $("#printPaperSize");
+  const printScalePreviewInput = $("#printScalePreview");
+  const printCustomWidthMmInput = $("#printCustomWidthMm");
+  const printCustomHeightMmInput = $("#printCustomHeightMm");
+  const generatePrintViewBtn = $("#generatePrintView");
 
   const pointsCount = $("#pointsCount");
   const modal = $("#pointsModal");
@@ -4917,6 +4956,7 @@
     hudMouse.textContent = `x: ${fmtPlainCoordinate(mouse.wx)}, y: ${fmtPlainCoordinate(mouse.wy)}`;
     hudZoom.textContent = `${view.scale.toFixed(4)} px/unit`;
     updateSelectionHUD();
+    updatePrintScalePreview();
     updateUndoRedoHUD();
 
     syncArrowHeadPayloadToStorage();
@@ -5067,7 +5107,11 @@
       return true;
     }
 
-    setStatus(`Unknown command: ${parts[0]}. Supported: line, move, rotate, inverse.`, "warn");
+    if (cmd === "printview") {
+      return generatePrintViewFromSelection();
+    }
+
+    setStatus(`Unknown command: ${parts[0]}. Supported: line, move, rotate, inverse, printview.`, "warn");
     return false;
   }
 
@@ -5075,9 +5119,18 @@
     { command: "line", usage: "line <point1> <point2>", detail: "Create line from two point numbers" },
     { command: "move", usage: "move <dx> <dy>", detail: "Move selected points/lines by delta" },
     { command: "rotate", usage: "rotate", detail: "Start rotate selection workflow" },
-    { command: "inverse", usage: "inverse <point1> <point2>", detail: "Measure bearing and distance" }
+    { command: "inverse", usage: "inverse <point1> <point2>", detail: "Measure bearing and distance" },
+    { command: "printview", usage: "printview", detail: "Generate black/white print view from selection" }
   ];
   const QUICK_SEARCH_POINT_SCALE = 10;
+  const PRINT_SCALES = [1, 5, 10, 20, 30, 40, 50, 100, 200, 500, 1000];
+  const PRINT_PAPER_SIZES_MM = {
+    A0: { widthMm: 1189, heightMm: 841 },
+    A1: { widthMm: 841, heightMm: 594 },
+    A2: { widthMm: 594, heightMm: 420 },
+    A3: { widthMm: 420, heightMm: 297 },
+    A4: { widthMm: 297, heightMm: 210 }
+  };
 
   function centerViewOnPoint(point) {
     if (!point) return;
@@ -5218,6 +5271,11 @@
     if (quickCommandSearchResults.contains(target) || quickCommandSearchInput.contains(target)) return;
     clearQuickCommandSearchResults();
   });
+
+  printPaperSizeInput?.addEventListener("change", updatePrintScalePreview);
+  printCustomWidthMmInput?.addEventListener("input", updatePrintScalePreview);
+  printCustomHeightMmInput?.addEventListener("input", updatePrintScalePreview);
+  generatePrintViewBtn?.addEventListener("click", generatePrintViewFromSelection);
 
   $("#toolSelect").addEventListener("click", ()=>setTool("select"));
   $("#toolAddPoint").addEventListener("click", ()=>setTool("addPoint"));
@@ -6025,6 +6083,209 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     if (!silent) {
       setStatus(`Zoomed to window.\nX: [${fmt(paddedMinX)}, ${fmt(paddedMaxX)}]\nY: [${fmt(paddedMinY)}, ${fmt(paddedMaxY)}]`, "ok");
     }
+    return true;
+  }
+
+  function mmToInches(mm) {
+    return Number(mm) / 25.4;
+  }
+
+  function resolvePrintPaperSizeInches() {
+    const preset = String(printPaperSizeInput?.value || "A3");
+    if (preset === "custom") {
+      const rawW = Number(printCustomWidthMmInput?.value);
+      const rawH = Number(printCustomHeightMmInput?.value);
+      const widthIn = mmToInches(Number.isFinite(rawW) ? Math.max(100, rawW) : 420);
+      const heightIn = mmToInches(Number.isFinite(rawH) ? Math.max(100, rawH) : 297);
+      return {
+        label: `Custom ${widthIn.toFixed(2)}" x ${heightIn.toFixed(2)}"`,
+        widthIn: Math.max(widthIn, heightIn),
+        heightIn: Math.min(widthIn, heightIn)
+      };
+    }
+    const presetSize = PRINT_PAPER_SIZES_MM[preset] || PRINT_PAPER_SIZES_MM.A3;
+    return {
+      label: preset,
+      widthIn: mmToInches(presetSize.widthMm),
+      heightIn: mmToInches(presetSize.heightMm)
+    };
+  }
+
+  function getSelectionWorldBounds() {
+    const selectedPointSet = new Set(selectedPointIds);
+    for (const selectedLine of selectedLines) {
+      const line = lines.get(selectedLine.lineId);
+      if (!line) continue;
+      selectedPointSet.add(line.a);
+      selectedPointSet.add(line.b);
+    }
+    const selectedPoints = [...selectedPointSet].map((id) => points.get(id)).filter(Boolean);
+    if (!selectedPoints.length) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const point of selectedPoints) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    const spanX = Math.max(EPS, maxX - minX);
+    const spanY = Math.max(EPS, maxY - minY);
+    const padX = Math.max(0.5, spanX * 0.03);
+    const padY = Math.max(0.5, spanY * 0.03);
+
+    return {
+      minX: minX - padX,
+      minY: minY - padY,
+      maxX: maxX + padX,
+      maxY: maxY + padY
+    };
+  }
+
+  function chooseClosestPrintScale(bounds, paper, marginIn = 0.5) {
+    const worldWidthFeet = Math.max(EPS, bounds.maxX - bounds.minX);
+    const worldHeightFeet = Math.max(EPS, bounds.maxY - bounds.minY);
+    const printableWidthFeet = Math.max(EPS, (paper.widthIn - (marginIn * 2)) / 12);
+    const printableHeightFeet = Math.max(EPS, (paper.heightIn - (marginIn * 2)) / 12);
+    const targetScale = Math.max(worldWidthFeet / printableWidthFeet, worldHeightFeet / printableHeightFeet);
+
+    let selectedScale = PRINT_SCALES[0];
+    let bestDelta = Infinity;
+    for (const candidate of PRINT_SCALES) {
+      const delta = Math.abs(candidate - targetScale);
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        selectedScale = candidate;
+      }
+    }
+
+    return { selectedScale, targetScale };
+  }
+
+  function renderSelectionToPrintDataUrl(bounds, paper, selectedScale) {
+    const dpi = 180;
+    const pageWidthPx = Math.max(1, Math.round(paper.widthIn * dpi));
+    const pageHeightPx = Math.max(1, Math.round(paper.heightIn * dpi));
+    const marginPx = Math.round(0.5 * dpi);
+
+    const workingCanvas = document.createElement("canvas");
+    workingCanvas.width = pageWidthPx;
+    workingCanvas.height = pageHeightPx;
+    const printCtx = workingCanvas.getContext("2d");
+
+    printCtx.fillStyle = "#ffffff";
+    printCtx.fillRect(0, 0, pageWidthPx, pageHeightPx);
+
+    printCtx.strokeStyle = "#000000";
+    printCtx.lineWidth = 1.5;
+    printCtx.strokeRect(marginPx * 0.5, marginPx * 0.5, pageWidthPx - marginPx, pageHeightPx - marginPx);
+
+    const titleBlockH = Math.round(0.9 * dpi);
+    const drawingLeft = marginPx;
+    const drawingTop = marginPx;
+    const drawingWidth = pageWidthPx - (marginPx * 2);
+    const drawingHeight = pageHeightPx - (marginPx * 2) - titleBlockH;
+
+    printCtx.strokeRect(drawingLeft, drawingTop, drawingWidth, drawingHeight);
+    printCtx.strokeRect(drawingLeft, drawingTop + drawingHeight, drawingWidth, titleBlockH);
+
+    const worldWidth = Math.max(EPS, bounds.maxX - bounds.minX);
+    const worldHeight = Math.max(EPS, bounds.maxY - bounds.minY);
+    const drawScale = Math.min(drawingWidth / worldWidth, drawingHeight / worldHeight);
+
+    const offsetX = drawingLeft + ((drawingWidth - (worldWidth * drawScale)) * 0.5);
+    const offsetY = drawingTop + ((drawingHeight - (worldHeight * drawScale)) * 0.5);
+
+    const worldToPrint = (x, y) => ({
+      x: offsetX + ((x - bounds.minX) * drawScale),
+      y: offsetY + ((bounds.maxY - y) * drawScale)
+    });
+
+    const lineInBounds = (line) => {
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      if (!a || !b) return false;
+      const minX = Math.min(a.x, b.x);
+      const maxX = Math.max(a.x, b.x);
+      const minY = Math.min(a.y, b.y);
+      const maxY = Math.max(a.y, b.y);
+      return !(maxX < bounds.minX || minX > bounds.maxX || maxY < bounds.minY || minY > bounds.maxY);
+    };
+
+    printCtx.strokeStyle = "#000000";
+    printCtx.lineWidth = 1.8;
+    for (const line of lines.values()) {
+      if (!lineInBounds(line)) continue;
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      if (!a || !b) continue;
+      const pa = worldToPrint(a.x, a.y);
+      const pb = worldToPrint(b.x, b.y);
+      printCtx.beginPath();
+      printCtx.moveTo(pa.x, pa.y);
+      printCtx.lineTo(pb.x, pb.y);
+      printCtx.stroke();
+    }
+
+    printCtx.lineWidth = 1.2;
+    for (const point of points.values()) {
+      if (point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY) continue;
+      const p = worldToPrint(point.x, point.y);
+      printCtx.beginPath();
+      printCtx.moveTo(p.x - 5, p.y - 5);
+      printCtx.lineTo(p.x + 5, p.y + 5);
+      printCtx.moveTo(p.x + 5, p.y - 5);
+      printCtx.lineTo(p.x - 5, p.y + 5);
+      printCtx.stroke();
+    }
+
+    printCtx.fillStyle = "#000000";
+    printCtx.font = '16px "Arial", sans-serif';
+    printCtx.fillText("Record of Survey Template (Landscape Placeholder)", drawingLeft + 12, drawingTop + drawingHeight + 30);
+    printCtx.font = '14px "Arial", sans-serif';
+    printCtx.fillText(`Scale 1:${selectedScale} (auto from selected window)`, drawingLeft + 12, drawingTop + drawingHeight + 58);
+
+    return workingCanvas.toDataURL("image/png");
+  }
+
+  function updatePrintScalePreview() {
+    const bounds = getSelectionWorldBounds();
+    if (!bounds) {
+      if (printScalePreviewInput) printScalePreviewInput.value = "Select geometry";
+      return;
+    }
+    const paper = resolvePrintPaperSizeInches();
+    const result = chooseClosestPrintScale(bounds, paper);
+    if (printScalePreviewInput) printScalePreviewInput.value = `1:${result.selectedScale}`;
+  }
+
+  function generatePrintViewFromSelection() {
+    const bounds = getSelectionWorldBounds();
+    if (!bounds) {
+      setStatus("Select at least one point or line before generating print view.", "warn");
+      return false;
+    }
+
+    const paper = resolvePrintPaperSizeInches();
+    const { selectedScale } = chooseClosestPrintScale(bounds, paper);
+    const imageUrl = renderSelectionToPrintDataUrl(bounds, paper, selectedScale);
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      setStatus("Popup blocked. Allow popups to open print preview.", "warn");
+      return false;
+    }
+
+    const title = `Print View 1:${selectedScale}`;
+    printWindow.document.write(`<!doctype html><html><head><title>${title}</title><style>body{margin:0;background:#f4f4f4;font-family:Arial,sans-serif;}main{max-width:96vw;margin:12px auto;padding:8px;}img{width:100%;height:auto;background:#fff;border:1px solid #111;box-shadow:0 2px 8px rgba(0,0,0,.15);}button{margin:6px 0;padding:8px 12px;font-size:14px;}</style></head><body><main><button onclick="window.print()">Print</button><div>Paper: ${paper.label} · Scale: 1:${selectedScale}</div><img src="${imageUrl}" alt="Print-ready black and white survey excerpt"/></main></body></html>`);
+    printWindow.document.close();
+
+    if (printScalePreviewInput) printScalePreviewInput.value = `1:${selectedScale}`;
+    setStatus(`Generated print view on ${paper.label} at 1:${selectedScale}.`, "ok");
     return true;
   }
 
