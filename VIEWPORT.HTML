@@ -3550,6 +3550,9 @@
   };
   const symbolMarkerImageCache = new Map();
   const tintedSymbolMarkerCache = new Map();
+  const SYMBOL_MARKER_SIZE_PX = 20;
+  const SYMBOL_MARKER_HALF_SIZE_PX = SYMBOL_MARKER_SIZE_PX / 2;
+  const SYMBOL_BOLD_OFFSET_PX = 1;
 
   async function loadSurveySymbolLibrary() {
     try {
@@ -3863,10 +3866,17 @@
     if (!(image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0)) return null;
 
     const markerCanvas = document.createElement("canvas");
-    markerCanvas.width = 10;
-    markerCanvas.height = 10;
+    markerCanvas.width = SYMBOL_MARKER_SIZE_PX;
+    markerCanvas.height = SYMBOL_MARKER_SIZE_PX;
     const markerCtx = markerCanvas.getContext("2d");
     if (!markerCtx) return null;
+
+    // Draw several 1px-offset passes first so thin symbol strokes stay visibly bold.
+    markerCtx.drawImage(image, 0, 0, markerCanvas.width, markerCanvas.height);
+    markerCtx.drawImage(image, SYMBOL_BOLD_OFFSET_PX, 0, markerCanvas.width, markerCanvas.height);
+    markerCtx.drawImage(image, -SYMBOL_BOLD_OFFSET_PX, 0, markerCanvas.width, markerCanvas.height);
+    markerCtx.drawImage(image, 0, SYMBOL_BOLD_OFFSET_PX, markerCanvas.width, markerCanvas.height);
+    markerCtx.drawImage(image, 0, -SYMBOL_BOLD_OFFSET_PX, markerCanvas.width, markerCanvas.height);
 
     // tint only the symbol footprint (avoid flooding the full marker square)
     markerCtx.drawImage(image, 0, 0, markerCanvas.width, markerCanvas.height);
@@ -5539,7 +5549,7 @@
         const pointSymbolMapFile = getPointSymbolMapFile(p.code);
         const symbolImage = getTintedSymbolMarker(pointSymbolMapFile, layer?.color);
         if (symbolImage) {
-          ctx.drawImage(symbolImage, sp.x - 5, sp.y - 5, 10, 10);
+          ctx.drawImage(symbolImage, sp.x - SYMBOL_MARKER_HALF_SIZE_PX, sp.y - SYMBOL_MARKER_HALF_SIZE_PX, SYMBOL_MARKER_SIZE_PX, SYMBOL_MARKER_SIZE_PX);
         } else {
           // marker
           ctx.strokeStyle = layer?.color || "#ff2b2b";
