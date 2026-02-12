@@ -1380,8 +1380,8 @@
             <option value="A0">A0</option>
             <option value="A1">A1</option>
             <option value="A2">A2</option>
-            <option value="A3" selected>A3</option>
-            <option value="A4">A4</option>
+            <option value="A3">A3</option>
+            <option value="A4" selected>A4</option>
             <option value="custom">Custom</option>
           </select>
         </label>
@@ -1611,6 +1611,7 @@
     <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
       <div class="quickToolsRow quickToolsRowPrimary">
         <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
+        <button id="quickPrintView" class="quickToolBtn" title="Draw Print Window" aria-label="Draw Print Window"><i class="fa-solid fa-print"></i></button>
         <button id="quickOpenArrowHead" class="quickToolBtn" title="Open ArrowHead AR" aria-label="Open ArrowHead AR"><i class="fa-solid fa-vr-cardboard"></i></button>
         <button id="quickLayerManager" class="quickToolBtn" title="Layer Manager" aria-label="Layer Manager"><i class="fa-solid fa-layer-group"></i></button>
         <div class="quickToolField quickToolLayer" title="Active layer">
@@ -5940,6 +5941,7 @@
   $("#redoBtn").addEventListener("click", ()=>history.redoAction());
 
   $("#quickSave")?.addEventListener("click", () => $("#saveDrawingToProject").click());
+  $("#quickPrintView")?.addEventListener("click", () => $("#generatePrintView")?.click());
   $("#quickOpenArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
   $("#quickSelect")?.addEventListener("click", () => setTool("select"));
   $("#quickAddPoint")?.addEventListener("click", () => setTool("addPoint"));
@@ -9072,11 +9074,13 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       const marqueeRect = rectNorm(mouse.dragObj.x0, mouse.dragObj.y0, mouse.dragObj.x1, mouse.dragObj.y1);
       pendingMarqueeZoomRect = marqueeRect;
       pendingMarqueeSelectionSnapshot = selectionSnapshot;
-      applyMarqueeSelection(mouse.dragObj);
       if (pendingPrintWindowCapture) {
         pendingPrintWindowCapture = false;
         const printBounds = worldBoundsFromScreenRect(marqueeRect);
         generatePrintViewFromBounds(printBounds);
+        applySelectionSnapshot(selectionSnapshot);
+      } else {
+        applyMarqueeSelection(mouse.dragObj);
       }
       endDrag();
       return;
