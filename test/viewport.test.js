@@ -812,9 +812,10 @@ test('VIEWPORT.HTML shows a modern point-link loading overlay while bootstrappin
   assert.match(html, /\.linesmith-loading-overlay\{[\s\S]*background:transparent;[\s\S]*pointer-events:none;/, 'loading overlay should not black out the UI and should remain visually non-blocking');
   assert.match(html, /class="linesmith-loading-network"/, 'loading overlay should include a point-link network visual');
   assert.match(html, /id="linesmithLoadingTraversePath"\s+class="linesmith-loading-route-outline"/, 'loading visual should include a route outline so motion feels like a survey traverse instead of floating points');
-  assert.match(html, /class="linesmith-loading-traverse-dot"[\s\S]*<animateMotion\s+dur="2\.9s"\s+repeatCount="indefinite"/, 'loading visual should animate a traverse marker moving forward along the route');
-  assert.match(html, /class="linesmith-loading-bearing-arm"/, 'loading visual should include a bearing sweep arm to resemble instrument aiming actions');
+  assert.match(html, /class="linesmith-loading-traverse-dot"[\s\S]*<animateMotion\s+dur="30s"\s+repeatCount="indefinite"/, 'loading visual should animate a traverse marker along a longer assembly pass instead of rapid back-and-forth motion');
+  assert.match(html, /class="linesmith-loading-segment\s+segment-1"[\s\S]*class="linesmith-loading-segment\s+segment-5"/, 'loading visual should reveal multiple assembly segments in staged order to mimic workspace construction');
   assert.match(html, /class="linesmith-loading-node-ping\s+origin"[\s\S]*class="linesmith-loading-node-ping\s+target"/, 'loading visual should pulse origin/target pings instead of only sinusoidal node movement');
+  assert.match(html, /@keyframes\s+linesmithAssembleSegment1[\s\S]*@keyframes\s+linesmithAssembleSegment5/, 'loading styles should define staged 30-second assembly keyframes instead of short oscillation loops');
   assert.match(html, /mask id="linesmithLoadingEdgeFade"/, 'loading network should use an edge-fade mask to avoid hard clipping at the sides');
   assert.doesNotMatch(html, /Demo:/, 'loading copy should not include demo-only labels in production');
   assert.match(html, /id="lineSmithLoadingStage"\s+class="linesmith-loading-stage"/, 'loading overlay should expose status copy for current bootstrap stage');
