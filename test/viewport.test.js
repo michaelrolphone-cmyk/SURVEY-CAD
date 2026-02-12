@@ -375,7 +375,7 @@ test('VIEWPORT.HTML exposes map backdrop controls with expected defaults and wir
   assert.match(html, /quickMapTileTypeInput\?\.addEventListener\("change"[\s\S]*setMapTileType\(quickMapTileTypeInput\.value\)/, 'quick toolbar map tile selector should update current tileset');
   assert.match(html, /mapOpacityInput\.addEventListener\("input"[\s\S]*mapLayerState\.opacity\s*=\s*clamp\(parseNum\(mapOpacityInput\.value,\s*10\)\s*\/\s*100,\s*0,\s*1\)/, 'opacity slider should update map backdrop opacity');
   assert.match(html, /function\s+zoomExtents\(options\s*=\s*\{\}\)/, 'zoom extents helper should accept options for silent and history-safe recentering');
-  assert.match(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*if \(mapLayerState\.enabled\) \{[\s\S]*ensureMapLayer\(\);[\s\S]*mapBackdrop\.classList\.toggle\("on", mapLayerState\.enabled\);[\s\S]*syncMapToView\(true\);/, 'enabling map layer should initialize Leaflet and sync to the current drawing viewport');
+  assert.match(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*if \(mapLayerState\.enabled\) \{[\s\S]*ensureMapLayer\(\);[\s\S]*syncMapBackdropVisibility\(\);[\s\S]*syncMapToView\(true\);/, 'enabling map layer should initialize Leaflet, animate visibility, and sync to the current drawing viewport');
   assert.doesNotMatch(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*zoomExtents\(\{ skipHistory: true, silent: true \}\);/, 'enabling map layer should not force a zoom-extents recenter');
   assert.match(html, /satellite:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'satellite tiles should allow overzooming beyond native coverage');
   assert.match(html, /osmStandard:[\s\S]*maxNativeZoom:\s*19,[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'OSM standard tiles should allow overzooming beyond native coverage');
@@ -989,4 +989,14 @@ test('VIEWPORT.HTML keeps FLD manager in quick toolbar and triples symbol marker
   assert.match(html, /id="quickFtfManager" class="quickToolBtn" title="Open FLD Editor"/, 'quick toolbar should expose an FLD manager launch button');
   assert.match(html, /\$\("#quickFtfManager"\)\?\.addEventListener\("click", \(\) => openFldEditorBtn\?\.click\(\)\);/, 'FLD quick button should route to the existing FLD editor launcher');
   assert.match(html, /const\s+SYMBOL_MARKER_SIZE_PX\s*=\s*30\s*;/, 'point symbol SVG markers should render at a corrected 30px footprint');
+});
+
+test('VIEWPORT.HTML fades map layer visibility and centers/fades the loading modal', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /\.mapBackdrop\{[\s\S]*transition:opacity \.28s ease;/, 'map backdrop should animate opacity changes for smooth map layer show/hide transitions');
+  assert.match(html, /function\s+syncMapBackdropVisibility\(\)\s*\{[\s\S]*const\s+targetOpacity\s*=\s*mapLayerState\.enabled\s*\?\s*mapLayerState\.opacity\s*:\s*0;[\s\S]*mapBackdrop\.style\.opacity\s*=\s*String\(clamp\(targetOpacity,\s*0,\s*1\)\);/, 'map layer visibility helper should fade to configured opacity when enabled and to zero when disabled');
+  assert.match(html, /function\s+setMapLayerEnabled\(enabled\)\s*\{[\s\S]*syncMapBackdropVisibility\(\);/, 'map enable toggle should route visibility updates through the fade helper');
+  assert.match(html, /\.linesmith-loading-overlay\{[\s\S]*display:flex;[\s\S]*align-items:center;[\s\S]*justify-content:center;/, 'loading overlay should center the modal both vertically and horizontally');
+  assert.match(html, /\.linesmith-loading-overlay\.hidden\s+\.linesmith-loading-card\{[\s\S]*opacity:0;[\s\S]*transform:translateY\(8px\) scale\(0\.985\);/, 'loading modal card should fade and ease out when the overlay is hidden');
 });
