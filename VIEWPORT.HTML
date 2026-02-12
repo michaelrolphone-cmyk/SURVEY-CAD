@@ -7232,13 +7232,19 @@
 
     history.push(editsByPoint.length === 1 ? "edit point" : "edit points");
 
+    let pointCodeChanged = false;
     for (const { point, values, proposedNum } of editsByPoint) {
       point.num = proposedNum;
       point.x = parseNum(values.x, point.x);
       point.y = parseNum(values.y, point.y);
       point.z = parseNum(values.z, point.z);
-      setPointCode(point, String(values.code ?? point.code));
+      if (setPointCode(point, String(values.code ?? point.code))) pointCodeChanged = true;
       point.notes = String(values.notes ?? point.notes);
+    }
+
+    if (pointCodeChanged) {
+      ensureLegacyAutoFieldToFinishLineMetadata();
+      syncFieldToFinishLinework();
     }
 
     schedulePointsTableRender();
@@ -7256,14 +7262,19 @@
     const selectedPoints = getSelectedPoints();
     if (!selectedPoints.length) return false;
     history.push(selectedPoints.length === 1 ? "edit point" : "edit points");
+    let pointCodeChanged = false;
     for (const point of selectedPoints) {
       if (key === "x" || key === "y" || key === "z") {
         point[key] = parseNum(rawValue, point[key]);
       } else if (key === "code") {
-        setPointCode(point, String(rawValue ?? point[key]));
+        if (setPointCode(point, String(rawValue ?? point[key]))) pointCodeChanged = true;
       } else if (key === "notes") {
         point[key] = String(rawValue ?? point[key]);
       }
+    }
+    if (pointCodeChanged) {
+      ensureLegacyAutoFieldToFinishLineMetadata();
+      syncFieldToFinishLinework();
     }
     schedulePointsTableRender();
     setStatus(`Updated ${key.toUpperCase()} for ${selectedPoints.length} selected point${selectedPoints.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
