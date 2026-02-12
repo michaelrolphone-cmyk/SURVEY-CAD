@@ -182,6 +182,8 @@ Symbol marker refresh now relies on the existing continuous canvas animation loo
 
 In `VIEWPORT.HTML`, the secondary quick toolbar now includes a dedicated **Field-to-Finish (FLD) Manager** button directly beside the **Points Manager** button so field-code rule editing is one click away while drafting.
 
+On mobile viewports, a new **Hide Bars / Show Bars** control is pinned at the top-left of the canvas so you can quickly hide both floating quick toolbars (and restore them with one tap) while panning or selecting in tight screen space.
+
 ## Survey Symbol SVG Library
 
 A dedicated library of surveying map symbols is available in `assets/survey-symbols/` for use with point-file symbol rendering workflows (property pins, cap types, meters, manholes, control points, poles, signs, and related utility marks). A machine-readable manifest is also included at `assets/survey-symbols/index.json`.

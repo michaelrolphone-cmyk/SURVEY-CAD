@@ -252,6 +252,15 @@ test('VIEWPORT.HTML moves current selection to the chosen toolbar layer', async 
   assert.match(html, /useBtn\.addEventListener\("click",\s*\(\)\s*=>\s*\{\s*applyLayerChoice\(layer\.id\);\s*\}\);/, 'layer manager Use action should use the same selection-moving layer handler for consistent behavior');
 });
 
+test('VIEWPORT.HTML adds a mobile toggle for hiding quick toolbars', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="mobileToolbarToggle"[\s\S]*Hide Bars/, 'canvas overlay should include a dedicated mobile toolbar hide/show control');
+  assert.match(html, /\.app\.mobileToolbarsHidden \.quickTools,[\s\S]*\.app\.mobileToolbarsHidden \.drawerToggle\{ display:none; \}/, 'mobile hidden state should remove both quick toolbar chrome and drawer toggle affordances');
+  assert.match(html, /function\s+setMobileToolbarsHidden\(hidden\)\s*\{[\s\S]*mobileToolbarToggle\.textContent = shouldHide \? "Show Bars" : "Hide Bars";[\s\S]*mobileToolbarToggle\.setAttribute\("aria-pressed", shouldHide \? "true" : "false"\);/, 'toolbar hide helper should synchronize app-shell classes and button accessibility state');
+  assert.match(html, /mobileToolbarToggle\.addEventListener\("click",\s*\(\)\s*=>\s*\{[\s\S]*setMobileToolbarsHidden\(!mobileToolbarsHidden\);[\s\S]*\}\);/, 'mobile toolbar toggle should switch visibility state each tap');
+});
+
 
 test('VIEWPORT.HTML preserves unchanged array entries in drawing diffs', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
