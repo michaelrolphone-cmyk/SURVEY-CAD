@@ -2061,6 +2061,7 @@
   const collab = {
     socket: null,
     roomId: "",
+    wsUrl: "",
     clientId: "",
     color: "#ffffff",
     peers: new Map(),
@@ -2068,7 +2069,10 @@
     remoteArPresence: new Map(),
     stateDebounce: null,
     applyingRemoteState: false,
-    enabled: false
+    enabled: false,
+    reconnectDelayMs: 3000,
+    reconnectTimer: null,
+    connectToken: 0
   };
 
   function setStatus(msg, kind="") {
@@ -3625,11 +3629,21 @@
 
     const scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const wsUrl = `${scheme}://${window.location.host}/ws/lineforge?room=${encodeURIComponent(roomId)}`;
+    collab.wsUrl = wsUrl;
+    if (collab.reconnectTimer) {
+      clearTimeout(collab.reconnectTimer);
+      collab.reconnectTimer = null;
+    }
+    const connectToken = ++collab.connectToken;
     setCollabStatus(`connecting (${roomId})…`);
     const socket = new WebSocket(wsUrl);
     collab.socket = socket;
 
     socket.addEventListener("open", () => {
+      if (connectToken !== collab.connectToken) {
+        socket.close();
+        return;
+      }
       setCollabStatus(`connected (${roomId})`);
       if (syncLocalStateOnConnect) {
         sendCollabMessage({ type: "state", state: serializeState({ includeView: false }) });
@@ -3637,11 +3651,19 @@
     });
 
     socket.addEventListener("close", () => {
-      setCollabStatus("offline");
+      if (connectToken !== collab.connectToken) return;
+      if (collab.socket === socket) collab.socket = null;
+      setCollabStatus(`reconnecting (${roomId})…`);
       collab.remoteCursors.clear();
       collab.remoteArPresence.clear();
       collab.peers.clear();
       clearMapArPresence();
+      if (collab.enabled && collab.roomId && !collab.reconnectTimer) {
+        collab.reconnectTimer = setTimeout(() => {
+          collab.reconnectTimer = null;
+          connectCollaboration({ skipInitialStateHydration, syncLocalStateOnConnect });
+        }, collab.reconnectDelayMs);
+      }
     });
 
     socket.addEventListener("message", (event) => {
