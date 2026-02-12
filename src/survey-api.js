@@ -651,7 +651,7 @@ export class SurveyCadClient {
     };
   }
 
-  async lookupUtilitiesByAddress(address, outSR = 4326) {
+  async lookupPowerUtilitiesByAddress(address, outSR = 4326) {
     const lookupUrl = String(this.config.idahoPowerUtilityLookupUrl || '');
 
     let rawUtilities = [];
@@ -801,8 +801,33 @@ export class SurveyCadClient {
         serviceTypeId: Number(utility.serviceTypeId),
         location: { lon, lat },
         projected,
+        source: 'power',
       };
     });
+  }
+
+  async lookupUtilityRecordsByAddress(address, { outSR = 4326, sources = ['power'] } = {}) {
+    const normalizedSources = Array.isArray(sources)
+      ? [...new Set(sources.map((source) => String(source || '').trim().toLowerCase()).filter(Boolean))]
+      : [];
+
+    const requestedSources = normalizedSources.length ? normalizedSources : ['power'];
+    const utilities = [];
+
+    for (const source of requestedSources) {
+      if (source === 'power') {
+        const powerUtilities = await this.lookupPowerUtilitiesByAddress(address, outSR);
+        powerUtilities.forEach((utility) => {
+          utilities.push({ ...utility, source });
+        });
+      }
+    }
+
+    return utilities;
+  }
+
+  async lookupUtilitiesByAddress(address, outSR = 4326) {
+    return this.lookupUtilityRecordsByAddress(address, { outSR, sources: ['power'] });
   }
 
   async findBestAddressFeature(rawAddress) {
@@ -1010,7 +1035,7 @@ export class SurveyCadClient {
 
     let utilities = [];
     try {
-      utilities = await this.lookupUtilitiesByAddress(address, 2243);
+      utilities = await this.lookupUtilityRecordsByAddress(address, { outSR: 2243, sources: ['power'] });
     } catch {
       utilities = [];
     }

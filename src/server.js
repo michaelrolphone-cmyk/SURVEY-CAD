@@ -355,8 +355,12 @@ export function createSurveyServer({
         const address = urlObj.searchParams.get('address');
         if (!address) throw new Error('address query parameter is required.');
         const outSR = Number(urlObj.searchParams.get('outSR') || 2243);
-        const utilities = await client.lookupUtilitiesByAddress(address, outSR);
-        sendJson(res, 200, { utilities });
+        const sources = (urlObj.searchParams.get('sources') || 'power')
+          .split(',')
+          .map((source) => source.trim().toLowerCase())
+          .filter(Boolean);
+        const utilities = await client.lookupUtilityRecordsByAddress(address, { outSR, sources });
+        sendJson(res, 200, { utilities, sources });
         return;
       }
 

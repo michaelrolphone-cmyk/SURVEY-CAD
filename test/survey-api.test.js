@@ -565,6 +565,28 @@ test('lookupUtilitiesByAddress uses Idaho Power NearPoint PrimaryPoints API and 
   }
 });
 
+
+test('lookupUtilityRecordsByAddress returns power utilities for supported sources and ignores unknown sources', async () => {
+  const { server, port } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    nominatimUrl: `${base}/geocode`,
+    arcgisGeometryProjectUrl: `${base}/geometry/project`,
+    idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
+  });
+
+  try {
+    const utilities = await client.lookupUtilityRecordsByAddress('100 Main St, Boise', {
+      outSR: 2243,
+      sources: ['power', 'water'],
+    });
+    assert.equal(utilities.length, 3);
+    assert.ok(utilities.every((utility) => utility.source === 'power'));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('lookupUtilitiesByAddress labels NearPoint utility points using PM/OH/UP service rules', async () => {
   const { server, port } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
