@@ -10,30 +10,29 @@
     .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
     h1 { margin: 0 0 6px; }
     p { color: #9fb0cc; }
-    form { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; margin: 20px 0; }
+    form { display: flex; align-items: center; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+    .lookupControls { display: flex; align-items: center; gap: 10px; flex: 1 1 560px; }
+    .lookupControls input { flex: 1 1 auto; min-width: 240px; }
     input, button { border-radius: 8px; border: 1px solid #2a3f62; background: #12203a; color: #e2e8f0; padding: 10px 12px; }
     button { cursor: pointer; background: #1d4ed8; border-color: #2563eb; }
     button.secondary { background: #243247; border-color: #334155; }
     button:disabled { opacity: 0.55; cursor: not-allowed; }
     .iconButton {
-      min-width: 88px;
+      min-width: 120px;
       display: inline-flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 4px;
+      gap: 6px;
       padding: 8px 10px;
       line-height: 1;
+      align-self: center;
     }
-    .iconButton svg { display: block; }
-    .iconWrap { position: relative; width: 24px; height: 24px; }
-    .iconFile { color: #cbd5e1; }
-    .iconDownload {
-      position: absolute;
-      right: -2px;
-      bottom: -2px;
-      color: #93c5fd;
-      filter: drop-shadow(0 0 2px rgba(15, 23, 42, 0.9));
+    .downloadIcon {
+      display: block;
+      height: 125px;
+      width: auto;
+      object-fit: contain;
     }
     .iconSubtitle { font-size: 11px; color: #cbd5e1; letter-spacing: 0.03em; }
     .status { min-height: 20px; color: #93c5fd; }
@@ -48,22 +47,17 @@
     <p>Fetch utility records for an address and export Idaho Power points with state-plane coordinates.</p>
 
     <form id="lookupForm">
-      <input id="addressInput" placeholder="100 Main St, Boise, ID" required />
-      <button id="lookupButton" type="submit">Fetch Utilities</button>
+      <div class="lookupControls">
+        <input id="addressInput" placeholder="100 Main St, Boise, ID" required />
+        <button id="lookupButton" type="submit">Fetch Utilities</button>
+      </div>
       <button id="exportButton" class="secondary iconButton" type="button" aria-label="Export power CSV" title="Export power CSV" disabled>
-        <span class="iconWrap" aria-hidden="true">
-          <svg class="iconFile" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 2H7C5.89543 2 5 2.89543 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M14 2V7H19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M8.5 11.5H15.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            <path d="M8.5 14.5H15.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
-          <svg class="iconDownload" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 1.5V8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            <path d="M3.75 5.75L6 8L8.25 5.75" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 10H10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
-        </span>
+        <img
+          class="downloadIcon"
+          src="./assets/icons/download/Download-CSV.png"
+          alt=""
+          aria-hidden="true"
+        />
         <span class="iconSubtitle">Export</span>
       </button>
     </form>
