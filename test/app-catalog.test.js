@@ -65,13 +65,13 @@ test('generated icon files exist for every app', async () => {
 });
 
 
-test('utilities pack uses CSV download icon override and height metadata', () => {
+test('utilities pack launcher icon uses default app icon with natural sizing', () => {
   const utilitiesPack = APP_CATALOG.find((app) => app.id === 'utilities-pack');
   assert.ok(utilitiesPack);
-  assert.equal(utilitiesPack.iconPath, '/assets/icons/download/Download-CSV.png');
-  assert.equal(utilitiesPack.iconHeight, 125);
+  assert.equal(utilitiesPack.iconPath, '/assets/icons/UtilitiesPack.png');
+  assert.equal(Object.hasOwn(utilitiesPack, 'iconHeight'), false);
 
   const publicUtilitiesPack = listApps().find((app) => app.id === 'utilities-pack');
   assert.ok(publicUtilitiesPack);
-  assert.equal(publicUtilitiesPack.iconHeight, 125);
+  assert.equal(Object.hasOwn(publicUtilitiesPack, 'iconHeight'), false);
 });

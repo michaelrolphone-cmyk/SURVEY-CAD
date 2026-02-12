@@ -9,8 +9,11 @@ test('UtilitiesPack loads power utilities through generic API source filtering',
 
   assert.match(html, /loadUtilitiesByAddress\(address,\s*\{\s*outSR:\s*state\.outSR,\s*sources:\s*\['power'\]\s*\}\)/);
   assert.match(html, /id="exportButton"[\s\S]*aria-label="Export power CSV"/);
-  assert.match(html, /class="iconFile"/);
-  assert.match(html, /class="iconDownload"/);
+  assert.match(html, /form\s*\{\s*display:\s*flex;[\s\S]*align-items:\s*center;/);
+  assert.match(html, /class="lookupControls"/);
+  assert.match(html, /class="downloadIcon"/);
+  assert.match(html, /src="\.\/assets\/icons\/download\/Download-CSV\.png"/);
+  assert.match(html, /height:\s*125px/);
   assert.match(html, /<span class="iconSubtitle">Export<\/span>/);
   assert.match(html, /utility\.source\s*\|\|\s*''/);
 });
