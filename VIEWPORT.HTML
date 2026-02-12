@@ -3968,6 +3968,10 @@
     if (Object.hasOwn(raw, "symbol_map_file")) raw.symbol_map_file = normalized;
   }
 
+  function normalizeSymbolOverrideKey(symbolName = "") {
+    return String(symbolName || "").trim().toUpperCase();
+  }
+
   function loadFldSymbolMapOverrides() {
     try {
       const raw = localStorage.getItem(FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY);
@@ -3976,7 +3980,7 @@
       if (!parsed || typeof parsed !== "object") return new Map();
       const overrides = new Map();
       for (const [symbol, file] of Object.entries(parsed)) {
-        const symbolKey = String(symbol || "").trim();
+        const symbolKey = normalizeSymbolOverrideKey(symbol);
         const mappedFile = String(file || "").trim();
         if (!symbolKey || !mappedFile) continue;
         overrides.set(symbolKey, mappedFile);
@@ -3990,7 +3994,7 @@
   function saveFldSymbolMapOverrides(overrides) {
     const obj = {};
     for (const [symbol, file] of (overrides instanceof Map ? overrides.entries() : [])) {
-      const symbolKey = String(symbol || "").trim();
+      const symbolKey = normalizeSymbolOverrideKey(symbol);
       const mappedFile = String(file || "").trim();
       if (!symbolKey || !mappedFile) continue;
       obj[symbolKey] = mappedFile;
@@ -3999,7 +4003,7 @@
   }
 
   function getSymbolMapFileForRule(rule) {
-    const symbolName = String(rule?.raw?.symbol || "").trim();
+    const symbolName = normalizeSymbolOverrideKey(rule?.raw?.symbol);
     if (symbolName) {
       const override = String(fieldToFinishRuleState.symbolSvgOverrides.get(symbolName) || "").trim();
       if (override) return override;
@@ -4008,12 +4012,13 @@
   }
 
   function setSymbolMapFileForRule(rule, value) {
-    const symbolName = String(rule?.raw?.symbol || "").trim();
+    const symbolName = normalizeSymbolOverrideKey(rule?.raw?.symbol);
     if (!symbolName) {
       setStatus("Enter a Symbol value before assigning an SVG mapping.", "warn");
       return false;
     }
     const mappedFile = String(value || "").trim();
+    setRuleSymbolMapFile(rule?.raw, mappedFile);
     if (mappedFile) fieldToFinishRuleState.symbolSvgOverrides.set(symbolName, mappedFile);
     else fieldToFinishRuleState.symbolSvgOverrides.delete(symbolName);
     saveFldSymbolMapOverrides(fieldToFinishRuleState.symbolSvgOverrides);
