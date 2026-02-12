@@ -1093,9 +1093,9 @@
         </label>
       </div>
       <div class="row" style="margin-top:8px;">
-        <button id="generatePrintView" class="ok" style="flex:1;">Generate Print View from Selection</button>
+        <button id="generatePrintView" class="ok" style="flex:1;">Draw Print Window</button>
       </div>
-      <div class="hint mini">Select points/lines with window or clicks, then generate a black-on-white print-ready excerpt. Scale snaps to nearest supported ratio: 1:1, 1:5, 1:10, 1:20, 1:30, 1:40, 1:50, 1:100, 1:200, 1:500, 1:1000.</div>
+      <div class="hint mini">Click <b>Draw Print Window</b>, drag a selection window around the area to print, then release to generate a black-on-white print-ready excerpt. Scale snaps to nearest supported ratio: 1:1, 1:5, 1:10, 1:20, 1:30, 1:40, 1:50, 1:100, 1:200, 1:500, 1:1000.</div>
     </div>
 
     <div class="section">
@@ -2113,6 +2113,7 @@
   };
   let pendingMarqueeZoomRect = null;
   let pendingMarqueeSelectionSnapshot = null;
+  let pendingPrintWindowCapture = false;
   const DOUBLE_RIGHT_CLICK_ZOOM_OUT_MS = 325;
   let lastRightClickAtMs = 0;
 
@@ -5275,7 +5276,7 @@
   printPaperSizeInput?.addEventListener("change", updatePrintScalePreview);
   printCustomWidthMmInput?.addEventListener("input", updatePrintScalePreview);
   printCustomHeightMmInput?.addEventListener("input", updatePrintScalePreview);
-  generatePrintViewBtn?.addEventListener("click", generatePrintViewFromSelection);
+  generatePrintViewBtn?.addEventListener("click", beginPrintWindowCapture);
 
   $("#toolSelect").addEventListener("click", ()=>setTool("select"));
   $("#toolAddPoint").addEventListener("click", ()=>setTool("addPoint"));
@@ -6167,6 +6168,19 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     return { selectedScale, targetScale };
   }
 
+  function worldBoundsFromScreenRect(screenRect) {
+    if (!screenRect) return null;
+    const worldA = screenToWorld(screenRect.minX, screenRect.maxY);
+    const worldB = screenToWorld(screenRect.maxX, screenRect.minY);
+    if (!worldA || !worldB) return null;
+    return {
+      minX: Math.min(worldA.x, worldB.x),
+      minY: Math.min(worldA.y, worldB.y),
+      maxX: Math.max(worldA.x, worldB.x),
+      maxY: Math.max(worldA.y, worldB.y)
+    };
+  }
+
   function renderSelectionToPrintDataUrl(bounds, paper, selectedScale) {
     const dpi = 180;
     const pageWidthPx = Math.max(1, Math.round(paper.widthIn * dpi));
@@ -6264,8 +6278,14 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     if (printScalePreviewInput) printScalePreviewInput.value = `1:${result.selectedScale}`;
   }
 
-  function generatePrintViewFromSelection() {
-    const bounds = getSelectionWorldBounds();
+  function beginPrintWindowCapture() {
+    pendingPrintWindowCapture = true;
+    setTool("select");
+    setStatus("Draw a selection window over the area to print, then release.", "ok");
+    return true;
+  }
+
+  function generatePrintViewFromBounds(bounds) {
     if (!bounds) {
       setStatus("Select at least one point or line before generating print view.", "warn");
       return false;
@@ -6274,19 +6294,24 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     const paper = resolvePrintPaperSizeInches();
     const { selectedScale } = chooseClosestPrintScale(bounds, paper);
     const imageUrl = renderSelectionToPrintDataUrl(bounds, paper, selectedScale);
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    const printWindow = window.open("", "_blank");
     if (!printWindow) {
       setStatus("Popup blocked. Allow popups to open print preview.", "warn");
       return false;
     }
 
     const title = `Print View 1:${selectedScale}`;
+    printWindow.document.open();
     printWindow.document.write(`<!doctype html><html><head><title>${title}</title><style>body{margin:0;background:#f4f4f4;font-family:Arial,sans-serif;}main{max-width:96vw;margin:12px auto;padding:8px;}img{width:100%;height:auto;background:#fff;border:1px solid #111;box-shadow:0 2px 8px rgba(0,0,0,.15);}button{margin:6px 0;padding:8px 12px;font-size:14px;}</style></head><body><main><button onclick="window.print()">Print</button><div>Paper: ${paper.label} · Scale: 1:${selectedScale}</div><img src="${imageUrl}" alt="Print-ready black and white survey excerpt"/></main></body></html>`);
     printWindow.document.close();
 
     if (printScalePreviewInput) printScalePreviewInput.value = `1:${selectedScale}`;
     setStatus(`Generated print view on ${paper.label} at 1:${selectedScale}.`, "ok");
     return true;
+  }
+
+  function generatePrintViewFromSelection() {
+    return generatePrintViewFromBounds(getSelectionWorldBounds());
   }
 
   // -------------------------
@@ -8322,6 +8347,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       pendingMarqueeZoomRect = marqueeRect;
       pendingMarqueeSelectionSnapshot = selectionSnapshot;
       applyMarqueeSelection(mouse.dragObj);
+      if (pendingPrintWindowCapture) {
+        pendingPrintWindowCapture = false;
+        const printBounds = worldBoundsFromScreenRect(marqueeRect);
+        generatePrintViewFromBounds(printBounds);
+      }
       endDrag();
       return;
     }
