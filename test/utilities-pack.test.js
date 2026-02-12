@@ -12,10 +12,12 @@ test('UtilitiesPack loads power utilities through generic API source filtering',
   assert.match(html, /utility\.source\s*\|\|\s*''/);
 });
 
-test('UtilitiesPack CSV export includes state-plane coordinates', async () => {
+test('UtilitiesPack CSV export matches name,northing,easting,elevation,code,description format', async () => {
   const html = await readFile(utilitiesPackHtmlPath, 'utf8');
 
-  assert.match(html, /\['id', 'source', 'provider', 'code', 'name', 'lon', 'lat', 'east', 'north', 'outSR'\]/);
-  assert.match(html, /Number\(projected\.east \|\| 0\)\.toFixed\(3\)/);
+  assert.match(html, /\['name', 'northing', 'easting', 'elevation', 'code', 'description'\]/);
+  assert.match(html, /utility\.name \|\| `POWER_\$\{index \+ 1\}`/);
   assert.match(html, /Number\(projected\.north \|\| 0\)\.toFixed\(3\)/);
+  assert.match(html, /Number\(projected\.east \|\| 0\)\.toFixed\(3\)/);
+  assert.match(html, /utility\.provider \|\| utility\.source \|\| ''/);
 });

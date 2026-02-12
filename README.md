@@ -326,7 +326,7 @@ Base URL (local): `http://localhost:3000`
 ### Launcher apps
 
 - `RecordQuarry.html` — full research bundle harvest workflow (plats, ROS, parcels, subdivision, and utility overlays).
-- `UtilitiesPack.html` — utilities-only workflow that fetches utility records for an address, stores state-plane coordinates in app state, and exports power utility CSV rows.
+- `UtilitiesPack.html` — utilities-only workflow that fetches utility records for an address, stores state-plane coordinates in app state, and exports power utility CSV rows in `name,northing,easting,elevation,code,description` format.
 
 
 - `GET /health`
