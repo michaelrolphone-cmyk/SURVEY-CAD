@@ -580,6 +580,10 @@ test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected
   assert.match(html, /ADA_CPF_PDF_BASE\s*=\s*"https:\/\/gisprod\.adacounty\.id\.gov\/apps\/acdscpf\/CpfPdfs\/"/, 'point inspector should use the Ada CP&F PDF base path');
   assert.match(html, /cpfLabel\.textContent\s*=\s*`CP&F \(≤\$\{CPNF_NEARBY_DISTANCE_FEET\}ft\)`/, 'point inspector should label CP&F row with nearby radius context');
   assert.match(html, /a\.textContent\s*=\s*`Open\s+\$\{instrument\}`/, 'point inspector should render quick-open CP&F links per instrument');
+  assert.match(html, /function\s+applySelectedPointEdits\(fields,\s*sourceLabel\s*=\s*"inspector"\)/, 'point inspector and point editor should share a single apply helper for point property updates');
+  assert.match(html, /const\s+fieldSpecs\s*=\s*\[[\s\S]*\["Point",\s*"num",\s*p\.num\][\s\S]*\["Notes",\s*"notes",\s*p\.notes \|\| ""\]/, 'point inspector should render editable fields for number, coordinates, code, and notes');
+  assert.match(html, /applyBtn\.id\s*=\s*"pointInspectorApply";/, 'point inspector should render an apply button for saving point property edits directly from inspector');
+  assert.match(html, /applySelectedPointEdits\(inspectorFields,\s*"point inspector"\);/, 'point inspector apply action should commit edits through the shared point update helper');
 });
 
 

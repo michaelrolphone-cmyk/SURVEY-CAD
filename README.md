@@ -28,6 +28,14 @@ npm start
 
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
+## LineSmith Point Inspector Editing
+
+When you click a point in `VIEWPORT.HTML`, you can now edit point properties directly inside the **Point Inspector** card:
+
+- Editable fields: point number, X, Y, Z, code, and notes.
+- Click **Apply Inspector Edits** to save updates to the selected point.
+- The classic **Add / Edit Point** panel remains available and uses the same update workflow.
+
 ## LineSmith Save Shortcuts
 
 When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the same project-linked save workflow as the **Save Drawing to Project** button:
@@ -119,6 +127,7 @@ npm run cli -- --help
 npm run ros:cli -- --help
 curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/apps"
+node --test test/viewport.test.js
 find assets/survey-symbols -maxdepth 1 -name '*.svg' | wc -l
 ```
 
