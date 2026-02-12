@@ -88,6 +88,17 @@ Quick command support in LineSmith:
 ```text
 printview
 ```
+## LineSmith Basis of Bearing
+
+`VIEWPORT.HTML` (LineSmith) now supports defining a **Basis of Bearing** directly in the drawing by entering two coordinate pairs:
+
+- Enter `X1`, `Y1`, `X2`, and `Y2` under the **Basis of Bearing** section.
+- Click **Set Basis of Bearing** to draw a dashed reference line between those two coordinates.
+- The reference is clearly labeled **BASIS OF BEARING** on-canvas for plan readability.
+- Click **Clear Basis of Bearing** to remove it.
+
+The basis-of-bearing definition is saved/restored with drawing state (local save, project drawing versions, and collaboration state sync).
+
 ## LineSmith Cluster Tooltip During Line Drawing
 
 When point clustering is enabled in `VIEWPORT.HTML` while drawing lines:

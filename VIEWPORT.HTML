@@ -1602,6 +1602,34 @@
 
     <div class="section">
       <div class="title">
+        <b>Basis of Bearing</b>
+        <span>define two drawing coordinates</span>
+      </div>
+      <div class="grid2">
+        <label>X1
+          <input id="basisBearingX1" placeholder="1000.000" />
+        </label>
+        <label>Y1
+          <input id="basisBearingY1" placeholder="1000.000" />
+        </label>
+      </div>
+      <div class="grid2">
+        <label>X2
+          <input id="basisBearingX2" placeholder="1010.000" />
+        </label>
+        <label>Y2
+          <input id="basisBearingY2" placeholder="1004.000" />
+        </label>
+      </div>
+      <div class="grid2" style="margin-top:8px;">
+        <button id="setBasisOfBearing" class="ok">Set Basis of Bearing</button>
+        <button id="clearBasisOfBearing">Clear Basis of Bearing</button>
+      </div>
+      <div class="hint mini">Draws an on-canvas reference line clearly labeled <b>BASIS OF BEARING</b>.</div>
+    </div>
+
+    <div class="section">
+      <div class="title">
         <b>Line Ops</b>
         <span>select lines (Shift for multi)</span>
       </div>
@@ -2410,6 +2438,12 @@
   const showPointNamesInput = $("#showPointNames");
   const showPointCodesInput = $("#showPointCodes");
   const showPointNotesInput = $("#showPointNotes");
+  const basisBearingX1Input = $("#basisBearingX1");
+  const basisBearingY1Input = $("#basisBearingY1");
+  const basisBearingX2Input = $("#basisBearingX2");
+  const basisBearingY2Input = $("#basisBearingY2");
+  const setBasisOfBearingBtn = $("#setBasisOfBearing");
+  const clearBasisOfBearingBtn = $("#clearBasisOfBearing");
   
   const enablePointClusteringInput = $("#enablePointClustering");
   const quickShowLinesBtn = $("#quickShowLines");
@@ -2490,6 +2524,7 @@
   var layersTableDirty = true;
   const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable,layerId}
   const lines = new Map();  // id -> {id,a,b,movable,layerId}
+  let basisOfBearing = null; // {start:{x,y}, end:{x,y}}
   let quickLayerDropdownOpen = false;
 
   // Selection
@@ -3097,6 +3132,26 @@
     }
   };
 
+  function sanitizeBasisOfBearing(value) {
+    const startX = Number(value?.start?.x);
+    const startY = Number(value?.start?.y);
+    const endX = Number(value?.end?.x);
+    const endY = Number(value?.end?.y);
+    if (![startX, startY, endX, endY].every(Number.isFinite)) return null;
+    if (Math.hypot(endX - startX, endY - startY) < EPS) return null;
+    return {
+      start: { x: startX, y: startY },
+      end: { x: endX, y: endY }
+    };
+  }
+
+  function syncBasisOfBearingInputs() {
+    if (basisBearingX1Input) basisBearingX1Input.value = basisOfBearing ? String(basisOfBearing.start.x) : "";
+    if (basisBearingY1Input) basisBearingY1Input.value = basisOfBearing ? String(basisOfBearing.start.y) : "";
+    if (basisBearingX2Input) basisBearingX2Input.value = basisOfBearing ? String(basisOfBearing.end.x) : "";
+    if (basisBearingY2Input) basisBearingY2Input.value = basisOfBearing ? String(basisOfBearing.end.y) : "";
+  }
+
   function serializeState(options = {}) {
     const { includeView = true } = options;
     const pts = Array.from(points.values()).map(p => ({...p}));
@@ -3114,6 +3169,10 @@
         lastSelectedLineId
       },
       construction: {...construction},
+      basisOfBearing: basisOfBearing ? {
+        start: { ...basisOfBearing.start },
+        end: { ...basisOfBearing.end }
+      } : null,
       mapGeoreference: mapGeoreference ? {
         lat: { ...mapGeoreference.lat },
         lng: { ...mapGeoreference.lng }
@@ -3154,6 +3213,8 @@
     lastSelectedLineId = s.selection?.lastSelectedLineId ?? null;
 
     construction = s.construction ?? { startPointId:null };
+    basisOfBearing = sanitizeBasisOfBearing(s.basisOfBearing);
+    syncBasisOfBearingInputs();
 
     if (applyView && s.view) {
       view.scale = s.view.scale ?? view.scale;
@@ -5644,6 +5705,45 @@
         ctx.restore();
 
         blockedTextRects.push(candidateAabb);
+      }
+      ctx.restore();
+    }
+
+    if (basisOfBearing) {
+      const start = worldToScreen(basisOfBearing.start.x, basisOfBearing.start.y);
+      const end = worldToScreen(basisOfBearing.end.x, basisOfBearing.end.y);
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const angle = Math.atan2(dy, dx);
+      const lengthPx = Math.hypot(dx, dy);
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,213,74,0.95)";
+      ctx.setLineDash([8, 6]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(255,213,74,0.95)";
+      ctx.beginPath();
+      ctx.arc(start.x, start.y, 3.5, 0, Math.PI * 2);
+      ctx.arc(end.x, end.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (lengthPx > 32) {
+        const labelX = (start.x + end.x) * 0.5;
+        const labelY = (start.y + end.y) * 0.5 - 12;
+        let labelAngle = angle;
+        if (labelAngle > Math.PI / 2 || labelAngle < -Math.PI / 2) labelAngle += Math.PI;
+        ctx.translate(labelX, labelY);
+        ctx.rotate(labelAngle);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "bold 12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+        ctx.fillText("BASIS OF BEARING", 0, 0);
       }
       ctx.restore();
     }
@@ -8189,6 +8289,34 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   // -------------------------
   // Line creation & ops (unchanged behavior)
   // -------------------------
+  setBasisOfBearingBtn?.addEventListener("click", () => {
+    const value = sanitizeBasisOfBearing({
+      start: { x: parseNum(basisBearingX1Input?.value, NaN), y: parseNum(basisBearingY1Input?.value, NaN) },
+      end: { x: parseNum(basisBearingX2Input?.value, NaN), y: parseNum(basisBearingY2Input?.value, NaN) }
+    });
+    if (!value) {
+      setStatus("Basis of bearing requires two distinct coordinate pairs.", "warn");
+      return;
+    }
+    history.push("set basis of bearing");
+    basisOfBearing = value;
+    syncBasisOfBearingInputs();
+    scheduleCollabStateSync();
+    setStatus("Basis of bearing set and labeled on the drawing.", "ok");
+  });
+
+  clearBasisOfBearingBtn?.addEventListener("click", () => {
+    if (!basisOfBearing) {
+      setStatus("No basis of bearing is currently defined.", "warn");
+      return;
+    }
+    history.push("clear basis of bearing");
+    basisOfBearing = null;
+    syncBasisOfBearingInputs();
+    scheduleCollabStateSync();
+    setStatus("Basis of bearing cleared.", "ok");
+  });
+
   $("#setStartFromSel").addEventListener("click", () => {
     if (!selectedPointId) { setStatus("Select a start point first.", "warn"); return; }
     construction.startPointId = selectedPointId;
@@ -10003,6 +10131,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       updatePointEditorFromSelection();
       updateUndoRedoHUD();
       updateCounts();
+      syncBasisOfBearingInputs();
       requestAnimationFrame(draw);
       markDrawingAsSaved();
 
