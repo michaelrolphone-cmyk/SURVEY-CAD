@@ -32,7 +32,7 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 
 ## API and CLI Notes for this change
 
-The launcher icon/layout refresh (2.5x icons, centered names, description tooltips, and reduced nested framing) is a UI-only update and does not add, remove, or modify any server API endpoints or CLI commands. The endpoint and command references below remain current for this release.
+The SurveyFoundry launcher has been visually redesigned around a rustic survey workshop motif (hand-painted texture layering, warm lamplight earth tones, and subtle futuristic cyan/amber glow accents). This is a UI-only refresh and does not add, remove, or modify server API endpoints or CLI commands; the endpoint and command references below remain current for this release.
 
 ## LineSmith Loading Experience
 

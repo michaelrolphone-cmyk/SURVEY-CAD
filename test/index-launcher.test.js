@@ -18,6 +18,16 @@ test('launcher cards show 2.5x icons, centered names, and descriptions via toolt
   assert.doesNotMatch(launcherHtml, /<span>\$\{app\.entryHtml\}<\/span>/);
 });
 
+test('launcher home styling blends rustic workshop tones with futuristic glow accents', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /--ember:\s*#ffb347;/, 'launcher should define an ember accent variable for warm lamplight color language');
+  assert.match(launcherHtml, /repeating-linear-gradient\(-14deg,[\s\S]*rgba\(255, 226, 187, 0\.03\)/, 'launcher body should include subtle painted texture striping');
+  assert.match(launcherHtml, /radial-gradient\(circle at 84% 14%, rgba\(104, 214, 255, 0\.16\)/, 'launcher background should preserve futuristic cyan highlight accents');
+  assert.match(launcherHtml, /\.app-card::before\s*\{[\s\S]*repeating-linear-gradient\(-18deg,[\s\S]*rgba\(255, 230, 194, 0\.03\)/i, 'launcher app cards should layer a hand-painted texture overlay');
+  assert.match(launcherHtml, /\.app-card:hover,[\s\S]*box-shadow:\s*0 14px 28px rgba\(16, 10, 6, 0\.62\), 0 0 0 1px rgba\(255, 214, 155, 0\.28\);/i, 'launcher hover states should add warm workshop depth with luminous edge highlights');
+});
+
 
 
 test('launcher renders experimental apps in a dedicated section after stable apps', async () => {
@@ -83,7 +93,7 @@ test('launcher includes SurveyFoundry branding in title and header', async () =>
   assert.match(launcherHtml, /id="activeProjectHeader" class="header-meta" aria-live="polite"/, 'header should include active project status region');
   assert.match(launcherHtml, /<a href="\/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<span id="launcherBackChevron" class="launcher-back-chevron" aria-hidden="true">‹<\/span>[\s\S]*<img id="launcherHeaderIcon" src="\/assets\/icons\/SurveyFoundry\.png" alt="SurveyFoundry app icon" class="launcher-icon" \/>/);
   assert.match(launcherHtml, /<header>[\s\S]*<a href="\/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">[\s\S]*<\/a>[\s\S]*<h1 id="launcherHeaderTitle">SurveyFoundry App Launcher<\/h1>/, 'header should place launcher icon link before app title text on the left');
-  assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;[\s\S]*background:\s*linear-gradient\(135deg, #facc15, #f97316\);[\s\S]*border-radius:\s*999px;/i, 'header active project should render as a standout pill');
+  assert.match(launcherHtml, /\.header-meta\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;[\s\S]*background:\s*linear-gradient\(135deg, #f9d18f, #e8974a\);[\s\S]*border-radius:\s*999px;/i, 'header active project should render as a standout pill');
   assert.match(launcherHtml, /<footer class="footer-logo-wrap"[\s\S]*<img src="943\.png" alt="SurveyFoundry logo" class="footer-logo"/);
   assert.match(launcherHtml, /header\s*\{[\s\S]*align-items:\s*center;/i);
   assert.match(launcherHtml, /\.launcher-icon\s*\{[\s\S]*width:\s*84px;[\s\S]*height:\s*84px;/i, 'header launcher icon should render at twice the previous size');
