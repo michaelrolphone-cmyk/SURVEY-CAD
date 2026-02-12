@@ -340,8 +340,8 @@
     .app-card {
       position: relative;
       isolation: isolate;
-      background: linear-gradient(160deg, rgba(72, 47, 31, 0.92), rgba(41, 29, 21, 0.92));
-      border: 1px solid rgba(230, 190, 132, 0.32);
+      background: linear-gradient(160deg, rgba(78, 51, 34, 0.56), rgba(45, 31, 23, 0.48));
+      border: 1px solid rgba(244, 199, 142, 0.38);
       border-radius: 14px;
       padding: 0.95rem;
       text-align: center;
@@ -353,7 +353,9 @@
       gap: 0.7rem;
       align-items: center;
       justify-content: flex-start;
-      box-shadow: 0 10px 24px var(--workshop-shadow), inset 0 1px 0 rgba(255, 225, 182, 0.07);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
+      box-shadow: 0 10px 24px var(--workshop-shadow), inset 0 1px 0 rgba(255, 225, 182, 0.15);
     }
 
     .app-card::before {
@@ -362,17 +364,18 @@
       inset: 0;
       border-radius: inherit;
       background:
-        radial-gradient(circle at 14% 12%, rgba(255, 200, 129, 0.19), rgba(255, 200, 129, 0) 36%),
-        radial-gradient(circle at 84% 7%, rgba(109, 215, 255, 0.14), rgba(109, 215, 255, 0) 32%);
+        radial-gradient(circle at 14% 12%, rgba(255, 200, 129, 0.24), rgba(255, 200, 129, 0) 38%),
+        radial-gradient(circle at 84% 7%, rgba(109, 215, 255, 0.18), rgba(109, 215, 255, 0) 34%),
+        linear-gradient(175deg, rgba(255, 224, 188, 0.1), rgba(108, 69, 43, 0.06));
       pointer-events: none;
       z-index: -1;
     }
 
     .app-card:hover,
     .app-card:focus-visible {
-      background: linear-gradient(160deg, rgba(88, 59, 38, 0.95), rgba(50, 35, 25, 0.95));
+      background: linear-gradient(160deg, rgba(96, 65, 43, 0.62), rgba(56, 39, 29, 0.56));
       transform: translateY(-2px);
-      border-color: rgba(255, 205, 136, 0.55);
+      border-color: rgba(255, 214, 155, 0.62);
       box-shadow: 0 14px 28px rgba(16, 10, 6, 0.62), 0 0 0 1px rgba(255, 214, 155, 0.28);
     }
 
