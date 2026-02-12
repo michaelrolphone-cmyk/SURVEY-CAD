@@ -27,7 +27,7 @@ test('launcher home styling blends rustic workshop tones with futuristic glow ac
   assert.match(launcherHtml, /--ember:\s*#ffb347;/, 'launcher should define an ember accent variable for warm lamplight color language');
   assert.match(launcherHtml, /repeating-linear-gradient\(-14deg,[\s\S]*rgba\(255, 226, 187, 0\.03\)/, 'launcher body should include subtle painted texture striping');
   assert.match(launcherHtml, /radial-gradient\(circle at 84% 14%, rgba\(104, 214, 255, 0\.16\)/, 'launcher background should preserve futuristic cyan highlight accents');
-  assert.match(launcherHtml, /\.app-card::before\s*\{[\s\S]*repeating-linear-gradient\(-18deg,[\s\S]*rgba\(255, 230, 194, 0\.03\)/i, 'launcher app cards should layer a hand-painted texture overlay');
+  assert.doesNotMatch(launcherHtml, /\.app-card::before\s*\{[\s\S]*repeating-linear-gradient\(-18deg,[\s\S]*rgba\(255, 230, 194, 0\.03\)/i, 'launcher app cards should not include the diagonal stripe texture overlay');
   assert.match(launcherHtml, /\.app-card:hover,[\s\S]*box-shadow:\s*0 14px 28px rgba\(16, 10, 6, 0\.62\), 0 0 0 1px rgba\(255, 214, 155, 0\.28\);/i, 'launcher hover states should add warm workshop depth with luminous edge highlights');
 });
 
