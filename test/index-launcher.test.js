@@ -221,11 +221,12 @@ test('launcher syncs localStorage to server with versioning and stale refresh ha
   assert.match(launcherHtml, /entries\.forEach\(\(\[key, value\]\) => \{[\s\S]*localStorage\.setItem\(key, String\(value\)\);/, 'launcher should merge stale server snapshots into localStorage keys without clearing unrelated data');
   assert.doesNotMatch(launcherHtml, /function\s+applyServerSnapshot\([\s\S]*localStorage\.clear\(/, 'launcher should not clear all localStorage when applying stale sync snapshots');
   assert.doesNotMatch(launcherHtml, /function\s+refreshOpenApp\(/, 'launcher should not force iframe refreshes when stale snapshots are applied');
-  assert.match(launcherHtml, /setInterval\(\(\) => \{[\s\S]*syncLocalStorageWithServer\(\)/, 'launcher should continuously sync localStorage updates');
-  assert.match(launcherHtml, /syncLocalStorageWithServer\(\{\s*force:\s*true\s*\}\)\.catch\(\(err\) => \{\s*console\.warn\('initial localStorage sync failed', err\);/,
-    'launcher should force the first startup sync so unchanged snapshots still post once');
-  assert.doesNotMatch(launcherHtml, /localStorageSyncSnapshot\s*=\s*JSON\.stringify\(buildLocalStorageSnapshot\(\)\);\s*setInterval\(/,
-    'launcher should not pre-seed the sync snapshot before scheduling background sync');
+  assert.match(launcherHtml, /function\s+queueLocalStorageSyncPoll\(delayMs = LOCAL_STORAGE_SYNC_INTERVAL_MS\)/, 'launcher should schedule background sync with a single timeout poller');
+  assert.match(launcherHtml, /if \(localStorageSyncInFlight\) \{[\s\S]*return;[\s\S]*\}/, 'launcher should avoid overlapping sync requests while one is in flight');
+  assert.match(launcherHtml, /runLocalStorageSyncCycle\(\{ force: true \}\);/,
+    'launcher should force the first startup sync via the guarded sync cycle');
+  assert.doesNotMatch(launcherHtml, /setInterval\(/,
+    'launcher should no longer use an unbounded interval that can stack pending sync requests');
 });
 
 test('launcher back-button navigation is wired through browser history state', async () => {

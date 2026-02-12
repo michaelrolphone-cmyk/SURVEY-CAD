@@ -355,6 +355,7 @@ When saving/downloading, unknown columns from the FLD header are preserved and n
 - `GET /api/localstorage-sync`
 - `POST /api/localstorage-sync`
   - JSON body: `{ "version": number, "snapshot": object }`
+  - Launcher sync behavior: browser client now runs a single in-flight polling loop (default 2s cadence, capped exponential retry backoff to 30s) so slow sync requests do not stack into dozens of pending calls.
 
 ### ROS and OCR
 
@@ -370,6 +371,9 @@ curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/section?lon=-116.20&lat=43.61"
 curl "http://localhost:3000/api/fld-config?file=config/MLS.fld"
+curl -X POST "http://localhost:3000/api/localstorage-sync" \
+  -H "Content-Type: application/json" \
+  -d '{"version":1730000000000,"snapshot":{"surveyfoundryProjects":"[]"}}'
 curl -I "http://localhost:3000/assets/survey-symbols/monument.svg"
 ```
 
