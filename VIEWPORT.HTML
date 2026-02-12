@@ -827,6 +827,50 @@
       flex-wrap:wrap;
     }
     .tableTools input{ flex:1; min-width:220px; }
+    .fldTypeConfigCell{
+      min-width:320px;
+    }
+    .fldTypeConfigStack{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap:6px;
+    }
+    .fldTypeConfigStack .cellInput,
+    .fldTypeConfigStack select{
+      width:100%;
+      min-width:0;
+    }
+    .fldSymbolGallery{
+      border-top:1px solid var(--border);
+      background:#0a0a0a;
+      padding:8px;
+      overflow:auto;
+      max-height:220px;
+    }
+    .fldSymbolGalleryGrid{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+      gap:8px;
+    }
+    .fldSymbolCard{
+      border:1px solid #262626;
+      border-radius:10px;
+      padding:6px;
+      background:#101010;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      align-items:center;
+      text-align:center;
+      font-size:11px;
+    }
+    .fldSymbolCard img{
+      width:36px;
+      height:36px;
+      object-fit:contain;
+      filter:invert(1);
+    }
+    .fldSymbolCard .muted{ color:var(--muted); }
     table{
       width:100%;
       border-collapse:collapse;
@@ -1466,12 +1510,16 @@
                 <th style="width:110px;">Process</th>
                 <th style="width:180px;">Layer</th>
                 <th style="width:220px;">Description</th>
+                <th style="width:340px;">Type Config (line type / symbol + scale)</th>
                 <th style="width:220px;">Companion Codes</th>
                 <th style="width:100px;">Actions</th>
               </tr>
             </thead>
             <tbody id="fldTbody"></tbody>
           </table>
+        </div>
+        <div id="fldSymbolGallery" class="fldSymbolGallery">
+          <div id="fldSymbolGalleryGrid" class="fldSymbolGalleryGrid"></div>
         </div>
       </div>
     </div>
@@ -2015,6 +2063,7 @@
   const fldModalClose = $("#fldModalClose");
   const fldFilterInput = $("#fldFilter");
   const fldTbody = $("#fldTbody");
+  const fldSymbolGalleryGrid = $("#fldSymbolGalleryGrid");
   const fldSourceLabel = $("#fldSourceLabel");
   const fldAddRuleBtn = $("#fldAddRule");
   const fldSaveLocalBtn = $("#fldSaveLocal");
@@ -3022,6 +3071,98 @@
     activeConfig: null,
     source: "server",
   };
+  const fldSymbolLibraryState = {
+    symbols: [],
+    byFile: new Map(),
+    loaded: false,
+  };
+
+  async function loadSurveySymbolLibrary() {
+    try {
+      const response = await fetch("/assets/survey-symbols/index.json");
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const manifest = await response.json();
+      const symbols = Array.isArray(manifest?.symbols) ? manifest.symbols : [];
+      fldSymbolLibraryState.symbols = symbols;
+      fldSymbolLibraryState.byFile = new Map(symbols.map((symbol) => [String(symbol?.file || "").trim(), symbol]));
+      fldSymbolLibraryState.loaded = true;
+      return true;
+    } catch (_err) {
+      fldSymbolLibraryState.symbols = [];
+      fldSymbolLibraryState.byFile = new Map();
+      fldSymbolLibraryState.loaded = false;
+      return false;
+    }
+  }
+
+  function buildLineTypeOptions(config) {
+    const options = new Set(["BYLAYER"]);
+    const rules = Array.isArray(config?.rules) ? config.rules : [];
+    for (const rule of rules) {
+      const lineType = String(rule?.raw?.linetype || "").trim();
+      if (lineType) options.add(lineType);
+    }
+    return Array.from(options).sort((a, b) => a.localeCompare(b));
+  }
+
+  function buildSymbolMapChoices(config) {
+    const choices = [];
+    const seen = new Set();
+    for (const symbol of fldSymbolLibraryState.symbols) {
+      const file = String(symbol?.file || "").trim();
+      if (!file || seen.has(file)) continue;
+      seen.add(file);
+      choices.push({
+        value: file,
+        label: `${String(symbol?.id || "symbol")} (${file})`,
+      });
+    }
+    const rules = Array.isArray(config?.rules) ? config.rules : [];
+    for (const rule of rules) {
+      const existingFile = String(rule?.raw?.symbol_name_2 || "").trim();
+      if (!existingFile || seen.has(existingFile)) continue;
+      seen.add(existingFile);
+      choices.push({ value: existingFile, label: existingFile });
+    }
+    return choices;
+  }
+
+  function renderFldSymbolGallery(config) {
+    if (!fldSymbolGalleryGrid) return;
+    const rules = Array.isArray(config?.rules) ? config.rules : [];
+    fldSymbolGalleryGrid.innerHTML = "";
+    const symbolRules = rules
+      .filter((rule) => String(rule?.raw?.entity_type || "") === "0")
+      .filter((rule) => String(rule?.raw?.symbol || "").trim() || String(rule?.raw?.symbol_name_2 || "").trim());
+    if (!symbolRules.length) {
+      fldSymbolGalleryGrid.innerHTML = '<div class="muted">No symbol-type FLD rules yet. Add one using Entity = Symbol.</div>';
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const rule of symbolRules) {
+      const card = document.createElement("div");
+      card.className = "fldSymbolCard";
+      const symbolId = String(rule?.raw?.symbol || "").trim() || "(none)";
+      const symbolFile = String(rule?.raw?.symbol_name_2 || "").trim();
+      if (symbolFile) {
+        const img = document.createElement("img");
+        img.src = `/assets/survey-symbols/${encodeURIComponent(symbolFile)}`;
+        img.alt = `${symbolId} symbol preview`;
+        card.appendChild(img);
+      }
+      const codeLabel = document.createElement("b");
+      codeLabel.textContent = String(rule?.raw?.code || "").trim() || "(no code)";
+      const symbolLabel = document.createElement("div");
+      symbolLabel.textContent = `ID: ${symbolId}`;
+      const fileLabel = document.createElement("div");
+      fileLabel.className = "muted";
+      fileLabel.textContent = symbolFile || "No SVG mapping";
+      card.append(codeLabel, symbolLabel, fileLabel);
+      frag.appendChild(card);
+    }
+    fldSymbolGalleryGrid.appendChild(frag);
+  }
 
   function deriveFieldToFinishCodeSetsFromConfig(config) {
     const lineworkCodes = new Set();
@@ -3128,6 +3269,7 @@
       fldEditorState.activeConfig = cloneFldConfig(localOverride || serverConfig);
       fldEditorState.source = localOverride ? "local" : "server";
       applyFieldToFinishConfig(fldEditorState.activeConfig, localOverride ? "localStorage" : path);
+      await loadSurveySymbolLibrary();
       return true;
     } catch (_err) {
       fieldToFinishRuleState.loaded = false;
@@ -8347,6 +8489,9 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     rule.fullName = String(raw.full_name || "").trim();
     rule.layer = String(raw.layer || "").trim();
     rule.entityType = String(raw.entity_type || "").trim();
+    rule.lineType = String(raw.linetype || "").trim();
+    rule.symbol = String(raw.symbol || "").trim();
+    rule.symbolScale = String(raw.symbol_size || "").trim();
     rule.processingOn = String(raw.processing_on || "") === "1";
     rule.companionCodes = String(raw.companion_codes || "").split(",").map((item) => item.trim()).filter(Boolean);
   }
@@ -8360,6 +8505,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (!fldTbody) return;
     const config = fldEditorState.activeConfig;
     const rules = Array.isArray(config?.rules) ? config.rules : [];
+    const lineTypeOptions = buildLineTypeOptions(config);
+    const symbolMapChoices = buildSymbolMapChoices(config);
     const filter = String(fldFilterInput?.value || "").trim().toUpperCase();
     fldTbody.innerHTML = "";
     const frag = document.createDocumentFragment();
@@ -8386,7 +8533,26 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       };
 
       const codeCell = mkInputCell("code");
-      const entityCell = mkInputCell("entity_type");
+      const entityTd = document.createElement("td");
+      const entitySelect = document.createElement("select");
+      entitySelect.className = "cellInput";
+      const entityOptions = [
+        { value: "2", label: "Linework" },
+        { value: "0", label: "Symbol" },
+      ];
+      entityOptions.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        entitySelect.appendChild(option);
+      });
+      entitySelect.value = String(rule.raw?.entity_type || "0");
+      entitySelect.addEventListener("change", () => {
+        rule.raw.entity_type = entitySelect.value;
+        syncFldRuleDerivedFields(rule);
+        renderFldEditorTable();
+      });
+      entityTd.appendChild(entitySelect);
       const processTd = document.createElement("td");
       const processInput = document.createElement("input");
       processInput.type = "checkbox";
@@ -8398,6 +8564,82 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       processTd.appendChild(processInput);
       const layerCell = mkInputCell("layer");
       const descCell = mkInputCell("description");
+      const typeConfigTd = document.createElement("td");
+      typeConfigTd.className = "fldTypeConfigCell";
+      const typeConfigStack = document.createElement("div");
+      typeConfigStack.className = "fldTypeConfigStack";
+      const isLinework = String(rule.raw?.entity_type || "") === "2";
+      if (isLinework) {
+        const lineTypeSelect = document.createElement("select");
+        lineTypeSelect.className = "cellInput";
+        lineTypeOptions.forEach((lineType) => {
+          const option = document.createElement("option");
+          option.value = lineType;
+          option.textContent = lineType;
+          lineTypeSelect.appendChild(option);
+        });
+        const currentLineType = String(rule.raw?.linetype || "").trim() || "BYLAYER";
+        if (!lineTypeOptions.includes(currentLineType)) {
+          const extraOption = document.createElement("option");
+          extraOption.value = currentLineType;
+          extraOption.textContent = currentLineType;
+          lineTypeSelect.appendChild(extraOption);
+        }
+        lineTypeSelect.value = currentLineType;
+        lineTypeSelect.title = "Line type";
+        lineTypeSelect.addEventListener("change", () => {
+          rule.raw.linetype = lineTypeSelect.value;
+          syncFldRuleDerivedFields(rule);
+        });
+        const helper = document.createElement("div");
+        helper.className = "muted";
+        helper.textContent = "Linework rule: pick linetype from FLD values.";
+        typeConfigStack.append(lineTypeSelect, helper);
+      } else {
+        const symbolIdInput = document.createElement("input");
+        symbolIdInput.className = "cellInput";
+        symbolIdInput.placeholder = "Symbol ID (FLD Symbol column)";
+        symbolIdInput.value = String(rule.raw?.symbol || "");
+        symbolIdInput.addEventListener("input", () => {
+          rule.raw.symbol = symbolIdInput.value;
+          syncFldRuleDerivedFields(rule);
+          renderFldSymbolGallery(config);
+        });
+
+        const symbolMapSelect = document.createElement("select");
+        symbolMapSelect.className = "cellInput";
+        const blankOption = document.createElement("option");
+        blankOption.value = "";
+        blankOption.textContent = "SVG mapping (optional)";
+        symbolMapSelect.appendChild(blankOption);
+        symbolMapChoices.forEach((choice) => {
+          const option = document.createElement("option");
+          option.value = choice.value;
+          option.textContent = choice.label;
+          symbolMapSelect.appendChild(option);
+        });
+        symbolMapSelect.value = String(rule.raw?.symbol_name_2 || "");
+        symbolMapSelect.addEventListener("change", () => {
+          rule.raw.symbol_name_2 = symbolMapSelect.value;
+          renderFldSymbolGallery(config);
+        });
+
+        const symbolScaleInput = document.createElement("input");
+        symbolScaleInput.className = "cellInput";
+        symbolScaleInput.type = "number";
+        symbolScaleInput.step = "0.0001";
+        symbolScaleInput.placeholder = "Scale";
+        symbolScaleInput.value = String(rule.raw?.symbol_size || "");
+        symbolScaleInput.addEventListener("input", () => {
+          rule.raw.symbol_size = symbolScaleInput.value;
+          syncFldRuleDerivedFields(rule);
+        });
+        const helper = document.createElement("div");
+        helper.className = "muted";
+        helper.textContent = "Symbol rule: set Symbol ID + SVG and symbol scale.";
+        typeConfigStack.append(symbolIdInput, symbolMapSelect, symbolScaleInput, helper);
+      }
+      typeConfigTd.appendChild(typeConfigStack);
       const companionsCell = mkInputCell("companion_codes");
 
       const actionTd = document.createElement("td");
@@ -8411,10 +8653,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       });
       actionTd.appendChild(delBtn);
 
-      tr.append(codeCell, entityCell, processTd, layerCell, descCell, companionsCell, actionTd);
+      tr.append(codeCell, entityTd, processTd, layerCell, descCell, typeConfigTd, companionsCell, actionTd);
       frag.appendChild(tr);
     });
     fldTbody.appendChild(frag);
+    renderFldSymbolGallery(config);
     updateFldSourceLabel();
   }
 
@@ -8443,7 +8686,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     const config = fldEditorState.activeConfig;
     if (!config || !Array.isArray(config.rules)) return;
     const template = getFldRuleTemplateRaw(config);
-    const raw = { ...template, code: "", description: "", full_name: "", layer: "", entity_type: "0", processing_on: "1", companion_codes: "" };
+    const raw = { ...template, code: "", description: "", full_name: "", layer: "", entity_type: "0", symbol: "", symbol_size: "0.1000", symbol_name_2: "", linetype: "BYLAYER", processing_on: "1", companion_codes: "" };
     const rule = { rowNumber: config.rules.length + 2, raw };
     syncFldRuleDerivedFields(rule);
     config.rules.push(rule);
