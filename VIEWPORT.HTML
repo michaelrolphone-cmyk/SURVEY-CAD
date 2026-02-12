@@ -3791,6 +3791,11 @@
     return image;
   }
 
+  function redraw() {
+    // Compatibility shim for async callbacks that still call redraw();
+    // the primary canvas loop is continuously scheduled by requestAnimationFrame(draw).
+  }
+
   function pointSupportsLineworkSequenceToken(tokenSet, lineCode) {
     if (tokenSet.has(lineCode)) return true;
     const companionCodes = fieldToFinishRuleState.lineworkCompanionCodes.get(lineCode);

@@ -37,6 +37,13 @@ test('VIEWPORT.HTML allows map tile rendering to continue zooming past native ti
   assert.match(html, /mapInstance\s*=\s*L\.map\("mapLayer",\s*\{[\s\S]*maxZoom:\s*MAP_LAYER_MAX_RENDER_ZOOM/, 'Leaflet map instance should accept the extended render zoom ceiling so setView can continue beyond tile max-native zoom');
 });
 
+test('VIEWPORT.HTML keeps a redraw compatibility shim for async symbol image callbacks', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+redraw\(\)\s*\{[\s\S]*Compatibility shim/, 'legacy redraw callback references should resolve to a defined function instead of throwing ReferenceError');
+  assert.match(html, /image\.addEventListener\("load",\s*\(\)\s*=>\s*redraw\(\)\);/, 'symbol image load callback should keep routing through redraw compatibility function');
+});
+
 test('VIEWPORT.HTML double right-click zooms out one map zoom level when nothing is selected', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
