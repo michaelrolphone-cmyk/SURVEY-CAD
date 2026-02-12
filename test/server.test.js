@@ -278,7 +278,7 @@ test('server exposes survey APIs and static html', async () => {
     const projectBrowserStaticRes = await fetch(`http://127.0.0.1:${app.port}/PROJECT_BROWSER.html`);
     assert.equal(projectBrowserStaticRes.status, 200);
     const projectBrowserHtml = await projectBrowserStaticRes.text();
-    assert.match(projectBrowserHtml, /SurveyFoundry Project Browser/i);
+    assert.match(projectBrowserHtml, /SurveyFoundry EvidenceDesk/i);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));
