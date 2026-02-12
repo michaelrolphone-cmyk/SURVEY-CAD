@@ -28,6 +28,14 @@ npm start
 
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
+## LineSmith Loading Experience
+
+When `VIEWPORT.HTML` (LineSmith) opens, a modern non-blocking loading indicator appears while startup tasks run:
+
+- Animated nodes and links visualize points being connected while drawing context loads.
+- A live stage message updates as LineSmith initializes map controls, restores project drawings, and joins collaboration.
+- The indicator card floats above the LineSmith UI so you can still see the editor behind it, then auto-dismisses once boot is complete (or after recovery from a startup error).
+
 ## LineSmith Point Inspector Editing
 
 When you click a point in `VIEWPORT.HTML`, you can now edit point properties directly inside the **Point Inspector** card:
