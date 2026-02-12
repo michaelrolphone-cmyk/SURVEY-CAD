@@ -264,6 +264,28 @@
     .inspectorRow{ display:flex; justify-content:space-between; gap:8px; margin-bottom:4px; }
     .inspectorRow:last-child{ margin-bottom:0; }
     .inspectorRow b{ color:var(--text); }
+    .inspectorValueWrap{ display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap; width:58%; min-width:130px; }
+    .inspectorSelect{
+      width:58%;
+      min-width:130px;
+      background:#0f1726;
+      color:var(--text);
+      border:1px solid #2a3550;
+      border-radius:6px;
+      padding:4px 6px;
+      font-size:11px;
+    }
+    .inspectorVariedPill{
+      border:1px solid #7f1d1d;
+      background:#b91c1c;
+      color:#fff;
+      border-radius:999px;
+      padding:2px 8px;
+      font-size:10px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .inspectorVariedPill:hover{ background:#dc2626; }
     .inspectorLinks{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
     .inspectorLinks a{ color:var(--accent); text-decoration:none; border:1px solid #2a3550; border-radius:999px; padding:3px 8px; font-size:11px; }
     .inspectorLinks a:hover{ background:#182238; }
@@ -6099,43 +6121,171 @@
     };
   }
 
-  function applySelectedPointEdits(fields, sourceLabel = "inspector") {
-    if (!selectedPointId || !points.has(selectedPointId)) {
-      setStatus("Select a point to apply edits.", "warn");
+  function getSelectedPoints() {
+    return selectedPointIds.map((id) => points.get(id)).filter(Boolean);
+  }
+
+  function summarizeSelectedPointValues(selectedPoints, keys) {
+    const summary = {};
+    for (const key of keys) {
+      const values = selectedPoints.map((point) => String(point?.[key] ?? ""));
+      const first = values[0] ?? "";
+      summary[key] = {
+        value: first,
+        varied: values.some((value) => value !== first)
+      };
+    }
+    return summary;
+  }
+
+  function applyEditsToMultiplePoints(fields, sourceLabel = "inspector") {
+    const selectedPoints = getSelectedPoints();
+    if (!selectedPoints.length) {
+      setStatus("Select at least one point to apply edits.", "warn");
       return false;
     }
-    const p = points.get(selectedPointId);
-    const values = readPointFieldValues(p, fields);
-    if (!values) return false;
 
-    const proposedNum = String(values.num || p.num).trim();
-    if (proposedNum !== p.num && pointNumberExists(proposedNum, p.id)) {
-      setStatus(`Point number ${proposedNum} already exists.`, "warn");
-      return false;
+    const selectedPointIdSet = new Set(selectedPoints.map((point) => point.id));
+    const outsideNumbers = new Set(
+      [...points.values()]
+        .filter((point) => point && !selectedPointIdSet.has(point.id))
+        .map((point) => String(point.num || "").trim())
+    );
+    const proposedNumbers = new Set();
+    const editsByPoint = [];
+    for (const point of selectedPoints) {
+      const values = readPointFieldValues(point, fields);
+      if (!values) continue;
+      const proposedNum = String(values.num || point.num).trim();
+      if (outsideNumbers.has(proposedNum)) {
+        setStatus(`Point number ${proposedNum} already exists.`, "warn");
+        return false;
+      }
+      if (proposedNumbers.has(proposedNum)) {
+        setStatus(`Point number ${proposedNum} would be duplicated.`, "warn");
+        return false;
+      }
+      proposedNumbers.add(proposedNum);
+      editsByPoint.push({ point, values, proposedNum });
     }
 
-    history.push("edit point");
+    history.push(editsByPoint.length === 1 ? "edit point" : "edit points");
 
-    p.num = proposedNum;
-    p.x = parseNum(values.x, p.x);
-    p.y = parseNum(values.y, p.y);
-    p.z = parseNum(values.z, p.z);
-    p.code = String(values.code ?? p.code);
-    p.notes = String(values.notes ?? p.notes);
+    for (const { point, values, proposedNum } of editsByPoint) {
+      point.num = proposedNum;
+      point.x = parseNum(values.x, point.x);
+      point.y = parseNum(values.y, point.y);
+      point.z = parseNum(values.z, point.z);
+      point.code = String(values.code ?? point.code);
+      point.notes = String(values.notes ?? point.notes);
+    }
 
     schedulePointsTableRender();
-    setStatus(`Updated point ${p.num} from ${sourceLabel}.`, "ok");
+    setStatus(`Updated ${editsByPoint.length} selected point${editsByPoint.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
     updateCounts();
     updatePointEditorFromSelection();
     return true;
   }
 
+  function applySelectedPointEdits(fields, sourceLabel = "inspector") {
+    return applyEditsToMultiplePoints(fields, sourceLabel);
+  }
+
+  function applySharedFieldToSelectedPoints(key, rawValue, sourceLabel = "point inspector") {
+    const selectedPoints = getSelectedPoints();
+    if (!selectedPoints.length) return false;
+    history.push(selectedPoints.length === 1 ? "edit point" : "edit points");
+    for (const point of selectedPoints) {
+      if (key === "x" || key === "y" || key === "z") {
+        point[key] = parseNum(rawValue, point[key]);
+      } else if (key === "code" || key === "notes") {
+        point[key] = String(rawValue ?? point[key]);
+      }
+    }
+    schedulePointsTableRender();
+    setStatus(`Updated ${key.toUpperCase()} for ${selectedPoints.length} selected point${selectedPoints.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
+    updateCounts();
+    updatePointEditorFromSelection();
+    return true;
+  }
+
+  function buildSharedPointInspector(selectedPoints) {
+    const summaryLabel = document.createElement("div");
+    summaryLabel.style.marginBottom = "6px";
+    summaryLabel.textContent = `Selected points (${selectedPoints.length}) shared values:`;
+    pointInspector.appendChild(summaryLabel);
+
+    const fieldSpecs = [
+      ["X", "x"],
+      ["Y", "y"],
+      ["Z", "z"],
+      ["Code", "code"],
+      ["Notes", "notes"]
+    ];
+    const summary = summarizeSelectedPointValues(selectedPoints, fieldSpecs.map(([, key]) => key));
+
+    for (const [label, key] of fieldSpecs) {
+      const row = document.createElement("div");
+      row.className = "inspectorRow";
+      const left = document.createElement("span");
+      left.textContent = label;
+      const right = document.createElement("div");
+      right.className = "inspectorValueWrap";
+      if (summary[key].varied) {
+        const variedButton = document.createElement("button");
+        variedButton.type = "button";
+        variedButton.className = "inspectorVariedPill";
+        variedButton.textContent = "Varied";
+        variedButton.addEventListener("click", () => {
+          const nextValue = window.prompt(`Set ${label} for ${selectedPoints.length} selected points:`, "");
+          if (nextValue === null) return;
+          applySharedFieldToSelectedPoints(key, nextValue, `point inspector ${label} bulk set`);
+        });
+        right.appendChild(variedButton);
+      } else {
+        const valueEl = document.createElement("b");
+        valueEl.textContent = summary[key].value;
+        right.appendChild(valueEl);
+      }
+      row.append(left, right);
+      pointInspector.appendChild(row);
+    }
+
+    if (selectedPoints.length > 1) {
+      const pickerRow = document.createElement("div");
+      pickerRow.className = "inspectorRow";
+      const pickerLabel = document.createElement("span");
+      pickerLabel.textContent = "Inspect point";
+      const picker = document.createElement("select");
+      picker.className = "inspectorSelect";
+      for (const point of selectedPoints) {
+        const option = document.createElement("option");
+        option.value = String(point.id);
+        option.textContent = `${point.num} (${fmt(point.x)}, ${fmt(point.y)})`;
+        if (point.id === selectedPointId) option.selected = true;
+        picker.appendChild(option);
+      }
+      picker.addEventListener("change", () => {
+        const nextId = Number(picker.value);
+        if (!Number.isFinite(nextId) || !points.has(nextId)) return;
+        selectedPointId = nextId;
+        updatePointEditorFromSelection();
+      });
+      pickerRow.append(pickerLabel, picker);
+      pointInspector.appendChild(pickerRow);
+    }
+  }
+
   function updatePointInspectorFromSelection() {
     pointInspector.innerHTML = "";
+    const selectedPoints = getSelectedPoints();
     const p = selectedPointId ? points.get(selectedPointId) : null;
     if (!p) {
       pointInspector.textContent = "Select one point to inspect point details.";
       return;
+    }
+    if (selectedPoints.length > 1) {
+      buildSharedPointInspector(selectedPoints);
     }
     const fieldSpecs = [
       ["Point", "num", p.num],

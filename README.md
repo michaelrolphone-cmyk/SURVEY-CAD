@@ -36,6 +36,14 @@ When you click a point in `VIEWPORT.HTML`, you can now edit point properties dir
 - Click **Apply Inspector Edits** to save updates to the selected point.
 - The classic **Add / Edit Point** panel remains available and uses the same update workflow.
 
+## LineSmith Multi-Point Inspector Controls
+
+When two or more points are selected in `VIEWPORT.HTML`, the **Point Inspector** now includes a shared-values summary before the per-point editor:
+
+- Shared values render directly for fields that match across all selected points.
+- Mismatched values render as a red **Varied** pill; click it to set one value across all selected points.
+- A point dropdown appears so you can pick which selected point to inspect/edit in the detailed inspector fields.
+
 ## LineSmith Save Shortcuts
 
 When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the same project-linked save workflow as the **Save Drawing to Project** button:

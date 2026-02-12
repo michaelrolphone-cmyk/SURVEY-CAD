@@ -597,7 +597,14 @@ test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected
   assert.match(html, /function\s+applySelectedPointEdits\(fields,\s*sourceLabel\s*=\s*"inspector"\)/, 'point inspector and point editor should share a single apply helper for point property updates');
   assert.match(html, /const\s+fieldSpecs\s*=\s*\[[\s\S]*\["Point",\s*"num",\s*p\.num\][\s\S]*\["Notes",\s*"notes",\s*p\.notes \|\| ""\]/, 'point inspector should render editable fields for number, coordinates, code, and notes');
   assert.match(html, /applyBtn\.id\s*=\s*"pointInspectorApply";/, 'point inspector should render an apply button for saving point property edits directly from inspector');
-  assert.match(html, /applySelectedPointEdits\(inspectorFields,\s*"point inspector"\);/, 'point inspector apply action should commit edits through the shared point update helper');
+  assert.match(html, /function\s+getSelectedPoints\(\)/, 'point inspector should expose a selected-point helper for multi-edit workflows');
+  assert.match(html, /function\s+summarizeSelectedPointValues\(selectedPoints,\s*keys\)/, 'point inspector should summarize shared values across selected points');
+  assert.match(html, /function\s+applySharedFieldToSelectedPoints\(key,\s*rawValue,\s*sourceLabel\s*=\s*"point inspector"\)/, 'point inspector should support bulk edits from varied pills');
+  assert.match(html, /if \(selectedPoints\.length > 1\) \{[\s\S]*buildSharedPointInspector\(selectedPoints\);/, 'point inspector should render shared multi-point values before the per-point editor');
+  assert.match(html, /variedButton\.textContent\s*=\s*"Varied";/, 'point inspector should render a red Varied pill for non-shared values');
+  assert.match(html, /window\.prompt\(`Set \$\{label\} for \$\{selectedPoints\.length\} selected points:`,\s*""\);/, 'clicking a Varied pill should prompt for a shared replacement value');
+  assert.match(html, /pickerLabel\.textContent\s*=\s*"Inspect point";/, 'point inspector should show a point picker label when multiple points are selected');
+  assert.match(html, /const\s+picker\s*=\s*document\.createElement\("select"\);/, 'point inspector should render a dropdown so a specific selected point can be inspected');
 });
 
 
