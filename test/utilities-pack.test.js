@@ -8,7 +8,10 @@ test('UtilitiesPack loads power utilities through generic API source filtering',
   const html = await readFile(utilitiesPackHtmlPath, 'utf8');
 
   assert.match(html, /loadUtilitiesByAddress\(address,\s*\{\s*outSR:\s*state\.outSR,\s*sources:\s*\['power'\]\s*\}\)/);
-  assert.match(html, /Export Power CSV/);
+  assert.match(html, /id="exportButton"[\s\S]*aria-label="Export power CSV"/);
+  assert.match(html, /class="iconFile"/);
+  assert.match(html, /class="iconDownload"/);
+  assert.match(html, /<span class="iconSubtitle">Export<\/span>/);
   assert.match(html, /utility\.source\s*\|\|\s*''/);
 });
 

@@ -15,6 +15,27 @@
     button { cursor: pointer; background: #1d4ed8; border-color: #2563eb; }
     button.secondary { background: #243247; border-color: #334155; }
     button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .iconButton {
+      min-width: 88px;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px 10px;
+      line-height: 1;
+    }
+    .iconButton svg { display: block; }
+    .iconWrap { position: relative; width: 24px; height: 24px; }
+    .iconFile { color: #cbd5e1; }
+    .iconDownload {
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      color: #93c5fd;
+      filter: drop-shadow(0 0 2px rgba(15, 23, 42, 0.9));
+    }
+    .iconSubtitle { font-size: 11px; color: #cbd5e1; letter-spacing: 0.03em; }
     .status { min-height: 20px; color: #93c5fd; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { border-bottom: 1px solid #243247; padding: 8px; text-align: left; font-size: 13px; }
@@ -29,7 +50,22 @@
     <form id="lookupForm">
       <input id="addressInput" placeholder="100 Main St, Boise, ID" required />
       <button id="lookupButton" type="submit">Fetch Utilities</button>
-      <button id="exportButton" class="secondary" type="button" disabled>Export Power CSV</button>
+      <button id="exportButton" class="secondary iconButton" type="button" aria-label="Export power CSV" title="Export power CSV" disabled>
+        <span class="iconWrap" aria-hidden="true">
+          <svg class="iconFile" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 2H7C5.89543 2 5 2.89543 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V7L14 2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 2V7H19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 11.5H15.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M8.5 14.5H15.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <svg class="iconDownload" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 1.5V8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M3.75 5.75L6 8L8.25 5.75" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 10H10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="iconSubtitle">Export</span>
+      </button>
     </form>
 
     <div class="status" id="status"></div>
