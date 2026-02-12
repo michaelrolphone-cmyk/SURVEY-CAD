@@ -541,6 +541,7 @@ test('VIEWPORT.HTML includes reusable workflow toast guidance for staged rotate 
   assert.match(html, /function\s+hideWorkflowToast\(\)/, 'workflow toast should expose reusable hide API');
   assert.match(html, /function\s+getToolWorkflowToastPayload\(activeTool = tool\)/, 'workflow toast should expose reusable payload helper for toolbar tools');
   assert.match(html, /if \(activeTool === "line2pt"\) \{[\s\S]*Pick line start point[\s\S]*Pick line end point[\s\S]*currentStepIndex: hasStart \? 1 : 0/, 'line-by-2-points tool should publish stage-aware toast steps for first and second clicks');
+  assert.match(html, /if \(tool === "line2pt"\) \{[\s\S]*if \(construction\.startPointId == null\) \{/, 'line-by-2-points tool should treat only null/undefined as missing start so point id 0 can still complete on the second click');
   assert.match(html, /if \(activeTool === "lineDB"\) \{[\s\S]*Select start point[\s\S]*Enter distance \+ bearing[\s\S]*Click Create Point \+ Line/, 'line distance-bearing tool should publish select-input-submit guidance in toast steps');
   assert.match(html, /if \(activeTool === "pointOnLine"\) \{[\s\S]*Select line[\s\S]*Enter station \+ offset[\s\S]*Click Create Point/, 'point-on-line tool should publish select-input-submit guidance in toast steps');
   assert.match(html, /const\s+lineIntersectionCommandSession\s*=\s*\{[\s\S]*active:\s*false,[\s\S]*mode:\s*""[\s\S]*\};/, 'extend/trim intersection workflows should track an explicit staged command session state');

@@ -48,6 +48,7 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 
 When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** zooms out to the next map zoom level at the cursor position.
 
+When using the **Line by 2 points** tool, LineSmith now treats only `null`/`undefined` as "no start point" so legacy drawings that include point id `0` can still complete on the second click.
 ## LineSmith Layer Reassignment Shortcut
 
 When points/lines are selected in `VIEWPORT.HTML`, choosing a layer from the quick layer toolbar dropdown (or clicking **Use** in Layer Manager) now moves the current selection to that chosen layer in one step.
