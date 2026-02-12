@@ -846,3 +846,13 @@ test('VIEWPORT.HTML FLD editor uses click-to-open symbol SVG dropdown without ga
   assert.match(html, /function\s+buildFldSymbolPreviewPicker\(\{ symbolMapChoices, currentValue, onPick \}\)\s*\{[\s\S]*fldSymbolPickerButton[\s\S]*fldSymbolPickerMenu/, 'symbol mapping should use a dropdown-style picker with a click target and menu');
   assert.match(html, /typeConfigStack\.append\(symbolIdInput, symbolScaleInput, symbolPreviewPicker\);/, 'symbol rows should render selected SVG preview picker in-place instead of a separate select and gallery');
 });
+
+test('VIEWPORT.HTML renders configured survey symbol SVG markers for point codes before falling back to x markers', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /codeSymbolMapFiles:\s*new Map\(\)/, 'field-to-finish state should track symbol SVG mappings per point code');
+  assert.match(html, /if \(entityType === "0" && symbolMapFile\) codeSymbolMapFiles\.set\(code, symbolMapFile\);/, 'FLD parsing should capture symbol_name_2 map files for symbol entity rules');
+  assert.match(html, /function\s+getPointSymbolMapFile\(pointCode = ""\)\s*\{[\s\S]*codeSymbolMapFiles\.get\(token\)/, 'point marker rendering should resolve mapped symbol files from point code tokens');
+  assert.match(html, /function\s+getSymbolMarkerImage\(symbolMapFile = ""\)\s*\{[\s\S]*image\.src = `\/assets\/survey-symbols\/\$\{encodeURIComponent\(file\)\}`;/, 'marker renderer should load symbol SVG assets from the survey-symbols library');
+  assert.match(html, /const pointSymbolMapFile = getPointSymbolMapFile\(p\.code\);[\s\S]*ctx\.drawImage\(symbolImage, sp\.x - 5, sp\.y - 5, 10, 10\);[\s\S]*ctx\.moveTo\(sp\.x-5, sp\.y-5\)/, 'point marker draw should render a loaded symbol SVG at x-marker size and fall back to the x marker when needed');
+});
