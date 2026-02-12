@@ -289,6 +289,54 @@
     .inspectorLinks{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
     .inspectorLinks a{ color:var(--accent); text-decoration:none; border:1px solid #2a3550; border-radius:999px; padding:3px 8px; font-size:11px; }
     .inspectorLinks a:hover{ background:#182238; }
+    .pointSymbolBadge{
+      width:20px;
+      height:20px;
+      object-fit:contain;
+      border-radius:6px;
+      border:1px solid #2a3550;
+      background:#0a0f1c;
+      padding:2px;
+      flex:0 0 auto;
+    }
+    .pointSymbolBadge.large{
+      width:46px;
+      height:46px;
+      border-radius:12px;
+      padding:5px;
+    }
+    .inspectorPointHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:8px;
+      padding-bottom:8px;
+      border-bottom:1px solid #263246;
+    }
+    .inspectorPointHeaderTitle{ font-size:12px; font-weight:700; }
+    .pointEditorSymbolRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:8px;
+      min-height:26px;
+      color:var(--muted);
+      font-size:11px;
+    }
+    .quickSearchResultWithSymbol{
+      display:flex;
+      align-items:flex-start;
+      gap:8px;
+      width:100%;
+    }
+    .quickSearchResultContent{
+      min-width:0;
+      flex:1 1 auto;
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
 
     .canvasWrap{
       grid-area:canvas;
@@ -429,6 +477,7 @@
     .clusterTooltip b{ color:#ffd54a; }
     .clusterTooltip .clusterTooltipLayerName,
     .clusterTooltip .clusterTooltipPointName{ font-weight:700; }
+    .clusterTooltipPointRow{ display:inline-flex; align-items:center; gap:6px; }
     .clusterTooltip ul{ margin:6px 0 0 16px; padding:0; }
     .clusterTooltip li{ margin:2px 0; }
     .clusterTooltip li.active{
@@ -1525,6 +1574,7 @@
           <input id="ptY" placeholder="(selected)" />
         </label>
       </div>
+      <div id="pointEditorSymbolRow" class="pointEditorSymbolRow" aria-live="polite"></div>
       <div class="grid2" style="margin-top:8px;">
         <button id="applyPoint" class="ok">Apply to Selected Point</button>
         <button id="focusSelected">Center on Selection</button>
@@ -2702,6 +2752,7 @@
   const toolHint = $("#toolHint");
   const quickCommandSearchInput = $("#quickCommandSearchInput");
   const quickCommandSearchResults = $("#quickCommandSearchResults");
+  const pointEditorSymbolRow = $("#pointEditorSymbolRow");
   const printPaperSizeInput = $("#printPaperSize");
   const printScalePreviewInput = $("#printScalePreview");
   const printCustomWidthMmInput = $("#printCustomWidthMm");
@@ -4165,6 +4216,12 @@
     return "";
   }
 
+  function getPointSymbolPreviewUrl(pointCode = "") {
+    const symbolMapFile = getPointSymbolMapFile(pointCode);
+    if (!symbolMapFile) return "";
+    return `/assets/survey-symbols/${encodeURIComponent(symbolMapFile)}`;
+  }
+
   function getSymbolMarkerImage(symbolMapFile = "") {
     const file = String(symbolMapFile || "").trim();
     if (!file) return null;
@@ -5438,8 +5495,10 @@
       const layer = getLayerById(point.layerId);
       const layerColor = String(layer?.color || "#ffd54a").trim() || "#ffd54a";
       const code = point.code ? ` — ${escapeHtml(getRenderedPointCode(point.code) || point.code)}` : "";
+      const pointSymbolUrl = getPointSymbolPreviewUrl(point.code);
+      const pointSymbolHtml = pointSymbolUrl ? `<img class="pointSymbolBadge" src="${escapeHtml(pointSymbolUrl)}" alt="Point symbol for ${escapeHtml(String(point.num || ""))}" />` : "";
       const activeClass = point.id === hoveredClusterPointId ? " class=\"active\"" : "";
-      return `<li${activeClass}><button type="button" class="clusterTooltipAction" data-cluster-action="select-point" data-point-id="${escapeHtml(point.id)}"><b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</button></li>`;
+      return `<li${activeClass}><button type="button" class="clusterTooltipAction" data-cluster-action="select-point" data-point-id="${escapeHtml(point.id)}"><span class="clusterTooltipPointRow">${pointSymbolHtml}<b class="clusterTooltipPointName" style="color:${escapeHtml(layerColor)}">${escapeHtml(point.num)}</b>${code}</span></button></li>`;
     }).join("");
   }
 
@@ -6447,7 +6506,9 @@
 
       if (result.type === "point") {
         btn.style.borderLeftColor = result.layerColor;
-        btn.innerHTML = `<span class="quickSearchResultLine"><span class="quickSearchResultTitle" style="color:${escapeHtml(result.layerColor)}">${escapeHtml(result.pointNumber)}</span><span class="quickSearchResultMeta">${escapeHtml(result.layerName)}</span></span><span class="quickSearchResultDescription">${escapeHtml(result.pointCode || "(no code)")} · ${escapeHtml(result.pointNotes || "No notes")}</span>`;
+        const pointSymbolUrl = getPointSymbolPreviewUrl(result.pointCode);
+        const pointSymbolHtml = pointSymbolUrl ? `<img class="pointSymbolBadge" src="${escapeHtml(pointSymbolUrl)}" alt="Point symbol for ${escapeHtml(String(result.pointNumber || ""))}" />` : "";
+        btn.innerHTML = `<span class="quickSearchResultWithSymbol">${pointSymbolHtml}<span class="quickSearchResultContent"><span class="quickSearchResultLine"><span class="quickSearchResultTitle" style="color:${escapeHtml(result.layerColor)}">${escapeHtml(result.pointNumber)}</span><span class="quickSearchResultMeta">${escapeHtml(result.layerName)}</span></span><span class="quickSearchResultDescription">${escapeHtml(result.pointCode || "(no code)")} · ${escapeHtml(result.pointNotes || "No notes")}</span></span></span>`;
         btn.addEventListener("click", () => {
           selectPointFromQuickSearch(result.pointId);
           clearQuickCommandSearchResults();
@@ -7366,6 +7427,23 @@
     if (selectedPoints.length > 1) {
       buildSharedPointInspector(selectedPoints);
     }
+
+    const pointSymbolUrl = getPointSymbolPreviewUrl(p.code);
+    const inspectorPointHeader = document.createElement("div");
+    inspectorPointHeader.className = "inspectorPointHeader";
+    const inspectorPointHeaderTitle = document.createElement("div");
+    inspectorPointHeaderTitle.className = "inspectorPointHeaderTitle";
+    inspectorPointHeaderTitle.textContent = `Point ${p.num || ""}`;
+    inspectorPointHeader.appendChild(inspectorPointHeaderTitle);
+    if (pointSymbolUrl) {
+      const symbolBadge = document.createElement("img");
+      symbolBadge.className = "pointSymbolBadge large";
+      symbolBadge.src = pointSymbolUrl;
+      symbolBadge.alt = `Point symbol for ${p.num || ""}`;
+      inspectorPointHeader.appendChild(symbolBadge);
+    }
+    pointInspector.appendChild(inspectorPointHeader);
+
     const fieldSpecs = [
       ["Point", "num", p.num],
       ["X", "x", p.x],
@@ -7450,6 +7528,19 @@
       $("#ptX").value = "";
       $("#ptY").value = "";
     }
+
+    if (pointEditorSymbolRow) {
+      if (!p) {
+        pointEditorSymbolRow.textContent = "Select a point to preview mapped symbol.";
+      } else {
+        const pointSymbolUrl = getPointSymbolPreviewUrl(p.code);
+        if (pointSymbolUrl) {
+          pointEditorSymbolRow.innerHTML = `<img class="pointSymbolBadge" src="${escapeHtml(pointSymbolUrl)}" alt="Point symbol for ${escapeHtml(String(p.num || ""))}" /><span>Mapped symbol preview</span>`;
+        } else {
+          pointEditorSymbolRow.textContent = "No mapped symbol for this point code.";
+        }
+      }
+    }
     updatePointInspectorFromSelection();
     syncPanelCollapseWithSelection();
   }
@@ -7463,6 +7554,17 @@
       code: $("#ptCode"),
       notes: $("#ptNotes")
     }, "point editor");
+  });
+
+  $("#ptCode")?.addEventListener("input", () => {
+    if (!pointEditorSymbolRow) return;
+    const currentCode = String($("#ptCode")?.value || "");
+    const pointSymbolUrl = getPointSymbolPreviewUrl(currentCode);
+    if (pointSymbolUrl) {
+      pointEditorSymbolRow.innerHTML = `<img class="pointSymbolBadge" src="${escapeHtml(pointSymbolUrl)}" alt="Point symbol preview" /><span>Mapped symbol preview</span>`;
+    } else {
+      pointEditorSymbolRow.textContent = "No mapped symbol for this point code.";
+    }
   });
 
   // -------------------------

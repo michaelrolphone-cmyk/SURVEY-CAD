@@ -158,6 +158,8 @@ LineSmith now renders configured survey symbol SVGs directly as map point marker
 
 FLD Manager local edits now persist SVG mapping selections both as symbol-name overrides and in the active FLD row mapping columns, so **Save Local** keeps new code mappings stable and point markers update immediately after saving.
 
+Mapped symbol previews are now reused across editing/search surfaces so the same SVG shows up in quick search results, Add/Edit point panel preview row, point-cluster tooltip rows, and as a profile-style badge in the point inspector for the selected point.
+
 Symbol marker refresh now relies on the existing continuous canvas animation loop (`requestAnimationFrame(draw)`) rather than legacy one-off `redraw()` callbacks.
 
 

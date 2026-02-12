@@ -373,7 +373,7 @@ test('VIEWPORT.HTML clusters nearby points with hover details, double-click zoom
   assert.match(html, /const\s+POINT_CLUSTER_POLYGON_MIN_WIDTH_TO_HEIGHT_RATIO\s*=\s*1\s*\/\s*3\s*;/, 'cluster boundary rendering should require a minimum width-to-height ratio of 1:3 before polygon rendering is allowed');
   assert.match(html, /cluster\.members\.length > POINT_CLUSTER_TOOLTIP_GROUP_BY_LAYER_LIMIT[\s\S]*countsByLayer/, 'cluster tooltip should aggregate large cluster details by drawing layer');
   assert.match(html, /<li><button type="button" class="clusterTooltipAction" data-cluster-action="expand-layer" data-layer-id="\$\{escapeHtml\(layerId\)\}"><b class="clusterTooltipLayerName" style="color:\$\{escapeHtml\(meta\.color\)\}">\$\{escapeHtml\(meta\.name\)\}<\/b>: \$\{meta\.count\} point\$\{meta\.count === 1 \? "" : "s"\}<\/button><\/li>/, 'large cluster tooltip layer groups should remain colorized and clickable for drill-in');
-  assert.match(html, /<li\$\{activeClass\}><button type="button" class="clusterTooltipAction" data-cluster-action="select-point" data-point-id="\$\{escapeHtml\(point\.id\)\}"><b class="clusterTooltipPointName" style="color:\$\{escapeHtml\(layerColor\)\}">\$\{escapeHtml\(point\.num\)\}<\/b>\$\{code\}<\/button><\/li>/, 'small cluster tooltip point names should use their layer color and be directly selectable');
+  assert.match(html, /<li\$\{activeClass\}><button type="button" class="clusterTooltipAction" data-cluster-action="select-point" data-point-id="\$\{escapeHtml\(point\.id\)\}"><span class="clusterTooltipPointRow">\$\{pointSymbolHtml\}<b class="clusterTooltipPointName" style="color:\$\{escapeHtml\(layerColor\)\}">\$\{escapeHtml\(point\.num\)\}<\/b>\$\{code\}<\/span><\/button><\/li>/, 'small cluster tooltip point names should use their layer color, optional symbol badge, and remain directly selectable');
   assert.match(html, /function\s+buildPointClusters\(\)/, 'LineSmith should build dynamic point clusters for nearby points');
   assert.match(html, /const\s+markerRadius\s*=\s*10\s*\+\s*Math\.max\(0,\s*countText\.length\s*-\s*2\)\s*\*\s*3\s*;/, 'cluster marker radius should stay fixed by count-text width rather than scaling by cluster population');
   assert.match(html, /cluster\.strokeAlpha\s*=\s*POINT_CLUSTER_MIN_STROKE_ALPHA\s*\+\s*normalized\s*\*\s*\(POINT_CLUSTER_MAX_STROKE_ALPHA\s*-\s*POINT_CLUSTER_MIN_STROKE_ALPHA\)/, 'cluster opacity should interpolate between min and max alpha based on group magnitude');
@@ -926,7 +926,18 @@ test('VIEWPORT.HTML supports record basis bearing rotation without modifying wor
   assert.match(html, /basisOfBearing:\s*basisOfBearing \?[\s\S]*recordBasisBearing,[\s\S]*recordBasisDistance,/, 'state serialization should persist record basis inputs');
 });
 
-test('VIEWPORT.HTML keeps FLD manager in quick toolbar and right-sizes symbol markers', async () => {
+
+test('VIEWPORT.HTML surfaces mapped SVG symbols in quick search, point editor, cluster tooltip, and point inspector', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+getPointSymbolPreviewUrl\(pointCode = ""\)\s*\{[\s\S]*getPointSymbolMapFile\(pointCode\)[\s\S]*`\/assets\/survey-symbols\/\$\{encodeURIComponent\(symbolMapFile\)\}`;/, 'LineSmith should expose a shared helper that resolves mapped point symbols to survey-symbol asset URLs');
+  assert.match(html, /result\.type === "point"[\s\S]*const pointSymbolUrl = getPointSymbolPreviewUrl\(result\.pointCode\);[\s\S]*quickSearchResultWithSymbol/, 'quick search point suggestions should render mapped symbol thumbnails when a point code has an SVG mapping');
+  assert.match(html, /id="pointEditorSymbolRow"[\s\S]*function\s+updatePointEditorFromSelection\(\)\s*\{[\s\S]*pointEditorSymbolRow\.innerHTML = `<img class="pointSymbolBadge"/, 'Add/Edit point panel should show a mapped symbol preview row for the selected point code');
+  assert.match(html, /getPointSymbolPreviewUrl\(point\.code\)[\s\S]*class="clusterTooltipPointRow"/, 'cluster tooltip point rows should include mapped symbol badges for each point');
+  assert.match(html, /className = "inspectorPointHeader"[\s\S]*symbolBadge\.className = "pointSymbolBadge large"/, 'point inspector should render a large profile-style mapped symbol badge for the selected point');
+});
+
+test('VIEWPORT.HTML keeps FLD manager in quick toolbar and triples symbol marker size', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="quickPointManager"[\s\S]*id="quickFtfManager"/, 'secondary quick toolbar should place FLD manager next to points manager');
