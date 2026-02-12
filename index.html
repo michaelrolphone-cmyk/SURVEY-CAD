@@ -378,8 +378,9 @@
     }
 
     .app-icon {
-      width: 140px;
-      height: 140px;
+      width: auto;
+      height: var(--app-icon-height, 140px);
+      max-width: 140px;
       object-fit: contain;
       flex: none;
     }
@@ -1150,8 +1151,12 @@
       card.className = 'app-card';
       card.type = 'button';
       card.title = app.description || '';
+      const iconHeight = Number(app.iconHeight);
+      const iconHeightStyle = Number.isFinite(iconHeight) && iconHeight > 0
+        ? ` style="--app-icon-height:${iconHeight}px"`
+        : "";
       card.innerHTML = `
-        <img class="app-icon" src="${app.iconPath}" alt="${app.name} icon" loading="lazy" />
+        <img class="app-icon" src="${app.iconPath}" alt="${app.name} icon" loading="lazy"${iconHeightStyle} />
         <div class="app-meta">
           <strong>${app.name}</strong>
         </div>

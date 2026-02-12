@@ -213,7 +213,7 @@ node -e "const m=require('./assets/survey-symbols/index.json'); console.table(m.
 
 ## UtilitiesPack Export Control
 
-`UtilitiesPack.html` now uses an icon-based export control for power CSV downloads: a CSV document glyph with a download-arrow overlay and an **Export** subtitle for compact action labeling.
+`UtilitiesPack.html` now uses an icon-based export control for power CSV downloads: a CSV document glyph with a download-arrow overlay and an **Export** subtitle for compact action labeling. The SurveyFoundry launcher app tile now also uses `assets/icons/download/Download-CSV.png` with a 125px-tall per-app icon override for UtilitiesPack.
 
 ## API and CLI Notes for this change
 
