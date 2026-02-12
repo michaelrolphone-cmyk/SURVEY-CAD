@@ -6082,6 +6082,54 @@
     return [...merged];
   }
 
+  function readPointFieldValues(basePoint, fields) {
+    if (!basePoint) return null;
+    const getValue = (key, fallback) => {
+      const element = fields?.[key];
+      if (!element) return fallback;
+      return String(element.value ?? fallback);
+    };
+    return {
+      num: getValue("num", basePoint.num),
+      x: getValue("x", basePoint.x),
+      y: getValue("y", basePoint.y),
+      z: getValue("z", basePoint.z),
+      code: getValue("code", basePoint.code),
+      notes: getValue("notes", basePoint.notes)
+    };
+  }
+
+  function applySelectedPointEdits(fields, sourceLabel = "inspector") {
+    if (!selectedPointId || !points.has(selectedPointId)) {
+      setStatus("Select a point to apply edits.", "warn");
+      return false;
+    }
+    const p = points.get(selectedPointId);
+    const values = readPointFieldValues(p, fields);
+    if (!values) return false;
+
+    const proposedNum = String(values.num || p.num).trim();
+    if (proposedNum !== p.num && pointNumberExists(proposedNum, p.id)) {
+      setStatus(`Point number ${proposedNum} already exists.`, "warn");
+      return false;
+    }
+
+    history.push("edit point");
+
+    p.num = proposedNum;
+    p.x = parseNum(values.x, p.x);
+    p.y = parseNum(values.y, p.y);
+    p.z = parseNum(values.z, p.z);
+    p.code = String(values.code ?? p.code);
+    p.notes = String(values.notes ?? p.notes);
+
+    schedulePointsTableRender();
+    setStatus(`Updated point ${p.num} from ${sourceLabel}.`, "ok");
+    updateCounts();
+    updatePointEditorFromSelection();
+    return true;
+  }
+
   function updatePointInspectorFromSelection() {
     pointInspector.innerHTML = "";
     const p = selectedPointId ? points.get(selectedPointId) : null;
@@ -6089,23 +6137,51 @@
       pointInspector.textContent = "Select one point to inspect point details.";
       return;
     }
-    const rows = [
-      ["Point", p.num],
-      ["X", p.x],
-      ["Y", p.y],
-      ["Z", p.z],
-      ["Code", p.code || "—"]
+    const fieldSpecs = [
+      ["Point", "num", p.num],
+      ["X", "x", p.x],
+      ["Y", "y", p.y],
+      ["Z", "z", p.z],
+      ["Code", "code", p.code || ""],
+      ["Notes", "notes", p.notes || ""]
     ];
-    for (const [label, value] of rows) {
+
+    const inspectorFields = {};
+    for (const [label, key, value] of fieldSpecs) {
       const row = document.createElement("div");
       row.className = "inspectorRow";
       const left = document.createElement("span");
       left.textContent = label;
-      const right = document.createElement("b");
-      right.textContent = String(value);
+      const right = document.createElement("input");
+      right.type = "text";
+      right.value = String(value);
+      right.dataset.pointInspectorField = key;
+      right.style.width = "58%";
+      right.style.minWidth = "130px";
+      right.style.background = "#0f1726";
+      right.style.color = "var(--text)";
+      right.style.border = "1px solid #2a3550";
+      right.style.borderRadius = "6px";
+      right.style.padding = "4px 6px";
       row.append(left, right);
       pointInspector.appendChild(row);
+      inspectorFields[key] = right;
     }
+
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "inspectorRow";
+    const actionsLabel = document.createElement("span");
+    actionsLabel.textContent = "Actions";
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.id = "pointInspectorApply";
+    applyBtn.className = "cellBtn ok";
+    applyBtn.textContent = "Apply Inspector Edits";
+    applyBtn.addEventListener("click", () => {
+      applySelectedPointEdits(inspectorFields, "point inspector");
+    });
+    actionsRow.append(actionsLabel, applyBtn);
+    pointInspector.appendChild(actionsRow);
 
     const cpfInstruments = collectNearbyCpfInstruments(p);
     const cpfRow = document.createElement("div");
@@ -6150,30 +6226,14 @@
   }
 
   $("#applyPoint").addEventListener("click", () => {
-    if (!selectedPointId || !points.has(selectedPointId)) {
-      setStatus("Select a point to apply edits.", "warn");
-      return;
-    }
-    const p = points.get(selectedPointId);
-
-    const proposedNum = String($("#ptNum").value || p.num).trim();
-    if (proposedNum !== p.num && pointNumberExists(proposedNum, p.id)) {
-      setStatus(`Point number ${proposedNum} already exists.`, "warn");
-      return;
-    }
-
-    history.push("edit point");
-
-    p.num = proposedNum;
-    p.x = parseNum($("#ptX").value, p.x);
-    p.y = parseNum($("#ptY").value, p.y);
-    p.z = parseNum($("#ptZ").value, p.z);
-    p.code = String($("#ptCode").value ?? p.code);
-    p.notes = String($("#ptNotes").value ?? p.notes);
-
-    schedulePointsTableRender();
-    setStatus(`Updated point ${p.num}.`, "ok");
-    updateCounts();
+    applySelectedPointEdits({
+      num: $("#ptNum"),
+      x: $("#ptX"),
+      y: $("#ptY"),
+      z: $("#ptZ"),
+      code: $("#ptCode"),
+      notes: $("#ptNotes")
+    }, "point editor");
   });
 
   // -------------------------
