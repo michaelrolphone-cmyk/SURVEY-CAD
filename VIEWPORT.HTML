@@ -6468,6 +6468,31 @@
     return results;
   }
 
+  function maybeRouteKeystrokeToQuickCommandSearch(event) {
+    if (!quickCommandSearchInput) return false;
+    if (event.defaultPrevented || event.isComposing) return false;
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (event.key.length !== 1) return false;
+    if (isEditableTarget(event.target) || isEditableTarget(document.activeElement)) return false;
+
+    event.preventDefault();
+
+    const currentValue = quickCommandSearchInput.value || "";
+    const start = Number.isFinite(quickCommandSearchInput.selectionStart)
+      ? quickCommandSearchInput.selectionStart
+      : currentValue.length;
+    const end = Number.isFinite(quickCommandSearchInput.selectionEnd)
+      ? quickCommandSearchInput.selectionEnd
+      : currentValue.length;
+    const nextValue = `${currentValue.slice(0, start)}${event.key}${currentValue.slice(end)}`;
+    quickCommandSearchInput.value = nextValue;
+    const cursor = start + event.key.length;
+    quickCommandSearchInput.setSelectionRange(cursor, cursor);
+    quickCommandSearchInput.focus();
+    renderQuickCommandSearchResults(nextValue);
+    return true;
+  }
+
   quickCommandSearchInput?.addEventListener("input", () => {
     renderQuickCommandSearchResults(quickCommandSearchInput.value || "");
   });
@@ -9315,6 +9340,8 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   window.addEventListener("keydown", (e) => {
     const typing = isEditableTarget(e.target);
     const key = e.key.toLowerCase();
+
+    if (maybeRouteKeystrokeToQuickCommandSearch(e)) return;
 
     if ((e.ctrlKey || e.metaKey) && !e.altKey && key === "s") {
       e.preventDefault();
