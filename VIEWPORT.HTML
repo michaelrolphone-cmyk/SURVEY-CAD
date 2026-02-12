@@ -1083,7 +1083,8 @@
       mask:url(#linesmithLoadingEdgeFade);
     }
     .linesmith-loading-link,
-    .linesmith-loading-route-outline{
+    .linesmith-loading-route-outline,
+    .linesmith-loading-segment{
       fill:none;
       stroke-linecap:round;
       stroke-linejoin:round;
@@ -1099,21 +1100,37 @@
       animation:linesmithLinkFlow 1.9s linear infinite;
       opacity:.95;
     }
+    .linesmith-loading-segment{
+      stroke:url(#linesmithLoadingAssemblyStroke);
+      stroke-width:4;
+      stroke-dasharray:var(--segment-length);
+      stroke-dashoffset:var(--segment-length);
+      opacity:0;
+    }
+    .linesmith-loading-segment.segment-1{ animation:linesmithAssembleSegment1 30s linear infinite; }
+    .linesmith-loading-segment.segment-2{ animation:linesmithAssembleSegment2 30s linear infinite; }
+    .linesmith-loading-segment.segment-3{ animation:linesmithAssembleSegment3 30s linear infinite; }
+    .linesmith-loading-segment.segment-4{ animation:linesmithAssembleSegment4 30s linear infinite; }
+    .linesmith-loading-segment.segment-5{ animation:linesmithAssembleSegment5 30s linear infinite; }
     .linesmith-loading-node{
       fill:#78e4ff;
       filter:drop-shadow(0 0 8px rgba(120, 228, 255, 0.75));
-      animation:linesmithNodeIdle 2.4s ease-in-out infinite;
+      animation:linesmithNodeIdle 30s linear infinite;
       transform-origin:center;
+      opacity:0;
     }
     .linesmith-loading-node.is-origin{
       fill:#ffe48b;
       filter:drop-shadow(0 0 10px rgba(255, 228, 139, 0.8));
-      animation-duration:2.8s;
+      animation-name:linesmithNodeAssemble1;
     }
+    .linesmith-loading-node.node-2{ animation-name:linesmithNodeAssemble2; }
+    .linesmith-loading-node.node-3{ animation-name:linesmithNodeAssemble3; }
+    .linesmith-loading-node.node-4{ animation-name:linesmithNodeAssemble4; }
     .linesmith-loading-node.is-target{
       fill:#8ff2b1;
       filter:drop-shadow(0 0 10px rgba(143, 242, 177, 0.82));
-      animation-duration:2s;
+      animation-name:linesmithNodeAssemble5;
     }
     .linesmith-loading-node-ping{
       fill:none;
@@ -1131,17 +1148,17 @@
       stroke-width:1.5;
       filter:drop-shadow(0 0 12px rgba(139, 214, 255, 0.9));
     }
-    .linesmith-loading-bearing-arm{
-      stroke:rgba(255,255,255,0.8);
-      stroke-width:2;
-      stroke-linecap:round;
-      opacity:.85;
-      animation:linesmithBearingSweep 2.2s ease-in-out infinite;
-      transform-origin:48px 96px;
+    .linesmith-loading-builder-dot{
+      fill:#fef6d8;
+      stroke:#ffd261;
+      stroke-width:1;
+      opacity:0;
+      filter:drop-shadow(0 0 8px rgba(255, 210, 97, 0.7));
+      animation:linesmithBuilderPulse 30s linear infinite;
     }
     @keyframes linesmithNodeIdle{
-      0%, 100% { transform:scale(0.95); opacity:.72; }
-      50% { transform:scale(1.06); opacity:1; }
+      0%, 100% { transform:scale(0.92); }
+      50% { transform:scale(1.05); }
     }
     @keyframes linesmithNodePing{
       0% { transform:scale(0.65); opacity:0; }
@@ -1152,9 +1169,60 @@
       from { stroke-dashoffset:0; }
       to { stroke-dashoffset:-48; }
     }
-    @keyframes linesmithBearingSweep{
-      0%, 100% { transform:rotate(-36deg); opacity:.35; }
-      50% { transform:rotate(24deg); opacity:1; }
+    @keyframes linesmithAssembleSegment1{
+      0%, 2% { opacity:0; stroke-dashoffset:var(--segment-length); }
+      10%, 82% { opacity:1; stroke-dashoffset:0; }
+      100% { opacity:0; stroke-dashoffset:0; }
+    }
+    @keyframes linesmithAssembleSegment2{
+      0%, 10% { opacity:0; stroke-dashoffset:var(--segment-length); }
+      20%, 84% { opacity:1; stroke-dashoffset:0; }
+      100% { opacity:0; stroke-dashoffset:0; }
+    }
+    @keyframes linesmithAssembleSegment3{
+      0%, 20% { opacity:0; stroke-dashoffset:var(--segment-length); }
+      32%, 86% { opacity:1; stroke-dashoffset:0; }
+      100% { opacity:0; stroke-dashoffset:0; }
+    }
+    @keyframes linesmithAssembleSegment4{
+      0%, 32% { opacity:0; stroke-dashoffset:var(--segment-length); }
+      44%, 88% { opacity:1; stroke-dashoffset:0; }
+      100% { opacity:0; stroke-dashoffset:0; }
+    }
+    @keyframes linesmithAssembleSegment5{
+      0%, 44% { opacity:0; stroke-dashoffset:var(--segment-length); }
+      56%, 90% { opacity:1; stroke-dashoffset:0; }
+      100% { opacity:0; stroke-dashoffset:0; }
+    }
+    @keyframes linesmithNodeAssemble1{
+      0%, 3% { opacity:0; transform:scale(0.7); }
+      10%, 90% { opacity:1; transform:scale(1); }
+      100% { opacity:0; transform:scale(0.9); }
+    }
+    @keyframes linesmithNodeAssemble2{
+      0%, 14% { opacity:0; transform:scale(0.7); }
+      21%, 90% { opacity:1; transform:scale(1); }
+      100% { opacity:0; transform:scale(0.9); }
+    }
+    @keyframes linesmithNodeAssemble3{
+      0%, 25% { opacity:0; transform:scale(0.7); }
+      32%, 90% { opacity:1; transform:scale(1); }
+      100% { opacity:0; transform:scale(0.9); }
+    }
+    @keyframes linesmithNodeAssemble4{
+      0%, 37% { opacity:0; transform:scale(0.7); }
+      44%, 90% { opacity:1; transform:scale(1); }
+      100% { opacity:0; transform:scale(0.9); }
+    }
+    @keyframes linesmithNodeAssemble5{
+      0%, 50% { opacity:0; transform:scale(0.7); }
+      57%, 90% { opacity:1; transform:scale(1); }
+      100% { opacity:0; transform:scale(0.9); }
+    }
+    @keyframes linesmithBuilderPulse{
+      0%, 4% { opacity:0; }
+      8%, 88% { opacity:1; }
+      100% { opacity:0; }
     }
 
     @media (max-width: 960px) {
@@ -1210,6 +1278,11 @@
           <stop offset="0.9" stop-color="white" stop-opacity="1" />
           <stop offset="1" stop-color="black" stop-opacity="0" />
         </linearGradient>
+        <linearGradient id="linesmithLoadingAssemblyStroke" x1="48" y1="96" x2="452" y2="90" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffe58d" />
+          <stop offset="0.45" stop-color="#8fdfff" />
+          <stop offset="1" stop-color="#8ff2b1" />
+        </linearGradient>
         <mask id="linesmithLoadingEdgeFade">
           <rect x="0" y="0" width="520" height="160" fill="url(#linesmithLoadingMaskFade)" />
         </mask>
@@ -1218,16 +1291,25 @@
         <path id="linesmithLoadingTraversePath" class="linesmith-loading-route-outline" d="M48 96 L140 62 L248 104 L344 48 L452 90" />
         <path class="linesmith-loading-link" d="M48 96 L140 62 L248 104 L344 48 L452 90" />
         <path class="linesmith-loading-link" d="M140 62 L250 24 L344 48" style="animation-delay:.4s" />
-        <line class="linesmith-loading-bearing-arm" x1="48" y1="96" x2="78" y2="76" />
+        <path class="linesmith-loading-segment segment-1" style="--segment-length:104" d="M48 96 L140 62" />
+        <path class="linesmith-loading-segment segment-2" style="--segment-length:124" d="M140 62 L248 104" />
+        <path class="linesmith-loading-segment segment-3" style="--segment-length:112" d="M248 104 L344 48" />
+        <path class="linesmith-loading-segment segment-4" style="--segment-length:118" d="M344 48 L452 90" />
+        <path class="linesmith-loading-segment segment-5" style="--segment-length:158" d="M140 62 L250 24 L344 48" />
         <circle class="linesmith-loading-node-ping origin" cx="48" cy="96" r="8" />
         <circle class="linesmith-loading-node-ping target" cx="452" cy="90" r="8" />
         <circle class="linesmith-loading-node is-origin" cx="48" cy="96" r="7" />
-        <circle class="linesmith-loading-node" cx="140" cy="62" r="7" />
-        <circle class="linesmith-loading-node" cx="248" cy="104" r="7" />
-        <circle class="linesmith-loading-node" cx="344" cy="48" r="7" />
+        <circle class="linesmith-loading-node node-2" cx="140" cy="62" r="7" />
+        <circle class="linesmith-loading-node node-3" cx="248" cy="104" r="7" />
+        <circle class="linesmith-loading-node node-4" cx="344" cy="48" r="7" />
         <circle class="linesmith-loading-node is-target" cx="452" cy="90" r="7" />
+        <circle class="linesmith-loading-builder-dot" cx="48" cy="96" r="3.2">
+          <animateMotion dur="30s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#linesmithLoadingTraversePath" />
+          </animateMotion>
+        </circle>
         <circle class="linesmith-loading-traverse-dot" cx="48" cy="96" r="4.5">
-          <animateMotion dur="2.9s" repeatCount="indefinite" rotate="auto">
+          <animateMotion dur="30s" repeatCount="indefinite" keyTimes="0;0.18;0.4;0.62;0.86;1" keyPoints="0;0.25;0.5;0.75;1;1" calcMode="linear" rotate="auto">
             <mpath href="#linesmithLoadingTraversePath" />
           </animateMotion>
         </circle>
