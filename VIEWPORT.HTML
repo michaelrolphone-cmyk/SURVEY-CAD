@@ -6406,9 +6406,10 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
   function chooseClosestPrintScale(bounds, paper, marginIn = 0.5) {
     const worldWidthFeet = Math.max(EPS, bounds.maxX - bounds.minX);
     const worldHeightFeet = Math.max(EPS, bounds.maxY - bounds.minY);
-    const printableWidthFeet = Math.max(EPS, (paper.widthIn - (marginIn * 2)) / 12);
-    const printableHeightFeet = Math.max(EPS, (paper.heightIn - (marginIn * 2)) / 12);
-    const targetScale = Math.max(worldWidthFeet / printableWidthFeet, worldHeightFeet / printableHeightFeet);
+    // Engineering print scales are interpreted as 1" = N' (feet on the ground).
+    const printableWidthInches = Math.max(EPS, paper.widthIn - (marginIn * 2));
+    const printableHeightInches = Math.max(EPS, paper.heightIn - (marginIn * 2));
+    const targetScale = Math.max(worldWidthFeet / printableWidthInches, worldHeightFeet / printableHeightInches);
 
     let selectedScale = PRINT_SCALES[0];
     let bestDelta = Infinity;
