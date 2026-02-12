@@ -135,6 +135,8 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 
 LineSmith now renders configured survey symbol SVGs directly as map point markers when a point code maps to an FLD symbol rule (`entity_type = 0`) with `symbol_name_2` set. When no SVG mapping is found (or while the SVG is still loading), LineSmith falls back to the existing `x` marker. SVG markers render at the same on-screen size as the legacy `x` marker footprint.
 
+Symbol marker refresh now relies on the existing continuous canvas animation loop (`requestAnimationFrame(draw)`) rather than legacy one-off `redraw()` callbacks.
+
 ## Survey Symbol SVG Library
 
 A dedicated library of surveying map symbols is available in `assets/survey-symbols/` for use with point-file symbol rendering workflows (property pins, cap types, meters, manholes, control points, poles, signs, and related utility marks). A machine-readable manifest is also included at `assets/survey-symbols/index.json`.
