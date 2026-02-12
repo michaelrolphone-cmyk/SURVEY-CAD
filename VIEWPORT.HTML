@@ -2934,6 +2934,7 @@
     startPanX: 0,
     startPanY: 0,
     startCenter: null,
+    startWorldAtCenter: null,
     boxSelectActive: false
   };
 
@@ -9912,6 +9913,9 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       touchGesture.startPanX = view.panX;
       touchGesture.startPanY = view.panY;
       touchGesture.startCenter = getTouchCenter();
+      touchGesture.startWorldAtCenter = touchGesture.startCenter
+        ? screenToWorld(touchGesture.startCenter.x, touchGesture.startCenter.y)
+        : null;
       return;
     }
 
@@ -9994,12 +9998,13 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (touchGesture.points.size === 2 && touchGesture.mode === "pinch") {
       const center = getTouchCenter();
       const distance = Math.max(1, getTouchDistance());
-      if (!center || !touchGesture.startCenter) return;
+      if (!center || !touchGesture.startCenter || !touchGesture.startWorldAtCenter) return;
       const factor = distance / Math.max(1, touchGesture.startDistance);
       const newScale = clamp(touchGesture.startScale * factor, MIN_SCALE, MAX_SCALE);
+      const rotatedAnchor = rotateWorldPointAroundBasis(touchGesture.startWorldAtCenter.x, touchGesture.startWorldAtCenter.y);
       view.scale = newScale;
-      view.panX = touchGesture.startPanX + (center.x - touchGesture.startCenter.x);
-      view.panY = touchGesture.startPanY + (center.y - touchGesture.startCenter.y);
+      view.panX = center.x - rotatedAnchor.x * view.scale;
+      view.panY = center.y + rotatedAnchor.y * view.scale;
       return;
     }
 
@@ -10021,6 +10026,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       handleCanvasPrimaryAction();
     }
     touchGesture.mode = null;
+    touchGesture.startWorldAtCenter = null;
     touchGesture.boxSelectActive = false;
   }
 
