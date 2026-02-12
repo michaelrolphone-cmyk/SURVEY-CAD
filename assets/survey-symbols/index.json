@@ -4,7 +4,7 @@
     {
       "id": "aluminum-cap",
       "file": "aluminum-cap.svg",
-      "code": "ALUMINUM_CAP"
+      "code": "FAC"
     },
     {
       "id": "benchmark",
@@ -14,7 +14,7 @@
     {
       "id": "brass-cap",
       "file": "brass-cap.svg",
-      "code": "BRASS_CAP"
+      "code": "FBC"
     },
     {
       "id": "catch-basin",
@@ -44,12 +44,12 @@
     {
       "id": "coper-cap",
       "file": "coper-cap.svg",
-      "code": "COPER_CAP"
+      "code": "FCC"
     },
     {
       "id": "copper-cap",
       "file": "copper-cap.svg",
-      "code": "COPPER_CAP"
+      "code": "FCC"
     },
     {
       "id": "edge-of-pavement",
@@ -59,22 +59,22 @@
     {
       "id": "electric-meter",
       "file": "electric-meter.svg",
-      "code": "ELECTRIC_METER"
+      "code": "PM"
     },
     {
       "id": "fence-corner",
       "file": "fence-corner.svg",
-      "code": "FENCE_CORNER"
+      "code": "FENCE"
     },
     {
       "id": "fire-hydrant",
       "file": "fire-hydrant.svg",
-      "code": "FIRE_HYDRANT"
+      "code": "FH"
     },
     {
       "id": "gas-meter",
       "file": "gas-meter.svg",
-      "code": "GAS_METER"
+      "code": "GM"
     },
     {
       "id": "light-pole",
@@ -99,7 +99,7 @@
     {
       "id": "power-pole",
       "file": "power-pole.svg",
-      "code": "POWER_POLE"
+      "code": "PP"
     },
     {
       "id": "property-pin-found",
@@ -134,7 +134,7 @@
     {
       "id": "storm-manhole",
       "file": "storm-manhole.svg",
-      "code": "STORM_MANHOLE"
+      "code": "SDMH"
     },
     {
       "id": "telecom-manhole",
@@ -164,7 +164,7 @@
     {
       "id": "valve-water",
       "file": "valve-water.svg",
-      "code": "VALVE_WATER"
+      "code": "WV"
     },
     {
       "id": "vault-electric",
@@ -179,7 +179,7 @@
     {
       "id": "water-meter",
       "file": "water-meter.svg",
-      "code": "WATER_METER"
+      "code": "WM"
     }
   ]
 }

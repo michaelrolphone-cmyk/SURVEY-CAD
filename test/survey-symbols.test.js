@@ -59,3 +59,23 @@ test('symbol index manifest references existing SVG files', async () => {
     assert.match(svg, /<svg/);
   }
 });
+
+test('symbol labels and manifest codes stay aligned for code-based symbols', async () => {
+  const indexPath = path.join(symbolDir, 'index.json');
+  const indexRaw = await readFile(indexPath, 'utf8');
+  const manifest = JSON.parse(indexRaw);
+
+  for (const symbol of manifest.symbols) {
+    const svg = await readFile(path.join(symbolDir, symbol.file), 'utf8');
+    const textMatch = svg.match(/<text[^>]*>(.*?)<\/text>/);
+    if (!textMatch || symbol.code.includes('_') || symbol.code.length > 5) {
+      continue;
+    }
+
+    assert.equal(
+      textMatch[1].trim(),
+      symbol.code,
+      `expected ${symbol.file} text label to match code ${symbol.code}`
+    );
+  }
+});
