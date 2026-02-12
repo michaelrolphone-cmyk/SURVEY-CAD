@@ -88,6 +88,8 @@ test('VIEWPORT.HTML includes icon-based quick toolbar shortcuts for core LineSmi
   assert.match(html, /id="quickOffsetLine"[\s\S]*fa-arrows-left-right/, 'quick toolbar should include Offset Selected Line icon shortcut');
   assert.match(html, /id="quickRotateSelection"[\s\S]*fa-rotate/, 'quick toolbar should include Rotate Selection icon shortcut');
   assert.match(html, /id="quickPointManager"[\s\S]*fa-list/, 'quick toolbar should include Point Manager icon shortcut');
+  assert.match(html, /\.quickToolBtn\.saveSuccessPulse\{[\s\S]*animation:quickSaveSuccessPulse 420ms ease-out;/, 'quick Save icon should expose a temporary success pulse animation class');
+  assert.match(html, /@keyframes quickSaveSuccessPulse\{[\s\S]*45%\{\s*transform:scale\(1\.14\);/, 'quick Save icon pulse animation should scale up midway through the success pulse');
   assert.match(html, /function\s+startLineByPointsFromToolbar\(\)\s*\{[\s\S]*if \(selectedPointIds\.length >= 2\) \{[\s\S]*runLineBetweenSelectedPoints\(\{ returnToSelectionTool: true \}\);[\s\S]*setTool\("line2pt"\);/, 'quick Line by Points should run line-between-selected when points are preselected and otherwise enter two-point draw mode');
   assert.match(html, /async\s+function\s+runLineBetweenSelectedPoints\(\{ returnToSelectionTool = false \} = \{\}\)[\s\S]*if \(returnToSelectionTool\) setTool\("select"\);/, 'line-between-selected workflow should optionally return to selection tool after completion');
   assert.match(html, /\$\("#quickSave"\)\?\.addEventListener\("click",\s*\(\)\s*=>\s*\$\("#saveDrawingToProject"\)\.click\(\)\)/, 'quick Save should trigger the existing save drawing workflow');
@@ -620,6 +622,8 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /function\s+sanitizeMapGeoreference\(candidate\)/, 'LineSmith should centralize georeference validation for restores and history fallback');
   assert.match(html, /mapGeoreference\s*=\s*sanitizeMapGeoreference\(s\.mapGeoreference\);/, 'restored drawing snapshots should hydrate georeference transform data through sanitization');
   assert.match(html, /record\.latestMapGeoreference\s*=\s*sanitizeMapGeoreference\(currentState\.mapGeoreference\);/, 'saving should persist a latest georeference fallback alongside differential versions');
+  assert.match(html, /setStatus\(`Saved drawing "\$\{drawingName\}" to project history \(\$\{record\.versions\.length\} version\$\{record\.versions\.length === 1 \? "" : "s"\}\)\.`, "ok"\);[\s\S]*triggerQuickSaveSuccessPulse\(\);/, 'successful drawing saves should pulse the quick save icon to confirm persistence');
+  assert.match(html, /function\s+triggerQuickSaveSuccessPulse\(\)\s*\{[\s\S]*quickSaveBtn\.classList\.remove\("saveSuccessPulse"\);[\s\S]*void quickSaveBtn\.offsetWidth;[\s\S]*quickSaveBtn\.classList\.add\("saveSuccessPulse"\);/, 'save pulse helper should restart the icon animation even for repeated rapid saves');
   assert.match(html, /const\s+fallbackGeoreference\s*=\s*sanitizeMapGeoreference\(record\.latestMapGeoreference\);[\s\S]*state\.mapGeoreference\s*=\s*fallbackGeoreference;/, 'version materialization should restore latest georeference when differential history omitted that field');
   assert.match(html, /latestMapGeoreference,/, 'project browser metadata should carry the latest georeference snapshot');
   assert.match(html, /latestSavedAt:\s*new Date\(\)\.toISOString\(\),/, 'project browser metadata should carry the latest drawing save timestamp');

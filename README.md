@@ -43,6 +43,7 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 - `Ctrl+S` (Windows/Linux)
 - `Cmd+S` (macOS)
 - `Ctrl+Shift+S` / `Cmd+Shift+S` (handled as save in-app)
+- Successful saves now pulse the quick-toolbar floppy-disk icon so you get immediate visual confirmation that the save completed.
 
 ## LineSmith Mouse Shortcut
 
