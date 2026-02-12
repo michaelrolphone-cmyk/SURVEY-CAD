@@ -321,7 +321,7 @@ LineSmith (`VIEWPORT.HTML`) now also includes an FLD editor workflow:
 - Add, edit, and remove FLD code rows.
 - For each row, choose **Entity** as **Linework**, **2D Polyline (Linework)**, or **Symbol**.
   - **Linework** and **2D Polyline** rows can pick a FLD `Linetype` value from existing line types in the loaded config; line entities default to FLD `Symbol` = `SPT10` and do not expose symbol SVG options.
-  - **Symbol** rows can set FLD `Symbol` to the symbol name used by your code set (for example `SPT10`), then choose the mapped SVG (`Symbol Name 2`) from a dropdown + preview picker so you can visually confirm the symbol before saving, and set FLD `Symbol Size` scale.
+  - **Symbol** rows can set FLD `Symbol` to the symbol name used by your code set (for example `SPT10`), then choose the mapped SVG from a dropdown + preview picker so you can visually confirm the symbol before saving, and set FLD `Symbol Size` scale. SVG mappings are stored separately in browser local storage as `Symbol -> SVG` overrides and are not written back into FLD columns.
 - Click **Save Local** to store a browser-local override (`localStorage` key: `lineSmithFldConfigLocal`) and immediately apply those rules to auto linework/layer behavior.
 - Click **Download Local FLD** (panel button or modal button) to export your saved local override as an `.fld` file.
 - Click **Download Current FLD** to export the currently-loaded editor state.

@@ -1957,6 +1957,7 @@
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = "surveyfoundryLastLineSmithDrawing";
   const ARROWHEAD_IMPORT_STORAGE_KEY = "lineSmithArrowHeadImport";
   const FLD_CONFIG_LOCAL_STORAGE_KEY = "lineSmithFldConfigLocal";
+  const FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY = "lineSmithFldSymbolSvgOverrides";
   const ARROWHEAD_SYNC_INTERVAL_MS = 1000;
   let lastArrowHeadPayloadJson = "";
   let lastArrowHeadPayloadSyncAt = 0;
@@ -3678,6 +3679,7 @@
     codeSymbolMapFiles: new Map(),
     lineworkCompanionCodes: new Map(),
     companionToLineworkCodes: new Map(),
+    symbolSvgOverrides: new Map(),
     source: null,
     loaded: false,
     attempted: false,
@@ -3745,7 +3747,7 @@
     }
     const rules = Array.isArray(config?.rules) ? config.rules : [];
     for (const rule of rules) {
-      const existingFile = String(rule?.raw?.symbol_name_2 || "").trim();
+      const existingFile = getSymbolMapFileForRule(rule);
       if (!existingFile || seen.has(existingFile)) continue;
       seen.add(existingFile);
       choices.push({ value: existingFile, label: existingFile });
@@ -3845,10 +3847,74 @@
     return normalized === "2" || normalized === "1";
   }
 
+  function getRuleSymbolMapFile(raw = {}) {
+    return String(raw?.symbol_name_2 || raw?.symbol_block_id || raw?.symbol_map_file || "").trim();
+  }
+
+  function setRuleSymbolMapFile(raw, value) {
+    if (!raw || typeof raw !== "object") return;
+    const normalized = String(value || "").trim();
+    raw.symbol_name_2 = normalized;
+    if (Object.hasOwn(raw, "symbol_block_id")) raw.symbol_block_id = normalized;
+    if (Object.hasOwn(raw, "symbol_map_file")) raw.symbol_map_file = normalized;
+  }
+
+  function loadFldSymbolMapOverrides() {
+    try {
+      const raw = localStorage.getItem(FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY);
+      if (!raw) return new Map();
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return new Map();
+      const overrides = new Map();
+      for (const [symbol, file] of Object.entries(parsed)) {
+        const symbolKey = String(symbol || "").trim();
+        const mappedFile = String(file || "").trim();
+        if (!symbolKey || !mappedFile) continue;
+        overrides.set(symbolKey, mappedFile);
+      }
+      return overrides;
+    } catch (_err) {
+      return new Map();
+    }
+  }
+
+  function saveFldSymbolMapOverrides(overrides) {
+    const obj = {};
+    for (const [symbol, file] of (overrides instanceof Map ? overrides.entries() : [])) {
+      const symbolKey = String(symbol || "").trim();
+      const mappedFile = String(file || "").trim();
+      if (!symbolKey || !mappedFile) continue;
+      obj[symbolKey] = mappedFile;
+    }
+    localStorage.setItem(FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY, JSON.stringify(obj));
+  }
+
+  function getSymbolMapFileForRule(rule) {
+    const symbolName = String(rule?.raw?.symbol || "").trim();
+    if (symbolName) {
+      const override = String(fieldToFinishRuleState.symbolSvgOverrides.get(symbolName) || "").trim();
+      if (override) return override;
+    }
+    return getRuleSymbolMapFile(rule?.raw);
+  }
+
+  function setSymbolMapFileForRule(rule, value) {
+    const symbolName = String(rule?.raw?.symbol || "").trim();
+    if (!symbolName) {
+      setStatus("Enter a Symbol value before assigning an SVG mapping.", "warn");
+      return false;
+    }
+    const mappedFile = String(value || "").trim();
+    if (mappedFile) fieldToFinishRuleState.symbolSvgOverrides.set(symbolName, mappedFile);
+    else fieldToFinishRuleState.symbolSvgOverrides.delete(symbolName);
+    saveFldSymbolMapOverrides(fieldToFinishRuleState.symbolSvgOverrides);
+    return true;
+  }
+
   function normalizeLineworkRuleDefaults(rule) {
     if (!rule?.raw || !isLineworkEntityType(rule.raw.entity_type)) return;
     rule.raw.symbol = "SPT10";
-    rule.raw.symbol_name_2 = "";
+    setRuleSymbolMapFile(rule.raw, "");
   }
 
   function deriveFieldToFinishCodeSetsFromConfig(config) {
@@ -3864,7 +3930,7 @@
       const code = String(rule.code).trim().toUpperCase();
       const entityType = String(rule.entityType ?? "").trim();
       const layerName = String(rule.layer ?? "").trim();
-      const symbolMapFile = String(rule.raw?.symbol_name_2 || "").trim();
+      const symbolMapFile = getSymbolMapFileForRule(rule);
       if (!code) continue;
       if (isLineworkEntityType(entityType)) lineworkCodes.add(code);
       if (entityType === "0") symbolCodes.add(code);
@@ -3945,6 +4011,7 @@
     fieldToFinishRuleState.codeSymbolMapFiles = codeSymbolMapFiles;
     fieldToFinishRuleState.lineworkCompanionCodes = lineworkCompanionCodes;
     fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
+    fieldToFinishRuleState.symbolSvgOverrides = loadFldSymbolMapOverrides();
     fieldToFinishRuleState.source = sourceLabel;
     fieldToFinishRuleState.loaded = true;
   }
@@ -3970,6 +4037,7 @@
       fieldToFinishRuleState.codeSymbolMapFiles = new Map();
       fieldToFinishRuleState.lineworkCompanionCodes = new Map();
       fieldToFinishRuleState.companionToLineworkCodes = new Map();
+      fieldToFinishRuleState.symbolSvgOverrides = loadFldSymbolMapOverrides();
       return false;
     }
   }
@@ -10112,10 +10180,12 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
 
         const symbolPreviewPicker = buildFldSymbolPreviewPicker({
           symbolMapChoices: [{ value: "", label: "No SVG mapping" }, ...symbolMapChoices],
-          currentValue: String(rule.raw?.symbol_name_2 || ""),
+          currentValue: getSymbolMapFileForRule(rule),
           onPick: (value) => {
-            rule.raw.symbol_name_2 = value;
+            const applied = setSymbolMapFileForRule(rule, value);
+            if (!applied) return;
             syncFldRuleDerivedFields(rule);
+            applyFieldToFinishConfig(fldEditorState.activeConfig, fldEditorState.source === "local" ? "localStorage" : defaultFldConfigPath);
             renderFldEditorTable();
           },
         });

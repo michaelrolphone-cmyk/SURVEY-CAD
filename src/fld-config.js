@@ -69,6 +69,13 @@ function parseRuleRecord(columns, values, rowNumber) {
     .map((code) => code.trim())
     .filter(Boolean);
 
+  const symbolMapFile = String(
+    record.symbol_name_2
+      || record.symbol_block_id
+      || record.symbol_map_file
+      || ''
+  ).trim();
+
   return {
     rowNumber,
     code: String(record.code || '').trim(),
@@ -79,7 +86,7 @@ function parseRuleRecord(columns, values, rowNumber) {
     lineType: String(record.linetype || '').trim(),
     symbol: String(record.symbol || '').trim(),
     symbolSize: String(record.symbol_size || '').trim(),
-    symbolMapFile: String(record.symbol_name_2 || '').trim(),
+    symbolMapFile,
     processingOn: record.processing_on === '1',
     codeSequence,
     companionCodes,
