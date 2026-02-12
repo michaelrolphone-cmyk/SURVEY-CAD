@@ -2432,6 +2432,30 @@
     };
   }
 
+  function normalizeReadableBearingTextAngle(angle) {
+    const twoPi = Math.PI * 2;
+    let normalized = angle;
+    while (normalized <= -Math.PI) normalized += twoPi;
+    while (normalized > Math.PI) normalized -= twoPi;
+
+    const candidates = [normalized, normalized + Math.PI, normalized - Math.PI];
+    let best = candidates[0];
+    let bestScore = -Infinity;
+    for (const candidate of candidates) {
+      const right = Math.cos(candidate);
+      const up = -Math.sin(candidate);
+      const score = (right * 3) + up;
+      if (score > bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+
+    while (best <= -Math.PI) best += twoPi;
+    while (best > Math.PI) best -= twoPi;
+    return best;
+  }
+
   function rectsOverlap(a, b, padding = 4) {
     return !(a.x + a.w + padding <= b.x || b.x + b.w + padding <= a.x || a.y + a.h + padding <= b.y || b.y + b.h + padding <= a.y);
   }
@@ -6052,7 +6076,7 @@
         const totalDistance = group.segments.reduce((sum, seg) => sum + seg.measure.distance, 0);
         const referenceSegment = group.segments[0];
         const groupLabel = `${referenceSegment.measure.bearing} • ${totalDistance.toFixed(3)}`;
-        const bearingAngle = referenceSegment.measure.angle;
+        const bearingAngle = normalizeReadableBearingTextAngle(referenceSegment.measure.angle);
 
         const anchorX = group.segments.reduce((sum, seg) => sum + (seg.sa.x + seg.sb.x) * 0.5, 0) / Math.max(1, group.segments.length);
         const anchorY = group.segments.reduce((sum, seg) => sum + (seg.sa.y + seg.sb.y) * 0.5, 0) / Math.max(1, group.segments.length);
@@ -6125,8 +6149,7 @@
       if (lengthPx > 32) {
         const labelX = (start.x + end.x) * 0.5;
         const labelY = (start.y + end.y) * 0.5 - 12;
-        let labelAngle = angle;
-        if (labelAngle > Math.PI / 2 || labelAngle < -Math.PI / 2) labelAngle += Math.PI;
+        const labelAngle = normalizeReadableBearingTextAngle(angle);
         ctx.translate(labelX, labelY);
         ctx.rotate(labelAngle);
         ctx.textAlign = "center";
