@@ -104,6 +104,9 @@ Quick command to inspect symbols:
 
 ```bash
 find assets/survey-symbols -maxdepth 1 -name '*.svg' | sort
+
+# inspect symbol-to-code mappings used by API/CLI workflows
+node -e "const m=require('./assets/survey-symbols/index.json'); console.table(m.symbols.map(({id,code,file})=>({id,code,file})))"
 ```
 
 ## Test
