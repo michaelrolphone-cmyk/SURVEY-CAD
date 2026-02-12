@@ -32,7 +32,7 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 When `VIEWPORT.HTML` (LineSmith) opens, a modern non-blocking loading indicator appears while startup tasks run:
 
-- Animated nodes and links visualize points being connected while drawing context loads.
+- A looped survey-traverse animation now shows a moving occupied-point marker, bearing sweep arm, and origin/target pings to better mimic real field layout actions while drawing context loads.
 - A live stage message updates as LineSmith initializes map controls, restores project drawings, and joins collaboration.
 - The indicator card floats above the LineSmith UI so you can still see the editor behind it, then auto-dismisses once boot is complete (or after recovery from a startup error).
 
