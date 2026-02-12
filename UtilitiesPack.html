@@ -80,23 +80,19 @@
     }
 
     function buildPowerCsv() {
-      const rows = [['id', 'source', 'provider', 'code', 'name', 'lon', 'lat', 'east', 'north', 'outSR']];
+      const rows = [['name', 'northing', 'easting', 'elevation', 'code', 'description']];
       state.utilities
         .filter((utility) => String(utility.source || '').toLowerCase() === 'power')
-        .forEach((utility) => {
+        .forEach((utility, index) => {
           const projected = utility.projected || {};
-          const location = utility.location || {};
+          const code = utility.code || utility.name || 'UTIL';
           rows.push([
-            utility.id || '',
-            utility.source || '',
-            utility.provider || '',
-            utility.code || '',
-            utility.name || '',
-            Number(location.lon || 0).toFixed(8),
-            Number(location.lat || 0).toFixed(8),
-            Number(projected.east || 0).toFixed(3),
+            utility.name || `POWER_${index + 1}`,
             Number(projected.north || 0).toFixed(3),
-            String(projected?.spatialReference?.wkid || state.outSR),
+            Number(projected.east || 0).toFixed(3),
+            '',
+            code,
+            utility.provider || utility.source || '',
           ]);
         });
       return rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n');
