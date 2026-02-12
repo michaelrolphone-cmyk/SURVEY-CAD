@@ -365,6 +365,18 @@
       background:#101010;
       color:var(--text);
     }
+    .mobileToolbarToggle{
+      display:none;
+      position:absolute;
+      top:10px;
+      left:10px;
+      z-index:7;
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:8px 12px;
+      background:#101010;
+      color:var(--text);
+    }
     .quickTools{
       position:absolute;
       top:10px;
@@ -1326,6 +1338,9 @@
       .app.drawerOpen .panel{ transform:translateX(0); }
       .drawerToggle{ display:block; }
       .quickTools{ max-width:calc(100% - 20px); }
+      .mobileToolbarToggle{ display:block; }
+      .app.mobileToolbarsHidden .quickTools,
+      .app.mobileToolbarsHidden .drawerToggle{ display:none; }
       .linesmith-loading-overlay{ padding-top:10px; }
       .workflowToast{
         top:auto;
@@ -1796,6 +1811,7 @@
 
   <div class="canvasWrap">
     <button id="drawerEdgeExpand" class="drawerEdgeExpand" aria-label="Expand controls drawer" title="Expand controls drawer">←</button>
+    <button id="mobileToolbarToggle" class="mobileToolbarToggle" aria-pressed="false" aria-label="Hide quick toolbars">Hide Bars</button>
     <button id="drawerToggle" class="drawerToggle">Tools</button>
     <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
       <div class="quickToolsRow quickToolsRowPrimary">
@@ -2745,6 +2761,7 @@
   const ctx = canvas.getContext("2d");
   const appShell = $("#appShell");
   const drawerToggle = $("#drawerToggle");
+  const mobileToolbarToggle = $("#mobileToolbarToggle");
   const panelCollapseHandle = $("#panelCollapseHandle");
   const drawerEdgeExpand = $("#drawerEdgeExpand");
   const mapBackdrop = $("#mapBackdrop");
@@ -2851,6 +2868,7 @@
   let recordBasisBearing = "";
   let recordBasisDistance = "";
   let quickLayerDropdownOpen = false;
+  let mobileToolbarsHidden = false;
 
   // Selection
   let selectedPointId = null;   // primary point
@@ -6848,6 +6866,11 @@
       setDrawerOpen(!isOpen);
     });
   }
+  if (mobileToolbarToggle) {
+    mobileToolbarToggle.addEventListener("click", () => {
+      setMobileToolbarsHidden(!mobileToolbarsHidden);
+    });
+  }
   if (panelCollapseHandle) {
     panelCollapseHandle.addEventListener("click", () => setPanelCollapsed(true));
   }
@@ -9477,6 +9500,18 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (drawerToggle) drawerToggle.textContent = open ? "Close" : "Tools";
   }
 
+  function setMobileToolbarsHidden(hidden) {
+    if (!appShell) return;
+    const shouldHide = isMobileViewport() && !!hidden;
+    mobileToolbarsHidden = shouldHide;
+    appShell.classList.toggle("mobileToolbarsHidden", shouldHide);
+    if (mobileToolbarToggle) {
+      mobileToolbarToggle.textContent = shouldHide ? "Show Bars" : "Hide Bars";
+      mobileToolbarToggle.setAttribute("aria-pressed", shouldHide ? "true" : "false");
+      mobileToolbarToggle.setAttribute("aria-label", shouldHide ? "Show quick toolbars" : "Hide quick toolbars");
+    }
+  }
+
   function setPanelCollapsed(collapsed) {
     if (!appShell) return;
     const shouldCollapse = !isMobileViewport() && !!collapsed;
@@ -9492,9 +9527,11 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
     if (isMobileViewport()) {
       setDrawerOpen(hasSelection);
       setPanelCollapsed(false);
+      setMobileToolbarsHidden(mobileToolbarsHidden);
       return;
     }
     setDrawerOpen(false);
+    setMobileToolbarsHidden(false);
     setPanelCollapsed(!hasSelection);
   }
 
