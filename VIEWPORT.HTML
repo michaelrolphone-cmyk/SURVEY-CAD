@@ -1603,25 +1603,17 @@
     <div class="section">
       <div class="title">
         <b>Basis of Bearing</b>
-        <span>define two drawing coordinates</span>
+        <span>define two existing points</span>
       </div>
       <div class="grid2">
-        <label>X1
-          <input id="basisBearingX1" placeholder="1000.000" />
+        <label>Start point #/name
+          <input id="basisBearingStartPoint" placeholder="101" />
         </label>
-        <label>Y1
-          <input id="basisBearingY1" placeholder="1000.000" />
-        </label>
-      </div>
-      <div class="grid2">
-        <label>X2
-          <input id="basisBearingX2" placeholder="1010.000" />
-        </label>
-        <label>Y2
-          <input id="basisBearingY2" placeholder="1004.000" />
+        <label>End point #/name
+          <input id="basisBearingEndPoint" placeholder="102" />
         </label>
       </div>
-      <div class="grid2" style="margin-top:8px;">
+            <div class="grid2" style="margin-top:8px;">
         <button id="setBasisOfBearing" class="ok">Set Basis of Bearing</button>
         <button id="clearBasisOfBearing">Clear Basis of Bearing</button>
       </div>
@@ -2275,7 +2267,85 @@
     const m = Math.floor(mFloat + 1e-10);
     const s = (mFloat - m) * 60;
     const sRound = Math.round(s*1000)/1000;
-    return `${q1}${d}-${String(m).padStart(2,"0")}-${String(sRound.toFixed(3)).padStart(6,"0")}${q2}`;
+    return `${q1}${d}°${String(m).padStart(2,"0")}'${String(sRound.toFixed(3)).padStart(6,"0")}"${q2}`;
+  }
+
+  function normalizeAzimuthRad(az) {
+    const twoPi = Math.PI * 2;
+    let value = az % twoPi;
+    if (value < 0) value += twoPi;
+    return value;
+  }
+
+  function resolvePointByNumberOrName(reference) {
+    const raw = String(reference ?? "").trim();
+    if (!raw) return null;
+    const normalized = raw.toUpperCase();
+
+    const byNumber = [...points.values()].find((point) => String(point?.num ?? "").trim().toUpperCase() === normalized);
+    if (byNumber) return byNumber;
+
+    if (/^\d+$/.test(raw)) {
+      const pointById = points.get(Number(raw));
+      if (pointById) return pointById;
+    }
+
+    const withoutPrefix = normalized.replace(/^P\s*-?\s*/i, "");
+    if (withoutPrefix && withoutPrefix !== normalized) {
+      const byPrefixedNumber = [...points.values()].find((point) => String(point?.num ?? "").trim().toUpperCase() === withoutPrefix);
+      if (byPrefixedNumber) return byPrefixedNumber;
+    }
+
+    return null;
+  }
+
+  function resolveBasisOfBearingEndpoints(value = basisOfBearing) {
+    if (!value) return null;
+
+    if (value.startPointId != null && value.endPointId != null) {
+      const startPoint = points.get(value.startPointId);
+      const endPoint = points.get(value.endPointId);
+      if (!startPoint || !endPoint) return null;
+      if (startPoint.id === endPoint.id) return null;
+      return {
+        start: { x: Number(startPoint.x), y: Number(startPoint.y) },
+        end: { x: Number(endPoint.x), y: Number(endPoint.y) },
+        startPoint,
+        endPoint
+      };
+    }
+
+    const startX = Number(value?.start?.x);
+    const startY = Number(value?.start?.y);
+    const endX = Number(value?.end?.x);
+    const endY = Number(value?.end?.y);
+    if (![startX, startY, endX, endY].every(Number.isFinite)) return null;
+    if (Math.hypot(endX - startX, endY - startY) <= EPS) return null;
+    return {
+      start: { x: startX, y: startY },
+      end: { x: endX, y: endY },
+      startPoint: null,
+      endPoint: null
+    };
+  }
+
+  function basisAzimuthRad() {
+    const endpoints = resolveBasisOfBearingEndpoints();
+    if (!endpoints) return null;
+    const dx = endpoints.end.x - endpoints.start.x;
+    const dy = endpoints.end.y - endpoints.start.y;
+    if (Math.hypot(dx, dy) <= EPS) return null;
+    return normalizeAzimuthRad(Math.atan2(dx, dy));
+  }
+
+  function orientAzimuthClockwiseFromBasis(az) {
+    const basisAz = basisAzimuthRad();
+    if (basisAz == null) return normalizeAzimuthRad(az);
+    const forward = normalizeAzimuthRad(az);
+    const reverse = normalizeAzimuthRad(az + Math.PI);
+    const fDelta = (forward - basisAz + Math.PI * 2) % (Math.PI * 2);
+    const rDelta = (reverse - basisAz + Math.PI * 2) % (Math.PI * 2);
+    return fDelta <= rDelta ? forward : reverse;
   }
 
   function lineMeasurement(a, b) {
@@ -2284,11 +2354,12 @@
     const dy = b.y - a.y;
     const distance = Math.hypot(dx, dy);
     if (!(distance > EPS)) return null;
-    const az = Math.atan2(dx, dy);
+    const az = orientAzimuthClockwiseFromBasis(Math.atan2(dx, dy));
     return {
       distance,
       bearing: azimuthRadToQuadrantString(az),
-      angle: Math.atan2(-(b.y - a.y), b.x - a.x)
+      angle: Math.atan2(-Math.cos(az), Math.sin(az)),
+      azimuth: az
     };
   }
 
@@ -2314,6 +2385,62 @@
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+
+  function buildBearingLabelGroups(lineCandidates) {
+    const withMeasure = lineCandidates
+      .map((candidate, index) => {
+        const measure = lineMeasurement(candidate.a, candidate.b);
+        if (!measure) return null;
+        return { ...candidate, index, measure };
+      })
+      .filter(Boolean);
+
+    const signatureMap = new Map();
+    for (const item of withMeasure) {
+      const sig = item.measure.bearing;
+      if (!signatureMap.has(sig)) signatureMap.set(sig, []);
+      signatureMap.get(sig).push(item);
+    }
+
+    const groups = [];
+    const idForPoint = (point) => `${point?.id ?? "xy"}:${point?.x ?? 0},${point?.y ?? 0}`;
+    for (const [bearing, items] of signatureMap.entries()) {
+      const pointToSegmentIndices = new Map();
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const aid = idForPoint(item.a);
+        const bid = idForPoint(item.b);
+        if (!pointToSegmentIndices.has(aid)) pointToSegmentIndices.set(aid, []);
+        if (!pointToSegmentIndices.has(bid)) pointToSegmentIndices.set(bid, []);
+        pointToSegmentIndices.get(aid).push(i);
+        pointToSegmentIndices.get(bid).push(i);
+      }
+
+      const visited = new Set();
+      for (let i = 0; i < items.length; i++) {
+        if (visited.has(i)) continue;
+        const queue = [i];
+        visited.add(i);
+        const component = [];
+        while (queue.length) {
+          const current = queue.shift();
+          component.push(items[current]);
+          const endpoints = [idForPoint(items[current].a), idForPoint(items[current].b)];
+          for (const endpoint of endpoints) {
+            for (const next of pointToSegmentIndices.get(endpoint) || []) {
+              if (!visited.has(next)) {
+                visited.add(next);
+                queue.push(next);
+              }
+            }
+          }
+        }
+        groups.push({ bearing, segments: component });
+      }
+    }
+
+    return groups;
   }
 
   // -------------------------
@@ -2438,10 +2565,8 @@
   const showPointNamesInput = $("#showPointNames");
   const showPointCodesInput = $("#showPointCodes");
   const showPointNotesInput = $("#showPointNotes");
-  const basisBearingX1Input = $("#basisBearingX1");
-  const basisBearingY1Input = $("#basisBearingY1");
-  const basisBearingX2Input = $("#basisBearingX2");
-  const basisBearingY2Input = $("#basisBearingY2");
+  const basisBearingStartPointInput = $("#basisBearingStartPoint");
+  const basisBearingEndPointInput = $("#basisBearingEndPoint");
   const setBasisOfBearingBtn = $("#setBasisOfBearing");
   const clearBasisOfBearingBtn = $("#clearBasisOfBearing");
   
@@ -2524,7 +2649,7 @@
   var layersTableDirty = true;
   const points = new Map(); // id -> {id,num,x,y,z,code,notes,movable,layerId}
   const lines = new Map();  // id -> {id,a,b,movable,layerId}
-  let basisOfBearing = null; // {start:{x,y}, end:{x,y}}
+  let basisOfBearing = null; // {startPointId, endPointId}
   let quickLayerDropdownOpen = false;
 
   // Selection
@@ -3133,6 +3258,16 @@
   };
 
   function sanitizeBasisOfBearing(value) {
+    const startPointId = Number(value?.startPointId);
+    const endPointId = Number(value?.endPointId);
+    if (Number.isFinite(startPointId) && Number.isFinite(endPointId)) {
+      const startPoint = points.get(startPointId);
+      const endPoint = points.get(endPointId);
+      if (!startPoint || !endPoint) return null;
+      if (startPoint.id === endPoint.id) return null;
+      return { startPointId: startPoint.id, endPointId: endPoint.id };
+    }
+
     const startX = Number(value?.start?.x);
     const startY = Number(value?.start?.y);
     const endX = Number(value?.end?.x);
@@ -3146,10 +3281,22 @@
   }
 
   function syncBasisOfBearingInputs() {
-    if (basisBearingX1Input) basisBearingX1Input.value = basisOfBearing ? String(basisOfBearing.start.x) : "";
-    if (basisBearingY1Input) basisBearingY1Input.value = basisOfBearing ? String(basisOfBearing.start.y) : "";
-    if (basisBearingX2Input) basisBearingX2Input.value = basisOfBearing ? String(basisOfBearing.end.x) : "";
-    if (basisBearingY2Input) basisBearingY2Input.value = basisOfBearing ? String(basisOfBearing.end.y) : "";
+    if (!basisOfBearing) {
+      if (basisBearingStartPointInput) basisBearingStartPointInput.value = "";
+      if (basisBearingEndPointInput) basisBearingEndPointInput.value = "";
+      return;
+    }
+
+    if (basisOfBearing.startPointId != null && basisOfBearing.endPointId != null) {
+      const startPoint = points.get(basisOfBearing.startPointId);
+      const endPoint = points.get(basisOfBearing.endPointId);
+      if (basisBearingStartPointInput) basisBearingStartPointInput.value = startPoint ? String(startPoint.num ?? startPoint.id) : "";
+      if (basisBearingEndPointInput) basisBearingEndPointInput.value = endPoint ? String(endPoint.num ?? endPoint.id) : "";
+      return;
+    }
+
+    if (basisBearingStartPointInput) basisBearingStartPointInput.value = basisOfBearing?.start ? `${basisOfBearing.start.x},${basisOfBearing.start.y}` : "";
+    if (basisBearingEndPointInput) basisBearingEndPointInput.value = basisOfBearing?.end ? `${basisOfBearing.end.x},${basisOfBearing.end.y}` : "";
   }
 
   function serializeState(options = {}) {
@@ -3169,10 +3316,7 @@
         lastSelectedLineId
       },
       construction: {...construction},
-      basisOfBearing: basisOfBearing ? {
-        start: { ...basisOfBearing.start },
-        end: { ...basisOfBearing.end }
-      } : null,
+      basisOfBearing: basisOfBearing ? { ...basisOfBearing } : null,
       mapGeoreference: mapGeoreference ? {
         lat: { ...mapGeoreference.lat },
         lng: { ...mapGeoreference.lng }
@@ -5672,44 +5816,90 @@
       ctx.save();
       ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
       ctx.fillStyle = "#ffd54a";
-      for (const c of lineLabelCandidates) {
-        const measure = lineMeasurement(c.a, c.b);
-        if (!measure) continue;
-        const label = `${measure.bearing} • ${measure.distance.toFixed(3)}`;
-        const labelW = ctx.measureText(label).width;
-        const dx = c.sb.x - c.sa.x;
-        const dy = c.sb.y - c.sa.y;
-        const pixelLength = Math.hypot(dx, dy);
-        if (pixelLength < labelW + 24) continue;
 
-        let angle = measure.angle;
-        if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
-        const mx = (c.sa.x + c.sb.x) * 0.5;
-        const my = (c.sa.y + c.sb.y) * 0.5;
-        const offset = 11;
-        const nx = -dy / Math.max(pixelLength, EPS);
-        const ny = dx / Math.max(pixelLength, EPS);
-        const cx = mx + nx * offset;
-        const cy = my + ny * offset;
-        const candidateAabb = rotatedRectAabb(cx, cy, labelW + 6, 16, angle);
-        if (blockedTextRects.some((r) => rectsOverlap(r, candidateAabb))) continue;
+      const groups = buildBearingLabelGroups(lineLabelCandidates);
+      const midpoints = groups.flatMap((group) => group.segments.map((segment) => ({
+        x: (segment.sa.x + segment.sb.x) * 0.5,
+        y: (segment.sa.y + segment.sb.y) * 0.5
+      })));
+      const centroid = midpoints.length
+        ? midpoints.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 })
+        : { x: 0, y: 0 };
+      if (midpoints.length) {
+        centroid.x /= midpoints.length;
+        centroid.y /= midpoints.length;
+      }
 
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(label, 0, 0);
-        ctx.restore();
+      const baseAz = basisAzimuthRad() ?? 0;
+      groups.sort((aGroup, bGroup) => {
+        const aSegment = aGroup.segments[0];
+        const bSegment = bGroup.segments[0];
+        const aDelta = (aSegment.measure.azimuth - baseAz + Math.PI * 2) % (Math.PI * 2);
+        const bDelta = (bSegment.measure.azimuth - baseAz + Math.PI * 2) % (Math.PI * 2);
+        if (Math.abs(aDelta - bDelta) > 1e-9) return aDelta - bDelta;
 
-        blockedTextRects.push(candidateAabb);
+        const aMidX = aGroup.segments.reduce((sum, seg) => sum + (seg.sa.x + seg.sb.x) * 0.5, 0) / Math.max(1, aGroup.segments.length);
+        const aMidY = aGroup.segments.reduce((sum, seg) => sum + (seg.sa.y + seg.sb.y) * 0.5, 0) / Math.max(1, aGroup.segments.length);
+        const bMidX = bGroup.segments.reduce((sum, seg) => sum + (seg.sa.x + seg.sb.x) * 0.5, 0) / Math.max(1, bGroup.segments.length);
+        const bMidY = bGroup.segments.reduce((sum, seg) => sum + (seg.sa.y + seg.sb.y) * 0.5, 0) / Math.max(1, bGroup.segments.length);
+        const aRadius = Math.hypot(aMidX - centroid.x, aMidY - centroid.y);
+        const bRadius = Math.hypot(bMidX - centroid.x, bMidY - centroid.y);
+        return bRadius - aRadius;
+      });
+
+      for (const group of groups) {
+        const totalDistance = group.segments.reduce((sum, seg) => sum + seg.measure.distance, 0);
+        const referenceSegment = group.segments[0];
+        const groupLabel = `${referenceSegment.measure.bearing} • ${totalDistance.toFixed(3)}`;
+        const bearingAngle = referenceSegment.measure.angle;
+
+        const anchorX = group.segments.reduce((sum, seg) => sum + (seg.sa.x + seg.sb.x) * 0.5, 0) / Math.max(1, group.segments.length);
+        const anchorY = group.segments.reduce((sum, seg) => sum + (seg.sa.y + seg.sb.y) * 0.5, 0) / Math.max(1, group.segments.length);
+        const dx = Math.sin(referenceSegment.measure.azimuth);
+        const dy = -Math.cos(referenceSegment.measure.azimuth);
+        const normalX = -dy;
+        const normalY = dx;
+
+        const groupLabelWidth = ctx.measureText(groupLabel).width;
+        const groupCx = anchorX + normalX * 15;
+        const groupCy = anchorY + normalY * 15;
+        const groupAabb = rotatedRectAabb(groupCx, groupCy, groupLabelWidth + 6, 16, bearingAngle);
+        if (!blockedTextRects.some((r) => rectsOverlap(r, groupAabb))) {
+          ctx.save();
+          ctx.translate(groupCx, groupCy);
+          ctx.rotate(bearingAngle);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(groupLabel, 0, 0);
+          ctx.restore();
+          blockedTextRects.push(groupAabb);
+        }
+
+        for (const segment of group.segments) {
+          const lengthLabel = segment.measure.distance.toFixed(3);
+          const lengthLabelWidth = ctx.measureText(lengthLabel).width;
+          const segCx = (segment.sa.x + segment.sb.x) * 0.5 - normalX * 13;
+          const segCy = (segment.sa.y + segment.sb.y) * 0.5 - normalY * 13;
+          const lengthAabb = rotatedRectAabb(segCx, segCy, lengthLabelWidth + 6, 14, bearingAngle);
+          if (blockedTextRects.some((r) => rectsOverlap(r, lengthAabb))) continue;
+
+          ctx.save();
+          ctx.translate(segCx, segCy);
+          ctx.rotate(bearingAngle);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(lengthLabel, 0, 0);
+          ctx.restore();
+          blockedTextRects.push(lengthAabb);
+        }
       }
       ctx.restore();
     }
 
-    if (basisOfBearing) {
-      const start = worldToScreen(basisOfBearing.start.x, basisOfBearing.start.y);
-      const end = worldToScreen(basisOfBearing.end.x, basisOfBearing.end.y);
+    const basisEndpoints = resolveBasisOfBearingEndpoints();
+    if (basisEndpoints) {
+      const start = worldToScreen(basisEndpoints.start.x, basisEndpoints.start.y);
+      const end = worldToScreen(basisEndpoints.end.x, basisEndpoints.end.y);
       const dx = end.x - start.x;
       const dy = end.y - start.y;
       const angle = Math.atan2(dy, dx);
@@ -8288,19 +8478,23 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   // Line creation & ops (unchanged behavior)
   // -------------------------
   setBasisOfBearingBtn?.addEventListener("click", () => {
+    const startRef = String(basisBearingStartPointInput?.value ?? "").trim();
+    const endRef = String(basisBearingEndPointInput?.value ?? "").trim();
+    const startPoint = resolvePointByNumberOrName(startRef);
+    const endPoint = resolvePointByNumberOrName(endRef);
     const value = sanitizeBasisOfBearing({
-      start: { x: parseNum(basisBearingX1Input?.value, NaN), y: parseNum(basisBearingY1Input?.value, NaN) },
-      end: { x: parseNum(basisBearingX2Input?.value, NaN), y: parseNum(basisBearingY2Input?.value, NaN) }
+      startPointId: startPoint?.id,
+      endPointId: endPoint?.id
     });
     if (!value) {
-      setStatus("Basis of bearing requires two distinct coordinate pairs.", "warn");
+      setStatus("Basis of bearing requires two existing, distinct points by point number/name.", "warn");
       return;
     }
     history.push("set basis of bearing");
     basisOfBearing = value;
     syncBasisOfBearingInputs();
     scheduleCollabStateSync();
-    setStatus("Basis of bearing set and labeled on the drawing.", "ok");
+    setStatus("Basis of bearing set from selected points and labeled on the drawing.", "ok");
   });
 
   clearBasisOfBearingBtn?.addEventListener("click", () => {

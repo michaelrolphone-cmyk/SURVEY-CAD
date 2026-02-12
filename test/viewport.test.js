@@ -298,9 +298,9 @@ test('VIEWPORT.HTML renders conditional line labels and avoids text collisions',
   assert.match(html, /id="showLines"\s+type="checkbox"\s+checked/, 'display controls should include a default-on draw lines checkbox');
   assert.match(html, /id="showBearings"\s+type="checkbox"\s+checked/, 'display controls should include a default-on draw bearings checkbox');
   assert.match(html, /if \(pointDisplayVisibility\.lines\) \{[\s\S]*for \(const ln of lines\.values\(\)\)/, 'line rendering loop should be gated behind line visibility state');
-  assert.match(html, /if \(pointDisplayVisibility\.bearings\) \{[\s\S]*for \(const c of lineLabelCandidates\)/, 'bearing label drawing should be gated behind bearing visibility state');
-  assert.match(html, /if \(pixelLength < labelW \+ 24\) continue;/, 'line labels should only draw when the label can fit beside the line');
-  assert.match(html, /blockedTextRects\.some\(\(r\) => rectsOverlap\(r, candidateAabb\)\)/, 'line labels should skip drawing when they overlap existing text bounds');
+  assert.match(html, /if \(pointDisplayVisibility\.bearings\) \{[\s\S]*const\s+groups\s*=\s*buildBearingLabelGroups\(lineLabelCandidates\);/, 'bearing label drawing should be gated behind bearing visibility state');
+  assert.match(html, /const\s+groupLabelWidth\s*=\s*ctx\.measureText\(groupLabel\)\.width;/, 'line labels should measure grouped bearing labels before placement');
+  assert.match(html, /blockedTextRects\.some\(\(r\) => rectsOverlap\(r, groupAabb\)\)/, 'line labels should skip drawing when they overlap existing text bounds');
 });
 
 test('VIEWPORT.HTML draws a light leader line from a single selected point to the cursor', async () => {
@@ -878,14 +878,25 @@ test('VIEWPORT.HTML renders configured survey symbol SVG markers for point codes
 });
 
 
-test('VIEWPORT.HTML supports defining and rendering a labeled basis of bearing from two coordinate pairs', async () => {
+
+
+test('VIEWPORT.HTML formats bearings in DMS symbols and groups shared-bearing segments with aggregate labels', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /<b>Basis of Bearing<\/b>[\s\S]*id="basisBearingX1"[\s\S]*id="basisBearingY1"[\s\S]*id="basisBearingX2"[\s\S]*id="basisBearingY2"/, 'LineSmith should expose inputs for two basis-of-bearing coordinates');
+  assert.match(html, /return `\$\{q1\}\$\{d\}°\$\{String\(m\)\.padStart\(2,"0"\)\}'\$\{String\(sRound\.toFixed\(3\)\)\.padStart\(6,"0"\)\}"\$\{q2\}`;/, 'quadrant bearing formatting should use degree-minute-second symbols instead of hyphen separators');
+  assert.match(html, /function\s+orientAzimuthClockwiseFromBasis\(az\)\s*\{[\s\S]*const\s+basisAz\s*=\s*basisAzimuthRad\(\);[\s\S]*return\s+fDelta\s*<=\s*rDelta\s*\?\s*forward\s*:\s*reverse;/, 'bearing azimuth should orient clockwise from basis-of-bearing when one is set');
+  assert.match(html, /const\s+groups\s*=\s*buildBearingLabelGroups\(lineLabelCandidates\);[\s\S]*groups\.sort\([\s\S]*const\s+aDelta\s*=\s*\(aSegment\.measure\.azimuth\s*-\s*baseAz/, 'bearing labels should be ordered clockwise from the basis-of-bearing and then outside-in by radius');
+  assert.match(html, /const\s+groupLabel\s*=\s*`\$\{referenceSegment\.measure\.bearing\}\s*•\s*\$\{totalDistance\.toFixed\(3\)\}`;[\s\S]*const\s+lengthLabel\s*=\s*segment\.measure\.distance\.toFixed\(3\);/, 'draw loop should render a grouped bearing+total distance label and individual segment distance labels on opposite sides');
+});
+test('VIEWPORT.HTML supports defining and rendering a labeled basis of bearing from two point references', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /<b>Basis of Bearing<\/b>[\s\S]*id="basisBearingStartPoint"[\s\S]*id="basisBearingEndPoint"/, 'LineSmith should expose start/end point reference inputs for basis-of-bearing');
   assert.match(html, /id="setBasisOfBearing"[\s\S]*id="clearBasisOfBearing"/, 'LineSmith should include set and clear controls for basis-of-bearing');
-  assert.match(html, /let\s+basisOfBearing\s*=\s*null;\s*\/\/ \{start:\{x,y\}, end:\{x,y\}\}/, 'drawing model should store basis-of-bearing coordinates');
-  assert.match(html, /function\s+sanitizeBasisOfBearing\(value\)\s*\{[\s\S]*Math\.hypot\(endX - startX, endY - startY\) < EPS/, 'basis-of-bearing parser should validate finite coordinates and reject zero-length definitions');
+  assert.match(html, /let\s+basisOfBearing\s*=\s*null;\s*\/\/ \{startPointId, endPointId\}/, 'drawing model should store basis-of-bearing point ids');
+  assert.match(html, /function\s+resolvePointByNumberOrName\(reference\)\s*\{[\s\S]*String\(point\?\.num \?\? ""\)\.trim\(\)\.toUpperCase\(\) === normalized/, 'basis-of-bearing should resolve point refs by point number/name');
+  assert.match(html, /function\s+sanitizeBasisOfBearing\(value\)\s*\{[\s\S]*const\s+startPointId\s*=\s*Number\(value\?\.startPointId\);[\s\S]*return\s*\{\s*startPointId:\s*startPoint\.id,\s*endPointId:\s*endPoint\.id\s*\};/, 'basis-of-bearing parser should validate point ids and normalize to existing points');
   assert.match(html, /basisOfBearing:\s*basisOfBearing \?[\s\S]*basisOfBearing = sanitizeBasisOfBearing\(s\.basisOfBearing\);/, 'basis-of-bearing should be serialized and restored with drawing state');
-  assert.match(html, /setBasisOfBearingBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*history\.push\("set basis of bearing"\);[\s\S]*setStatus\("Basis of bearing set and labeled on the drawing\.", "ok"\);/, 'setting basis-of-bearing should create undo history and user feedback');
-  assert.match(html, /if \(basisOfBearing\) \{[\s\S]*ctx\.setLineDash\(\[8, 6\]\);[\s\S]*ctx\.fillText\("BASIS OF BEARING", 0, 0\);/, 'draw loop should render a dashed basis line and explicit BASIS OF BEARING label');
+  assert.match(html, /setBasisOfBearingBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*resolvePointByNumberOrName\(startRef\);[\s\S]*history\.push\("set basis of bearing"\);[\s\S]*setStatus\("Basis of bearing set from selected points and labeled on the drawing\.", "ok"\);/, 'setting basis-of-bearing should resolve user point refs, create undo history, and show user feedback');
+  assert.match(html, /const basisEndpoints = resolveBasisOfBearingEndpoints\(\);[\s\S]*ctx\.setLineDash\(\[8, 6\]\);[\s\S]*ctx\.fillText\("BASIS OF BEARING", 0, 0\);/, 'draw loop should render a dashed basis line and explicit BASIS OF BEARING label using resolved basis endpoints');
 });

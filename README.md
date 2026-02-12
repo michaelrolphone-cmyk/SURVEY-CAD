@@ -90,14 +90,16 @@ printview
 ```
 ## LineSmith Basis of Bearing
 
-`VIEWPORT.HTML` (LineSmith) now supports defining a **Basis of Bearing** directly in the drawing by entering two coordinate pairs:
+`VIEWPORT.HTML` (LineSmith) now supports defining a **Basis of Bearing** directly in the drawing by selecting two existing point numbers/names:
 
-- Enter `X1`, `Y1`, `X2`, and `Y2` under the **Basis of Bearing** section.
-- Click **Set Basis of Bearing** to draw a dashed reference line between those two coordinates.
+- Enter a **Start point #/name** and **End point #/name** under the **Basis of Bearing** section (for example `101` and `102`).
+- Click **Set Basis of Bearing** to draw a dashed reference line between those two points.
 - The reference is clearly labeled **BASIS OF BEARING** on-canvas for plan readability.
 - Click **Clear Basis of Bearing** to remove it.
 
 The basis-of-bearing definition is saved/restored with drawing state (local save, project drawing versions, and collaboration state sync).
+
+Bearing annotations now render in DMS using degree/minute/second symbols (`°`, `'`, `"`) and orient clockwise from the active basis-of-bearing when one is set. Consecutive shared-bearing segments are grouped by a single bearing + total distance label on the left side of travel, while individual segment lengths are placed on the opposite side.
 
 ## LineSmith Cluster Tooltip During Line Drawing
 
