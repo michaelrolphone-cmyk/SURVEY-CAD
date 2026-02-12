@@ -941,6 +941,90 @@
       min-height: 0;
     }
 
+    .linesmith-loading-overlay{
+      position:fixed;
+      inset:0;
+      z-index:1200;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      padding-top:18px;
+      background:transparent;
+      pointer-events:none;
+      transition:opacity .35s ease, visibility .35s ease;
+    }
+    .linesmith-loading-overlay.hidden{
+      opacity:0;
+      visibility:hidden;
+      pointer-events:none;
+    }
+    .linesmith-loading-card{
+      width:min(520px, calc(100vw - 30px));
+      border:1px solid rgba(121, 160, 255, 0.45);
+      border-radius:20px;
+      background:rgba(7,10,20,0.58);
+      box-shadow:0 18px 42px rgba(0,0,0,0.38), inset 0 0 0 1px rgba(255,255,255,0.05);
+      padding:18px 22px 14px;
+      backdrop-filter: blur(6px);
+      pointer-events:auto;
+    }
+    .linesmith-loading-title{
+      margin:0;
+      font-size:17px;
+      font-weight:700;
+      letter-spacing:.3px;
+      color:#edf3ff;
+    }
+    .linesmith-loading-subtitle{
+      margin:6px 0 14px;
+      font-size:13px;
+      color:#9fb2dd;
+    }
+    .linesmith-loading-stage{
+      font-size:12px;
+      color:#c8d7ff;
+      font-weight:600;
+      letter-spacing:.25px;
+      min-height:18px;
+      display:block;
+    }
+    .linesmith-loading-network{
+      width:100%;
+      height:auto;
+      display:block;
+      margin-bottom:10px;
+      overflow:visible;
+    }
+    .linesmith-loading-network-graph{
+      mask:url(#linesmithLoadingEdgeFade);
+    }
+    .linesmith-loading-node{
+      fill:#78e4ff;
+      filter:drop-shadow(0 0 8px rgba(120, 228, 255, 0.75));
+      animation:linesmithNodePulse 1.5s ease-in-out infinite;
+    }
+    .linesmith-loading-node:nth-child(2){ animation-delay:.2s; }
+    .linesmith-loading-node:nth-child(3){ animation-delay:.4s; }
+    .linesmith-loading-node:nth-child(4){ animation-delay:.6s; }
+    .linesmith-loading-node:nth-child(5){ animation-delay:.8s; }
+    .linesmith-loading-link{
+      stroke:url(#linesmithLoadingLinkFade);
+      stroke-width:3;
+      fill:none;
+      stroke-linecap:round;
+      stroke-dasharray:7 9;
+      animation:linesmithLinkFlow 2s linear infinite;
+      opacity:.9;
+    }
+    @keyframes linesmithNodePulse{
+      0%, 100% { transform:scale(0.92); opacity:.65; }
+      50% { transform:scale(1.16); opacity:1; }
+    }
+    @keyframes linesmithLinkFlow{
+      from { stroke-dashoffset:0; }
+      to { stroke-dashoffset:-48; }
+    }
+
     @media (max-width: 960px) {
       .app{ grid-template-columns:1fr; grid-template-areas:"canvas"; }
       .panel{
@@ -964,6 +1048,7 @@
       .app.drawerOpen .panel{ transform:translateX(0); }
       .drawerToggle{ display:block; }
       .quickTools{ max-width:calc(100% - 20px); }
+      .linesmith-loading-overlay{ padding-top:10px; }
       .workflowToast{
         top:auto;
         right:8px;
@@ -975,6 +1060,41 @@
   </style>
 </head>
 <body>
+<div id="lineSmithLoadingOverlay" class="linesmith-loading-overlay" role="status" aria-live="polite" aria-label="LineSmith loading animation">
+  <div class="linesmith-loading-card">
+    <h2 class="linesmith-loading-title">Building your LineSmith workspace</h2>
+    <p class="linesmith-loading-subtitle">Connecting survey points and restoring drawing context…</p>
+    <svg class="linesmith-loading-network" viewBox="0 0 520 160" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="linesmithLoadingLinkFade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#7ba2ff" stop-opacity="0" />
+          <stop offset="0.12" stop-color="#7ba2ff" stop-opacity="1" />
+          <stop offset="0.88" stop-color="#7ba2ff" stop-opacity="1" />
+          <stop offset="1" stop-color="#7ba2ff" stop-opacity="0" />
+        </linearGradient>
+        <linearGradient id="linesmithLoadingMaskFade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="black" stop-opacity="0" />
+          <stop offset="0.1" stop-color="white" stop-opacity="1" />
+          <stop offset="0.9" stop-color="white" stop-opacity="1" />
+          <stop offset="1" stop-color="black" stop-opacity="0" />
+        </linearGradient>
+        <mask id="linesmithLoadingEdgeFade">
+          <rect x="0" y="0" width="520" height="160" fill="url(#linesmithLoadingMaskFade)" />
+        </mask>
+      </defs>
+      <g class="linesmith-loading-network-graph">
+        <path class="linesmith-loading-link" d="M48 96 L140 62 L248 104 L344 48 L452 90" />
+        <path class="linesmith-loading-link" d="M140 62 L250 24 L344 48" style="animation-delay:.35s" />
+        <circle class="linesmith-loading-node" cx="48" cy="96" r="7" />
+        <circle class="linesmith-loading-node" cx="140" cy="62" r="7" />
+        <circle class="linesmith-loading-node" cx="248" cy="104" r="7" />
+        <circle class="linesmith-loading-node" cx="344" cy="48" r="7" />
+        <circle class="linesmith-loading-node" cx="452" cy="90" r="7" />
+      </g>
+    </svg>
+    <span id="lineSmithLoadingStage" class="linesmith-loading-stage">Preparing drawing canvas…</span>
+  </div>
+</div>
 <div class="app panelCollapsed" id="appShell">
   <div class="panel">
     <button id="panelCollapseHandle" class="panelCollapseHandle" aria-label="Collapse controls drawer" title="Collapse controls drawer">→</button>
@@ -1625,6 +1745,25 @@
     const el = $("#status");
     el.textContent = msg;
     el.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function setLineSmithLoadingStage(stage = "") {
+    const stageEl = $("#lineSmithLoadingStage");
+    if (!stageEl) return;
+    stageEl.textContent = String(stage || "").trim() || "Preparing drawing canvas…";
+  }
+
+  function showLineSmithLoadingOverlay(stage = "") {
+    const overlay = $("#lineSmithLoadingOverlay");
+    if (!overlay) return;
+    setLineSmithLoadingStage(stage);
+    overlay.classList.remove("hidden");
+  }
+
+  function hideLineSmithLoadingOverlay() {
+    const overlay = $("#lineSmithLoadingOverlay");
+    if (!overlay) return;
+    overlay.classList.add("hidden");
   }
 
   const workflowToastState = {
@@ -9229,58 +9368,74 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
   // Boot
   // -------------------------
   async function boot() {
-    await loadFieldToFinishRulesFromFld(defaultFldConfigPath);
-    resize();
-    window.addEventListener("resize", resize);
-    mapEnabledInput.checked = false;
-    mapTileTypeInput.value = "satellite";
-    mapOpacityInput.value = "66";
-    mapLayerState.opacity = 0.66;
-    applyMapOpacity();
-    setMapLayerEnabled(false);
-    setTool("select");
-    updatePointEditorFromSelection();
-    updateUndoRedoHUD();
-    updateCounts();
-    requestAnimationFrame(draw);
-    markDrawingAsSaved();
+    showLineSmithLoadingOverlay("Connecting survey points…");
+    try {
+      await loadFieldToFinishRulesFromFld(defaultFldConfigPath);
+      setLineSmithLoadingStage("Calibrating canvas and map controls…");
+      resize();
+      window.addEventListener("resize", resize);
+      mapEnabledInput.checked = false;
+      mapTileTypeInput.value = "satellite";
+      mapOpacityInput.value = "66";
+      mapLayerState.opacity = 0.66;
+      applyMapOpacity();
+      setMapLayerEnabled(false);
+      setTool("select");
+      updatePointEditorFromSelection();
+      updateUndoRedoHUD();
+      updateCounts();
+      requestAnimationFrame(draw);
+      markDrawingAsSaved();
 
-    const drawingHint = $("#drawingSaveHint");
-    if (drawingHint) {
-      drawingHint.textContent = activeProjectId
-        ? `Project-linked saves enabled for ${activeProjectName || activeProjectId}.`
-        : "Open LineSmith from an active SurveyFoundry project to enable project-linked drawing saves.";
-    }
+      const drawingHint = $("#drawingSaveHint");
+      if (drawingHint) {
+        drawingHint.textContent = activeProjectId
+          ? `Project-linked saves enabled for ${activeProjectName || activeProjectId}.`
+          : "Open LineSmith from an active SurveyFoundry project to enable project-linked drawing saves.";
+      }
 
-    const openedFromProjectBrowser = tryImportProjectBrowserDrawingPayload();
-    if (openedFromProjectBrowser) {
+      setLineSmithLoadingStage("Restoring saved drawing state…");
+      const openedFromProjectBrowser = tryImportProjectBrowserDrawingPayload();
+      if (openedFromProjectBrowser) {
+        setLineSmithLoadingStage("Syncing collaboration room…");
+        connectCollaboration();
+        return;
+      }
+
+      const importedFromPointforge = tryImportPointforgePayload();
+      if (importedFromPointforge) {
+        setLineSmithLoadingStage("Applying PointForge payload…");
+        connectCollaboration({ skipInitialStateHydration: true, syncLocalStateOnConnect: true });
+        return;
+      }
+
+      const restoredLastDrawing = tryRestoreLastOpenedProjectDrawing();
+      if (restoredLastDrawing) {
+        setLineSmithLoadingStage("Opening previous project drawing…");
+        connectCollaboration();
+        return;
+      }
+
+      setLineSmithLoadingStage("Finalizing workspace…");
       connectCollaboration();
-      return;
+
+      setStatus(
+        "Ready.\n" +
+        "This build preserves your baseline interaction.\n" +
+        "Fixes added:\n" +
+        "• CSV headerless N,E vs E,N import control (prevents X/Y swapped point data).\n" +
+        "• Swap X↔Y for ALL points (Undoable) for already-imported transposed datasets.\n" +
+        "• Pan/drag release robustness (window mouseup + blur reset).",
+        "ok"
+      );
+    } catch (error) {
+      console.error(error);
+      setStatus("LineSmith could not finish loading. Refresh to try again.", "warn");
+    } finally {
+      window.setTimeout(() => {
+        hideLineSmithLoadingOverlay();
+      }, 180);
     }
-
-    const importedFromPointforge = tryImportPointforgePayload();
-    if (importedFromPointforge) {
-      connectCollaboration({ skipInitialStateHydration: true, syncLocalStateOnConnect: true });
-      return;
-    }
-
-    const restoredLastDrawing = tryRestoreLastOpenedProjectDrawing();
-    if (restoredLastDrawing) {
-      connectCollaboration();
-      return;
-    }
-
-    connectCollaboration();
-
-    setStatus(
-      "Ready.\n" +
-      "This build preserves your baseline interaction.\n" +
-      "Fixes added:\n" +
-      "• CSV headerless N,E vs E,N import control (prevents X/Y swapped point data).\n" +
-      "• Swap X↔Y for ALL points (Undoable) for already-imported transposed datasets.\n" +
-      "• Pan/drag release robustness (window mouseup + blur reset).",
-      "ok"
-    );
   }
 
   boot();

@@ -790,3 +790,18 @@ test('VIEWPORT.HTML exposes an FLD editor with local override save/reset and dow
   assert.match(html, /function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*clearLocalFldOverride\(\);[\s\S]*fldEditorState\.activeConfig = cloneFldConfig\(fldEditorState\.serverConfig\);/, 'FLD editor reset action should clear local override and restore the server FLD rules');
   assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-LocalOverride\.fld", serializeFieldToFinishConfig\(local\)\);/, 'FLD editor should support downloading local override FLD files');
 });
+
+
+test('VIEWPORT.HTML shows a modern point-link loading overlay while bootstrapping LineSmith', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /id="lineSmithLoadingOverlay"\s+class="linesmith-loading-overlay"/, 'LineSmith should render a dedicated loading overlay shell');
+  assert.match(html, /\.linesmith-loading-overlay\{[\s\S]*background:transparent;[\s\S]*pointer-events:none;/, 'loading overlay should not black out the UI and should remain visually non-blocking');
+  assert.match(html, /class="linesmith-loading-network"/, 'loading overlay should include a point-link network visual');
+  assert.match(html, /mask id="linesmithLoadingEdgeFade"/, 'loading network should use an edge-fade mask to avoid hard clipping at the sides');
+  assert.doesNotMatch(html, /Demo:/, 'loading copy should not include demo-only labels in production');
+  assert.match(html, /id="lineSmithLoadingStage"\s+class="linesmith-loading-stage"/, 'loading overlay should expose status copy for current bootstrap stage');
+  assert.match(html, /function\s+showLineSmithLoadingOverlay\(stage = ""\)/, 'bootstrap should include a helper to display the loading overlay');
+  assert.match(html, /function\s+setLineSmithLoadingStage\(stage = ""\)/, 'bootstrap should include a helper to update loading stage text');
+  assert.match(html, /async function boot\(\) \{[\s\S]*showLineSmithLoadingOverlay\("Connecting survey points…"\);[\s\S]*finally \{[\s\S]*hideLineSmithLoadingOverlay\(\);/, 'boot flow should show the loading animation immediately and hide it when initialization completes');
+});
