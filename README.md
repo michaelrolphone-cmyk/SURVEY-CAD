@@ -40,6 +40,21 @@ When using `VIEWPORT.HTML` (LineSmith), standard OS save shortcuts trigger the s
 
 When no points/lines are selected in `VIEWPORT.HTML`, a **double right-click** zooms out to the next map zoom level at the cursor position.
 
+## LineSmith Print View (Record of Survey placeholder)
+
+`VIEWPORT.HTML` now includes a **Print View** panel for generating black-on-white print-ready excerpts from selected geometry:
+
+- Select points/lines first (window select or click select).
+- Choose paper size: `A0`, `A1`, `A2`, `A3`, `A4`, or `Custom` dimensions in millimeters.
+- The print scale automatically snaps to the closest supported ratio: `1:1`, `1:5`, `1:10`, `1:20`, `1:30`, `1:40`, `1:50`, `1:100`, `1:200`, `1:500`, `1:1000`.
+- Output opens in a new print preview window with a landscape **Record of Survey template placeholder** and a print button.
+
+Quick command support in LineSmith:
+
+```text
+printview
+```
+
 ## LineSmith Quick Search
 
 In `VIEWPORT.HTML`, the point/command quick-search flyout is intentionally wider than the input field so long code/notes descriptions remain readable, and point suggestions now display the point number without a `P` prefix.
