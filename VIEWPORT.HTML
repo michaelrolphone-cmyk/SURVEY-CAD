@@ -354,10 +354,21 @@
     .quickToolBtn.saveSuccessPulse{
       animation:quickSaveSuccessPulse 420ms ease-out;
     }
+    .quickToolBtn.printCaptureArmed{
+      border-color:#5c4b14;
+      background:#201a09;
+      color:#ffe7a0;
+      box-shadow:0 0 0 1px rgba(255,231,160,0.3), 0 0 12px rgba(255,213,74,0.25);
+      animation:printCaptureReadyPulse 1s ease-in-out infinite;
+    }
     @keyframes quickSaveSuccessPulse{
       0%{ transform:scale(1); box-shadow:0 0 0 0 rgba(110,231,183,0.45); }
       45%{ transform:scale(1.14); box-shadow:0 0 0 8px rgba(110,231,183,0.18); }
       100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(110,231,183,0); }
+    }
+    @keyframes printCaptureReadyPulse{
+      0%, 100%{ transform:scale(1); box-shadow:0 0 0 1px rgba(255,231,160,0.3), 0 0 8px rgba(255,213,74,0.18); }
+      50%{ transform:scale(1.05); box-shadow:0 0 0 1px rgba(255,231,160,0.45), 0 0 14px rgba(255,213,74,0.35); }
     }
     .quickToolDivider{
       width:1px;
@@ -6035,6 +6046,7 @@
 
   $("#quickSave")?.addEventListener("click", () => $("#saveDrawingToProject").click());
   $("#quickPrintView")?.addEventListener("click", () => $("#generatePrintView")?.click());
+  syncPrintWindowCaptureUi();
   $("#quickOpenArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
   $("#quickSelect")?.addEventListener("click", () => setTool("select"));
   $("#quickAddPoint")?.addEventListener("click", () => setTool("addPoint"));
@@ -7088,9 +7100,30 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     if (printScalePreviewInput) printScalePreviewInput.value = `1:${result.selectedScale}`;
   }
 
+  function syncPrintWindowCaptureUi() {
+    const quickPrintBtn = $("#quickPrintView");
+    quickPrintBtn?.classList.toggle("printCaptureArmed", pendingPrintWindowCapture);
+
+    if (pendingPrintWindowCapture) {
+      showWorkflowToast({
+        title: "Print Window Ready",
+        message: "Drag a selection window over the area you want to print, then release.",
+        steps: [
+          "Click and drag to draw the print window",
+          "Release to generate print preview"
+        ],
+        currentStepIndex: 0
+      });
+      return;
+    }
+
+    hideWorkflowToast();
+  }
+
   function beginPrintWindowCapture() {
     pendingPrintWindowCapture = true;
     setTool("select");
+    syncPrintWindowCaptureUi();
     setStatus("Draw a selection window over the area to print, then release.", "ok");
     return true;
   }
@@ -9175,6 +9208,7 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       pendingMarqueeSelectionSnapshot = selectionSnapshot;
       if (pendingPrintWindowCapture) {
         pendingPrintWindowCapture = false;
+        syncPrintWindowCaptureUi();
         const printBounds = worldBoundsFromScreenRect(marqueeRect);
         generatePrintViewFromBounds(printBounds);
         applySelectionSnapshot(selectionSnapshot);
