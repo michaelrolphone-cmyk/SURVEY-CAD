@@ -4940,14 +4940,15 @@
     return selectedLayerId || DEFAULT_LAYER_ID;
   }
 
-  function createAutoFieldToFinishLine(aPointId, bPointId, { type = "sequential", baseCode = "", sourcePointId = null } = {}) {
+  function createAutoFieldToFinishLine(aPointId, bPointId, { type = "sequential", baseCode = "", sourcePointId = null, middlePointId = null } = {}) {
     const layerId = resolveAutoLineLayerId(aPointId, bPointId, { type, baseCode, sourcePointId });
-    const lineId = addLine(aPointId, bPointId, false, layerId);
+    const lineId = addLine(aPointId, bPointId, false, layerId, { curveMiddlePointId: middlePointId });
     const line = lines.get(lineId);
     if (line) {
       line.generatedBy = "field-to-finish";
       line.fieldToFinishType = type;
       line.fieldToFinishBaseCode = String(baseCode || "").trim().toUpperCase();
+      line.fieldToFinishCurveMiddlePointId = Number.isFinite(Number(middlePointId)) ? Number(middlePointId) : null;
     }
     return lineId;
   }
@@ -5003,6 +5004,7 @@
         type: cmd.type === "jpn" ? "jpn" : (cmd.type === "curve" ? "curve" : "sequential"),
         baseCode: cmd.baseCode,
         sourcePointId: cmd.sourcePointId,
+        middlePointId: cmd.middlePointId,
       });
       if (cmd.type === "jpn") addedJpn++;
       else if (cmd.type === "curve") addedCurve++;
@@ -5140,19 +5142,48 @@
     let activeCurve = null;
     for (const point of pointsInOrder) {
       if (pointHasCurveStartToken(point.code)) {
-        activeCurve = { lastPointId: point.id };
+        activeCurve = { startPointId: point.id, middlePointId: null };
         continue;
       }
       if (!activeCurve) continue;
-      if (activeCurve.lastPointId !== point.id) {
-        lineCommands.push({ a: activeCurve.lastPointId, b: point.id, baseCode: "CURVE" });
-        activeCurve.lastPointId = point.id;
+      if (!activeCurve.middlePointId && point.id !== activeCurve.startPointId) {
+        activeCurve.middlePointId = point.id;
       }
       if (pointHasCurveEndToken(point.code)) {
+        if (activeCurve.startPointId && activeCurve.middlePointId && point.id !== activeCurve.startPointId && point.id !== activeCurve.middlePointId) {
+          lineCommands.push({
+            a: activeCurve.startPointId,
+            b: point.id,
+            middlePointId: activeCurve.middlePointId,
+            baseCode: "CURVE"
+          });
+        }
         activeCurve = null;
       }
     }
     return lineCommands;
+  }
+
+  function getCurveMiddlePoint(line) {
+    if (!line || line.fieldToFinishType !== "curve") return null;
+    const middlePointId = Number(line.fieldToFinishCurveMiddlePointId);
+    if (!Number.isFinite(middlePointId)) return null;
+    return points.get(middlePointId) || null;
+  }
+
+  function traceLinePath(context, line, startScreen, endScreen, projectPoint = worldToScreen) {
+    context.beginPath();
+    context.moveTo(startScreen.x, startScreen.y);
+    const middlePoint = getCurveMiddlePoint(line);
+    if (!middlePoint) {
+      context.lineTo(endScreen.x, endScreen.y);
+      return;
+    }
+    const middleScreen = projectPoint(middlePoint.x, middlePoint.y);
+    const tangentX = (endScreen.x - startScreen.x) * 0.25;
+    const tangentY = (endScreen.y - startScreen.y) * 0.25;
+    context.quadraticCurveTo(middleScreen.x - tangentX, middleScreen.y - tangentY, middleScreen.x, middleScreen.y);
+    context.quadraticCurveTo(middleScreen.x + tangentX, middleScreen.y + tangentY, endScreen.x, endScreen.y);
   }
 
   function connectFieldToFinishSequentialLines() {
@@ -5410,9 +5441,17 @@
     return id;
   }
 
-  function addLine(aPointId, bPointId, movable=false, layerId = selectedLayerId) {
+  function addLine(aPointId, bPointId, movable=false, layerId = selectedLayerId, options = {}) {
     const id = nextId++;
-    lines.set(id, { id, a: aPointId, b: bPointId, movable: !!movable, layerId: layers.has(layerId) ? layerId : (selectedLayerId || DEFAULT_LAYER_ID) });
+    const curveMiddlePointId = Number(options?.curveMiddlePointId);
+    lines.set(id, {
+      id,
+      a: aPointId,
+      b: bPointId,
+      movable: !!movable,
+      layerId: layers.has(layerId) ? layerId : (selectedLayerId || DEFAULT_LAYER_ID),
+      fieldToFinishCurveMiddlePointId: Number.isFinite(curveMiddlePointId) ? curveMiddlePointId : null,
+    });
     updateCounts();
     return id;
   }
@@ -6345,9 +6384,7 @@
           ctx.strokeStyle = lockVisualState.flashColor;
           ctx.lineWidth = Math.max(2, layer.lineWeight + 0.5);
         }
-        ctx.beginPath();
-        ctx.moveTo(sa.x, sa.y);
-        ctx.lineTo(sb.x, sb.y);
+        traceLinePath(ctx, ln, sa, sb);
         ctx.stroke();
 
         if (isMovable(ln.movable)) {
@@ -6362,7 +6399,7 @@
           ctx.restore();
         }
 
-        if (lineIsEligibleForBearingLabels(ln, a, b)) {
+        if (!getCurveMiddlePoint(ln) && lineIsEligibleForBearingLabels(ln, a, b)) {
           lineLabelCandidates.push({ a, b, sa, sb });
         }
       }
@@ -6397,9 +6434,7 @@
           if (!a || !b) continue;
           const sa = worldToScreen(a.x,a.y);
           const sb = worldToScreen(b.x,b.y);
-          ctx.beginPath();
-          ctx.moveTo(sa.x, sa.y);
-          ctx.lineTo(sb.x, sb.y);
+          traceLinePath(ctx, ln, sa, sb);
           ctx.stroke();
 
           const gripPt = (s.grip === "a") ? a : b;
@@ -8373,10 +8408,13 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
       const a = points.get(line.a);
       const b = points.get(line.b);
       if (!a || !b) return false;
-      const minX = Math.min(a.x, b.x);
-      const maxX = Math.max(a.x, b.x);
-      const minY = Math.min(a.y, b.y);
-      const maxY = Math.max(a.y, b.y);
+      const middle = getCurveMiddlePoint(line);
+      const xs = middle ? [a.x, b.x, middle.x] : [a.x, b.x];
+      const ys = middle ? [a.y, b.y, middle.y] : [a.y, b.y];
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
       return !(maxX < bounds.minX || minX > bounds.maxX || maxY < bounds.minY || minY > bounds.maxY);
     };
 
@@ -8389,9 +8427,7 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
       if (!a || !b) continue;
       const pa = worldToPrint(a.x, a.y);
       const pb = worldToPrint(b.x, b.y);
-      printCtx.beginPath();
-      printCtx.moveTo(pa.x, pa.y);
-      printCtx.lineTo(pb.x, pb.y);
+      traceLinePath(printCtx, line, pa, pb, worldToPrint);
       printCtx.stroke();
     }
 
