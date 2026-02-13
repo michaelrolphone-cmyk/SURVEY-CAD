@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#134e4a"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="40" fill="url(#bg)"/>
+  <!-- clipboard body -->
+  <rect x="50" y="45" width="100" height="120" rx="10" fill="#ccfbf1" opacity="0.15"/>
+  <rect x="50" y="45" width="100" height="120" rx="10" stroke="#ccfbf1" stroke-width="4" fill="none"/>
+  <!-- clipboard clip -->
+  <rect x="78" y="35" width="44" height="18" rx="6" fill="#ccfbf1" opacity="0.9"/>
+  <!-- equipment list lines with icons -->
+  <!-- GPS icon row -->
+  <circle cx="72" cy="82" r="6" fill="#5eead4"/>
+  <line x1="86" y1="82" x2="132" y2="82" stroke="#ccfbf1" stroke-width="4" stroke-linecap="round"/>
+  <!-- total station icon row -->
+  <polygon points="72,100 66,112 78,112" fill="#5eead4"/>
+  <line x1="86" y1="106" x2="126" y2="106" stroke="#ccfbf1" stroke-width="4" stroke-linecap="round"/>
+  <!-- level icon row -->
+  <rect x="65" y="126" width="14" height="8" rx="2" fill="#5eead4"/>
+  <line x1="86" y1="130" x2="120" y2="130" stroke="#ccfbf1" stroke-width="4" stroke-linecap="round"/>
+  <!-- checkmark accent -->
+  <circle cx="152" cy="148" r="22" fill="#14b8a6"/>
+  <polyline points="142,148 149,155 163,141" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
