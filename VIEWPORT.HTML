@@ -2113,7 +2113,8 @@
     lastQueuedState: "",
     objectLocks: new Map(),
     pendingLockRequests: new Map(),
-    activeDragLock: null
+    activeDragLock: null,
+    pendingDragLockRelease: null
   };
 
   function nextCollabReconnectDelay(previousDelayMs, maxDelayMs) {
@@ -3719,6 +3720,14 @@
     releaseObjectLock(entityType, entityId);
   }
 
+  function flushPendingDragLockRelease() {
+    const pendingLock = collab.pendingDragLockRelease;
+    if (!pendingLock) return;
+    if (collab.stateDebounce || collab.pendingState || collab.stateInFlight) return;
+    collab.pendingDragLockRelease = null;
+    sendLockRelease(pendingLock);
+  }
+
   const LOCK_REQUEST_TIMEOUT_MS = 5000;
 
   function requestObjectEditLock({ entityType, entityId, onGranted, onDenied } = {}) {
@@ -3811,12 +3820,21 @@
   }
 
   function flushCollabStateSync() {
-    if (!collab.enabled || collab.applyingRemoteState) return;
-    if (collab.stateInFlight || !collab.pendingState) return;
+    if (!collab.enabled || collab.applyingRemoteState) {
+      flushPendingDragLockRelease();
+      return;
+    }
+    if (collab.stateInFlight || !collab.pendingState) {
+      flushPendingDragLockRelease();
+      return;
+    }
 
     const statePayload = collab.pendingState;
     collab.pendingState = "";
-    if (statePayload === collab.latestServerState) return;
+    if (statePayload === collab.latestServerState) {
+      flushPendingDragLockRelease();
+      return;
+    }
 
     const requestId = `state-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     collab.stateInFlight = {
@@ -3891,6 +3909,7 @@
       collab.peers.clear();
       collab.stateInFlight = null;
       collab.pendingState = "";
+      collab.pendingDragLockRelease = null;
       for (const pending of collab.pendingLockRequests.values()) {
         if (pending.timeoutId) window.clearTimeout(pending.timeoutId);
       }
@@ -3935,6 +3954,7 @@
           collab.applyingRemoteState = false;
         }
         flushCollabStateSync();
+        flushPendingDragLockRelease();
         return;
       }
 
@@ -4001,6 +4021,7 @@
           collab.stateInFlight = null;
         }
         flushCollabStateSync();
+        flushPendingDragLockRelease();
         return;
       }
 
@@ -10003,8 +10024,15 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     mouse.drag = false;
     mouse.dragObj = null;
     if (collab.activeDragLock) {
-      sendLockRelease(collab.activeDragLock);
+      const activeLock = collab.activeDragLock;
       collab.activeDragLock = null;
+      if (collab.enabled && collab.socket?.readyState === WebSocket.OPEN
+        && (collab.stateDebounce || collab.pendingState || collab.stateInFlight)) {
+        collab.pendingDragLockRelease = activeLock;
+        flushPendingDragLockRelease();
+      } else {
+        sendLockRelease(activeLock);
+      }
     }
   }
 

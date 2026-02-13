@@ -741,12 +741,21 @@ test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch 
   assert.match(html, /if \(mouse\.dragObj && mouse\.dragObj\.type !== "pan"\) \{[\s\S]*if \(!mouse\.dragObj\._moved\) \{[\s\S]*\} else \{[\s\S]*scheduleCollabStateSync\(\);/, 'drag commit should force a final collaboration state sync after movement');
 
   assert.match(html, /sendCollabMessage\(\{[\s\S]*type: "state",[\s\S]*baseRevision: collab\.lastKnownRevision,[\s\S]*state: statePayload,[\s\S]*\}\);/, 'collaboration state sync should include base revision and state payload for optimistic concurrency');
-  assert.match(html, /const\s+statePayload\s*=\s*collab\.pendingState;[\s\S]*if \(statePayload === collab\.latestServerState\) return;/, 'flush should drop queued payloads that already match latest server state to avoid repeat-send loops');
+  assert.match(html, /const\s+statePayload\s*=\s*collab\.pendingState;[\s\S]*if \(statePayload === collab\.latestServerState\) \{[\s\S]*return;[\s\S]*\}/, 'flush should drop queued payloads that already match latest server state to avoid repeat-send loops');
   assert.match(html, /if \(message\.type === "state" && message\.state\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'remote collaboration state restores should not overwrite local user view pan/zoom');
   assert.match(html, /if \(message\.type === "state-rejected"\) \{[\s\S]*const\s+localDiff\s*=\s*diffState\(baseObj, localObj\);[\s\S]*applyStateDiff\(serverObj, localDiff\);/, 'LineSmith should rebase unsent local edits on top of canonical server state when revisions conflict');
 });
 
 
+
+test('VIEWPORT.HTML defers drag lock release until queued collaboration state sync is flushed', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /pendingDragLockRelease\s*:\s*null/, 'collaboration state should track pending drag lock release while state sync is in-flight');
+  assert.match(html, /function\s+flushPendingDragLockRelease\(\)\s*\{[\s\S]*if \(collab\.stateDebounce \|\| collab\.pendingState \|\| collab\.stateInFlight\) return;[\s\S]*sendLockRelease\(pendingLock\);/, 'drag lock release helper should wait until no queued/in-flight state sync remains before releasing lock');
+  assert.match(html, /function\s+endDrag\(\)\s*\{[\s\S]*if \(collab\.activeDragLock\) \{[\s\S]*if \(collab\.enabled && collab\.socket\?\.readyState === WebSocket\.OPEN[\s\S]*collab\.pendingDragLockRelease = activeLock;[\s\S]*flushPendingDragLockRelease\(\);[\s\S]*\} else \{[\s\S]*sendLockRelease\(activeLock\);/, 'endDrag should defer lock release while drag state sync is queued so other clients cannot acquire stale point/line edits before final state publishes');
+  assert.match(html, /if \(message\.type === "state-ack"\) \{[\s\S]*flushCollabStateSync\(\);[\s\S]*flushPendingDragLockRelease\(\);/, 'state acknowledgements should flush any deferred drag lock release after queued state sync processing');
+});
 
 test('VIEWPORT.HTML collaboration includes object lock handshake and lock flash visuals', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');

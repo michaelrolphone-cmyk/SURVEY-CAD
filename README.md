@@ -105,7 +105,7 @@ This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify A
 
 ## API and CLI Notes for this change
 
-LineSmith point edits now schedule collaboration state sync immediately from both Point Manager inline edits and Point Inspector apply flows (including shared-field applies and pending primary point-editor applies), so connected clients receive `num`/`x`/`y`/`z`/`code`/`notes` updates without waiting for later actions. The save-path behavior remains: pending primary point-editor edits are applied before `Save Drawing to Project` snapshots state so saved history and collaboration state stay aligned.
+LineSmith point edits now schedule collaboration state sync immediately from both Point Manager inline edits and Point Inspector apply flows (including shared-field applies and pending primary point-editor applies), so connected clients receive `num`/`x`/`y`/`z`/`code`/`notes` updates without waiting for later actions. Drag lock release is now deferred until queued/in-flight collaboration state sync is flushed, preventing two clients from immediately re-locking and diverging point locations before the final drag position publishes. The save-path behavior remains: pending primary point-editor edits are applied before `Save Drawing to Project` snapshots state so saved history and collaboration state stay aligned.
 
 API and CLI surface area remains unchanged for this bug fix. Continue using:
 
