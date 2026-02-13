@@ -587,5 +587,7 @@ LineSmith now renders field-to-finish PC/PT curve runs as a true 3-point curve i
 - Any FLD-configured linework code can participate (not only `CPAD`).
 - For a point-code run like `CODE PC`, `CODE`, `CODE PT`, LineSmith now draws a smooth curve from **PC** to **PT** that passes through the middle point.
 - Curve linework stores the middle tangent point so redraws/prints preserve the same shape.
+- PC→PT runs suppress their straight start→middle and middle→end auto-segments so only the curve is drawn, including on first sync (no edit-triggered redraw needed).
+- If an older auto-generated straight segment already exists between PC and PT, LineSmith now upgrades it to curve metadata during sync so the curve renders immediately without requiring point-code edits.
 
 API/CLI impact: no endpoint or command changes; continue using the API and CLI commands documented in this README.

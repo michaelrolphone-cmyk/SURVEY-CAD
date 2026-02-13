@@ -4213,11 +4213,15 @@
     return null;
   }
 
-  function arePointsDirectlyConnected(aId, bId) {
+  function findDirectConnectionLine(aId, bId) {
     for (const ln of lines.values()) {
-      if ((ln.a === aId && ln.b === bId) || (ln.a === bId && ln.b === aId)) return true;
+      if ((ln.a === aId && ln.b === bId) || (ln.a === bId && ln.b === aId)) return ln;
     }
-    return false;
+    return null;
+  }
+
+  function arePointsDirectlyConnected(aId, bId) {
+    return !!findDirectConnectionLine(aId, bId);
   }
 
   const defaultFldConfigPath = "config/MLS.fld";
@@ -4955,9 +4959,15 @@
 
   function ensureLegacyAutoFieldToFinishLineMetadata() {
     const expectedKeys = new Set();
+    const curveCommands = buildFieldToFinishCurveLineCommands();
+    const curveSuppressedSequentialKeys = buildCurveSuppressedSequentialLineKeys(curveCommands);
     for (const cmd of buildExpectedJpnLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
-    for (const cmd of buildFieldToFinishSequentialLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
-    for (const cmd of buildFieldToFinishCurveLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
+    for (const cmd of buildFieldToFinishSequentialLineCommands()) {
+      const key = getNormalizedLineKey(cmd.a, cmd.b);
+      if (!key || curveSuppressedSequentialKeys.has(key)) continue;
+      expectedKeys.add(key);
+    }
+    for (const cmd of curveCommands) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
     for (const ln of lines.values()) {
       if (ln.generatedBy === "field-to-finish") continue;
       if (isMovable(ln.movable)) continue;
@@ -4969,6 +4979,8 @@
   }
 
   function syncFieldToFinishLinework() {
+    const curveCommands = buildFieldToFinishCurveLineCommands();
+    const curveSuppressedSequentialKeys = buildCurveSuppressedSequentialLineKeys(curveCommands);
     const expected = new Map();
     for (const cmd of buildExpectedJpnLineCommands()) {
       const key = getNormalizedLineKey(cmd.a, cmd.b);
@@ -4976,10 +4988,11 @@
     }
     for (const cmd of buildFieldToFinishSequentialLineCommands()) {
       const key = getNormalizedLineKey(cmd.a, cmd.b);
+      if (key && curveSuppressedSequentialKeys.has(key)) continue;
       if (!key || expected.has(key)) continue;
       expected.set(key, { ...cmd, type: "sequential" });
     }
-    for (const cmd of buildFieldToFinishCurveLineCommands()) {
+    for (const cmd of curveCommands) {
       const key = getNormalizedLineKey(cmd.a, cmd.b);
       if (!key || expected.has(key)) continue;
       expected.set(key, { ...cmd, type: "curve" });
@@ -4999,7 +5012,16 @@
     let addedCurve = 0;
     for (const cmd of expected.values()) {
       if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
-      if (arePointsDirectlyConnected(cmd.a, cmd.b)) continue;
+      const existingLine = findDirectConnectionLine(cmd.a, cmd.b);
+      if (existingLine) {
+        if (cmd.type === "curve" && existingLine.generatedBy === "field-to-finish" && existingLine.fieldToFinishType !== "curve") {
+          existingLine.fieldToFinishType = "curve";
+          existingLine.fieldToFinishBaseCode = String(cmd.baseCode || "").trim().toUpperCase();
+          existingLine.fieldToFinishCurveMiddlePointId = Number.isFinite(Number(cmd.middlePointId)) ? Number(cmd.middlePointId) : null;
+          addedCurve++;
+        }
+        continue;
+      }
       createAutoFieldToFinishLine(cmd.a, cmd.b, {
         type: cmd.type === "jpn" ? "jpn" : (cmd.type === "curve" ? "curve" : "sequential"),
         baseCode: cmd.baseCode,
@@ -5195,6 +5217,17 @@
       }
     }
     return lineCommands;
+  }
+
+  function buildCurveSuppressedSequentialLineKeys(curveCommands = []) {
+    const suppressed = new Set();
+    for (const cmd of curveCommands) {
+      const startMiddleKey = getNormalizedLineKey(cmd?.a, cmd?.middlePointId);
+      if (startMiddleKey) suppressed.add(startMiddleKey);
+      const middleEndKey = getNormalizedLineKey(cmd?.middlePointId, cmd?.b);
+      if (middleEndKey) suppressed.add(middleEndKey);
+    }
+    return suppressed;
   }
 
   function getCurveMiddlePoint(line) {
