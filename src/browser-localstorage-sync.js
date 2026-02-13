@@ -135,6 +135,63 @@ function normalizeQueuedDifferential(diff = {}) {
   };
 }
 
+function mergeQueuedDifferentials(existingQueue = [], nextDifferential = null, inFlightRequestId = null) {
+  const queue = Array.isArray(existingQueue)
+    ? existingQueue.map((entry) => normalizeQueuedDifferential(entry)).filter((entry) => entry.operations.length)
+    : [];
+
+  const next = nextDifferential ? normalizeQueuedDifferential(nextDifferential) : null;
+  if (!next?.operations?.length) return queue;
+
+  const inFlight = typeof inFlightRequestId === 'string' ? inFlightRequestId : '';
+
+  if (!queue.length) {
+    return [next];
+  }
+
+  if (!inFlight) {
+    const mergedOperations = coalesceQueuedOperations(
+      queue.flatMap((entry) => entry.operations),
+      next.operations,
+    );
+    return mergedOperations.length
+      ? [normalizeQueuedDifferential({
+        requestId: queue[0].requestId,
+        baseChecksum: queue[0].baseChecksum || next.baseChecksum,
+        operations: mergedOperations,
+      })]
+      : [];
+  }
+
+  const inFlightIndex = queue.findIndex((entry) => entry.requestId === inFlight);
+  if (inFlightIndex === -1 || queue.length === 1) {
+    return [...queue, next];
+  }
+
+  const tailStart = Math.max(inFlightIndex + 1, 1);
+  const tail = queue.slice(tailStart);
+  if (!tail.length) {
+    return [...queue, next];
+  }
+
+  const tailMergedOperations = coalesceQueuedOperations(
+    tail.flatMap((entry) => entry.operations),
+    next.operations,
+  );
+
+  const preserved = queue.slice(0, tailStart);
+  if (!tailMergedOperations.length) return preserved;
+
+  return [
+    ...preserved,
+    normalizeQueuedDifferential({
+      requestId: tail[0].requestId,
+      baseChecksum: tail[0].baseChecksum || next.baseChecksum,
+      operations: tailMergedOperations,
+    }),
+  ];
+}
+
 class LocalStorageSocketSync {
   constructor() {
     this.clientId = null;
@@ -256,7 +313,7 @@ class LocalStorageSocketSync {
 
   #commitPendingBatch() {
     if (!this.pendingBatch?.operations?.length) return;
-    this.queue.push(normalizeQueuedDifferential(this.pendingBatch));
+    this.queue = mergeQueuedDifferentials(this.queue, this.pendingBatch, this.inFlight);
     this.pendingBatch = null;
     this.#persistQueue();
     this.flush();
@@ -412,6 +469,16 @@ class LocalStorageSocketSync {
     this.suppress = true;
     try {
       window.localStorage.setItem(PENDING_DIFFS_KEY, JSON.stringify(this.queue));
+    } catch (error) {
+      if (error?.name !== 'QuotaExceededError') throw error;
+
+      this.queue = mergeQueuedDifferentials([], {
+        requestId: this.queue[0]?.requestId || `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        baseChecksum: this.queue[0]?.baseChecksum || this.serverChecksum || '',
+        operations: this.queue.flatMap((entry) => entry?.operations || []),
+      }, null);
+
+      window.localStorage.setItem(PENDING_DIFFS_KEY, JSON.stringify(this.queue));
     } finally {
       this.suppress = false;
     }
@@ -472,6 +539,7 @@ export {
   buildSnapshot,
   buildDifferentialOperations,
   coalesceQueuedOperations,
+  mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldSyncLocalStorageKey,
 };

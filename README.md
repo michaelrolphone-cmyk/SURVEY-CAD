@@ -96,6 +96,8 @@ This websocket reconnect-backoff reliability update also does not add, remove, o
 
 This localStorage sync checksum-alignment fix also does not add, remove, or rename API endpoints or CLI commands; existing endpoint and command references below remain current.
 
+This localStorage sync reliability fix now compacts queued browser sync differentials while offline/unavailable to prevent localStorage quota overflows (`surveyfoundryLocalStoragePendingDiffs`) when collaboration sync cannot connect; API endpoints and CLI commands remain unchanged.
+
 ## LineSmith Layer Reassignment Shortcut
 
 When points/lines are selected in `VIEWPORT.HTML`, choosing a layer from the quick layer toolbar dropdown (or clicking **Use** in Layer Manager) now moves the current selection to that chosen layer in one step.
