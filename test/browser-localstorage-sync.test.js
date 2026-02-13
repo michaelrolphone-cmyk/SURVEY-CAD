@@ -7,6 +7,7 @@ import {
   mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
+  shouldApplyStartupServerState,
   shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
@@ -95,6 +96,53 @@ test('new browser with empty localStorage hydrates from server when welcome chec
     queueLength: 0,
     hasPendingBatch: false,
   }), true);
+});
+
+
+test('shouldApplyStartupServerState hydrates startup snapshot when server is newer or local storage is blank', () => {
+  assert.equal(shouldApplyStartupServerState({
+    localVersion: 2,
+    serverVersion: 3,
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+    localEntryCount: 4,
+    serverEntryCount: 5,
+  }), true);
+
+  assert.equal(shouldApplyStartupServerState({
+    localVersion: 7,
+    serverVersion: 7,
+    localChecksum: checksumSnapshot({}),
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+    localEntryCount: 0,
+    serverEntryCount: 3,
+  }), true);
+
+  assert.equal(shouldApplyStartupServerState({
+    localVersion: 7,
+    serverVersion: 7,
+    localChecksum: 'same',
+    serverChecksum: 'same',
+    queueLength: 1,
+    hasPendingBatch: false,
+    localEntryCount: 4,
+    serverEntryCount: 5,
+  }), false);
+
+  assert.equal(shouldApplyStartupServerState({
+    localVersion: 7,
+    serverVersion: 7,
+    localChecksum: 'same',
+    serverChecksum: 'same',
+    queueLength: 0,
+    hasPendingBatch: false,
+    localEntryCount: 4,
+    serverEntryCount: 0,
+  }), false);
 });
 
 test('shouldRebaseQueueFromServerOnWelcome enables server-hydrate+rebase when queued local changes exist and checksums diverge', () => {
