@@ -65,6 +65,9 @@ function createWebSocketAccept(secWebSocketKey) {
     .digest('base64');
 }
 
+const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const LOCK_SWEEP_INTERVAL_MS = 60 * 1000;
+
 export function createLineforgeCollabService() {
   const rooms = new Map();
 
@@ -79,6 +82,34 @@ export function createLineforgeCollabService() {
     }
     return rooms.get(roomId);
   }
+
+  function sweepStaleLocks() {
+    const now = Date.now();
+    for (const [roomId, room] of rooms.entries()) {
+      const expired = [];
+      for (const [lockKey, lock] of room.locks.entries()) {
+        if (now - lock.at > LOCK_TIMEOUT_MS) {
+          expired.push({ lockKey, lock });
+        }
+      }
+      for (const { lockKey, lock } of expired) {
+        room.locks.delete(lockKey);
+        broadcast(room, {
+          type: 'lock-updated',
+          action: 'released',
+          entityType: lock.entityType,
+          entityId: lock.entityId,
+          ownerClientId: lock.ownerClientId,
+          ownerColor: lock.ownerColor,
+          reason: 'timeout',
+          at: now,
+        });
+      }
+    }
+  }
+
+  const lockSweepTimer = setInterval(sweepStaleLocks, LOCK_SWEEP_INTERVAL_MS);
+  if (lockSweepTimer.unref) lockSweepTimer.unref();
 
   function send(client, payload) {
     if (!client.socket.writable) return;
@@ -376,4 +407,4 @@ export function createLineforgeCollabService() {
   };
 }
 
-export const lineforgeCollabInternals = { decodeFrame, encodeTextFrame, createWebSocketAccept, USER_COLORS };
+export const lineforgeCollabInternals = { decodeFrame, encodeTextFrame, createWebSocketAccept, USER_COLORS, LOCK_TIMEOUT_MS, LOCK_SWEEP_INTERVAL_MS };

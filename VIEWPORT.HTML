@@ -3719,7 +3719,9 @@
     releaseObjectLock(entityType, entityId);
   }
 
-  function requestObjectEditLock({ entityType, entityId, onGranted } = {}) {
+  const LOCK_REQUEST_TIMEOUT_MS = 5000;
+
+  function requestObjectEditLock({ entityType, entityId, onGranted, onDenied } = {}) {
     if (!entityType || entityId == null) return false;
     if (!collab.enabled || !collab.socket || collab.socket.readyState !== WebSocket.OPEN) {
       onGranted?.();
@@ -3730,14 +3732,26 @@
     if (isObjectLockedByOther(entityType, entityIdString)) {
       setStatus(`${entityType} ${entityIdString} is locked by another collaborator.`, 'warn');
       triggerLockDeniedFlash();
+      onDenied?.();
       return false;
     }
 
     const requestId = `lock-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const timeoutId = window.setTimeout(() => {
+      const pending = collab.pendingLockRequests.get(requestId);
+      if (pending) {
+        collab.pendingLockRequests.delete(requestId);
+        setStatus(`Lock request for ${entityType} ${entityIdString} timed out.`, 'warn');
+        pending.onDenied?.();
+      }
+    }, LOCK_REQUEST_TIMEOUT_MS);
+
     collab.pendingLockRequests.set(requestId, {
       entityType,
       entityId: entityIdString,
       onGranted,
+      onDenied,
+      timeoutId,
       at: Date.now(),
     });
 
@@ -3877,6 +3891,9 @@
       collab.peers.clear();
       collab.stateInFlight = null;
       collab.pendingState = "";
+      for (const pending of collab.pendingLockRequests.values()) {
+        if (pending.timeoutId) window.clearTimeout(pending.timeoutId);
+      }
       collab.pendingLockRequests.clear();
       collab.objectLocks.clear();
       clearMapArPresence();
@@ -3950,6 +3967,7 @@
         const pending = collab.pendingLockRequests.get(message.requestId);
         if (pending) {
           collab.pendingLockRequests.delete(message.requestId);
+          if (pending.timeoutId) window.clearTimeout(pending.timeoutId);
           pending.onGranted?.();
         }
         return;
@@ -3959,8 +3977,10 @@
         const pending = collab.pendingLockRequests.get(message.requestId);
         if (pending) {
           collab.pendingLockRequests.delete(message.requestId);
+          if (pending.timeoutId) window.clearTimeout(pending.timeoutId);
           setStatus(`${pending.entityType} ${pending.entityId} is locked by another collaborator.`, "warn");
           triggerLockDeniedFlash();
+          pending.onDenied?.();
         }
         return;
       }
@@ -6391,11 +6411,20 @@
       if (pointDisplayVisibility.points) {
         const pointSymbolMapFile = getPointSymbolMapFile(p.code);
         const symbolImage = getTintedSymbolMarker(pointSymbolMapFile, layer?.color);
+        const isCollabLockedPoint = lockVisualState.lockedPointIds.has(p.id);
         if (symbolImage) {
           ctx.drawImage(symbolImage, sp.x - SYMBOL_MARKER_HALF_SIZE_PX, sp.y - SYMBOL_MARKER_HALF_SIZE_PX, SYMBOL_MARKER_SIZE_PX, SYMBOL_MARKER_SIZE_PX);
+          if (isCollabLockedPoint) {
+            ctx.save();
+            ctx.strokeStyle = lockVisualState.flashColor;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, SYMBOL_MARKER_HALF_SIZE_PX + 3, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
         } else {
           // marker
-          const isCollabLockedPoint = lockVisualState.lockedPointIds.has(p.id);
           ctx.strokeStyle = isCollabLockedPoint ? lockVisualState.flashColor : (layer?.color || "#ff2b2b");
           ctx.lineWidth = 1.5;
           ctx.beginPath();
@@ -7751,6 +7780,14 @@
       return false;
     }
 
+    for (const point of selectedPoints) {
+      if (isObjectLockedByOther("point", point.id)) {
+        setStatus(`Point ${point.num} is locked by another collaborator.`, "warn");
+        triggerLockDeniedFlash();
+        return false;
+      }
+    }
+
     const selectedPointIdSet = new Set(selectedPoints.map((point) => point.id));
     const outsideNumbers = new Set(
       [...points.values()]
@@ -7775,27 +7812,47 @@
       editsByPoint.push({ point, values, proposedNum });
     }
 
-    history.push(editsByPoint.length === 1 ? "edit point" : "edit points");
+    function commitEdits() {
+      history.push(editsByPoint.length === 1 ? "edit point" : "edit points");
 
-    let pointCodeChanged = false;
-    for (const { point, values, proposedNum } of editsByPoint) {
-      point.num = proposedNum;
-      point.x = parseNum(values.x, point.x);
-      point.y = parseNum(values.y, point.y);
-      point.z = parseNum(values.z, point.z);
-      if (setPointCode(point, String(values.code ?? point.code))) pointCodeChanged = true;
-      point.notes = String(values.notes ?? point.notes);
+      let pointCodeChanged = false;
+      for (const { point, values, proposedNum } of editsByPoint) {
+        point.num = proposedNum;
+        point.x = parseNum(values.x, point.x);
+        point.y = parseNum(values.y, point.y);
+        point.z = parseNum(values.z, point.z);
+        if (setPointCode(point, String(values.code ?? point.code))) pointCodeChanged = true;
+        point.notes = String(values.notes ?? point.notes);
+      }
+
+      if (pointCodeChanged) {
+        ensureLegacyAutoFieldToFinishLineMetadata();
+        syncFieldToFinishLinework();
+      }
+
+      schedulePointsTableRender();
+      setStatus(`Updated ${editsByPoint.length} selected point${editsByPoint.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
+      updateCounts();
+      updatePointEditorFromSelection();
     }
 
-    if (pointCodeChanged) {
-      ensureLegacyAutoFieldToFinishLineMetadata();
-      syncFieldToFinishLinework();
+    if (editsByPoint.length === 1 && collab.enabled && collab.socket?.readyState === WebSocket.OPEN) {
+      const point = editsByPoint[0].point;
+      requestObjectEditLock({
+        entityType: "point",
+        entityId: point.id,
+        onGranted: () => {
+          commitEdits();
+          sendLockRelease({ entityType: "point", entityId: point.id });
+        },
+        onDenied: () => {
+          setStatus(`Point ${point.num} is locked by another collaborator.`, "warn");
+        }
+      });
+    } else {
+      commitEdits();
     }
 
-    schedulePointsTableRender();
-    setStatus(`Updated ${editsByPoint.length} selected point${editsByPoint.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
-    updateCounts();
-    updatePointEditorFromSelection();
     return true;
   }
 
@@ -7806,6 +7863,13 @@
   function applySharedFieldToSelectedPoints(key, rawValue, sourceLabel = "point inspector") {
     const selectedPoints = getSelectedPoints();
     if (!selectedPoints.length) return false;
+    for (const point of selectedPoints) {
+      if (isObjectLockedByOther("point", point.id)) {
+        setStatus(`Point ${point.num} is locked by another collaborator.`, "warn");
+        triggerLockDeniedFlash();
+        return false;
+      }
+    }
     history.push(selectedPoints.length === 1 ? "edit point" : "edit points");
     let pointCodeChanged = false;
     for (const point of selectedPoints) {
@@ -9225,6 +9289,12 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       setStatus(`Layer ${getLayerById(p.layerId)?.name || p.layerId} is locked.`, "warn");
       return;
     }
+    if (isObjectLockedByOther("point", pid)) {
+      inp.classList.add("bad");
+      setStatus(`Point ${p.num} is locked by another collaborator.`, "warn");
+      triggerLockDeniedFlash();
+      return;
+    }
 
     pushTableEditHistoryOnce();
 
@@ -10056,6 +10126,10 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
             onGranted: () => {
               collab.activeDragLock = { entityType: "point", entityId: pid };
               beginDrag({type:"point", id: pid, _moved:false});
+            },
+            onDenied: () => {
+              history.undo.pop();
+              updateUndoRedoHUD();
             }
           });
           if (!lockRequested) {
@@ -10107,6 +10181,10 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
             onGranted: () => {
               collab.activeDragLock = { entityType: "line", entityId: lpick.lineId };
               beginDrag({type:"line", id: lpick.lineId, _moved:false});
+            },
+            onDenied: () => {
+              history.undo.pop();
+              updateUndoRedoHUD();
             }
           });
           if (!lockRequested) {

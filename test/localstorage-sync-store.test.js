@@ -74,3 +74,44 @@ test('local storage sync store reports checksum-conflict for same-version diverg
   assert.equal(result.status, 'checksum-conflict');
   assert.deepEqual(result.state.snapshot, { activeProject: 'Hartman' });
 });
+
+
+test('applyDifferentialBatch applies multiple diffs atomically', () => {
+  const store = new LocalStorageSyncStore({
+    version: 1,
+    snapshot: { alpha: '1' },
+  });
+
+  const result = store.applyDifferentialBatch({
+    diffs: [
+      { operations: [{ type: 'set', key: 'beta', value: '2' }] },
+      { operations: [{ type: 'set', key: 'gamma', value: '3' }] },
+      { operations: [{ type: 'remove', key: 'alpha' }] },
+    ],
+  });
+
+  assert.equal(result.status, 'applied');
+  assert.deepEqual(result.state.snapshot, { beta: '2', gamma: '3' });
+  assert.equal(result.state.version, 2);
+  assert.equal(result.allOperations.length, 3);
+});
+
+
+test('applyDifferentialBatch returns no-op for empty diffs', () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: { x: '1' } });
+  const result = store.applyDifferentialBatch({ diffs: [] });
+  assert.equal(result.status, 'no-op');
+  assert.equal(result.state.version, 1);
+});
+
+
+test('applyDifferentialBatch skips diffs with no valid operations', () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: { x: '1' } });
+  const result = store.applyDifferentialBatch({
+    diffs: [
+      { operations: [] },
+      { operations: [{ type: 'invalid' }] },
+    ],
+  });
+  assert.equal(result.status, 'no-op');
+});
