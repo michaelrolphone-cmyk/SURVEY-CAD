@@ -186,4 +186,46 @@ export class LocalStorageSyncStore {
       state: this.getState(),
     };
   }
+
+  applyDifferentialBatch({ diffs = [] } = {}) {
+    if (!Array.isArray(diffs) || !diffs.length) {
+      return {
+        status: 'no-op',
+        state: this.getState(),
+        allOperations: [],
+      };
+    }
+
+    const allOperations = [];
+    const snapshotBefore = { ...this.#state.snapshot };
+
+    for (const diff of diffs) {
+      const normalizedOps = normalizeDifferential(diff?.operations);
+      if (!normalizedOps.length) continue;
+      allOperations.push(...normalizedOps);
+    }
+
+    if (!allOperations.length) {
+      return {
+        status: 'no-op',
+        state: this.getState(),
+        allOperations: [],
+      };
+    }
+
+    const nextSnapshot = applyDifferential(snapshotBefore, allOperations);
+    const checksum = computeSnapshotChecksum(nextSnapshot);
+    this.#state = {
+      version: this.#state.version + 1,
+      snapshot: nextSnapshot,
+      checksum,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return {
+      status: 'applied',
+      allOperations,
+      state: this.getState(),
+    };
+  }
 }

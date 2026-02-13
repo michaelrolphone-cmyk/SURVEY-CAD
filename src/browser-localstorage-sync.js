@@ -299,6 +299,7 @@ class LocalStorageSocketSync {
     this.dormantUntilMs = 0;
     this.httpFallbackTimer = null;
     this.httpFallbackInProgress = false;
+    this.offlineSince = navigator.onLine ? null : Date.now();
     this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
     this.socketEndpointIndex = 0;
     this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
@@ -319,7 +320,10 @@ class LocalStorageSocketSync {
       }
       this.flush();
     });
-    window.addEventListener('offline', () => this.#scheduleFlush());
+    window.addEventListener('offline', () => {
+      if (!this.offlineSince) this.offlineSince = Date.now();
+      this.#scheduleFlush();
+    });
   }
 
   #connect() {
@@ -564,6 +568,14 @@ class LocalStorageSocketSync {
 
   #commitPendingBatch() {
     if (!this.pendingBatch?.operations?.length) return;
+
+    if (this.offlineSince && !this.inFlight) {
+      this.queue.push(normalizeQueuedDifferential(this.pendingBatch));
+      this.pendingBatch = null;
+      this.#persistQueue();
+      return;
+    }
+
     this.queue = mergeQueuedDifferentials(this.queue, this.pendingBatch, this.inFlight);
     this.pendingBatch = null;
     this.#persistQueue();
@@ -580,6 +592,24 @@ class LocalStorageSocketSync {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     if (this.inFlight || this.queue.length === 0) return;
 
+    if (this.queue.length > 1 && this.offlineSince) {
+      const batchRequestId = `sync-batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      this.inFlight = batchRequestId;
+      this.offlineSince = null;
+      try {
+        this.socket.send(JSON.stringify({
+          type: 'sync-differential-batch',
+          requestId: batchRequestId,
+          diffs: this.queue.map((entry) => ({ operations: entry.operations })),
+        }));
+      } catch {
+        this.inFlight = null;
+        this.#scheduleFlush();
+      }
+      return;
+    }
+
+    this.offlineSince = null;
     const next = this.queue[0];
     this.inFlight = next.requestId;
     try {
@@ -641,16 +671,29 @@ class LocalStorageSocketSync {
     }
 
     if (message?.type === 'sync-checksum-mismatch') {
+      const wasBatch = typeof this.inFlight === 'string' && this.inFlight.startsWith('sync-batch-');
       this.inFlight = null;
       const serverSnapshot = await this.#fetchAndApplyServerSnapshot();
       this.#rebasePendingQueue(serverSnapshot);
+      if (wasBatch) {
+        this.offlineSince = null;
+      }
       this.#scheduleFlush();
       return;
     }
 
     if (message?.type !== 'sync-differential-applied') return;
 
-    if (message.originClientId === this.clientId && this.queue[0]?.requestId === message.requestId) {
+    const isBatchAck = message.originClientId === this.clientId
+      && typeof this.inFlight === 'string'
+      && this.inFlight.startsWith('sync-batch-')
+      && message.requestId === this.inFlight;
+
+    if (isBatchAck) {
+      this.queue = [];
+      this.#persistQueue();
+      this.inFlight = null;
+    } else if (message.originClientId === this.clientId && this.queue[0]?.requestId === message.requestId) {
       this.queue.shift();
       this.#persistQueue();
       this.inFlight = null;

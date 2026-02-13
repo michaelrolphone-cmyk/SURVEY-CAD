@@ -72,6 +72,33 @@ export function createLocalStorageSyncWsService({ store }) {
         return;
       }
 
+      if (message?.type === 'sync-differential-batch') {
+        const diffs = Array.isArray(message.diffs) ? message.diffs : [];
+        if (!diffs.length) {
+          send(client, { type: 'sync-ack', requestId: message.requestId || null, state: store.getState() });
+          return;
+        }
+
+        const result = store.applyDifferentialBatch({ diffs });
+
+        if (result.status === 'no-op') {
+          send(client, { type: 'sync-ack', requestId: message.requestId || null, state: result.state });
+          return;
+        }
+
+        broadcast({
+          type: 'sync-differential-applied',
+          requestId: message.requestId || null,
+          originClientId: clientId,
+          operations: result.allOperations,
+          state: {
+            version: result.state.version,
+            checksum: result.state.checksum,
+          },
+        });
+        return;
+      }
+
       if (message?.type !== 'sync-differential') return;
 
       const result = store.applyDifferential({
