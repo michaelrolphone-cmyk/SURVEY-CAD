@@ -795,6 +795,15 @@ test('VIEWPORT.HTML continuously syncs ArrowHead handoff payload while LineSmith
   assert.match(html, /updateUndoRedoHUD\(\);[\s\S]*syncArrowHeadPayloadToStorage\(\);[\s\S]*requestAnimationFrame\(draw\);/, 'draw loop should keep syncing ArrowHead payload so point\/line edits appear in AR without reopening');
 });
 
+
+
+test('VIEWPORT.HTML point manager cell edits schedule collaboration sync for each committed field update', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+onPointCellInput\(e\)\s*\{[\s\S]*if \(!raw \|\| pointNumberExists\(raw, p\.id\)\) \{ inp\.classList\.add\("bad"\); return; \}[\s\S]*p\.num = raw;[\s\S]*scheduleCollabStateSync\(\);[\s\S]*return;/, 'point manager number edits should sync collaboration state after valid commits so remote clients update point labels/codes immediately');
+  assert.match(html, /if \(field === "x" \|\| field === "y" \|\| field === "z"\) \{[\s\S]*if \(!Number\.isFinite\(val\)\) \{ inp\.classList\.add\("bad"\); return; \}[\s\S]*p\[field\] = val;[\s\S]*scheduleCollabStateSync\(\);[\s\S]*return;/, 'point manager coordinate edits should sync collaboration state after valid numeric changes');
+  assert.match(html, /if \(field === "code" \|\| field === "notes"\) \{[\s\S]*if \(field === "code"\) setPointCode\(p, String\(inp\.value\)\);[\s\S]*scheduleCollabStateSync\(\);[\s\S]*return;/, 'point manager code/notes edits should sync collaboration state after each committed change, including normalized code edits');
+});
 test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

@@ -9403,6 +9403,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       p.num = raw;
       if (selectedPointId === pid) $("#ptNum").value = raw;
       updateCounts();
+      scheduleCollabStateSync();
       return;
     }
 
@@ -9416,6 +9417,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
         if (field === "y") $("#ptY").value = val;
         if (field === "z") $("#ptZ").value = val;
       }
+      scheduleCollabStateSync();
       return;
     }
 
@@ -9434,6 +9436,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
           setStatus(`Auto-updated linework for point ${p.num}: +${addedJpn} JPN, +${addedSequential} sequential, +${addedCurve} curve, -${removed} removed.`, "ok");
         }
       }
+      scheduleCollabStateSync();
       return;
     }
   }
