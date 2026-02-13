@@ -31,6 +31,16 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
 
+
+## API and CLI Notes for this change
+
+LineSmith 3-point PC/PT curve rendering now draws a true circular arc fit through the start, middle, and end points instead of approximating the path with a Bezier segment.
+
+API and CLI surface area remains unchanged for this bug fix. Continue using:
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI notes for this LineSmith collaboration frame-handling fix
 
 LineSmith collaboration websocket handling now correctly processes fragmented frames and multiple coalesced frames in a single TCP packet, which prevents missed point/code saves and stale peer point positions during concurrent editing.

@@ -5273,6 +5273,47 @@
     return points.get(middlePointId) || null;
   }
 
+  function getCircleFromThreePoints(start, middle, end) {
+    if (!start || !middle || !end) return null;
+    const x1 = Number(start.x);
+    const y1 = Number(start.y);
+    const x2 = Number(middle.x);
+    const y2 = Number(middle.y);
+    const x3 = Number(end.x);
+    const y3 = Number(end.y);
+    if (![x1, y1, x2, y2, x3, y3].every(Number.isFinite)) return null;
+
+    const determinant = (x1 * (y2 - y3)) + (x2 * (y3 - y1)) + (x3 * (y1 - y2));
+    if (Math.abs(determinant) < 1e-9) return null;
+
+    const x1SqPlusY1Sq = x1 * x1 + y1 * y1;
+    const x2SqPlusY2Sq = x2 * x2 + y2 * y2;
+    const x3SqPlusY3Sq = x3 * x3 + y3 * y3;
+
+    const centerX = (
+      x1SqPlusY1Sq * (y2 - y3)
+      + x2SqPlusY2Sq * (y3 - y1)
+      + x3SqPlusY3Sq * (y1 - y2)
+    ) / (2 * determinant);
+    const centerY = (
+      x1SqPlusY1Sq * (x3 - x2)
+      + x2SqPlusY2Sq * (x1 - x3)
+      + x3SqPlusY3Sq * (x2 - x1)
+    ) / (2 * determinant);
+    const radius = Math.hypot(x1 - centerX, y1 - centerY);
+    if (!Number.isFinite(radius) || radius <= 0) return null;
+
+    return { centerX, centerY, radius };
+  }
+
+  function normalizeAngleRadians(angle) {
+    let normalized = Number(angle);
+    if (!Number.isFinite(normalized)) return 0;
+    while (normalized < 0) normalized += Math.PI * 2;
+    while (normalized >= Math.PI * 2) normalized -= Math.PI * 2;
+    return normalized;
+  }
+
   function traceLinePath(context, line, startScreen, endScreen, projectPoint = worldToScreen) {
     context.beginPath();
     context.moveTo(startScreen.x, startScreen.y);
@@ -5281,11 +5322,37 @@
       context.lineTo(endScreen.x, endScreen.y);
       return;
     }
-    const middleScreen = projectPoint(middlePoint.x, middlePoint.y);
-    const tangentX = (endScreen.x - startScreen.x) * 0.25;
-    const tangentY = (endScreen.y - startScreen.y) * 0.25;
-    context.quadraticCurveTo(middleScreen.x - tangentX, middleScreen.y - tangentY, middleScreen.x, middleScreen.y);
-    context.quadraticCurveTo(middleScreen.x + tangentX, middleScreen.y + tangentY, endScreen.x, endScreen.y);
+    const middleWorld = { x: middlePoint.x, y: middlePoint.y };
+    const startWorldPoint = points.get(line.a);
+    const endWorldPoint = points.get(line.b);
+    if (!startWorldPoint || !endWorldPoint) {
+      context.lineTo(endScreen.x, endScreen.y);
+      return;
+    }
+    const startWorld = { x: startWorldPoint.x, y: startWorldPoint.y };
+    const endWorld = { x: endWorldPoint.x, y: endWorldPoint.y };
+    const circle = getCircleFromThreePoints(startWorld, middleWorld, endWorld);
+    if (!circle) {
+      context.lineTo(endScreen.x, endScreen.y);
+      return;
+    }
+
+    const centerScreen = projectPoint(circle.centerX, circle.centerY);
+    const radiusScreen = Math.hypot(startScreen.x - centerScreen.x, startScreen.y - centerScreen.y);
+    if (!Number.isFinite(radiusScreen) || radiusScreen <= 0) {
+      context.lineTo(endScreen.x, endScreen.y);
+      return;
+    }
+
+    const middleScreen = projectPoint(middleWorld.x, middleWorld.y);
+    const startAngle = normalizeAngleRadians(Math.atan2(startScreen.y - centerScreen.y, startScreen.x - centerScreen.x));
+    const middleAngle = normalizeAngleRadians(Math.atan2(middleScreen.y - centerScreen.y, middleScreen.x - centerScreen.x));
+    const endAngle = normalizeAngleRadians(Math.atan2(endScreen.y - centerScreen.y, endScreen.x - centerScreen.x));
+
+    const ccwSweep = (endAngle - startAngle + Math.PI * 2) % (Math.PI * 2);
+    const ccwToMiddle = (middleAngle - startAngle + Math.PI * 2) % (Math.PI * 2);
+    const clockwise = ccwToMiddle > ccwSweep;
+    context.arc(centerScreen.x, centerScreen.y, radiusScreen, startAngle, endAngle, clockwise);
   }
 
   function connectFieldToFinishSequentialLines() {
