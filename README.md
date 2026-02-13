@@ -35,7 +35,7 @@ A new launcher app, **BoundaryLab** (`/BoundaryLab.html`), helps you validate bo
 
 - Enter calls in order (bearing + distance) and edit rows live.
 - See an immediate boundary preview as each call changes.
-- Review live closure metrics: total distance, linear misclosure, angular misclosure, and closure ratio.
+- Review live closure metrics: total distance, linear misclosure, angular misclosure (shown in DMS), and closure ratio.
 
 ### API/CLI endpoints and commands for this change
 

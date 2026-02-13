@@ -59,7 +59,7 @@
     import {
       calculateTraverseFromOrderedCalls,
       closureRatio,
-      formatDegrees,
+      formatDms,
     } from './src/boundarylab.js';
 
     const state = {
@@ -143,7 +143,7 @@
 
       totalDistanceEl.textContent = traversal.totalLength.toFixed(2);
       linearErrorEl.textContent = Number.isFinite(traversal.linearMisclosure) ? traversal.linearMisclosure.toFixed(4) : '—';
-      angularErrorEl.textContent = formatDegrees(traversal.angularMisclosure);
+      angularErrorEl.textContent = formatDms(traversal.angularMisclosure);
       closureRatioEl.textContent = ratio === Infinity ? 'Perfect closure' : (Number.isFinite(ratio) ? `1:${Math.round(ratio).toLocaleString()}` : '—');
 
       const closed = Number.isFinite(traversal.linearMisclosure) && traversal.linearMisclosure <= 1e-6;

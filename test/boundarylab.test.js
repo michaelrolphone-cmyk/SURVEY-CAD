@@ -5,6 +5,7 @@ import {
   bearingToAzimuth,
   calculateTraverseFromOrderedCalls,
   closureRatio,
+  formatDms,
 } from '../src/boundarylab.js';
 
 test('parseBearing supports compact and spaced quadrant bearings', () => {
@@ -44,4 +45,12 @@ test('calculateTraverseFromOrderedCalls computes closure and error metrics', () 
   assert.ok((open.linearMisclosure || 0) > 0);
   assert.equal(open.angularMisclosure, 90);
   assert.ok((closureRatio(open.totalLength, open.linearMisclosure) || 0) > 1);
+});
+
+
+test('formatDms renders angular errors in DMS text with rollover-safe precision', () => {
+  assert.equal(formatDms(90), `90°00'00.00"`);
+  assert.equal(formatDms(12.5), `12°30'00.00"`);
+  assert.equal(formatDms(12.9999999), `13°00'00.00"`);
+  assert.equal(formatDms(Number.NaN), '—');
 });

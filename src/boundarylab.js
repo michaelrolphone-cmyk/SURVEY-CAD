@@ -12,6 +12,29 @@ export function formatDegrees(value) {
   return Number.isFinite(value) ? `${value.toFixed(2)}°` : '—';
 }
 
+
+export function formatDms(value) {
+  if (!Number.isFinite(value)) return '—';
+  const sign = value < 0 ? '-' : '';
+  let abs = Math.abs(value);
+  let degrees = Math.floor(abs);
+  abs = (abs - degrees) * 60;
+  let minutes = Math.floor(abs);
+  let seconds = (abs - minutes) * 60;
+
+  if (seconds >= 59.9995) {
+    seconds = 0;
+    minutes += 1;
+  }
+  if (minutes >= 60) {
+    minutes = 0;
+    degrees += 1;
+  }
+
+  const secText = seconds.toFixed(2).padStart(5, '0');
+  return `${sign}${degrees}°${String(minutes).padStart(2, '0')}'${secText}"`;
+}
+
 export function parseBearing(value = '') {
   const source = String(value || '').trim().toUpperCase();
   if (!source) return null;
