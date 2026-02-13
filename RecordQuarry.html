@@ -454,25 +454,34 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   function getProjectContext() {
     const params = new URLSearchParams(window.location.search || "");
     const projectId = params.get("projectId") || params.get("activeProjectId") || "";
-    const address = params.get("address") || params.get("activeAddress") || "";
-    const projectName = params.get("projectName") || params.get("activeProjectName") || "";
-    const client = params.get("client") || params.get("activeClient") || "";
+    const launchProject = loadLaunchProject(projectId);
+    const address = launchProject?.address
+      || params.get("address")
+      || params.get("activeAddress")
+      || "";
+    const projectName = launchProject?.name
+      || params.get("projectName")
+      || params.get("activeProjectName")
+      || "";
+    const client = launchProject?.client
+      || params.get("client")
+      || params.get("activeClient")
+      || "";
     const autostart = params.get("autostart") === "1";
     return { projectId, address, projectName, client, autostart };
   }
 
-  function loadLaunchProjectAddress(projectId) {
+  function loadLaunchProject(projectId) {
     const normalizedProjectId = String(projectId || '').trim();
-    if (!normalizedProjectId) return '';
+    if (!normalizedProjectId) return null;
     try {
       const raw = localStorage.getItem('surveyfoundryProjects');
-      if (!raw) return '';
+      if (!raw) return null;
       const projects = JSON.parse(raw);
-      if (!Array.isArray(projects)) return '';
-      const project = projects.find((entry) => String(entry?.id || '') === normalizedProjectId);
-      return String(project?.address || '').trim();
+      if (!Array.isArray(projects)) return null;
+      return projects.find((entry) => String(entry?.id || '') === normalizedProjectId) || null;
     } catch {
-      return '';
+      return null;
     }
   }
 
@@ -1425,7 +1434,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   // -----------------------------
   const initialProjectContext = getProjectContext();
   if (!normalizeAddressStorageKey(initialProjectContext.address) && initialProjectContext.projectId) {
-    const launchAddress = loadLaunchProjectAddress(initialProjectContext.projectId);
+    const launchAddress = String(loadLaunchProject(initialProjectContext.projectId)?.address || '').trim();
     if (launchAddress) {
       initialProjectContext.address = launchAddress;
     }

@@ -169,8 +169,10 @@ test('RecordQuarry.html restores and saves project lookup snapshots when launche
   assert.match(html, /const\s+LAST_LOOKUP_ADDRESS_STORAGE_KEY\s*=\s*"surveyfoundryLastLookupAddress"/, 'RecordQuarry should track the latest looked-up address for restore-on-open behavior');
   assert.match(html, /function\s+getProjectContext\(\)/, 'RecordQuarry should parse launcher-provided project context from URL params');
   assert.match(html, /params\.get\(\"projectId\"\)\s*\|\|\s*params\.get\(\"activeProjectId\"\)/, 'RecordQuarry should accept activeProjectId launcher param aliases');
-  assert.match(html, /function\s+loadLaunchProjectAddress\(projectId\)/, 'RecordQuarry should resolve active project addresses from launcher localStorage when no address query param is provided');
+  assert.match(html, /function\s+loadLaunchProject\(projectId\)/, 'RecordQuarry should resolve active project metadata from launcher localStorage when URL params are stale');
   assert.match(html, /const\s+raw\s*=\s*localStorage\.getItem\('surveyfoundryProjects'\);/, 'RecordQuarry should read project records from the launcher project storage key');
+  assert.match(html, /const\s+launchProject\s*=\s*loadLaunchProject\(projectId\);/, 'RecordQuarry should load latest project metadata by id before trusting query params');
+  assert.match(html, /const\s+client\s*=\s*launchProject\?\.client[\s\S]*params\.get\("client"\)\s*\|\|\s*params\.get\("activeClient"\)/, 'RecordQuarry should prefer launcher project client metadata over stale URL client params');
   assert.match(html, /if\s*\(!normalizeAddressStorageKey\(initialProjectContext\.address\) && initialProjectContext\.projectId\)\s*\{[\s\S]*initialProjectContext\.address\s*=\s*launchAddress;/, 'RecordQuarry should default lookup address to the active project address when URL params omit an address');
   assert.match(html, /params\.get\(\"projectName\"\)\s*\|\|\s*params\.get\(\"activeProjectName\"\)/, 'RecordQuarry should accept activeProjectName launcher param aliases');
   assert.match(html, /params\.get\(\"client\"\)\s*\|\|\s*params\.get\(\"activeClient\"\)/, 'RecordQuarry should accept activeClient launcher param aliases');
