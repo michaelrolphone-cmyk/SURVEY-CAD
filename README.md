@@ -47,6 +47,7 @@ When `VIEWPORT.HTML` (LineSmith) opens, a modern non-blocking loading indicator 
 LineSmith (`VIEWPORT.HTML`) and ArrowHead (`ArrowHead.html`) now auto-retry collaboration room connections when a websocket disconnects:
 
 - Both apps reconnect to `/ws/lineforge?room=...` on a short timer (every few seconds) after an unexpected close.
+- Launcher/app localStorage sync websocket clients now reconnect with exponential backoff (1.5s up to 60s) to reduce repeated connection-error spam when `/ws/localstorage-sync` is temporarily unavailable.
 - Presence/cursor overlays are cleared when a disconnect occurs, then restored as peers rejoin.
 - This reconnect loop helps collaboration recover from transient network drops without requiring a manual page refresh.
 - LineSmith now uses object-level edit locks for the most common simultaneous-edit collision: client sends `lock-request`, waits for `lock-granted`, and sends `lock-release` when edit is complete. If lock is denied (`lock-denied`), the UI flashes red/blue and blocks the edit attempt.
@@ -90,6 +91,8 @@ LineSmith pinch gestures in `VIEWPORT.HTML` now anchor zoom to the gesture midpo
 ## API and CLI Notes for this change
 
 This mobile pinch-zoom stability fix does not add or remove server API endpoints or CLI commands; existing endpoint and command references below remain current for this release.
+
+This websocket reconnect-backoff reliability update also does not add, remove, or rename any API endpoints or CLI commands.
 
 ## LineSmith Layer Reassignment Shortcut
 
