@@ -4904,6 +4904,7 @@
     const expectedKeys = new Set();
     for (const cmd of buildExpectedJpnLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
     for (const cmd of buildFieldToFinishSequentialLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
+    for (const cmd of buildFieldToFinishCurveLineCommands()) expectedKeys.add(getNormalizedLineKey(cmd.a, cmd.b));
     for (const ln of lines.values()) {
       if (ln.generatedBy === "field-to-finish") continue;
       if (isMovable(ln.movable)) continue;
@@ -4925,6 +4926,11 @@
       if (!key || expected.has(key)) continue;
       expected.set(key, { ...cmd, type: "sequential" });
     }
+    for (const cmd of buildFieldToFinishCurveLineCommands()) {
+      const key = getNormalizedLineKey(cmd.a, cmd.b);
+      if (!key || expected.has(key)) continue;
+      expected.set(key, { ...cmd, type: "curve" });
+    }
 
     let removed = 0;
     for (const [lineId, ln] of Array.from(lines.entries())) {
@@ -4937,20 +4943,22 @@
 
     let addedJpn = 0;
     let addedSequential = 0;
+    let addedCurve = 0;
     for (const cmd of expected.values()) {
       if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
       if (arePointsDirectlyConnected(cmd.a, cmd.b)) continue;
       createAutoFieldToFinishLine(cmd.a, cmd.b, {
-        type: cmd.type === "jpn" ? "jpn" : "sequential",
+        type: cmd.type === "jpn" ? "jpn" : (cmd.type === "curve" ? "curve" : "sequential"),
         baseCode: cmd.baseCode,
         sourcePointId: cmd.sourcePointId,
       });
       if (cmd.type === "jpn") addedJpn++;
+      else if (cmd.type === "curve") addedCurve++;
       else addedSequential++;
     }
 
     updateCounts();
-    return { addedJpn, addedSequential, removed };
+    return { addedJpn, addedSequential, addedCurve, removed };
   }
 
   function buildFieldToFinishSequentialLineCommands() {
@@ -5039,9 +5047,51 @@
     return circles;
   }
 
+  function pointHasCurveStartToken(pointCode = "") {
+    const { tokensUpper } = parseFieldToFinishCommands(pointCode);
+    return tokensUpper.includes("PC");
+  }
+
+  function pointHasCurveEndToken(pointCode = "") {
+    const { tokensUpper } = parseFieldToFinishCommands(pointCode);
+    return tokensUpper.includes("PT");
+  }
+
+  function buildFieldToFinishCurveLineCommands() {
+    const pointsInOrder = [...points.values()].sort((a, b) => {
+      const aNum = Number(a.num);
+      const bNum = Number(b.num);
+      if (Number.isFinite(aNum) && Number.isFinite(bNum) && aNum !== bNum) return aNum - bNum;
+      return a.id - b.id;
+    });
+
+    const lineCommands = [];
+    let activeCurve = null;
+    for (const point of pointsInOrder) {
+      if (pointHasCurveStartToken(point.code)) {
+        activeCurve = { lastPointId: point.id };
+        continue;
+      }
+      if (!activeCurve) continue;
+      if (activeCurve.lastPointId !== point.id) {
+        lineCommands.push({ a: activeCurve.lastPointId, b: point.id, baseCode: "CURVE" });
+        activeCurve.lastPointId = point.id;
+      }
+      if (pointHasCurveEndToken(point.code)) {
+        activeCurve = null;
+      }
+    }
+    return lineCommands;
+  }
+
   function connectFieldToFinishSequentialLines() {
     const { addedSequential } = syncFieldToFinishLinework();
     return addedSequential;
+  }
+
+  function connectFieldToFinishCurveLines() {
+    const { addedCurve } = syncFieldToFinishLinework();
+    return addedCurve;
   }
 
   function connectJpnReferencedPoints() {
@@ -5055,8 +5105,8 @@
   }
 
   function connectFieldToFinishLinework() {
-    const { addedJpn, addedSequential } = syncFieldToFinishLinework();
-    return { jpnLinesAdded: addedJpn, sequentialLinesAdded: addedSequential };
+    const { addedJpn, addedSequential, addedCurve } = syncFieldToFinishLinework();
+    return { jpnLinesAdded: addedJpn, sequentialLinesAdded: addedSequential, curveLinesAdded: addedCurve };
   }
 
   function moveSelectionByDelta(dx, dy) {
@@ -5230,6 +5280,10 @@
     if (!key) return false;
     const sequentialCommands = buildFieldToFinishSequentialLineCommands();
     for (const cmd of sequentialCommands) {
+      if (getNormalizedLineKey(cmd.a, cmd.b) === key) return true;
+    }
+    const curveCommands = buildFieldToFinishCurveLineCommands();
+    for (const cmd of curveCommands) {
       if (getNormalizedLineKey(cmd.a, cmd.b) === key) return true;
     }
     return false;
@@ -8452,7 +8506,7 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
       added++;
     }
 
-    const { jpnLinesAdded, sequentialLinesAdded } = connectFieldToFinishLinework();
+    const { jpnLinesAdded, sequentialLinesAdded, curveLinesAdded } = connectFieldToFinishLinework();
 
     setStatus(`${sourceLabel} done.
 Added: ${added}
@@ -8461,7 +8515,8 @@ Renamed: ${renamed}
 Skipped: ${skipped}
 Coord-swap applied (headerless only): ${swappedApplied}
 JPN lines added: ${jpnLinesAdded}
-Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
+Field-to-finish sequential lines added: ${sequentialLinesAdded}
+Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
 
     schedulePointsTableRender();
     if ($("#autoZoomAfterImport").checked) zoomExtents();
@@ -9174,9 +9229,9 @@ Field-to-finish sequential lines added: ${sequentialLinesAdded}`, "ok");
       }
       if (field === "code") {
         ensureLegacyAutoFieldToFinishLineMetadata();
-        const { addedJpn, addedSequential, removed } = syncFieldToFinishLinework();
-        if (addedJpn > 0 || addedSequential > 0 || removed > 0) {
-          setStatus(`Auto-updated linework for point ${p.num}: +${addedJpn} JPN, +${addedSequential} sequential, -${removed} removed.`, "ok");
+        const { addedJpn, addedSequential, addedCurve, removed } = syncFieldToFinishLinework();
+        if (addedJpn > 0 || addedSequential > 0 || addedCurve > 0 || removed > 0) {
+          setStatus(`Auto-updated linework for point ${p.num}: +${addedJpn} JPN, +${addedSequential} sequential, +${addedCurve} curve, -${removed} removed.`, "ok");
         }
       }
       return;
