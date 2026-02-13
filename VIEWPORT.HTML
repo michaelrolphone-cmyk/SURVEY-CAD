@@ -1876,6 +1876,7 @@
         <button id="quickUndo" class="quickToolBtn" title="Undo" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
         <button id="quickRedo" class="quickToolBtn" title="Redo" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
         <button id="quickZoomExtents" class="quickToolBtn" title="Zoom Extents" aria-label="Zoom Extents"><i class="fa-solid fa-expand"></i></button>
+        <button id="quickCenterOnLocation" class="quickToolBtn" title="Center on My Location (25′ radius)" aria-label="Center on My Location"><i class="fa-solid fa-location-dot"></i></button>
         <span class="quickToolDivider" aria-hidden="true"></span>
         <button id="quickExtend" class="quickToolBtn" title="Extend to Intersect" aria-label="Extend"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
         <button id="quickTrimIntersect" class="quickToolBtn" title="Trim to Intersect" aria-label="Trim / Intersect"><i class="fa-solid fa-scissors"></i></button>
@@ -3268,6 +3269,21 @@
       }
     }
     return worldToApproxLatLng(x, y);
+  }
+
+  function latLngToWorld(lat, lng) {
+    if (mapGeoreference) {
+      const g = mapGeoreference;
+      const det = g.lat.ax * g.lng.by - g.lat.by * g.lng.ax;
+      if (Math.abs(det) > 1e-20) {
+        const dLat = lat - g.lat.c;
+        const dLng = lng - g.lng.c;
+        const x = (g.lng.by * dLat - g.lat.by * dLng) / det;
+        const y = (g.lat.ax * dLng - g.lng.ax * dLat) / det;
+        if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+      }
+    }
+    return { x: lng, y: lat };
   }
 
   function sanitizeMapGeoreference(candidate) {
@@ -7573,6 +7589,7 @@
   $("#quickUndo")?.addEventListener("click", () => history.undoAction());
   $("#quickRedo")?.addEventListener("click", () => history.redoAction());
   $("#quickZoomExtents")?.addEventListener("click", () => zoomExtents());
+  $("#quickCenterOnLocation")?.addEventListener("click", () => centerOnMyLocation());
   $("#quickExtend")?.addEventListener("click", () => $("#extendToIntersect").click());
   $("#quickTrimIntersect")?.addEventListener("click", () => $("#trimToIntersect").click());
   $("#quickOffsetLine")?.addEventListener("click", () => $("#offsetSelectedLine")?.click());
@@ -8497,6 +8514,47 @@ X: [${fmt(minX)}, ${fmt(maxX)}]
 Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     }
     return true;
+  }
+
+  function centerOnMyLocation() {
+    if (!navigator.geolocation) {
+      setStatus("Geolocation is not supported by this browser.", "warn");
+      return;
+    }
+    if (!mapGeoreference) {
+      setStatus("No georeference set — cannot convert GPS to drawing coordinates.", "warn");
+      return;
+    }
+    setStatus("Acquiring GPS location…", "");
+    const btn = $("#quickCenterOnLocation");
+    if (btn) btn.classList.add("primary");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (btn) btn.classList.remove("primary");
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const world = latLngToWorld(lat, lng);
+        const radius = 25;
+        zoomToWorldBounds(
+          world.x - radius, world.y - radius,
+          world.x + radius, world.y + radius,
+          { paddingFraction: 0.05 }
+        );
+        syncMapToView(true);
+        requestAnimationFrame(draw);
+        setStatus(`Centered on GPS location (${lat.toFixed(6)}, ${lng.toFixed(6)}).`, "ok");
+      },
+      (error) => {
+        if (btn) btn.classList.remove("primary");
+        const msgs = {
+          1: "Location permission denied.",
+          2: "Location unavailable.",
+          3: "Location request timed out."
+        };
+        setStatus(msgs[error.code] || "Could not get location.", "warn");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
   }
 
   function zoomToScreenRect(screenRect, options = {}) {
