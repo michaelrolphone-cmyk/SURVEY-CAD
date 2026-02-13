@@ -39,6 +39,38 @@ function decodeFrame(buffer) {
   return { opcode, payload: buffer.subarray(offset, offset + payloadLen) };
 }
 
+function decodeNextFrame(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 2) return null;
+  const first = buffer[0];
+  const second = buffer[1];
+  const masked = (second & 0x80) !== 0;
+  let payloadLen = second & 0x7f;
+  let offset = 2;
+
+  if (payloadLen === 126) {
+    if (buffer.length < offset + 2) return null;
+    payloadLen = buffer.readUInt16BE(offset);
+    offset += 2;
+  } else if (payloadLen === 127) {
+    if (buffer.length < offset + 8) return null;
+    const value = Number(buffer.readBigUInt64BE(offset));
+    if (!Number.isSafeInteger(value)) return null;
+    payloadLen = value;
+    offset += 8;
+  }
+
+  if (masked) offset += 4;
+  const totalLength = offset + payloadLen;
+  if (buffer.length < totalLength) return null;
+
+  const frame = decodeFrame(buffer.subarray(0, totalLength));
+  if (!frame) return null;
+  return {
+    ...frame,
+    consumed: totalLength,
+  };
+}
+
 function encodeTextFrame(text) {
   const payload = Buffer.from(String(text), 'utf8');
   const len = payload.length;
@@ -160,10 +192,7 @@ export function createLineforgeCollabService() {
     ];
     socket.write(responseHeaders.join('\r\n'));
 
-    if (head.length) {
-      const frame = decodeFrame(head);
-      if (frame?.opcode === 0x8) socket.end();
-    }
+    client.buffer = head.length ? Buffer.from(head) : Buffer.alloc(0);
 
     const peers = Array.from(room.clients.values())
       .filter((peer) => peer.id !== clientId)
@@ -187,22 +216,25 @@ export function createLineforgeCollabService() {
     broadcast(room, { type: 'peer-joined', clientId, color }, clientId);
 
     socket.on('data', (chunk) => {
-      const frame = decodeFrame(chunk);
-      if (!frame) return;
-      if (frame.opcode === 0x8) {
-        socket.end();
-        return;
-      }
-      if (frame.opcode !== 0x1) return;
+      client.buffer = client.buffer.length ? Buffer.concat([client.buffer, chunk]) : Buffer.from(chunk);
+      while (client.buffer.length) {
+        const frame = decodeNextFrame(client.buffer);
+        if (!frame) break;
+        client.buffer = client.buffer.subarray(frame.consumed);
+        if (frame.opcode === 0x8) {
+          socket.end();
+          return;
+        }
+        if (frame.opcode !== 0x1) continue;
 
-      let message;
-      try {
-        message = JSON.parse(frame.payload.toString('utf8'));
-      } catch {
-        return;
-      }
+        let message;
+        try {
+          message = JSON.parse(frame.payload.toString('utf8'));
+        } catch {
+          continue;
+        }
 
-      if (message?.type === 'cursor' && message.cursor) {
+        if (message?.type === 'cursor' && message.cursor) {
         broadcast(room, {
           type: 'cursor',
           clientId,
@@ -213,10 +245,10 @@ export function createLineforgeCollabService() {
           },
           at: Date.now(),
         }, clientId);
-        return;
-      }
+          continue;
+        }
 
-      if (message?.type === 'state' && message.state) {
+        if (message?.type === 'state' && message.state) {
         const baseRevision = Number(message.baseRevision);
         if (!Number.isInteger(baseRevision) || baseRevision !== room.revision) {
           send(client, {
@@ -228,8 +260,8 @@ export function createLineforgeCollabService() {
             revision: room.revision,
             at: Date.now(),
           });
-          return;
-        }
+            continue;
+          }
 
         room.latestState = message.state;
         room.revision += 1;
@@ -250,11 +282,11 @@ export function createLineforgeCollabService() {
           requestId: message.requestId || null,
           at: Date.now(),
         }, clientId);
-        return;
-      }
+          continue;
+        }
 
 
-      if (message?.type === 'lock-request' && message.entityType && message.entityId) {
+        if (message?.type === 'lock-request' && message.entityType && message.entityId) {
         const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
         const entityId = String(message.entityId || '').trim();
         if (!entityType || !entityId) {
@@ -264,8 +296,8 @@ export function createLineforgeCollabService() {
             reason: 'invalid-entity',
             at: Date.now(),
           });
-          return;
-        }
+            continue;
+          }
 
         const lockKey = `${entityType}:${entityId}`;
         const existing = room.locks.get(lockKey);
@@ -280,8 +312,8 @@ export function createLineforgeCollabService() {
             ownerColor: existing.ownerColor,
             at: Date.now(),
           });
-          return;
-        }
+            continue;
+          }
 
         const lock = {
           entityType,
@@ -311,17 +343,17 @@ export function createLineforgeCollabService() {
           ownerColor: color,
           at: Date.now(),
         }, clientId);
-        return;
-      }
+          continue;
+        }
 
-      if (message?.type === 'lock-release' && message.entityType && message.entityId) {
+        if (message?.type === 'lock-release' && message.entityType && message.entityId) {
         const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
         const entityId = String(message.entityId || '').trim();
-        if (!entityType || !entityId) return;
+          if (!entityType || !entityId) continue;
 
         const lockKey = `${entityType}:${entityId}`;
         const existing = room.locks.get(lockKey);
-        if (!existing || existing.ownerClientId !== clientId) return;
+          if (!existing || existing.ownerClientId !== clientId) continue;
 
         room.locks.delete(lockKey);
         broadcast(room, {
@@ -333,10 +365,10 @@ export function createLineforgeCollabService() {
           ownerColor: color,
           at: Date.now(),
         });
-        return;
-      }
+          continue;
+        }
 
-      if (message?.type === 'ar-presence' && message.presence) {
+        if (message?.type === 'ar-presence' && message.presence) {
         const presence = message.presence;
         const projected = {
           type: 'ar-presence',
@@ -362,7 +394,8 @@ export function createLineforgeCollabService() {
         if (!Number.isFinite(projected.presence.headingRad)) delete projected.presence.headingRad;
         if (!Number.isFinite(projected.presence.pitchRad)) delete projected.presence.pitchRad;
         if (!Number.isFinite(projected.presence.rollRad)) delete projected.presence.rollRad;
-        broadcast(room, projected, clientId);
+          broadcast(room, projected, clientId);
+        }
       }
     });
 
