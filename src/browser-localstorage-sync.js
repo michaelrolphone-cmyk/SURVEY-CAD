@@ -738,6 +738,7 @@ class LocalStorageSocketSync {
     } finally {
       this.suppress = false;
     }
+    this.#notifyLocalStorageChanged();
   }
 
   #rebasePendingQueue(serverSnapshot = {}, localSnapshotOverride = null) {
@@ -789,6 +790,7 @@ class LocalStorageSocketSync {
 
     this.serverChecksum = String(payload.checksum || checksumSnapshot(buildSnapshot()));
     this.#persistMeta();
+    this.#notifyLocalStorageChanged();
     return snapshot;
   }
 
@@ -879,6 +881,14 @@ class LocalStorageSocketSync {
       return typeof parsed?.serverChecksum === 'string' ? parsed.serverChecksum : '';
     } catch {
       return '';
+    }
+  }
+
+  #notifyLocalStorageChanged() {
+    try {
+      window.dispatchEvent(new CustomEvent('surveyfoundry-localstorage-sync'));
+    } catch {
+      // Ignore errors from event dispatch.
     }
   }
 
