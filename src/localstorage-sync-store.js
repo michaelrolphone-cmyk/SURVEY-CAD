@@ -133,6 +133,13 @@ export class LocalStorageSyncStore {
     }
 
     const checksum = computeSnapshotChecksum(incomingSnapshot);
+    if (checksum !== this.#state.checksum) {
+      return {
+        status: 'checksum-conflict',
+        state: this.getState(),
+      };
+    }
+
     this.#state = {
       version: incomingVersion,
       snapshot: incomingSnapshot,

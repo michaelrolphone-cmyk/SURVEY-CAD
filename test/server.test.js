@@ -194,6 +194,19 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(localStorageStale.status, 'client-stale');
     assert.deepEqual(localStorageStale.state.snapshot, { sample: 'value' });
 
+
+    const localStorageConflictRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ version: 100, snapshot: { sample: 'different' } }),
+    });
+    assert.equal(localStorageConflictRes.status, 200);
+    const localStorageConflict = await localStorageConflictRes.json();
+    assert.equal(localStorageConflict.status, 'checksum-conflict');
+    assert.deepEqual(localStorageConflict.state.snapshot, { sample: 'value' });
+
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();

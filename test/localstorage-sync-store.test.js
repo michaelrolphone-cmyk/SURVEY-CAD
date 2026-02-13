@@ -58,3 +58,19 @@ test('local storage sync store rejects differentials when base checksum mismatch
   assert.equal(result.status, 'checksum-mismatch');
   assert.deepEqual(result.state.snapshot, { alpha: '1' });
 });
+
+
+test('local storage sync store reports checksum-conflict for same-version divergent snapshots', () => {
+  const store = new LocalStorageSyncStore({
+    version: 4,
+    snapshot: { activeProject: 'Hartman' },
+  });
+
+  const result = store.syncIncoming({
+    version: 4,
+    snapshot: { activeProject: 'Office' },
+  });
+
+  assert.equal(result.status, 'checksum-conflict');
+  assert.deepEqual(result.state.snapshot, { activeProject: 'Hartman' });
+});

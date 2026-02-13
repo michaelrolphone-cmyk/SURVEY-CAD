@@ -8,8 +8,9 @@ const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
 const INITIAL_RECONNECT_DELAY_MS = 1500;
 const MAX_RECONNECT_DELAY_MS = 60000;
 const OPERATION_BATCH_DELAY_MS = 120;
-const MAX_INITIAL_CONNECT_FAILURES = 3;
-const SNAPSHOT_POLL_INTERVAL_MS = 30000;
+const MAX_PRECONNECT_FAILURES_BEFORE_DORMANT = 3;
+const DORMANT_RETRY_DELAY_MS = 60000;
+const HTTP_FALLBACK_SYNC_INTERVAL_MS = 60000;
 
 function shouldSyncLocalStorageKey(key) {
   const keyString = String(key || '');
@@ -24,6 +25,41 @@ function sortedSnapshot(snapshot = {}) {
 function normalizeSnapshot(snapshot = {}) {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return {};
   return Object.fromEntries(Object.entries(snapshot).map(([key, value]) => [String(key), String(value)]));
+}
+
+
+function buildSocketEndpointCandidates({
+  protocol = 'https:',
+  host = '',
+  pathname = '/',
+} = {}) {
+  const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+  const normalizedPathname = typeof pathname === 'string' && pathname ? pathname : '/';
+  const baseDir = normalizedPathname.endsWith('/')
+    ? normalizedPathname.slice(0, -1)
+    : normalizedPathname.replace(/\/[^/]*$/, '');
+
+  const candidates = [`${wsProtocol}//${host}/ws/localstorage-sync`];
+  if (baseDir && baseDir !== '/') {
+    candidates.push(`${wsProtocol}//${host}${baseDir}/ws/localstorage-sync`);
+  }
+  return [...new Set(candidates)];
+}
+
+function buildApiEndpointCandidates({
+  origin = '',
+  pathname = '/',
+} = {}) {
+  const normalizedPathname = typeof pathname === 'string' && pathname ? pathname : '/';
+  const baseDir = normalizedPathname.endsWith('/')
+    ? normalizedPathname.slice(0, -1)
+    : normalizedPathname.replace(/\/[^/]*$/, '');
+
+  const candidates = [`${origin}/api/localstorage-sync`];
+  if (baseDir && baseDir !== '/') {
+    candidates.push(`${origin}${baseDir}/api/localstorage-sync`);
+  }
+  return [...new Set(candidates)];
 }
 
 function buildSnapshot() {
@@ -113,12 +149,44 @@ function shouldHydrateFromServerOnWelcome({
   return String(localChecksum) !== String(serverChecksum);
 }
 
-function shouldFallbackToHttpSync({
+
+
+
+
+function shouldRunHttpFallbackSync({
+  socketReadyState = 3,
+  online = true,
+} = {}) {
+  if (!online) return false;
+  return socketReadyState !== 1;
+}
+
+function shouldEnterDormantReconnect({
   hasEverConnected = false,
   consecutiveFailures = 0,
-  maxFailures = MAX_INITIAL_CONNECT_FAILURES,
+  maxPreconnectFailures = MAX_PRECONNECT_FAILURES_BEFORE_DORMANT,
 } = {}) {
-  return !hasEverConnected && consecutiveFailures >= maxFailures;
+  if (hasEverConnected) return false;
+  return consecutiveFailures >= maxPreconnectFailures;
+}
+
+function shouldRebaseQueueFromServerOnWelcome({
+  localChecksum = '',
+  serverChecksum = '',
+  queueLength = 0,
+  hasPendingBatch = false,
+} = {}) {
+  if (!serverChecksum) return false;
+  if (!queueLength && !hasPendingBatch) return false;
+  return String(localChecksum) !== String(serverChecksum);
+}
+
+function shouldReplayInFlightOnSocketClose({
+  inFlightRequestId = '',
+  queueHeadRequestId = '',
+} = {}) {
+  if (!inFlightRequestId || !queueHeadRequestId) return false;
+  return String(inFlightRequestId) === String(queueHeadRequestId);
 }
 
 function normalizeQueuedDifferential(diff = {}) {
@@ -228,12 +296,29 @@ class LocalStorageSocketSync {
     this.batchTimer = null;
     this.hasEverConnected = false;
     this.consecutiveConnectFailures = 0;
-    this.snapshotPollTimer = null;
+    this.dormantUntilMs = 0;
+    this.httpFallbackTimer = null;
+    this.httpFallbackInProgress = false;
+    this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+    this.socketEndpointIndex = 0;
+    this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+    this.apiEndpointIndex = 0;
 
     this.#patchStorage();
     this.#connect();
 
-    window.addEventListener('online', () => this.flush());
+    window.addEventListener('online', () => {
+      this.dormantUntilMs = 0;
+      this.httpFallbackInProgress = false;
+      this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+      this.socketEndpointIndex = 0;
+      this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+      this.apiEndpointIndex = 0;
+      if (!this.socket || this.socket.readyState >= WebSocket.CLOSING) {
+        this.#connect();
+      }
+      this.flush();
+    });
     window.addEventListener('offline', () => this.#scheduleFlush());
   }
 
@@ -243,38 +328,163 @@ class LocalStorageSocketSync {
       this.reconnectTimer = null;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (this.socket && this.socket.readyState < WebSocket.CLOSING) {
+      return;
+    }
+
+    if (this.dormantUntilMs > Date.now()) {
+      this.#scheduleReconnect(this.dormantUntilMs - Date.now());
+      return;
+    }
+
+    const socketUrl = this.socketEndpointCandidates[this.socketEndpointIndex]
+      || this.socketEndpointCandidates[0]
+      || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/localstorage-sync`;
+
     try {
-      this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
+      this.socket = new WebSocket(socketUrl);
     } catch {
-      this.#scheduleSnapshotPoll();
+      this.#scheduleHttpFallbackSync();
+      this.#scheduleReconnect();
       return;
     }
 
     this.socket.addEventListener('open', () => {
       this.hasEverConnected = true;
       this.consecutiveConnectFailures = 0;
+      this.dormantUntilMs = 0;
+      this.httpFallbackInProgress = false;
+      this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+      this.socketEndpointIndex = 0;
+      this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+      this.apiEndpointIndex = 0;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
-      this.#cancelSnapshotPoll();
+      this.#cancelHttpFallbackSync();
       this.flush();
     });
     this.socket.addEventListener('message', (event) => this.#onMessage(event));
     this.socket.addEventListener('close', () => {
       this.consecutiveConnectFailures += 1;
-      if (shouldFallbackToHttpSync({
+      if (shouldReplayInFlightOnSocketClose({
+        inFlightRequestId: this.inFlight,
+        queueHeadRequestId: this.queue[0]?.requestId,
+      })) {
+        this.inFlight = null;
+      }
+
+      if (!this.hasEverConnected && this.socketEndpointCandidates.length > 1) {
+        this.socketEndpointIndex = (this.socketEndpointIndex + 1) % this.socketEndpointCandidates.length;
+      }
+
+      this.socket = null;
+      if (!navigator.onLine) return;
+      this.#scheduleHttpFallbackSync();
+
+      if (shouldEnterDormantReconnect({
         hasEverConnected: this.hasEverConnected,
         consecutiveFailures: this.consecutiveConnectFailures,
       })) {
-        this.#scheduleSnapshotPoll();
+        this.dormantUntilMs = Date.now() + DORMANT_RETRY_DELAY_MS;
+        this.#scheduleReconnect(DORMANT_RETRY_DELAY_MS);
         return;
       }
 
-      this.reconnectTimer = window.setTimeout(() => {
-        this.reconnectTimer = null;
-        this.#connect();
-      }, this.reconnectDelayMs);
-      this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
+      this.#scheduleReconnect();
     });
+  }
+
+
+  #scheduleReconnect(delayOverrideMs = null) {
+    if (this.reconnectTimer !== null) return;
+
+    const delayMs = Number.isFinite(delayOverrideMs)
+      ? Math.max(0, Math.trunc(delayOverrideMs))
+      : this.reconnectDelayMs;
+
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.#connect();
+    }, delayMs);
+
+    if (delayOverrideMs === null) {
+      this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
+    }
+  }
+
+
+  #scheduleHttpFallbackSync() {
+    if (this.httpFallbackTimer !== null) return;
+    this.httpFallbackTimer = window.setInterval(() => {
+      this.#syncViaHttpFallback();
+    }, HTTP_FALLBACK_SYNC_INTERVAL_MS);
+  }
+
+  #cancelHttpFallbackSync() {
+    if (this.httpFallbackTimer === null) return;
+    window.clearInterval(this.httpFallbackTimer);
+    this.httpFallbackTimer = null;
+  }
+
+  async #syncViaHttpFallback() {
+    if (this.httpFallbackInProgress) return;
+    if (!shouldRunHttpFallbackSync({
+      socketReadyState: this.socket?.readyState,
+      online: navigator.onLine,
+    })) {
+      this.#cancelHttpFallbackSync();
+      return;
+    }
+
+    this.httpFallbackInProgress = true;
+    try {
+      if (this.batchTimer !== null) {
+        window.clearTimeout(this.batchTimer);
+        this.batchTimer = null;
+        this.#commitPendingBatch();
+      }
+
+      const serverState = await this.#fetchServerState();
+      if (!serverState) return;
+
+      const localSnapshot = buildSnapshot();
+      const localChecksum = checksumSnapshot(localSnapshot);
+
+      if (this.queue.length > 0 || this.pendingBatch?.operations?.length) {
+        const response = await this.#requestLocalStorageSyncApi({
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            version: (Number.isFinite(serverState.version) ? serverState.version : 0) + 1,
+            snapshot: localSnapshot,
+          }),
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const postStatus = String(payload?.status || '');
+
+        if (postStatus === 'server-updated' || postStatus === 'in-sync') {
+          this.serverChecksum = String(payload?.state?.checksum || localChecksum);
+          this.#persistMeta();
+          this.inFlight = null;
+          this.queue = [];
+          this.#persistQueue();
+          return;
+        }
+
+        if (postStatus === 'client-stale' || postStatus === 'checksum-conflict') {
+          const localSnapshotBeforeHydrate = localSnapshot;
+          const serverSnapshot = await this.#fetchAndApplyServerSnapshot();
+          this.#rebasePendingQueue(serverSnapshot, localSnapshotBeforeHydrate);
+          return;
+        }
+      }
+
+      if (serverState.checksum && serverState.checksum !== localChecksum) {
+        await this.#fetchAndApplyServerSnapshot();
+      }
+    } finally {
+      this.httpFallbackInProgress = false;
+    }
   }
 
   #patchStorage() {
@@ -372,12 +582,17 @@ class LocalStorageSocketSync {
 
     const next = this.queue[0];
     this.inFlight = next.requestId;
-    this.socket.send(JSON.stringify({
-      type: 'sync-differential',
-      requestId: next.requestId,
-      baseChecksum: next.baseChecksum || '',
-      operations: next.operations,
-    }));
+    try {
+      this.socket.send(JSON.stringify({
+        type: 'sync-differential',
+        requestId: next.requestId,
+        baseChecksum: next.baseChecksum || '',
+        operations: next.operations,
+      }));
+    } catch {
+      this.inFlight = null;
+      this.#scheduleFlush();
+    }
   }
 
   async #onMessage(event) {
@@ -395,11 +610,28 @@ class LocalStorageSocketSync {
         this.#persistMeta();
 
         const localChecksum = checksumSnapshot(buildSnapshot());
-        if (shouldHydrateFromServerOnWelcome({
+        const queueLength = this.queue.length;
+        const hasPendingBatch = Boolean(this.pendingBatch?.operations?.length);
+
+        if (shouldRebaseQueueFromServerOnWelcome({
           localChecksum,
           serverChecksum: this.serverChecksum,
-          queueLength: this.queue.length,
-          hasPendingBatch: Boolean(this.pendingBatch?.operations?.length),
+          queueLength,
+          hasPendingBatch,
+        })) {
+          if (this.batchTimer !== null) {
+            window.clearTimeout(this.batchTimer);
+            this.batchTimer = null;
+            this.#commitPendingBatch();
+          }
+          const localSnapshotBeforeHydrate = buildSnapshot();
+          const serverSnapshot = await this.#fetchAndApplyServerSnapshot();
+          this.#rebasePendingQueue(serverSnapshot, localSnapshotBeforeHydrate);
+        } else if (shouldHydrateFromServerOnWelcome({
+          localChecksum,
+          serverChecksum: this.serverChecksum,
+          queueLength,
+          hasPendingBatch,
         })) {
           await this.#fetchAndApplyServerSnapshot();
         }
@@ -465,10 +697,12 @@ class LocalStorageSocketSync {
     }
   }
 
-  #rebasePendingQueue(serverSnapshot = {}) {
+  #rebasePendingQueue(serverSnapshot = {}, localSnapshotOverride = null) {
     if (!this.queue.length) return;
 
-    const localSnapshot = buildSnapshot();
+    const localSnapshot = localSnapshotOverride && typeof localSnapshotOverride === 'object'
+      ? normalizeSnapshot(localSnapshotOverride)
+      : buildSnapshot();
     const operations = buildDifferentialOperations(serverSnapshot || {}, localSnapshot);
     if (!operations.length) {
       this.queue = [];
@@ -516,32 +750,42 @@ class LocalStorageSocketSync {
   }
 
   async #fetchServerState() {
-    const response = await fetch('/api/localstorage-sync');
+    const response = await this.#requestLocalStorageSyncApi();
     if (!response.ok) return null;
     const payload = await response.json();
     return {
+      version: Number(payload?.version || 0),
       checksum: String(payload?.checksum || ''),
       snapshot: normalizeSnapshot(payload?.snapshot || {}),
     };
   }
 
-  #scheduleSnapshotPoll() {
-    if (this.snapshotPollTimer !== null) return;
-    this.snapshotPollTimer = window.setInterval(async () => {
-      if (!navigator.onLine) return;
-      if (this.queue.length || this.pendingBatch?.operations?.length) return;
-      const localChecksum = checksumSnapshot(buildSnapshot());
-      const state = await this.#fetchServerState();
-      if (!state?.checksum) return;
-      if (state.checksum === localChecksum) return;
-      await this.#fetchAndApplyServerSnapshot();
-    }, SNAPSHOT_POLL_INTERVAL_MS);
-  }
+  async #requestLocalStorageSyncApi(fetchInit = undefined) {
+    const candidates = Array.isArray(this.apiEndpointCandidates) && this.apiEndpointCandidates.length
+      ? this.apiEndpointCandidates
+      : buildApiEndpointCandidates(window.location);
+    let lastResponse = null;
 
-  #cancelSnapshotPoll() {
-    if (this.snapshotPollTimer === null) return;
-    window.clearInterval(this.snapshotPollTimer);
-    this.snapshotPollTimer = null;
+    for (let i = 0; i < candidates.length; i += 1) {
+      const candidateIndex = (this.apiEndpointIndex + i) % candidates.length;
+      const endpoint = candidates[candidateIndex];
+      try {
+        const response = await fetch(endpoint, fetchInit);
+        if (response.ok) {
+          this.apiEndpointIndex = candidateIndex;
+          return response;
+        }
+
+        lastResponse = response;
+        if (response.status !== 404) {
+          return response;
+        }
+      } catch {
+        // Try the next routed endpoint candidate.
+      }
+    }
+
+    return lastResponse || new Response(null, { status: 503 });
   }
 
   #persistQueue() {
@@ -621,6 +865,11 @@ export {
   mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
+  shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
-  shouldFallbackToHttpSync,
+  shouldReplayInFlightOnSocketClose,
+  shouldEnterDormantReconnect,
+  shouldRunHttpFallbackSync,
+  buildSocketEndpointCandidates,
+  buildApiEndpointCandidates,
 };

@@ -73,8 +73,9 @@ When `VIEWPORT.HTML` (LineSmith) opens, a modern non-blocking loading indicator 
 LineSmith (`VIEWPORT.HTML`) and ArrowHead (`ArrowHead.html`) now auto-retry collaboration room connections when a websocket disconnects:
 
 - Both apps reconnect to `/ws/lineforge?room=...` with exponential backoff (3s doubling up to 60s) after an unexpected close, reducing excessive reconnect churn when a room endpoint is down.
-- Launcher/app localStorage sync websocket clients now reconnect with exponential backoff (1.5s up to 60s) to reduce repeated connection-error spam when `/ws/localstorage-sync` is temporarily unavailable.
-- If `/ws/localstorage-sync` fails repeatedly before the first successful connection, the browser now stops aggressive websocket retries and switches to periodic REST snapshot polling (`GET /api/localstorage-sync`) every 30s until realtime sync becomes available again.
+- Launcher/app localStorage sync websocket clients now reconnect with exponential backoff (1.5s up to 60s), and after repeated pre-connect failures enter a brief dormant retry window (60s) to reduce repeated connection-error spam when `/ws/localstorage-sync` is temporarily unavailable. Clients now also try both root (`/ws/localstorage-sync`) and base-path websocket endpoints when the app is deployed behind prefixed routers/proxies.
+- While websocket transport is unavailable, clients use a low-frequency REST fallback sync (`GET /api/localstorage-sync`, `POST /api/localstorage-sync`) so browser state converges without high-frequency polling; same-version snapshot conflicts are rejected server-side and clients rehydrate/rebase instead of overwriting peers. REST sync now also tries routed base-path variants (for example, `/record-of-survey/api/localstorage-sync`) so fresh browsers behind prefixed routers can hydrate existing project state instead of starting empty.
+- If `/ws/localstorage-sync` disconnects, clients keep queued differentials locally, reset any interrupted in-flight differential safely, and replay changes in-order after reconnecting to websocket sync. On checksum mismatch during reconnect, clients hydrate from `GET /api/localstorage-sync` first and then rebase queued local edits before replay so browser states converge instead of drifting.
 - Presence/cursor overlays are cleared when a disconnect occurs, then restored as peers rejoin.
 - This reconnect loop helps collaboration recover from transient network drops without requiring a manual page refresh.
 - LineSmith now uses object-level edit locks for the most common simultaneous-edit collision: client sends `lock-request`, waits for `lock-granted`, and sends `lock-release` when edit is complete. If lock is denied (`lock-denied`), the UI flashes red/blue and blocks the edit attempt.
@@ -123,7 +124,7 @@ This websocket reconnect-backoff reliability update also does not add, remove, o
 
 This localStorage sync checksum-alignment fix also does not add, remove, or rename API endpoints or CLI commands; existing endpoint and command references below remain current.
 
-This localStorage sync reliability fix now compacts queued browser sync differentials while offline/unavailable to prevent localStorage quota overflows (`surveyfoundryLocalStoragePendingDiffs`) when collaboration sync cannot connect; API endpoints and CLI commands remain unchanged.
+This localStorage sync reliability fix now compacts queued browser sync differentials while offline/unavailable to prevent localStorage quota overflows (`surveyfoundryLocalStoragePendingDiffs`) when collaboration sync cannot connect. Differential replay remains websocket-first (`GET /ws/localstorage-sync`), and clients continue to reconcile checksum mismatches using `GET /api/localstorage-sync`; when websocket transport is unavailable, clients can publish queued local state using `POST /api/localstorage-sync`. CLI commands remain unchanged (`npm run cli -- --help`, `npm run ros:cli -- --help`). No new API endpoints or CLI commands were added for reconnect-dormant throttling.
 
 ## LineSmith Layer Reassignment Shortcut
 

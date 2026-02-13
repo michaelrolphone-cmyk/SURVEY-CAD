@@ -7,8 +7,13 @@ import {
   mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
+  shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
-  shouldFallbackToHttpSync,
+  shouldReplayInFlightOnSocketClose,
+  shouldEnterDormantReconnect,
+  shouldRunHttpFallbackSync,
+  buildSocketEndpointCandidates,
+  buildApiEndpointCandidates,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -75,11 +80,116 @@ test('shouldHydrateFromServerOnWelcome requests server snapshot only when safe a
 });
 
 
-test('shouldFallbackToHttpSync only enables polling fallback after repeated pre-connect failures', () => {
-  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 3 }), true);
-  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 2 }), false);
-  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: true, consecutiveFailures: 10 }), false);
+test('shouldRebaseQueueFromServerOnWelcome enables server-hydrate+rebase when queued local changes exist and checksums diverge', () => {
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 1,
+    hasPendingBatch: false,
+  }), true);
+
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: true,
+  }), true);
+
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-same',
+    serverChecksum: 'fnv1a-same',
+    queueLength: 1,
+    hasPendingBatch: false,
+  }), false);
+
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+  }), false);
 });
+
+
+test('shouldEnterDormantReconnect enables cooldown only before first successful connection', () => {
+  assert.equal(shouldEnterDormantReconnect({
+    hasEverConnected: false,
+    consecutiveFailures: 3,
+  }), true);
+
+  assert.equal(shouldEnterDormantReconnect({
+    hasEverConnected: false,
+    consecutiveFailures: 2,
+  }), false);
+
+  assert.equal(shouldEnterDormantReconnect({
+    hasEverConnected: true,
+    consecutiveFailures: 10,
+  }), false);
+});
+
+
+test('buildSocketEndpointCandidates includes root and base-path websocket URLs', () => {
+  assert.deepEqual(buildSocketEndpointCandidates({
+    protocol: 'https:',
+    host: 'example.com',
+    pathname: '/record-of-survey/index.html',
+  }), [
+    'wss://example.com/ws/localstorage-sync',
+    'wss://example.com/record-of-survey/ws/localstorage-sync',
+  ]);
+
+  assert.deepEqual(buildSocketEndpointCandidates({
+    protocol: 'http:',
+    host: 'localhost:3000',
+    pathname: '/index.html',
+  }), [
+    'ws://localhost:3000/ws/localstorage-sync',
+  ]);
+});
+
+test('buildApiEndpointCandidates includes root and base-path API URLs', () => {
+  assert.deepEqual(buildApiEndpointCandidates({
+    origin: 'https://example.com',
+    pathname: '/record-of-survey/index.html',
+  }), [
+    'https://example.com/api/localstorage-sync',
+    'https://example.com/record-of-survey/api/localstorage-sync',
+  ]);
+
+  assert.deepEqual(buildApiEndpointCandidates({
+    origin: 'http://localhost:3000',
+    pathname: '/index.html',
+  }), [
+    'http://localhost:3000/api/localstorage-sync',
+  ]);
+});
+
+
+test('shouldRunHttpFallbackSync runs only while online and websocket is not open', () => {
+  assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 3, online: true }), true);
+  assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 1, online: true }), false);
+  assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 3, online: false }), false);
+});
+
+
+test('shouldReplayInFlightOnSocketClose only resets in-flight request when queue head matches', () => {
+  assert.equal(shouldReplayInFlightOnSocketClose({
+    inFlightRequestId: 'sync-a',
+    queueHeadRequestId: 'sync-a',
+  }), true);
+
+  assert.equal(shouldReplayInFlightOnSocketClose({
+    inFlightRequestId: 'sync-a',
+    queueHeadRequestId: 'sync-b',
+  }), false);
+
+  assert.equal(shouldReplayInFlightOnSocketClose({
+    inFlightRequestId: '',
+    queueHeadRequestId: 'sync-a',
+  }), false);
+});
+
 
 test('coalesceQueuedOperations keeps only the latest operation per key and preserves clear ordering', () => {
   const operations = coalesceQueuedOperations(
