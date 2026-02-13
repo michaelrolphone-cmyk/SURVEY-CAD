@@ -68,6 +68,7 @@ export const APP_CATALOG = [
     color: '#0F766E',
     accent: '#CCFBF1',
     glyph: 'EM',
+    section: 'Field Tools',
   },
   {
     id: 'equipment-log',
@@ -78,6 +79,7 @@ export const APP_CATALOG = [
     color: '#7C3AED',
     accent: '#EDE9FE',
     glyph: 'EL',
+    section: 'Field Tools',
   },
   {
     id: 'crew-manager',
@@ -88,6 +90,7 @@ export const APP_CATALOG = [
     color: '#0F4C75',
     accent: '#BFDBFE',
     glyph: 'CM',
+    section: 'Field Tools',
   },
   {
     id: 'arrowhead-ar',
@@ -138,5 +141,8 @@ export const APP_CATALOG = [
 ];
 
 export function listApps() {
-  return APP_CATALOG.map(({ color, accent, glyph, ...publicApp }) => publicApp);
+  return APP_CATALOG.map(({ color, accent, glyph, section, ...publicApp }) => ({
+    ...publicApp,
+    ...(section ? { section } : {}),
+  }));
 }

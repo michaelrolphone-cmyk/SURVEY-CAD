@@ -1617,12 +1617,23 @@
 
     function renderApps() {
       appSections.innerHTML = '';
-      const stableApps = apps.filter((app) => !app.experimental);
       const experimentalApps = apps.filter((app) => app.experimental);
+      const stableApps = apps.filter((app) => !app.experimental);
 
-      renderAppSection('', stableApps);
+      const mainApps = stableApps.filter((app) => !app.section);
+      renderAppSection('', mainApps);
+
+      const sectionNames = [];
+      for (const app of stableApps) {
+        if (app.section && !sectionNames.includes(app.section)) {
+          sectionNames.push(app.section);
+        }
+      }
+      for (const name of sectionNames) {
+        renderAppSection(name, stableApps.filter((app) => app.section === name));
+      }
+
       renderAppSection('Experimental', experimentalApps);
-
     }
 
 
