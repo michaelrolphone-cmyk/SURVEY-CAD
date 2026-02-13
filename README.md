@@ -30,6 +30,14 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 See **API Endpoints** and **CLI Commands** below for the complete endpoint and command reference used by this release.
 
+### API/CLI endpoints and commands (current for this bug fix)
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI commands: `npm run cli -- --help` and `npm run ros:cli -- --help` (with subcommands documented in [CLI Commands](#cli-commands)).
+
+This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify API endpoints or CLI commands; continue using the endpoints and commands listed above.
+
+
 ## API and CLI Notes for this change
 
 SurveyFoundry Launcher now shows an on-home active project metadata overview (Project, Client, Contact info, Address, PLSS, and Index) directly inside the `project-manager-launch` section and adds tap-friendly deep links for phone (`tel:`), email (`mailto:`), and address (`geo:` native maps deep link) from the project manager section. This is a launcher UI behavior update only and does not add or change API endpoints or CLI commands.

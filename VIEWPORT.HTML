@@ -353,29 +353,21 @@
       overflow:hidden;
       background:#000;
     }
-    .drawerToggle{
-      display:none;
-      position:absolute;
-      top:10px;
-      right:10px;
-      z-index:7;
-      border:1px solid var(--border);
-      border-radius:999px;
-      padding:8px 12px;
-      background:#101010;
-      color:var(--text);
-    }
+    .drawerToggle,
     .mobileToolbarToggle{
       display:none;
-      position:absolute;
-      top:10px;
-      left:10px;
-      z-index:7;
       border:1px solid var(--border);
       border-radius:999px;
-      padding:8px 12px;
+      padding:6px 10px;
       background:#101010;
       color:var(--text);
+      font-size:12px;
+      line-height:1.1;
+    }
+    .quickToolsMobileRow{
+      display:none;
+      justify-content:space-between;
+      gap:8px;
     }
     .quickTools{
       position:absolute;
@@ -1345,11 +1337,12 @@
       .panelCollapseHandle,
       .drawerEdgeExpand{ display:none !important; }
       .app.drawerOpen .panel{ transform:translateX(0); }
-      .drawerToggle{ display:block; }
       .quickTools{ max-width:calc(100% - 20px); }
-      .mobileToolbarToggle{ display:block; }
-      .app.mobileToolbarsHidden .quickTools,
-      .app.mobileToolbarsHidden .drawerToggle{ display:none; }
+      .quickToolsMobileRow{ display:flex; }
+      .drawerToggle,
+      .mobileToolbarToggle{ display:inline-flex; align-items:center; justify-content:center; }
+      .app.mobileToolbarsHidden .quickTools .quickToolsRowPrimary,
+      .app.mobileToolbarsHidden .quickTools .quickToolsRowSecondary{ display:none; }
       .linesmith-loading-overlay{ padding:10px; }
       .workflowToast{
         top:auto;
@@ -1832,9 +1825,11 @@
 
   <div class="canvasWrap">
     <button id="drawerEdgeExpand" class="drawerEdgeExpand" aria-label="Expand controls drawer" title="Expand controls drawer">←</button>
-    <button id="mobileToolbarToggle" class="mobileToolbarToggle" aria-pressed="false" aria-label="Hide quick toolbars">Hide Bars</button>
-    <button id="drawerToggle" class="drawerToggle">Tools</button>
     <div id="quickTools" class="quickTools" aria-label="LineSmith quick tools">
+      <div class="quickToolsRow quickToolsMobileRow">
+        <button id="mobileToolbarToggle" class="mobileToolbarToggle" aria-pressed="false" aria-label="Hide quick toolbars">Hide Bars</button>
+        <button id="drawerToggle" class="drawerToggle">Tools</button>
+      </div>
       <div class="quickToolsRow quickToolsRowPrimary">
         <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
         <button id="quickPrintView" class="quickToolBtn" title="Draw Print Window" aria-label="Draw Print Window"><i class="fa-solid fa-print"></i></button>
