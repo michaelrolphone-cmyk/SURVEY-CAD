@@ -82,6 +82,53 @@ test('localstorage sync websocket applies differentials and broadcasts checksums
 });
 
 
+test('localstorage sync websocket applies batch differentials and broadcasts to all clients', () => {
+  const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
+  const service = createLocalStorageSyncWsService({ store });
+
+  const s1 = new FakeSocket();
+  const s2 = new FakeSocket();
+
+  service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'kb1==' } }, s1);
+  service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'kb2==' } }, s2);
+
+  s1.emit('data', clientFrame({
+    type: 'sync-differential-batch',
+    requestId: 'batch-1',
+    diffs: [
+      { operations: [{ type: 'set', key: 'beta', value: '2' }] },
+      { operations: [{ type: 'set', key: 'gamma', value: '3' }, { type: 'remove', key: 'alpha' }] },
+    ],
+  }));
+
+  const b1 = parseServerTextMessage(s1);
+  const b2 = parseServerTextMessage(s2);
+  assert.equal(b1.type, 'sync-differential-applied');
+  assert.equal(b1.requestId, 'batch-1');
+  assert.equal(b2.type, 'sync-differential-applied');
+  assert.deepEqual(store.getState().snapshot, { beta: '2', gamma: '3' });
+});
+
+
+test('localstorage sync websocket returns ack for empty batch', () => {
+  const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
+  const service = createLocalStorageSyncWsService({ store });
+  const s1 = new FakeSocket();
+
+  service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'ke==' } }, s1);
+
+  s1.emit('data', clientFrame({
+    type: 'sync-differential-batch',
+    requestId: 'batch-empty',
+    diffs: [],
+  }));
+
+  const msg = parseServerTextMessage(s1);
+  assert.equal(msg.type, 'sync-ack');
+  assert.equal(msg.requestId, 'batch-empty');
+});
+
+
 test('localstorage websocket upgrade accepts prefixed router paths', () => {
   const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
   const service = createLocalStorageSyncWsService({ store });
