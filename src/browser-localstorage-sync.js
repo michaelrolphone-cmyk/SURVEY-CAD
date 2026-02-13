@@ -5,6 +5,8 @@ const INTERNAL_KEYS = new Set([
 ]);
 const PENDING_DIFFS_KEY = 'surveyfoundryLocalStoragePendingDiffs';
 const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
+const INITIAL_RECONNECT_DELAY_MS = 1500;
+const MAX_RECONNECT_DELAY_MS = 60000;
 
 function sortedSnapshot(snapshot = {}) {
   return Object.fromEntries(Object.entries(snapshot).sort(([a], [b]) => a.localeCompare(b)));
@@ -56,6 +58,16 @@ function buildDifferentialOperations(previousSnapshot = {}, nextSnapshot = {}) {
   return operations;
 }
 
+function nextReconnectDelay(previousDelayMs = INITIAL_RECONNECT_DELAY_MS, maxDelayMs = MAX_RECONNECT_DELAY_MS) {
+  const normalizedPrevious = Number.isFinite(previousDelayMs)
+    ? Math.max(INITIAL_RECONNECT_DELAY_MS, Math.trunc(previousDelayMs))
+    : INITIAL_RECONNECT_DELAY_MS;
+  const normalizedMax = Number.isFinite(maxDelayMs)
+    ? Math.max(INITIAL_RECONNECT_DELAY_MS, Math.trunc(maxDelayMs))
+    : MAX_RECONNECT_DELAY_MS;
+  return Math.min(normalizedPrevious * 2, normalizedMax);
+}
+
 function normalizeQueuedDifferential(diff = {}) {
   const operationsRaw = Array.isArray(diff?.operations) ? diff.operations : [];
   const operations = operationsRaw
@@ -100,6 +112,8 @@ class LocalStorageSocketSync {
     this.queue = this.#loadPendingQueue();
     this.serverChecksum = this.#loadMetaChecksum();
     this.flushTimer = null;
+    this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+    this.reconnectTimer = null;
 
     this.#patchStorage();
     this.#connect();
@@ -109,13 +123,25 @@ class LocalStorageSocketSync {
   }
 
   #connect() {
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
 
-    this.socket.addEventListener('open', () => this.flush());
+    this.socket.addEventListener('open', () => {
+      this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+      this.flush();
+    });
     this.socket.addEventListener('message', (event) => this.#onMessage(event));
     this.socket.addEventListener('close', () => {
-      window.setTimeout(() => this.#connect(), 1500);
+      this.reconnectTimer = window.setTimeout(() => {
+        this.reconnectTimer = null;
+        this.#connect();
+      }, this.reconnectDelayMs);
+      this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
     });
   }
 
@@ -375,4 +401,4 @@ if (typeof window !== 'undefined' && !window.document.documentElement.hasAttribu
   }
 }
 
-export { LocalStorageSocketSync, checksumSnapshot, buildSnapshot, buildDifferentialOperations };
+export { LocalStorageSocketSync, checksumSnapshot, buildSnapshot, buildDifferentialOperations, nextReconnectDelay };
