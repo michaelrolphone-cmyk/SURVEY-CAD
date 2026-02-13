@@ -581,3 +581,45 @@ test('server static map endpoint proxies upstream image, retries tile fallback, 
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+test('server localstorage sync endpoint supports async-backed stores', async () => {
+  const state = {
+    version: 2,
+    snapshot: { shared: 'yes' },
+    checksum: 'abc123',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  const store = {
+    async getState() {
+      return { ...state, snapshot: { ...state.snapshot } };
+    },
+    async syncIncoming() {
+      state.version = 3;
+      state.snapshot = { shared: 'updated' };
+      state.checksum = 'def456';
+      return { status: 'server-updated', state: { ...state, snapshot: { ...state.snapshot } } };
+    },
+  };
+
+  const app = await startApiServer(new SurveyCadClient(), { localStorageSyncStore: store });
+  try {
+    const initialRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`);
+    assert.equal(initialRes.status, 200);
+    const initialPayload = await initialRes.json();
+    assert.equal(initialPayload.version, 2);
+    assert.equal(initialPayload.snapshot.shared, 'yes');
+
+    const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version: 3, snapshot: { shared: 'updated' } }),
+    });
+    assert.equal(updateRes.status, 200);
+    const updatePayload = await updateRes.json();
+    assert.equal(updatePayload.status, 'server-updated');
+    assert.equal(updatePayload.state.snapshot.shared, 'updated');
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});

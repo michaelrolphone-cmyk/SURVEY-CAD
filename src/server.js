@@ -7,6 +7,7 @@ import { createRosOcrApp } from './ros-ocr-api.js';
 import { listApps } from './app-catalog.js';
 import { buildProjectArchivePlan, createProjectFile } from './project-file.js';
 import { LocalStorageSyncStore } from './localstorage-sync-store.js';
+import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { loadFldConfig } from './fld-config.js';
@@ -227,6 +228,9 @@ export function createSurveyServer({
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
 
+  const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
+  const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
+
   const server = createServer(async (req, res) => {
     if (!req.url) {
       sendJson(res, 400, { error: 'Missing request URL.' });
@@ -269,13 +273,13 @@ export function createSurveyServer({
 
       if (urlObj.pathname === '/api/localstorage-sync') {
         if (req.method === 'GET') {
-          sendJson(res, 200, localStorageSyncStore.getState());
+          sendJson(res, 200, await resolveStoreState());
           return;
         }
 
         if (req.method === 'POST') {
           const body = await readJsonBody(req);
-          const result = localStorageSyncStore.syncIncoming({
+          const result = await syncIncomingState({
             version: body.version,
             snapshot: body.snapshot,
           });
@@ -503,8 +507,24 @@ export function createSurveyServer({
   return server;
 }
 
-export function startServer({ port = Number(process.env.PORT) || 3000, host = '0.0.0.0', ...opts } = {}) {
-  const server = createSurveyServer(opts);
+export async function startServer({ port = Number(process.env.PORT) || 3000, host = '0.0.0.0', ...opts } = {}) {
+  const resolvedOpts = { ...opts };
+
+  if (!resolvedOpts.localStorageSyncStore) {
+    const redisBackedStore = await createRedisLocalStorageSyncStore();
+    if (redisBackedStore) {
+      resolvedOpts.localStorageSyncStore = redisBackedStore;
+    }
+  }
+
+  const server = createSurveyServer(resolvedOpts);
+
+  if (resolvedOpts.localStorageSyncStore && typeof resolvedOpts.localStorageSyncStore.close === 'function') {
+    server.on('close', () => {
+      Promise.resolve(resolvedOpts.localStorageSyncStore.close()).catch(() => {});
+    });
+  }
+
   return new Promise((resolve) => {
     server.listen(port, host, () => resolve(server));
   });

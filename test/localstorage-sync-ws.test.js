@@ -53,7 +53,7 @@ function parseServerTextMessage(socket, index = -1) {
   return JSON.parse(frame.payload.toString('utf8'));
 }
 
-test('localstorage sync websocket applies differentials and broadcasts checksums', () => {
+test('localstorage sync websocket applies differentials and broadcasts checksums', async () => {
   const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
   const service = createLocalStorageSyncWsService({ store });
 
@@ -63,8 +63,13 @@ test('localstorage sync websocket applies differentials and broadcasts checksums
   assert.equal(service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'k1==' } }, s1), true);
   assert.equal(service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'k2==' } }, s2), true);
 
+  await new Promise((resolve) => setImmediate(resolve));
   const welcome1 = parseServerTextMessage(s1, 1);
   assert.equal(welcome1.type, 'sync-welcome');
+
+  await new Promise((resolve) => setImmediate(resolve));
+
+  await new Promise((resolve) => setImmediate(resolve));
 
   s1.emit('data', clientFrame({
     type: 'sync-differential',
@@ -73,6 +78,8 @@ test('localstorage sync websocket applies differentials and broadcasts checksums
     operations: [{ type: 'set', key: 'beta', value: '2' }],
   }));
 
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
   const b1 = parseServerTextMessage(s1);
   const b2 = parseServerTextMessage(s2);
   assert.equal(b1.type, 'sync-differential-applied');
@@ -82,7 +89,7 @@ test('localstorage sync websocket applies differentials and broadcasts checksums
 });
 
 
-test('localstorage sync websocket applies batch differentials and broadcasts to all clients', () => {
+test('localstorage sync websocket applies batch differentials and broadcasts to all clients', async () => {
   const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
   const service = createLocalStorageSyncWsService({ store });
 
@@ -91,6 +98,8 @@ test('localstorage sync websocket applies batch differentials and broadcasts to 
 
   service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'kb1==' } }, s1);
   service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'kb2==' } }, s2);
+
+  await new Promise((resolve) => setImmediate(resolve));
 
   s1.emit('data', clientFrame({
     type: 'sync-differential-batch',
@@ -101,6 +110,7 @@ test('localstorage sync websocket applies batch differentials and broadcasts to 
     ],
   }));
 
+  await new Promise((resolve) => setImmediate(resolve));
   const b1 = parseServerTextMessage(s1);
   const b2 = parseServerTextMessage(s2);
   assert.equal(b1.type, 'sync-differential-applied');
@@ -110,7 +120,7 @@ test('localstorage sync websocket applies batch differentials and broadcasts to 
 });
 
 
-test('localstorage sync websocket returns ack for empty batch', () => {
+test('localstorage sync websocket returns ack for empty batch', async () => {
   const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
   const service = createLocalStorageSyncWsService({ store });
   const s1 = new FakeSocket();
@@ -123,13 +133,14 @@ test('localstorage sync websocket returns ack for empty batch', () => {
     diffs: [],
   }));
 
+  await new Promise((resolve) => setImmediate(resolve));
   const msg = parseServerTextMessage(s1);
   assert.equal(msg.type, 'sync-ack');
   assert.equal(msg.requestId, 'batch-empty');
 });
 
 
-test('localstorage websocket upgrade accepts prefixed router paths', () => {
+test('localstorage websocket upgrade accepts prefixed router paths', async () => {
   const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
   const service = createLocalStorageSyncWsService({ store });
   const socket = new FakeSocket();
@@ -139,6 +150,50 @@ test('localstorage websocket upgrade accepts prefixed router paths', () => {
     headers: { upgrade: 'websocket', 'sec-websocket-key': 'k-pref==' },
   }, socket), true);
 
+  await new Promise((resolve) => setImmediate(resolve));
   const welcome = parseServerTextMessage(socket, 1);
   assert.equal(welcome.type, 'sync-welcome');
+});
+
+test('localstorage sync websocket supports async store methods', async () => {
+  const state = { version: 1, snapshot: { alpha: '1' }, checksum: 'seed', updatedAt: null };
+  const store = {
+    async getState() {
+      return { ...state, snapshot: { ...state.snapshot } };
+    },
+    async applyDifferential() {
+      state.version = 2;
+      state.snapshot = { alpha: '1', beta: '2' };
+      state.checksum = 'next';
+      return {
+        status: 'applied',
+        operations: [{ type: 'set', key: 'beta', value: '2' }],
+        state: await this.getState(),
+      };
+    },
+    async applyDifferentialBatch() {
+      return { status: 'no-op', state: await this.getState(), allOperations: [] };
+    },
+  };
+
+  const service = createLocalStorageSyncWsService({ store });
+  const socket = new FakeSocket();
+  service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'ka==' } }, socket);
+
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  const welcome = parseServerTextMessage(socket, 1);
+
+  socket.emit('data', clientFrame({
+    type: 'sync-differential',
+    requestId: 'async-1',
+    baseChecksum: welcome.state.checksum,
+    operations: [{ type: 'set', key: 'beta', value: '2' }],
+  }));
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const applied = parseServerTextMessage(socket);
+  assert.equal(applied.type, 'sync-differential-applied');
+  assert.equal(applied.state.version, 2);
+  assert.equal(applied.state.checksum, 'next');
 });
