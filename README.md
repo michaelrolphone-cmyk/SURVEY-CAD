@@ -351,6 +351,8 @@ Base URL (local): `http://localhost:3000`
 - `UtilitiesPack.html` — utilities-only workflow that fetches utility records for an address, stores state-plane coordinates in app state, and exports power utility CSV rows in `name,northing,easting,elevation,code,description` format.
 
 - Launcher project management now uses a shared modal form for both create and edit flows with inline required-field validation (project name + address) instead of browser prompt/alert dialogs.
+- Launcher project saves now enrich the project overview with PLSS township/range and first aliquot text by chaining `GET /api/lookup` + `GET /api/aliquots` for the entered address coordinates before persisting local project metadata.
+- SurveyFoundry header now renders an Index value derived from normalized PLSS metadata using township/range/section + aliquot coding (for example `44-01-430-0-0`) when an active project has indexed data.
 
 
 - `GET /health`

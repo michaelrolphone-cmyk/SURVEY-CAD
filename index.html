@@ -713,6 +713,151 @@
       return map.toString();
     }
 
+    function firstAttributeValue(feature, preferredKeys = [], fallbackPattern = null) {
+      const attrs = feature?.attributes;
+      if (!attrs || typeof attrs !== 'object') return '';
+      for (const key of preferredKeys) {
+        const value = attrs[key];
+        if (value != null && String(value).trim()) {
+          return String(value).trim();
+        }
+      }
+      if (fallbackPattern) {
+        const matchedKey = Object.keys(attrs).find((key) => fallbackPattern.test(key));
+        if (matchedKey && attrs[matchedKey] != null && String(attrs[matchedKey]).trim()) {
+          return String(attrs[matchedKey]).trim();
+        }
+      }
+      return '';
+    }
+
+    function toAliquotFraction(part) {
+      if (part === 'N' || part === 'S' || part === 'E' || part === 'W') return `${part} 1/2`;
+      if (part === 'NE' || part === 'NW' || part === 'SE' || part === 'SW') return `${part} 1/4`;
+      return part;
+    }
+
+    function formatAliquotCode(code = '') {
+      const normalized = String(code || '').toUpperCase().replace(/[^NSEW]/g, '');
+      if (!normalized) return '';
+      if (normalized.length % 2 === 0) {
+        const quarterParts = normalized.match(/.{1,2}/g) || [];
+        if (quarterParts.every((part) => ['NE', 'NW', 'SE', 'SW'].includes(part))) {
+          return quarterParts.map((part) => toAliquotFraction(part)).join(' of ');
+        }
+      }
+      const halfParts = normalized.split('');
+      if (halfParts.every((part) => ['N', 'S', 'E', 'W'].includes(part))) {
+        return halfParts.map((part) => toAliquotFraction(part)).join(' of ');
+      }
+      return code;
+    }
+
+    function normalizeTrsComponent(value = '', padLength = 2) {
+      const digits = (String(value || '').match(/\d+/g) || []).join('');
+      if (!digits) return '';
+      return padLength > 0 ? digits.padStart(padLength, '0') : digits;
+    }
+
+    function normalizeBookOrPage(value = '') {
+      return (String(value || '').match(/\d+/g) || []).join('');
+    }
+
+    function aliquotToCode(value = '') {
+      const map = { NE: '1', SE: '2', SW: '3', NW: '4' };
+      return map[value.toUpperCase?.() || ''] || '0';
+    }
+
+    function buildAliquotCodes(aliquots = []) {
+      const codes = aliquots.slice(0, 3).map((entry) => aliquotToCode(entry));
+      while (codes.length < 3) codes.push('0');
+      return codes.join('');
+    }
+
+    function buildSurveyIndexNumber(project) {
+      if (!project) return '';
+      const township = normalizeTrsComponent(project.townships?.[0], 0) || '0';
+      const range = normalizeTrsComponent(project.ranges?.[0], 0) || '0';
+      const section = normalizeTrsComponent(project.sections?.[0]) || '00';
+      const quadrant = aliquotToCode(project.sectionQuadrant) || '0';
+      const aliquotCodes = buildAliquotCodes(project.aliquots) || '000';
+      const book = normalizeBookOrPage(project.platBook) || '0';
+      const pageStart = normalizeBookOrPage(project.platPageStart) || '0';
+      const pageEnd = normalizeBookOrPage(project.platPageEnd) || '';
+
+      const base = `${township}${range}${quadrant}-${section}-${aliquotCodes}-${book}-${pageStart}`;
+      return pageEnd ? `${base}-${pageEnd || '0'}` : base;
+    }
+
+    function extractAliquotSequence(code = '') {
+      const normalized = String(code || '').toUpperCase().replace(/[^NSEW]/g, '');
+      if (!normalized || normalized.length % 2 !== 0) return [];
+      const parts = normalized.match(/.{1,2}/g) || [];
+      return parts.every((part) => ['NE', 'NW', 'SE', 'SW'].includes(part)) ? parts : [];
+    }
+
+    function buildTownshipRangeMetadata(lookupPayload = null) {
+      const sectionFeature = lookupPayload?.section;
+      const townshipFeature = lookupPayload?.township;
+      const township = firstAttributeValue(townshipFeature, ['TWNSHPNO', 'TOWNSHIP', 'TWP', 'TWP_NO'], /TWP|TOWNSHIP|TWNSHP/i);
+      const townshipDir = firstAttributeValue(townshipFeature, ['TWNSHPDIR', 'TOWNSHPDIR', 'TWPDIR', 'TOWNSHIP_DIR', 'TDIR'], /TWP.*DIR|TOWNSHIP.*DIR|TWNSHP.*DIR/i).toUpperCase();
+      const range = firstAttributeValue(townshipFeature, ['RANGENO', 'RANGE', 'RNG', 'RANGE_NO'], /RNG|RANGE/i);
+      const rangeDir = firstAttributeValue(townshipFeature, ['RANGEDIR', 'RNGDIR', 'RANGE_DIR', 'RDIR'], /RANGE.*DIR|RNG.*DIR/i).toUpperCase();
+      const section = firstAttributeValue(sectionFeature, ['FRSTDIVNO', 'SEC', 'SECTION', 'SECNO'], /SEC|SECTION/i);
+      const townshipLabel = township ? `T${township}${townshipDir || ''}` : '';
+      const rangeLabel = range ? `R${range}${rangeDir || ''}` : '';
+      const sectionLabel = section ? `Sec ${section}` : '';
+      return {
+        township,
+        townshipDir,
+        range,
+        rangeDir,
+        section,
+        townshipRange: [townshipLabel, rangeLabel, sectionLabel].filter(Boolean).join(' '),
+      };
+    }
+
+    async function fetchProjectPlssMetadata(address = '') {
+      const trimmedAddress = String(address || '').trim();
+      if (!trimmedAddress) return null;
+
+      const lookupResponse = await fetch(`/api/lookup?address=${encodeURIComponent(trimmedAddress)}`);
+      if (!lookupResponse.ok) throw new Error(`Lookup failed (${lookupResponse.status})`);
+      const lookupPayload = await lookupResponse.json();
+      const townshipMeta = buildTownshipRangeMetadata(lookupPayload);
+      const lon = Number(lookupPayload?.location?.lon);
+      const lat = Number(lookupPayload?.location?.lat);
+      let aliquotLabel = '';
+      let aliquotSequence = [];
+
+      if (Number.isFinite(lon) && Number.isFinite(lat)) {
+        const aliquotResponse = await fetch(`/api/aliquots?lon=${encodeURIComponent(lon)}&lat=${encodeURIComponent(lat)}`);
+        if (aliquotResponse.ok) {
+          const aliquotPayload = await aliquotResponse.json();
+          const firstAliquotCode = (aliquotPayload?.aliquots || [])
+            .map((feature) => String(feature?.attributes?.ALIQUOT || feature?.attributes?.NAME || '').trim())
+            .find((code) => code);
+          aliquotLabel = formatAliquotCode(firstAliquotCode || '');
+          aliquotSequence = extractAliquotSequence(firstAliquotCode || '');
+        }
+      }
+
+      const surveyIndex = buildSurveyIndexNumber({
+        townships: [townshipMeta.township],
+        ranges: [townshipMeta.range],
+        sections: [townshipMeta.section],
+        sectionQuadrant: aliquotSequence[0] || '',
+        aliquots: aliquotSequence.slice(1),
+      });
+
+      return {
+        townshipRange: townshipMeta.townshipRange,
+        aliquotLabel,
+        plssDescription: [townshipMeta.townshipRange, aliquotLabel].filter(Boolean).join(' '),
+        surveyIndex,
+      };
+    }
+
     async function syncActiveProjectBackground() {
       const activeProject = getActiveProject();
       const address = activeProject?.address?.trim();
@@ -912,7 +1057,10 @@
       activeProjectSummary.textContent = activeProject
         ? `Active project: ${activeProject.name}`
         : 'No active project selected.';
-      activeProjectHeader.textContent = activeProject ? `${activeProject.name}` : '';
+      const activeProjectIndex = activeProject?.surveyIndex || '';
+      activeProjectHeader.textContent = activeProject
+        ? `${activeProject.name}${activeProjectIndex ? ` • Index ${activeProjectIndex}` : ''}`
+        : '';
       syncActiveProjectBackground();
 
       projectList.innerHTML = '';
@@ -933,7 +1081,9 @@
         const billingRateText = project.billingRate ? `$${project.billingRate}/hr` : 'Rate not set';
         const clientContactText = project.clientContact || 'No client contact';
         const descriptionText = project.description || 'No project description';
-        info.innerHTML = `<strong>${project.name}${activeBadge}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small><br/><small>Status: ${currentStatus}</small><br/><small>${clientContactText} • ${billingRateText}</small><br/><small>${descriptionText}</small>`;
+        const plssText = project.plssDescription || 'Township/range and aliquot pending';
+        const surveyIndexText = project.surveyIndex || 'pending';
+        info.innerHTML = `<strong>${project.name}${activeBadge}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small><br/><small>Status: ${currentStatus}</small><br/><small>${clientContactText} • ${billingRateText}</small><br/><small>${descriptionText}</small><br/><small>PLSS: ${plssText}</small><br/><small>Index: ${surveyIndexText}</small>`;
 
         const start = document.createElement('button');
         start.type = 'button';
@@ -980,7 +1130,7 @@
       });
     }
 
-    function saveProjectFromForm(event) {
+    async function saveProjectFromForm(event) {
       event.preventDefault();
       const name = projectNameInput.value.trim();
       const client = projectClientInput.value.trim();
@@ -991,6 +1141,13 @@
       if (!name || !address) {
         setProjectFormError('Please provide both a project name and project address before saving.');
         return;
+      }
+
+      let plssMetadata = null;
+      try {
+        plssMetadata = await fetchProjectPlssMetadata(address);
+      } catch (err) {
+        console.warn('Unable to enrich project with township/range and aliquot metadata', err);
       }
 
       if (editingProjectId) {
@@ -1006,6 +1163,10 @@
         project.billingRate = billingRate;
         project.address = address;
         project.description = description;
+        project.townshipRange = plssMetadata?.townshipRange || project.townshipRange || '';
+        project.aliquotLabel = plssMetadata?.aliquotLabel || project.aliquotLabel || '';
+        project.plssDescription = plssMetadata?.plssDescription || project.plssDescription || '';
+        project.surveyIndex = plssMetadata?.surveyIndex || project.surveyIndex || '';
         project.updatedAt = new Date().toISOString();
       } else {
         const project = {
@@ -1016,6 +1177,10 @@
           billingRate,
           address,
           description,
+          townshipRange: plssMetadata?.townshipRange || '',
+          aliquotLabel: plssMetadata?.aliquotLabel || '',
+          plssDescription: plssMetadata?.plssDescription || '',
+          surveyIndex: plssMetadata?.surveyIndex || '',
           status: 'Proposed',
           createdAt: new Date().toISOString(),
         };
