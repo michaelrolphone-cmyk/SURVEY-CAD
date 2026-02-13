@@ -10,6 +10,7 @@ const MAX_RECONNECT_DELAY_MS = 60000;
 const OPERATION_BATCH_DELAY_MS = 120;
 const MAX_PRECONNECT_FAILURES_BEFORE_DORMANT = 3;
 const DORMANT_RETRY_DELAY_MS = 60000;
+const HTTP_FALLBACK_SYNC_INTERVAL_MS = 60000;
 
 function shouldSyncLocalStorageKey(key) {
   const keyString = String(key || '');
@@ -115,6 +116,15 @@ function shouldHydrateFromServerOnWelcome({
 
 
 
+
+
+function shouldRunHttpFallbackSync({
+  socketReadyState = 3,
+  online = true,
+} = {}) {
+  if (!online) return false;
+  return socketReadyState !== 1;
+}
 
 function shouldEnterDormantReconnect({
   hasEverConnected = false,
@@ -252,12 +262,16 @@ class LocalStorageSocketSync {
     this.hasEverConnected = false;
     this.consecutiveConnectFailures = 0;
     this.dormantUntilMs = 0;
+    this.httpFallbackTimer = null;
+    this.httpFallbackInProgress = false;
 
     this.#patchStorage();
     this.#connect();
 
     window.addEventListener('online', () => {
       this.dormantUntilMs = 0;
+    this.httpFallbackTimer = null;
+    this.httpFallbackInProgress = false;
       if (!this.socket || this.socket.readyState >= WebSocket.CLOSING) {
         this.#connect();
       }
@@ -285,6 +299,7 @@ class LocalStorageSocketSync {
     try {
       this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
     } catch {
+      this.#scheduleHttpFallbackSync();
       this.#scheduleReconnect();
       return;
     }
@@ -293,7 +308,10 @@ class LocalStorageSocketSync {
       this.hasEverConnected = true;
       this.consecutiveConnectFailures = 0;
     this.dormantUntilMs = 0;
+    this.httpFallbackTimer = null;
+    this.httpFallbackInProgress = false;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+      this.#cancelHttpFallbackSync();
       this.flush();
     });
     this.socket.addEventListener('message', (event) => this.#onMessage(event));
@@ -308,6 +326,7 @@ class LocalStorageSocketSync {
 
       this.socket = null;
       if (!navigator.onLine) return;
+      this.#scheduleHttpFallbackSync();
 
       if (shouldEnterDormantReconnect({
         hasEverConnected: this.hasEverConnected,
@@ -337,6 +356,71 @@ class LocalStorageSocketSync {
 
     if (delayOverrideMs === null) {
       this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
+    }
+  }
+
+
+  #scheduleHttpFallbackSync() {
+    if (this.httpFallbackTimer !== null) return;
+    this.httpFallbackTimer = window.setInterval(() => {
+      this.#syncViaHttpFallback();
+    }, HTTP_FALLBACK_SYNC_INTERVAL_MS);
+  }
+
+  #cancelHttpFallbackSync() {
+    if (this.httpFallbackTimer === null) return;
+    window.clearInterval(this.httpFallbackTimer);
+    this.httpFallbackTimer = null;
+  }
+
+  async #syncViaHttpFallback() {
+    if (this.httpFallbackInProgress) return;
+    if (!shouldRunHttpFallbackSync({
+      socketReadyState: this.socket?.readyState,
+      online: navigator.onLine,
+    })) {
+      this.#cancelHttpFallbackSync();
+      return;
+    }
+
+    this.httpFallbackInProgress = true;
+    try {
+      if (this.batchTimer !== null) {
+        window.clearTimeout(this.batchTimer);
+        this.batchTimer = null;
+        this.#commitPendingBatch();
+      }
+
+      const serverState = await this.#fetchServerState();
+      if (!serverState) return;
+
+      const localSnapshot = buildSnapshot();
+      const localChecksum = checksumSnapshot(localSnapshot);
+
+      if (this.queue.length > 0 || this.pendingBatch?.operations?.length) {
+        const response = await fetch('/api/localstorage-sync', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            version: (Number.isFinite(serverState.version) ? serverState.version : 0) + 1,
+            snapshot: localSnapshot,
+          }),
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        this.serverChecksum = String(payload?.state?.checksum || localChecksum);
+        this.#persistMeta();
+        this.inFlight = null;
+        this.queue = [];
+        this.#persistQueue();
+        return;
+      }
+
+      if (serverState.checksum && serverState.checksum !== localChecksum) {
+        await this.#fetchAndApplyServerSnapshot();
+      }
+    } finally {
+      this.httpFallbackInProgress = false;
     }
   }
 
@@ -607,6 +691,7 @@ class LocalStorageSocketSync {
     if (!response.ok) return null;
     const payload = await response.json();
     return {
+      version: Number(payload?.version || 0),
       checksum: String(payload?.checksum || ''),
       snapshot: normalizeSnapshot(payload?.snapshot || {}),
     };
@@ -693,4 +778,5 @@ export {
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
   shouldEnterDormantReconnect,
+  shouldRunHttpFallbackSync,
 };

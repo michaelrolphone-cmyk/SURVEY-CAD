@@ -11,6 +11,7 @@ import {
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
   shouldEnterDormantReconnect,
+  shouldRunHttpFallbackSync,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -123,6 +124,13 @@ test('shouldEnterDormantReconnect enables cooldown only before first successful 
     hasEverConnected: true,
     consecutiveFailures: 10,
   }), false);
+});
+
+
+test('shouldRunHttpFallbackSync runs only while online and websocket is not open', () => {
+  assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 3, online: true }), true);
+  assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 1, online: true }), false);
+  assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 3, online: false }), false);
 });
 
 
