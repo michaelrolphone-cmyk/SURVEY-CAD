@@ -45,6 +45,9 @@
     .empty-state p { margin: 8px 0; }
 
     .badge { display: inline-block; background: #1e3a5f; color: #60a5fa; border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
+    .teardown-btn { background: #1e3a5f; border-color: #3b82f6; color: #60a5fa; }
+    .teardown-btn:hover { background: #2a4a6f; }
+    .teardown-btn:disabled { opacity: 0.5; cursor: default; background: #12203a; border-color: #2a3f62; color: #64748b; }
     .hidden { display: none; }
 
     .export-bar { display: flex; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #22314f; }
@@ -82,6 +85,10 @@
           <div class="form-group">
             <label for="setupTime">Setup Time</label>
             <input id="setupTime" type="datetime-local" />
+          </div>
+          <div class="form-group">
+            <label for="teardownTime">Teardown Time</label>
+            <input id="teardownTime" type="datetime-local" />
           </div>
           <div class="form-group">
             <label for="jobFileName">Job File Name</label>
@@ -135,6 +142,7 @@
       equipmentHeight: document.getElementById('equipmentHeight'),
       referencePoint: document.getElementById('referencePoint'),
       setupTime: document.getElementById('setupTime'),
+      teardownTime: document.getElementById('teardownTime'),
       jobFileName: document.getElementById('jobFileName'),
       equipmentType: document.getElementById('equipmentType'),
       notes: document.getElementById('notes'),
@@ -197,6 +205,7 @@
       fields.equipmentHeight.value = log.equipmentHeight || '';
       fields.referencePoint.value = log.referencePoint || '';
       fields.setupTime.value = log.setupTime || '';
+      fields.teardownTime.value = log.teardownTime || '';
       fields.jobFileName.value = log.jobFileName || '';
       fields.equipmentType.value = log.equipmentType || '';
       fields.notes.value = log.notes || '';
@@ -232,10 +241,12 @@
             <div class="log-card-field"><strong>Height:</strong> ${esc(log.equipmentHeight) || '—'}</div>
             <div class="log-card-field"><strong>Ref Point:</strong> ${esc(log.referencePoint) || '—'}</div>
             <div class="log-card-field"><strong>Setup Time:</strong> ${formatDateTime(log.setupTime)}</div>
+            <div class="log-card-field"><strong>Teardown Time:</strong> ${formatDateTime(log.teardownTime)}</div>
             ${log.equipmentType ? `<div class="log-card-field"><span class="badge">${esc(log.equipmentType)}</span></div>` : ''}
           </div>
           ${log.notes ? `<div style="margin-top:8px;font-size:0.82rem;color:#9fb0cc;">${esc(log.notes)}</div>` : ''}
           <div style="margin-top:10px;display:flex;gap:6px;">
+            <button class="teardown-btn${log.teardownTime ? ' teardown-btn' : ''}" data-id="${log.id}" data-action="teardown" type="button"${log.teardownTime ? ' disabled' : ''}>${log.teardownTime ? 'Teardown Recorded' : 'Record Teardown'}</button>
             <button class="edit-btn" data-id="${log.id}" type="button">Edit</button>
             <button class="delete-btn danger" data-id="${log.id}" type="button">Delete</button>
           </div>
@@ -249,6 +260,7 @@
         equipmentHeight: fields.equipmentHeight.value.trim(),
         referencePoint: fields.referencePoint.value.trim(),
         setupTime: fields.setupTime.value,
+        teardownTime: fields.teardownTime.value,
         jobFileName: fields.jobFileName.value.trim(),
         equipmentType: fields.equipmentType.value,
         notes: fields.notes.value.trim(),
@@ -298,7 +310,17 @@
       const id = target.dataset.id;
       if (!id) return;
 
-      if (target.classList.contains('edit-btn')) {
+      if (target.dataset.action === 'teardown') {
+        const log = logs.find((l) => l.id === id);
+        if (log && !log.teardownTime) {
+          const now = new Date();
+          const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+          log.teardownTime = local;
+          log.updatedAt = now.toISOString();
+          saveLogs();
+          renderLogs();
+        }
+      } else if (target.classList.contains('edit-btn')) {
         const log = logs.find((l) => l.id === id);
         if (log) populateForm(log);
       } else if (target.classList.contains('delete-btn')) {
@@ -319,10 +341,10 @@
 
     exportCsvBtn.addEventListener('click', () => {
       if (logs.length === 0) return;
-      const headers = ['Job File', 'Rodman', 'Equipment Height', 'Reference Point', 'Setup Time', 'Equipment Type', 'Notes', 'Created At'];
+      const headers = ['Job File', 'Rodman', 'Equipment Height', 'Reference Point', 'Setup Time', 'Teardown Time', 'Equipment Type', 'Notes', 'Created At'];
       const rows = logs.map((l) => [
         l.jobFileName, l.rodman, l.equipmentHeight, l.referencePoint,
-        l.setupTime, l.equipmentType, l.notes, l.createdAt,
+        l.setupTime, l.teardownTime, l.equipmentType, l.notes, l.createdAt,
       ].map((v) => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
 
       const csv = [headers.join(','), ...rows].join('\n');
