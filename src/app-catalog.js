@@ -69,6 +69,18 @@ export const APP_CATALOG = [
     accent: '#DBEAFE',
     glyph: 'UP',
   },
+
+  {
+    id: 'boundary-lab',
+    name: 'BoundaryLab',
+    description: 'Traverse closure lab with ordered bearings/distances, live boundary preview, and misclosure metrics.',
+    entryHtml: 'BoundaryLab.html',
+    iconPath: '/assets/icons/boundary-lab.svg',
+    color: '#0F766E',
+    accent: '#BFDBFE',
+    glyph: 'BL',
+  },
+
   {
     id: 'cpnf-corners',
     name: 'PLSS + CP&F Explorer',

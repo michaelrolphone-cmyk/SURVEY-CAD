@@ -28,6 +28,22 @@ npm start
 
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
+
+## BoundaryLab
+
+A new launcher app, **BoundaryLab** (`/BoundaryLab.html`), helps you validate boundary closure from an ordered list of bearings and distances.
+
+- Enter calls in order (bearing + distance) and edit rows live.
+- See an immediate boundary preview as each call changes.
+- Review live closure metrics: total distance, linear misclosure, angular misclosure (shown in DMS), and closure ratio.
+
+### API/CLI endpoints and commands for this change
+
+BoundaryLab is a browser-only feature and does not introduce new server endpoints or CLI commands. Continue using:
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI commands: `npm run cli -- --help`, `npm run ros:cli -- --help`, and `npm test`.
+
 See **API Endpoints** and **CLI Commands** below for the complete endpoint and command reference used by this release.
 
 ### API/CLI endpoints and commands (current for this bug fix)
