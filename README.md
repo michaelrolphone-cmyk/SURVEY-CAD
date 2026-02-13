@@ -134,7 +134,7 @@ A new launcher app, **BoundaryLab** (`/BoundaryLab.html`), helps you validate bo
 
 - Enter calls in order (bearing + distance) and edit rows live.
 - See an immediate boundary preview as each call changes.
-- Review live closure metrics: total distance, linear misclosure, angular misclosure (shown in DMS), and closure ratio.
+- Review live closure metrics: total distance, linear misclosure, closure bearing (quadrant format), and closure ratio.
 
 ### API/CLI endpoints and commands for this BoundaryLab input-focus fix
 
@@ -737,9 +737,9 @@ LineSmith now renders field-to-finish PC/PT curve runs as a true 3-point curve i
 
 API/CLI impact: no endpoint or command changes; continue using the API and CLI commands documented in this README.
 
-## API and CLI notes for this BoundaryLab closure-angle fix
+## API and CLI notes for this BoundaryLab closure-bearing and tolerance fix
 
-BoundaryLab now reports **0°00'00.00" angular misclosure** whenever the traverse is already linearly closed within tolerance, preventing false reverse-angle errors on valid out-and-back closures.
+BoundaryLab now treats very small linear residuals (≤ `0.01` units) as closed, and reports open-traverse closure direction as a **quadrant bearing** instead of a degree-only closure angle.
 
 - API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.

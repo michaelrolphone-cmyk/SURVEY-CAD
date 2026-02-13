@@ -6,6 +6,8 @@ import {
   calculateTraverseFromOrderedCalls,
   closureRatio,
   formatDms,
+  azimuthToBearing,
+  LINEAR_CLOSURE_TOLERANCE,
 } from '../src/boundarylab.js';
 
 test('parseBearing supports compact and spaced quadrant bearings', () => {
@@ -44,7 +46,28 @@ test('calculateTraverseFromOrderedCalls computes closure and error metrics', () 
   });
   assert.ok((open.linearMisclosure || 0) > 0);
   assert.equal(open.angularMisclosure, 90);
+  assert.equal(open.closureBearing, `S 90°00'00.00" E`);
   assert.ok((closureRatio(open.totalLength, open.linearMisclosure) || 0) > 1);
+});
+
+
+test('calculateTraverseFromOrderedCalls treats small rounding errors as closed and returns Closed bearing', () => {
+  const nearlyClosed = calculateTraverseFromOrderedCalls({
+    orderedCalls: [
+      { bearing: 'N45W', distance: 100 },
+      { bearing: 'S45E', distance: 100.005 },
+    ],
+  });
+
+  assert.ok((nearlyClosed.linearMisclosure || 0) <= LINEAR_CLOSURE_TOLERANCE);
+  assert.equal(nearlyClosed.closureIsLinear, true);
+  assert.equal(nearlyClosed.closureBearing, 'Closed');
+});
+
+test('azimuthToBearing formats closure azimuths as quadrant bearings', () => {
+  assert.equal(azimuthToBearing(0), `N 0°00'00.00" E`);
+  assert.equal(azimuthToBearing(135), `N 45°00'00.00" W`);
+  assert.equal(azimuthToBearing(225), `S 45°00'00.00" W`);
 });
 
 test('calculateTraverseFromOrderedCalls reports zero angular misclosure for linearly closed reversals', () => {
