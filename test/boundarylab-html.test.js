@@ -13,3 +13,11 @@ test('BoundaryLab UI shows angular error in DMS format', async () => {
   assert.match(html, /formatDms\(traversal\.angularMisclosure\)/);
   assert.doesNotMatch(html, /formatDegrees\(traversal\.angularMisclosure\)/);
 });
+
+test('BoundaryLab preserves active call input focus during rerender', async () => {
+  const html = await readFile(path.join(rootDir, 'BoundaryLab.html'), 'utf8');
+  assert.match(html, /function captureActiveInputState\(/);
+  assert.match(html, /function restoreActiveInputState\(/);
+  assert.match(html, /renderRows\(captureActiveInputState\(\)\)/);
+  assert.match(html, /nextInput\.focus\(\{ preventScroll: true \}\)/);
+});

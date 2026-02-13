@@ -112,6 +112,13 @@ A new launcher app, **BoundaryLab** (`/BoundaryLab.html`), helps you validate bo
 - See an immediate boundary preview as each call changes.
 - Review live closure metrics: total distance, linear misclosure, angular misclosure (shown in DMS), and closure ratio.
 
+### API/CLI endpoints and commands for this BoundaryLab input-focus fix
+
+BoundaryLab now preserves keyboard focus/caret position while you type in call bearing and distance fields, so continuous entry no longer requires re-clicking the field after each character.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ### API/CLI endpoints and commands for this change
 
 BoundaryLab is a browser-only feature and does not introduce new server endpoints or CLI commands. Continue using:

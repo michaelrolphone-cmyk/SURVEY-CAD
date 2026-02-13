@@ -84,7 +84,34 @@
       return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
-    function renderRows() {
+    function captureActiveInputState() {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLInputElement)) return null;
+      const { id, key } = active.dataset;
+      if (!id || !key) return null;
+
+      return {
+        id,
+        key,
+        selectionStart: active.selectionStart,
+        selectionEnd: active.selectionEnd,
+      };
+    }
+
+    function restoreActiveInputState(activeState) {
+      if (!activeState) return;
+      const nextInput = Array.from(body.querySelectorAll('input')).find((input) => (
+        input.dataset.id === activeState.id && input.dataset.key === activeState.key
+      ));
+
+      if (!nextInput) return;
+      nextInput.focus({ preventScroll: true });
+      if (Number.isInteger(activeState.selectionStart) && Number.isInteger(activeState.selectionEnd)) {
+        nextInput.setSelectionRange(activeState.selectionStart, activeState.selectionEnd);
+      }
+    }
+
+    function renderRows(activeState = null) {
       body.innerHTML = state.calls.map((call, index) => `
         <tr>
           <td>${index + 1}</td>
@@ -93,6 +120,8 @@
           <td><button data-remove="${call.id}" type="button">✕</button></td>
         </tr>
       `).join('');
+
+      restoreActiveInputState(activeState);
     }
 
     function draw(points) {
@@ -137,7 +166,7 @@
     }
 
     function render() {
-      renderRows();
+      renderRows(captureActiveInputState());
       const traversal = calculateTraverseFromOrderedCalls({ orderedCalls: state.calls });
       const ratio = closureRatio(traversal.totalLength, traversal.linearMisclosure);
 
