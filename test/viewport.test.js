@@ -266,8 +266,9 @@ test('VIEWPORT.HTML moves current selection to the chosen toolbar layer', async 
 test('VIEWPORT.HTML adds a mobile toggle for hiding quick toolbars', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /id="mobileToolbarToggle"[\s\S]*Hide Bars/, 'canvas overlay should include a dedicated mobile toolbar hide/show control');
-  assert.match(html, /\.app\.mobileToolbarsHidden \.quickTools,[\s\S]*\.app\.mobileToolbarsHidden \.drawerToggle\{ display:none; \}/, 'mobile hidden state should remove both quick toolbar chrome and drawer toggle affordances');
+  assert.match(html, /id="quickTools"[\s\S]*quickToolsMobileRow[\s\S]*id="mobileToolbarToggle"[\s\S]*id="drawerToggle"/, 'mobile hide-bars and tools buttons should live in a dedicated quick-toolbar row to avoid overlaying toolbar actions');
+  assert.match(html, /@media \(max-width: 960px\) \{[\s\S]*\.quickToolsMobileRow\{ display:flex; \}[\s\S]*\.drawerToggle,[\s\S]*\.mobileToolbarToggle\{ display:inline-flex;/, 'mobile-only toolbar controls should only be visible on narrow viewports');
+  assert.match(html, /\.app\.mobileToolbarsHidden \.quickTools \.quickToolsRowPrimary,[\s\S]*\.app\.mobileToolbarsHidden \.quickTools \.quickToolsRowSecondary\{ display:none; \}/, 'mobile hidden state should collapse quick toolbar rows while preserving access to mobile control buttons');
   assert.match(html, /function\s+setMobileToolbarsHidden\(hidden\)\s*\{[\s\S]*mobileToolbarToggle\.textContent = shouldHide \? "Show Bars" : "Hide Bars";[\s\S]*mobileToolbarToggle\.setAttribute\("aria-pressed", shouldHide \? "true" : "false"\);/, 'toolbar hide helper should synchronize app-shell classes and button accessibility state');
   assert.match(html, /mobileToolbarToggle\.addEventListener\("click",\s*\(\)\s*=>\s*\{[\s\S]*setMobileToolbarsHidden\(!mobileToolbarsHidden\);[\s\S]*\}\);/, 'mobile toolbar toggle should switch visibility state each tap');
 });
@@ -502,7 +503,7 @@ test('VIEWPORT.HTML includes mobile-first canvas interactions and slide-out draw
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /@media \(max-width:\s*960px\)[\s\S]*\.app\.drawerOpen \.panel\{ transform:translateX\(0\); \}/, 'mobile layout should convert controls panel into a slide-out drawer');
-  assert.match(html, /id="drawerToggle"\s+class="drawerToggle"/, 'canvas area should expose a drawer toggle button for mobile controls');
+  assert.match(html, /class="quickToolsRow quickToolsMobileRow"[\s\S]*id="drawerToggle"\s+class="drawerToggle"/, 'quick toolbar should expose a mobile controls row containing the tools drawer button');
   assert.match(html, /canvas\{[\s\S]*touch-action:none;/, 'canvas should disable native touch actions so custom pinch\/pan gestures can run');
   assert.match(html, /canvas\.addEventListener\("pointerdown"[\s\S]*touchGesture\.mode = "pinch"/, 'touch pointer down should initialize pinch mode for two-finger zoom');
   assert.match(html, /canvas\.addEventListener\("pointermove"[\s\S]*view\.scale = newScale;[\s\S]*view\.panX = center\.x - rotatedAnchor\.x \* view\.scale;[\s\S]*view\.panY = center\.y \+ rotatedAnchor\.y \* view\.scale;/, 'touch pointer move should apply pinch zoom and anchored pan updates');
