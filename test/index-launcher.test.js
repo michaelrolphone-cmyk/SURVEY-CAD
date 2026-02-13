@@ -213,6 +213,25 @@ test('launcher project manager is opened from a button and closes after activati
   assert.match(launcherHtml, /clientContact,\s*[\s\S]*billingRate,\s*[\s\S]*description,/, 'create flow should persist new metadata fields on saved project');
   assert.match(launcherHtml, /setActiveProject\(project\.id\);[\s\S]*saveProjects\(\);[\s\S]*renderProjects\(\);[\s\S]*closeProjectForm\(\);[\s\S]*closeProjectManager\(\);/, 'saving from create mode should auto-activate and close both form and manager modals');
   assert.match(launcherHtml, /activeProjectSummary\.textContent\s*=\s*activeProject[\s\S]*'No active project selected\.'/, 'launcher home should show active project summary text');
+  assert.match(launcherHtml, /id="activeProjectOverview" class="active-project-overview"/, 'launcher should render an active project overview panel on home view');
+  assert.match(launcherHtml, /class="project-manager-launch"[\s\S]*id="activeProjectOverview" class="active-project-overview"/, 'overview should be rendered inside the project-manager-launch section on the main screen');
+  assert.match(launcherHtml, /id="activeProjectNameOverview"/, 'overview should render project field');
+  assert.match(launcherHtml, /id="activeProjectClientOverview"/, 'overview should render client field');
+  assert.match(launcherHtml, /id="activeProjectContactOverview"/, 'overview should render contact field');
+  assert.match(launcherHtml, /id="activeProjectAddressOverview"/, 'overview should render address field');
+  assert.match(launcherHtml, /id="activeProjectPlssOverview"/, 'overview should render PLSS field');
+  assert.match(launcherHtml, /id="activeProjectIndexOverview"/, 'overview should render index in the right-hand header area');
+  assert.match(launcherHtml, /function\s+buildNativeMapsHref\(address = ''\)/, 'overview should provide native maps link generation for addresses');
+  assert.match(launcherHtml, /return `geo:0,0\?q=\$\{encodeURIComponent\(trimmedAddress\)\}`;/, 'overview address links should use native geo URI deep links');
+  assert.match(launcherHtml, /function\s+extractPhoneNumber\(value = ''\)/, 'overview should parse phone numbers from contact metadata');
+  assert.match(launcherHtml, /function\s+extractEmailAddress\(value = ''\)/, 'overview should parse email addresses from contact metadata');
+  assert.match(launcherHtml, /phoneLink\.href\s*=\s*normalizePhoneHref\(phoneNumber\);/, 'overview should make phone numbers tappable with tel links');
+  assert.match(launcherHtml, /phoneLink\.textContent\s*=\s*phoneNumber;/, 'overview should render the phone number itself as the tappable text');
+  assert.match(launcherHtml, /emailLink\.href\s*=\s*`mailto:\$\{emailAddress\}`;/, 'overview should make email addresses tappable with mailto links');
+  assert.match(launcherHtml, /setProjectOverviewLink\(activeProjectAddressOverview, activeProject\?\.address \|\| '', buildNativeMapsHref\(activeProject\?\.address \|\| ''\), '—'\);/, 'overview should make addresses tappable with native maps links');
+  assert.doesNotMatch(launcherHtml, /phoneLink\.textContent\s*=\s*'Call';/, 'overview should not require separate call label; the number itself should be tappable');
+  assert.doesNotMatch(launcherHtml, /emailLink\.textContent\s*=\s*'Email';/, 'overview should not require separate email label; the address itself should be tappable');
+  assert.match(launcherHtml, /renderActiveProjectOverview\(activeProject\);/, 'project rendering should refresh the active project overview panel');
   assert.match(launcherHtml, /activeProjectHeader\.textContent\s*=\s*activeProject[\s\S]*Index \$\{activeProjectIndex\}/, 'launcher header should include survey index text when available and clear when no active project');
 });
 

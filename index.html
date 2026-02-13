@@ -174,6 +174,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
       gap: 0.7rem;
       margin-bottom: 1rem;
       padding: 0.75rem 0.9rem;
@@ -202,6 +203,75 @@
 
     .project-manager-button {
       flex: none;
+    }
+
+    .active-project-overview {
+      width: 100%;
+      margin-top: 0;
+      border: 1px solid rgba(230, 190, 132, 0.24);
+      border-radius: 12px;
+      padding: 0.8rem;
+      background: linear-gradient(150deg, rgba(57, 40, 29, 0.72), rgba(38, 27, 20, 0.82));
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .active-project-overview-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.8rem;
+    }
+
+    .active-project-overview-title {
+      margin: 0;
+      font-size: 0.92rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .active-project-overview-index {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--text);
+      text-align: right;
+      padding: 0.22rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(230, 190, 132, 0.18);
+      border: 1px solid rgba(230, 190, 132, 0.36);
+    }
+
+    .active-project-overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.55rem;
+    }
+
+    .active-project-overview-item {
+      display: grid;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+
+    .active-project-overview-item dt {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .active-project-overview-item dd {
+      margin: 0;
+      font-size: 0.92rem;
+      overflow-wrap: anywhere;
+    }
+
+    .active-project-overview-item a {
+      color: #ffd59b;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
 
     .project-modal-backdrop {
@@ -510,6 +580,34 @@
           <small id="activeProjectSummary">No active project selected.</small>
         </div>
         <button id="openProjectManagerButton" class="project-manager-button" type="button">Choose project</button>
+        <section id="activeProjectOverview" class="active-project-overview" aria-live="polite">
+          <div class="active-project-overview-header">
+            <h2 class="active-project-overview-title">Project overview</h2>
+            <p id="activeProjectIndexOverview" class="active-project-overview-index">Index: —</p>
+          </div>
+          <dl class="active-project-overview-grid">
+            <div class="active-project-overview-item">
+              <dt>Project</dt>
+              <dd id="activeProjectNameOverview">No active project selected.</dd>
+            </div>
+            <div class="active-project-overview-item">
+              <dt>Client</dt>
+              <dd id="activeProjectClientOverview">—</dd>
+            </div>
+            <div class="active-project-overview-item">
+              <dt>Contact info</dt>
+              <dd id="activeProjectContactOverview">—</dd>
+            </div>
+            <div class="active-project-overview-item">
+              <dt>Address</dt>
+              <dd id="activeProjectAddressOverview">—</dd>
+            </div>
+            <div class="active-project-overview-item">
+              <dt>PLSS</dt>
+              <dd id="activeProjectPlssOverview">—</dd>
+            </div>
+          </dl>
+        </section>
       </div>
       <div id="projectModalBackdrop" class="project-modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="SurveyFoundry project manager dialog">
         <div class="project-modal">
@@ -604,6 +702,12 @@
     const leaveLineSmithCancelButton = document.getElementById('leaveLineSmithCancelButton');
     const activeProjectSummary = document.getElementById('activeProjectSummary');
     const activeProjectHeader = document.getElementById('activeProjectHeader');
+    const activeProjectNameOverview = document.getElementById('activeProjectNameOverview');
+    const activeProjectClientOverview = document.getElementById('activeProjectClientOverview');
+    const activeProjectContactOverview = document.getElementById('activeProjectContactOverview');
+    const activeProjectAddressOverview = document.getElementById('activeProjectAddressOverview');
+    const activeProjectPlssOverview = document.getElementById('activeProjectPlssOverview');
+    const activeProjectIndexOverview = document.getElementById('activeProjectIndexOverview');
     const footerLogoWrap = document.querySelector('.footer-logo-wrap');
     const launcherHomeLink = document.getElementById('launcherHomeLink');
     const launcherHeaderIcon = document.getElementById('launcherHeaderIcon');
@@ -1105,6 +1209,98 @@
       renderProjects();
     }
 
+    function extractPhoneNumber(value = '') {
+      const matched = String(value || '').match(/\+?\d[\d\s().-]{6,}\d/);
+      return matched ? matched[0].trim() : '';
+    }
+
+    function normalizePhoneHref(value = '') {
+      const digits = String(value || '').replace(/[^\d+]/g, '');
+      if (!digits) return '';
+      return `tel:${digits}`;
+    }
+
+    function extractEmailAddress(value = '') {
+      const matched = String(value || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+      return matched ? matched[0].trim() : '';
+    }
+
+    function buildNativeMapsHref(address = '') {
+      const trimmedAddress = String(address || '').trim();
+      if (!trimmedAddress) return '';
+      return `geo:0,0?q=${encodeURIComponent(trimmedAddress)}`;
+    }
+
+    function setProjectOverviewValue(element, label, value) {
+      if (!element) return;
+      element.textContent = value || label;
+    }
+
+    function setProjectOverviewLink(element, value, href, fallbackLabel) {
+      if (!element) return;
+      element.replaceChildren();
+      if (value && href) {
+        const link = document.createElement('a');
+        link.href = href;
+        link.textContent = value;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        element.appendChild(link);
+        return;
+      }
+      element.textContent = value || fallbackLabel;
+    }
+
+    function renderActiveProjectOverview(activeProject) {
+      const emailAddress = extractEmailAddress(activeProject?.clientContact || '');
+      const phoneNumber = extractPhoneNumber(activeProject?.clientContact || '');
+      const contactValue = activeProject?.clientContact?.trim() || '';
+
+      setProjectOverviewValue(activeProjectNameOverview, 'No active project selected.', activeProject?.name || '');
+      setProjectOverviewValue(activeProjectClientOverview, '—', activeProject?.client || '');
+      setProjectOverviewValue(activeProjectPlssOverview, '—', activeProject?.plssDescription || activeProject?.townshipRange || '');
+      setProjectOverviewValue(activeProjectIndexOverview, 'Index: —', `Index: ${activeProject?.surveyIndex || '—'}`);
+      setProjectOverviewLink(activeProjectAddressOverview, activeProject?.address || '', buildNativeMapsHref(activeProject?.address || ''), '—');
+
+      activeProjectContactOverview.replaceChildren();
+      if (!contactValue) {
+        activeProjectContactOverview.textContent = '—';
+        return;
+      }
+
+      const phoneToken = '__PHONE__';
+      const emailToken = '__EMAIL__';
+      let displayValue = contactValue;
+
+      if (phoneNumber) {
+        displayValue = displayValue.replace(phoneNumber, phoneToken);
+      }
+      if (emailAddress) {
+        displayValue = displayValue.replace(emailAddress, emailToken);
+      }
+
+      const segments = displayValue.split(/(__PHONE__|__EMAIL__)/g).filter(Boolean);
+      segments.forEach((segment) => {
+        if (segment === phoneToken && phoneNumber) {
+          const phoneLink = document.createElement('a');
+          phoneLink.href = normalizePhoneHref(phoneNumber);
+          phoneLink.textContent = phoneNumber;
+          activeProjectContactOverview.appendChild(phoneLink);
+          return;
+        }
+
+        if (segment === emailToken && emailAddress) {
+          const emailLink = document.createElement('a');
+          emailLink.href = `mailto:${emailAddress}`;
+          emailLink.textContent = emailAddress;
+          activeProjectContactOverview.appendChild(emailLink);
+          return;
+        }
+
+        activeProjectContactOverview.appendChild(document.createTextNode(segment));
+      });
+    }
+
     function renderProjects() {
       const activeProject = getActiveProject();
       activeProjectSummary.textContent = activeProject
@@ -1114,6 +1310,7 @@
       activeProjectHeader.textContent = activeProject
         ? `${activeProject.name}${activeProjectIndex ? ` • Index ${activeProjectIndex}` : ''}`
         : '';
+      renderActiveProjectOverview(activeProject);
       syncActiveProjectBackground();
 
       projectList.innerHTML = '';
