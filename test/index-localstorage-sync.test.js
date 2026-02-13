@@ -34,5 +34,6 @@ test('browser localStorage sync module patches localStorage and queues offline d
   assert.match(source, /fetch\('\/api\/localstorage-sync'\)/, 'sync module should fall back to server API snapshot fetch for checksum recovery');
   assert.match(source, /MAX_PRECONNECT_FAILURES_BEFORE_DORMANT/, 'sync module should reduce repeated websocket-failed reconnect spam before first successful connection');
   assert.match(source, /shouldRunHttpFallbackSync/, 'sync module should enable low-frequency HTTP fallback sync when websocket transport is unavailable');
-  assert.match(source, /method:\s*'POST'/, 'sync module should publish queued local changes through POST \/api\/localstorage-sync while websocket transport is unavailable');
+  assert.match(source, /method:\s*'POST'/, 'sync module should publish queued local changes through POST /api/localstorage-sync while websocket transport is unavailable');
+  assert.match(source, /checksum-conflict/, 'sync module should rehydrate and rebase queued local updates when fallback POST detects a same-version conflict');
 });

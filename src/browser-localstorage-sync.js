@@ -408,12 +408,23 @@ class LocalStorageSocketSync {
         });
         if (!response.ok) return;
         const payload = await response.json();
-        this.serverChecksum = String(payload?.state?.checksum || localChecksum);
-        this.#persistMeta();
-        this.inFlight = null;
-        this.queue = [];
-        this.#persistQueue();
-        return;
+        const postStatus = String(payload?.status || '');
+
+        if (postStatus === 'server-updated' || postStatus === 'in-sync') {
+          this.serverChecksum = String(payload?.state?.checksum || localChecksum);
+          this.#persistMeta();
+          this.inFlight = null;
+          this.queue = [];
+          this.#persistQueue();
+          return;
+        }
+
+        if (postStatus === 'client-stale' || postStatus === 'checksum-conflict') {
+          const localSnapshotBeforeHydrate = localSnapshot;
+          const serverSnapshot = await this.#fetchAndApplyServerSnapshot();
+          this.#rebasePendingQueue(serverSnapshot, localSnapshotBeforeHydrate);
+          return;
+        }
       }
 
       if (serverState.checksum && serverState.checksum !== localChecksum) {
