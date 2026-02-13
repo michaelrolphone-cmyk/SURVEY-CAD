@@ -637,6 +637,8 @@
               <input id="projectClientContact" type="text" placeholder="Client contact info" />
               <input id="projectBillingRate" type="number" min="0" step="0.01" placeholder="Billing rate (USD/hr)" />
               <input id="projectAddress" type="text" placeholder="Address" />
+              <input id="projectTsr" type="text" placeholder="TSR" />
+              <input id="projectSection" type="text" placeholder="Section" />
               <textarea id="projectDescription" placeholder="Project description"></textarea>
             </div>
             <div class="project-form-actions">
@@ -683,6 +685,8 @@
     const projectClientContactInput = document.getElementById('projectClientContact');
     const projectBillingRateInput = document.getElementById('projectBillingRate');
     const projectAddressInput = document.getElementById('projectAddress');
+    const projectTsrInput = document.getElementById('projectTsr');
+    const projectSectionInput = document.getElementById('projectSection');
     const projectDescriptionInput = document.getElementById('projectDescription');
     const openProjectFormButton = document.getElementById('openProjectFormButton');
     const projectList = document.getElementById('projectList');
@@ -969,6 +973,8 @@
 
       return {
         townshipRange: townshipMeta.townshipRange,
+        tsr: townshipMeta.townshipRange,
+        section: townshipMeta.section,
         aliquotLabel,
         plssDescription: [townshipMeta.townshipRange, aliquotLabel].filter(Boolean).join(' '),
         surveyIndex,
@@ -1016,6 +1022,7 @@
 
     function projectNeedsPlssMetadata(project) {
       if (!project) return false;
+      if (project.manualPlssOverride) return false;
       const address = String(project.address || '').trim();
       if (!address) return false;
       const plssDescription = String(project.plssDescription || '').trim();
@@ -1041,10 +1048,13 @@
           const targetProject = projects.find((entry) => entry.id === projectId);
           if (!projectNeedsPlssMetadata(targetProject)) return false;
 
+          targetProject.tsr = plssMetadata?.tsr || targetProject.tsr || targetProject.townshipRange || '';
+          targetProject.section = plssMetadata?.section || targetProject.section || targetProject.sections?.[0] || '';
           targetProject.townshipRange = plssMetadata?.townshipRange || targetProject.townshipRange || '';
           targetProject.aliquotLabel = plssMetadata?.aliquotLabel || targetProject.aliquotLabel || '';
           targetProject.plssDescription = plssMetadata?.plssDescription || targetProject.plssDescription || '';
           targetProject.surveyIndex = plssMetadata?.surveyIndex || targetProject.surveyIndex || '';
+          targetProject.sections = targetProject.section ? [targetProject.section] : [];
           targetProject.updatedAt = new Date().toISOString();
 
           saveProjects();
@@ -1078,8 +1088,13 @@
         projects = Array.isArray(parsed)
           ? parsed.map((project) => {
               const knownStatus = PROJECT_STATUS_SEQUENCE.includes(project?.status) ? project.status : 'Proposed';
+              const tsr = String(project?.tsr || project?.townshipRange || '').trim();
+              const section = String(project?.section || project?.sections?.[0] || '').trim();
               return {
                 ...project,
+                tsr,
+                section,
+                sections: section ? [section] : Array.isArray(project?.sections) ? project.sections : [],
                 status: knownStatus,
               };
             })
@@ -1163,6 +1178,8 @@
       projectClientContactInput.value = '';
       projectBillingRateInput.value = '';
       projectAddressInput.value = '';
+      projectTsrInput.value = '';
+      projectSectionInput.value = '';
       projectDescriptionInput.value = '';
     }
 
@@ -1177,6 +1194,8 @@
       projectClientContactInput.value = project?.clientContact || '';
       projectBillingRateInput.value = project?.billingRate || '';
       projectAddressInput.value = project?.address || '';
+      projectTsrInput.value = project?.tsr || project?.townshipRange || '';
+      projectSectionInput.value = project?.section || project?.sections?.[0] || '';
       projectDescriptionInput.value = project?.description || '';
 
       resetProjectFormError();
@@ -1342,7 +1361,7 @@
         const billingRateText = project.billingRate ? `$${project.billingRate}/hr` : 'Rate not set';
         const clientContactText = project.clientContact || 'No client contact';
         const descriptionText = project.description || 'No project description';
-        const plssText = project.plssDescription || 'Township/range and aliquot pending';
+        const plssText = project.plssDescription || project.tsr || 'Township/range and aliquot pending';
         const surveyIndexText = project.surveyIndex || 'pending';
         info.innerHTML = `<strong>${project.name}${activeBadge}</strong><br/><small>${project.client || 'No client'} • ${project.address}</small><br/><small>Status: ${currentStatus}</small><br/><small>${clientContactText} • ${billingRateText}</small><br/><small>${descriptionText}</small><br/><small>PLSS: ${plssText}</small><br/><small>Index: ${surveyIndexText}</small>`;
 
@@ -1400,6 +1419,8 @@
       const clientContact = projectClientContactInput.value.trim();
       const billingRate = projectBillingRateInput.value.trim();
       const address = projectAddressInput.value.trim();
+      const tsr = projectTsrInput.value.trim();
+      const section = projectSectionInput.value.trim();
       const description = projectDescriptionInput.value.trim();
       const projectIdBeingEdited = editingProjectId;
       if (!name || !address) {
@@ -1422,14 +1443,28 @@
           }
 
           const addressChanged = String(project.address || '').trim() !== address;
+          const previousTsr = String(project.tsr || project.townshipRange || '').trim();
+          const previousSection = String(project.section || project.sections?.[0] || '').trim();
+          const plssEdited = tsr !== previousTsr || section !== previousSection;
 
           project.name = name;
           project.client = client;
           project.clientContact = clientContact;
           project.billingRate = billingRate;
           project.address = address;
+          project.tsr = tsr;
+          project.section = section;
+          project.sections = section ? [section] : [];
+          if (plssEdited) {
+            project.manualPlssOverride = true;
+            project.townshipRange = tsr;
+            project.plssDescription = [tsr, project.aliquotLabel].filter(Boolean).join(' ');
+          }
           project.description = description;
-          if (addressChanged) {
+          if (addressChanged && !project.manualPlssOverride) {
+            project.tsr = '';
+            project.section = '';
+            project.sections = [];
             project.townshipRange = '';
             project.aliquotLabel = '';
             project.plssDescription = '';
@@ -1439,6 +1474,7 @@
           savedProjectId = project.id;
           shouldBackfillMetadata = addressChanged || projectNeedsPlssMetadata(project);
         } else {
+          const manualPlssOverride = Boolean(tsr || section);
           const project = {
             id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             name,
@@ -1446,17 +1482,21 @@
             clientContact,
             billingRate,
             address,
+            tsr,
+            section,
+            sections: section ? [section] : [],
             description,
-            townshipRange: '',
+            townshipRange: tsr,
             aliquotLabel: '',
-            plssDescription: '',
+            plssDescription: tsr,
             surveyIndex: '',
+            manualPlssOverride,
             status: 'Proposed',
             createdAt: new Date().toISOString(),
           };
           projects.unshift(project);
           savedProjectId = project.id;
-          shouldBackfillMetadata = true;
+          shouldBackfillMetadata = !manualPlssOverride;
           setActiveProject(project.id);
         }
 

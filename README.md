@@ -33,6 +33,14 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
 
+
+## API and CLI Notes for project editor TSR/section overrides
+
+The launcher project editor now includes explicit **TSR** and **Section** inputs so project metadata can be corrected manually (or cleared) when lookup-derived PLSS values are wrong. When TSR/Section are manually edited, the launcher preserves those values as an override and skips automatic PLSS backfill for that project.
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI notes for this PLSS section parsing fix
 
 Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
