@@ -507,13 +507,23 @@ export function createSurveyServer({
   return server;
 }
 
-export async function startServer({ port = Number(process.env.PORT) || 3000, host = '0.0.0.0', ...opts } = {}) {
+export async function startServer({
+  port = Number(process.env.PORT) || 3000,
+  host = '0.0.0.0',
+  redisStoreFactory = createRedisLocalStorageSyncStore,
+  ...opts
+} = {}) {
   const resolvedOpts = { ...opts };
 
   if (!resolvedOpts.localStorageSyncStore) {
-    const redisBackedStore = await createRedisLocalStorageSyncStore();
-    if (redisBackedStore) {
-      resolvedOpts.localStorageSyncStore = redisBackedStore;
+    try {
+      const redisBackedStore = await redisStoreFactory();
+      if (redisBackedStore) {
+        resolvedOpts.localStorageSyncStore = redisBackedStore;
+      }
+    } catch (err) {
+      const message = err?.message || String(err);
+      console.warn(`Redis localstorage sync unavailable, using in-memory store: ${message}`);
     }
   }
 

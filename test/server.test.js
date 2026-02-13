@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { createSurveyServer } from '../src/server.js';
+import { createSurveyServer, startServer } from '../src/server.js';
 import SurveyCadClient from '../src/survey-api.js';
 
 function createMockServer(options = {}) {
@@ -295,6 +295,32 @@ test('server exposes survey APIs and static html', async () => {
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));
+  }
+});
+
+test('startServer falls back to in-memory sync store when redis setup fails', async () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(String(message));
+
+  const server = await startServer({
+    host: '127.0.0.1',
+    port: 0,
+    redisStoreFactory: async () => {
+      throw new Error('redis unavailable in dyno');
+    },
+  });
+
+  try {
+    const port = server.address().port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/localstorage-sync`);
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.version, 0);
+    assert.ok(warnings.some((entry) => entry.includes('using in-memory store')));
+  } finally {
+    console.warn = originalWarn;
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 

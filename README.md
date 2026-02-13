@@ -39,7 +39,7 @@ Set these environment variables in Heroku:
 - `REDIS_URL` (provided by Heroku Key-Value Store)
 - `LOCALSTORAGE_SYNC_REDIS_KEY` (optional, default: `survey-cad:localstorage-sync:state`)
 
-When `REDIS_URL` is set, `npm start` will automatically hydrate and persist shared sync state in Redis. Without it, the server uses in-memory state.
+When `REDIS_URL` is set, `npm start` attempts to hydrate and persist shared sync state in Redis. If Redis is unavailable at startup (connection/auth/TLS failure) or `REDIS_URL` is not set, the server now falls back to in-memory sync state instead of crashing.
 
 ### API endpoints (state sync)
 
