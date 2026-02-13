@@ -45,6 +45,13 @@ For a focused, implementation-level explanation of browser-to-browser sync over 
 - Run server: `npm start`
 - Run tests: `npm test`
 
+### API and CLI notes for this localStorage realtime sync fix
+
+Clients now apply the websocket `sync-welcome` snapshot immediately when checksums differ and no unsafe local pending queue exists, so newly connected browsers reflect recent remote edits right away instead of waiting for delayed fallback sync loops.
+
+- API endpoints (unchanged): `GET /api/localstorage-sync`, `POST /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## Redis-backed shared platform state
 
 To persist shared browser/platform state across dyno restarts and deploys, the server can use Heroku Key-Value Store (Redis) for `/api/localstorage-sync` and `/ws/localstorage-sync`.
