@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CrewManager — Field Crew Profiles</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0b1220; color: #e2e8f0; }
+    .layout { display: flex; flex-direction: column; min-height: 100vh; }
+    header { padding: 18px 24px; border-bottom: 1px solid #22314f; background: #0f1a2e; }
+    header h1 { margin: 0 0 4px; font-size: 1.25rem; }
+    header p { margin: 0; color: #9fb0cc; font-size: 0.875rem; }
+    main { flex: 1; padding: 20px 24px; max-width: 960px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+
+    .form-section { background: #0f1a2e; border: 1px solid #22314f; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .form-section h2 { margin: 0 0 16px; font-size: 1rem; color: #60a5fa; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group.full-width { grid-column: 1 / -1; }
+    label { font-size: 0.8rem; color: #9fb0cc; font-weight: 500; }
+    input, select, textarea { border: 1px solid #2a3f62; border-radius: 8px; background: #12203a; color: #e2e8f0; padding: 9px 11px; font-size: 0.875rem; font-family: inherit; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+    textarea { resize: vertical; min-height: 60px; }
+
+    .toolbar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    button { border: 1px solid #2a3f62; border-radius: 8px; background: #12203a; color: #e2e8f0; padding: 9px 14px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
+    button:hover { background: #1a2d4a; }
+    .primary { background: #2563eb; border-color: #3b82f6; }
+    .primary:hover { background: #1d4ed8; }
+    .danger { background: #7f1d1d; border-color: #dc2626; }
+    .danger:hover { background: #991b1b; }
+
+    .crew-list { display: flex; flex-direction: column; gap: 10px; }
+    .crew-card { background: #0f1a2e; border: 1px solid #22314f; border-radius: 10px; padding: 16px; cursor: pointer; transition: border-color 0.15s; display: flex; gap: 16px; align-items: flex-start; }
+    .crew-card:hover { border-color: #3b82f6; }
+
+    .crew-avatar { width: 56px; height: 56px; border-radius: 50%; background: #1e3a5f; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 700; color: #60a5fa; flex-shrink: 0; overflow: hidden; }
+    .crew-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .crew-card-body { flex: 1; min-width: 0; }
+    .crew-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .crew-card-name { font-weight: 600; font-size: 0.95rem; }
+    .crew-card-title { font-size: 0.82rem; color: #60a5fa; }
+    .crew-card-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; font-size: 0.82rem; margin-top: 6px; }
+    .crew-card-field { color: #9fb0cc; }
+    .crew-card-field strong { color: #e2e8f0; font-weight: 500; }
+
+    .roles-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .badge { display: inline-block; background: #1e3a5f; color: #60a5fa; border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+    .empty-state p { margin: 8px 0; }
+    .hidden { display: none; }
+
+    .photo-upload { display: flex; align-items: center; gap: 12px; }
+    .photo-preview { width: 64px; height: 64px; border-radius: 50%; background: #1e3a5f; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; border: 2px solid #2a3f62; }
+    .photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-preview-placeholder { color: #64748b; font-size: 0.75rem; text-align: center; line-height: 1.2; }
+    .photo-controls { display: flex; flex-direction: column; gap: 4px; }
+    .photo-controls button { padding: 6px 10px; font-size: 0.78rem; }
+    input[type="file"] { display: none; }
+
+    .roles-input-group { display: flex; gap: 6px; }
+    .roles-input-group input { flex: 1; }
+    .roles-input-group button { flex-shrink: 0; }
+    .roles-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .role-tag { display: inline-flex; align-items: center; gap: 4px; background: #1e3a5f; color: #60a5fa; border-radius: 6px; padding: 3px 8px; font-size: 0.78rem; font-weight: 500; }
+    .role-tag .remove-role { cursor: pointer; color: #9fb0cc; font-size: 0.85rem; line-height: 1; }
+    .role-tag .remove-role:hover { color: #ef4444; }
+
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      main { padding: 14px; }
+      .crew-card { flex-direction: column; align-items: stretch; }
+      .crew-avatar { align-self: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <h1>CrewManager</h1>
+      <p>Manage field crew team member profiles, roles, and contact information.</p>
+    </header>
+
+    <main>
+      <!-- Entry Form -->
+      <div id="formSection" class="form-section">
+        <h2 id="formHeading">New Team Member</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="firstName">First Name</label>
+            <input id="firstName" type="text" placeholder="e.g. John" />
+          </div>
+          <div class="form-group">
+            <label for="lastName">Last Name</label>
+            <input id="lastName" type="text" placeholder="e.g. Smith" />
+          </div>
+          <div class="form-group">
+            <label for="jobTitle">Job Title</label>
+            <input id="jobTitle" type="text" placeholder="e.g. Party Chief" />
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone</label>
+            <input id="phone" type="tel" placeholder="e.g. (208) 555-0142" />
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input id="email" type="email" placeholder="e.g. jsmith@example.com" />
+          </div>
+          <div class="form-group">
+            <label for="certifications">Certifications / License</label>
+            <input id="certifications" type="text" placeholder="e.g. PLS #12345" />
+          </div>
+          <div class="form-group full-width">
+            <label>Profile Photo (optional)</label>
+            <div class="photo-upload">
+              <div class="photo-preview" id="photoPreview">
+                <span class="photo-preview-placeholder">No photo</span>
+              </div>
+              <div class="photo-controls">
+                <button type="button" id="choosePhotoBtn">Choose Photo</button>
+                <button type="button" id="removePhotoBtn" class="hidden">Remove</button>
+              </div>
+              <input type="file" id="photoInput" accept="image/*" />
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label>Roles &amp; Responsibilities</label>
+            <div class="roles-input-group">
+              <input id="roleInput" type="text" placeholder="e.g. Instrument Operator" />
+              <button type="button" id="addRoleBtn">Add</button>
+            </div>
+            <div class="roles-tags" id="rolesTags"></div>
+          </div>
+          <div class="form-group full-width">
+            <label for="notes">Notes</label>
+            <textarea id="notes" placeholder="Additional notes about this team member…"></textarea>
+          </div>
+        </div>
+        <div style="margin-top: 14px; display: flex; gap: 8px;">
+          <button id="saveBtn" class="primary" type="button">Save Profile</button>
+          <button id="cancelBtn" type="button" class="hidden">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <button id="newMemberBtn" class="primary" type="button">New Member</button>
+        <button id="exportCsvBtn" type="button">Export CSV</button>
+        <button id="exportJsonBtn" type="button">Export JSON</button>
+        <button id="clearAllBtn" class="danger" type="button">Clear All</button>
+      </div>
+
+      <!-- Crew List -->
+      <div id="crewList" class="crew-list"></div>
+      <div id="emptyState" class="empty-state hidden">
+        <p><strong>No crew members yet.</strong></p>
+        <p>Fill in the form above to add your first team member.</p>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    const STORAGE_KEY = 'surveyfoundryCrewProfiles';
+
+    const fields = {
+      firstName: document.getElementById('firstName'),
+      lastName: document.getElementById('lastName'),
+      jobTitle: document.getElementById('jobTitle'),
+      phone: document.getElementById('phone'),
+      email: document.getElementById('email'),
+      certifications: document.getElementById('certifications'),
+      notes: document.getElementById('notes'),
+    };
+
+    const formHeading = document.getElementById('formHeading');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const newMemberBtn = document.getElementById('newMemberBtn');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const crewListEl = document.getElementById('crewList');
+    const emptyStateEl = document.getElementById('emptyState');
+    const photoInput = document.getElementById('photoInput');
+    const photoPreview = document.getElementById('photoPreview');
+    const choosePhotoBtn = document.getElementById('choosePhotoBtn');
+    const removePhotoBtn = document.getElementById('removePhotoBtn');
+    const roleInput = document.getElementById('roleInput');
+    const addRoleBtn = document.getElementById('addRoleBtn');
+    const rolesTags = document.getElementById('rolesTags');
+
+    let profiles = [];
+    let editingId = null;
+    let currentPhoto = null;
+    let currentRoles = [];
+
+    function loadProfiles() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        profiles = raw ? JSON.parse(raw) : [];
+      } catch {
+        profiles = [];
+      }
+    }
+
+    function saveProfiles() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+    }
+
+    function esc(v = '') {
+      return String(v).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[c]));
+    }
+
+    function getInitials(first, last) {
+      const f = (first || '').trim().charAt(0).toUpperCase();
+      const l = (last || '').trim().charAt(0).toUpperCase();
+      return f + l || '?';
+    }
+
+    function clearForm() {
+      Object.values(fields).forEach((el) => { el.value = ''; });
+      editingId = null;
+      currentPhoto = null;
+      currentRoles = [];
+      formHeading.textContent = 'New Team Member';
+      cancelBtn.classList.add('hidden');
+      removePhotoBtn.classList.add('hidden');
+      photoPreview.innerHTML = '<span class="photo-preview-placeholder">No photo</span>';
+      renderRolesTags();
+    }
+
+    function populateForm(profile) {
+      fields.firstName.value = profile.firstName || '';
+      fields.lastName.value = profile.lastName || '';
+      fields.jobTitle.value = profile.jobTitle || '';
+      fields.phone.value = profile.phone || '';
+      fields.email.value = profile.email || '';
+      fields.certifications.value = profile.certifications || '';
+      fields.notes.value = profile.notes || '';
+      currentPhoto = profile.photo || null;
+      currentRoles = [...(profile.roles || [])];
+      editingId = profile.id;
+      formHeading.textContent = 'Edit Team Member';
+      cancelBtn.classList.remove('hidden');
+      updatePhotoPreview();
+      renderRolesTags();
+      fields.firstName.focus();
+    }
+
+    function updatePhotoPreview() {
+      if (currentPhoto) {
+        photoPreview.innerHTML = `<img src="${currentPhoto}" alt="Profile photo" />`;
+        removePhotoBtn.classList.remove('hidden');
+      } else {
+        photoPreview.innerHTML = '<span class="photo-preview-placeholder">No photo</span>';
+        removePhotoBtn.classList.add('hidden');
+      }
+    }
+
+    function renderRolesTags() {
+      rolesTags.innerHTML = currentRoles.map((role, i) =>
+        `<span class="role-tag">${esc(role)}<span class="remove-role" data-index="${i}">&times;</span></span>`
+      ).join('');
+    }
+
+    function renderProfiles() {
+      if (profiles.length === 0) {
+        crewListEl.innerHTML = '';
+        emptyStateEl.classList.remove('hidden');
+        return;
+      }
+
+      emptyStateEl.classList.add('hidden');
+
+      const sorted = [...profiles].sort((a, b) => {
+        const na = `${a.lastName || ''} ${a.firstName || ''}`.trim().toLowerCase();
+        const nb = `${b.lastName || ''} ${b.firstName || ''}`.trim().toLowerCase();
+        return na.localeCompare(nb);
+      });
+
+      crewListEl.innerHTML = sorted.map((p) => {
+        const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unnamed';
+        const avatarContent = p.photo
+          ? `<img src="${p.photo}" alt="${esc(fullName)}" />`
+          : esc(getInitials(p.firstName, p.lastName));
+        const rolesHtml = (p.roles || []).length > 0
+          ? `<div class="roles-list">${p.roles.map((r) => `<span class="badge">${esc(r)}</span>`).join('')}</div>`
+          : '';
+
+        return `
+          <div class="crew-card" data-id="${p.id}">
+            <div class="crew-avatar">${avatarContent}</div>
+            <div class="crew-card-body">
+              <div class="crew-card-header">
+                <span class="crew-card-name">${esc(fullName)}</span>
+                ${p.jobTitle ? `<span class="crew-card-title">${esc(p.jobTitle)}</span>` : ''}
+              </div>
+              <div class="crew-card-details">
+                ${p.phone ? `<div class="crew-card-field"><strong>Phone:</strong> ${esc(p.phone)}</div>` : ''}
+                ${p.email ? `<div class="crew-card-field"><strong>Email:</strong> ${esc(p.email)}</div>` : ''}
+                ${p.certifications ? `<div class="crew-card-field"><strong>Certs:</strong> ${esc(p.certifications)}</div>` : ''}
+              </div>
+              ${rolesHtml}
+              ${p.notes ? `<div style="margin-top:8px;font-size:0.82rem;color:#9fb0cc;">${esc(p.notes)}</div>` : ''}
+              <div style="margin-top:10px;display:flex;gap:6px;">
+                <button class="edit-btn" data-id="${p.id}" type="button">Edit</button>
+                <button class="delete-btn danger" data-id="${p.id}" type="button">Delete</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function getFormData() {
+      return {
+        firstName: fields.firstName.value.trim(),
+        lastName: fields.lastName.value.trim(),
+        jobTitle: fields.jobTitle.value.trim(),
+        phone: fields.phone.value.trim(),
+        email: fields.email.value.trim(),
+        certifications: fields.certifications.value.trim(),
+        notes: fields.notes.value.trim(),
+        photo: currentPhoto,
+        roles: [...currentRoles],
+      };
+    }
+
+    // Photo handling
+    choosePhotoBtn.addEventListener('click', () => {
+      photoInput.click();
+    });
+
+    photoInput.addEventListener('change', () => {
+      const file = photoInput.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        // Resize to keep localStorage reasonable
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 256;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          currentPhoto = canvas.toDataURL('image/jpeg', 0.8);
+          updatePhotoPreview();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      photoInput.value = '';
+    });
+
+    removePhotoBtn.addEventListener('click', () => {
+      currentPhoto = null;
+      updatePhotoPreview();
+    });
+
+    // Roles handling
+    function addRole() {
+      const role = roleInput.value.trim();
+      if (!role) return;
+      if (!currentRoles.includes(role)) {
+        currentRoles.push(role);
+        renderRolesTags();
+      }
+      roleInput.value = '';
+      roleInput.focus();
+    }
+
+    addRoleBtn.addEventListener('click', addRole);
+    roleInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addRole(); }
+    });
+
+    rolesTags.addEventListener('click', (e) => {
+      const target = e.target;
+      if (target.classList.contains('remove-role')) {
+        const idx = parseInt(target.dataset.index, 10);
+        currentRoles.splice(idx, 1);
+        renderRolesTags();
+      }
+    });
+
+    // Save
+    saveBtn.addEventListener('click', () => {
+      const data = getFormData();
+
+      if (!data.firstName && !data.lastName) {
+        fields.firstName.focus();
+        return;
+      }
+
+      if (editingId) {
+        const idx = profiles.findIndex((p) => p.id === editingId);
+        if (idx !== -1) {
+          profiles[idx] = { ...profiles[idx], ...data, updatedAt: new Date().toISOString() };
+        }
+      } else {
+        profiles.push({
+          id: crypto.randomUUID(),
+          ...data,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      saveProfiles();
+      clearForm();
+      renderProfiles();
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      clearForm();
+    });
+
+    newMemberBtn.addEventListener('click', () => {
+      clearForm();
+      fields.firstName.focus();
+    });
+
+    crewListEl.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const id = target.dataset.id;
+      if (!id) return;
+
+      if (target.classList.contains('edit-btn')) {
+        const profile = profiles.find((p) => p.id === id);
+        if (profile) populateForm(profile);
+      } else if (target.classList.contains('delete-btn')) {
+        profiles = profiles.filter((p) => p.id !== id);
+        saveProfiles();
+        if (editingId === id) clearForm();
+        renderProfiles();
+      }
+    });
+
+    clearAllBtn.addEventListener('click', () => {
+      if (!confirm('Delete all crew profiles? This cannot be undone.')) return;
+      profiles = [];
+      saveProfiles();
+      clearForm();
+      renderProfiles();
+    });
+
+    exportCsvBtn.addEventListener('click', () => {
+      if (profiles.length === 0) return;
+      const headers = ['First Name', 'Last Name', 'Job Title', 'Phone', 'Email', 'Certifications', 'Roles', 'Notes', 'Created At'];
+      const rows = profiles.map((p) => [
+        p.firstName, p.lastName, p.jobTitle, p.phone, p.email,
+        p.certifications, (p.roles || []).join('; '), p.notes, p.createdAt,
+      ].map((v) => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
+
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `crew-profiles-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    exportJsonBtn.addEventListener('click', () => {
+      if (profiles.length === 0) return;
+      const exportData = profiles.map(({ photo, ...rest }) => rest);
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `crew-profiles-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    loadProfiles();
+    renderProfiles();
+  </script>
+</body>
+</html>

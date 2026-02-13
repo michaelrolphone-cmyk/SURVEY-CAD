@@ -70,6 +70,16 @@ export const APP_CATALOG = [
     glyph: 'EL',
   },
   {
+    id: 'crew-manager',
+    name: 'CrewManager',
+    description: 'Manage field crew team member profiles, job titles, contact info, and roles.',
+    entryHtml: 'CrewManager.html',
+    iconPath: '/assets/icons/CrewManager.svg',
+    color: '#0F4C75',
+    accent: '#BFDBFE',
+    glyph: 'CM',
+  },
+  {
     id: 'arrowhead-ar',
     name: 'ArrowHead',
     description: 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.',
