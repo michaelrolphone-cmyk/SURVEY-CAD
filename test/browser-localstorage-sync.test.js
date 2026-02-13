@@ -4,6 +4,7 @@ import {
   buildDifferentialOperations,
   checksumSnapshot,
   coalesceQueuedOperations,
+  mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldSyncLocalStorageKey,
 } from '../src/browser-localstorage-sync.js';
@@ -67,6 +68,76 @@ test('shouldSyncLocalStorageKey excludes only internal sync metadata keys', () =
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLocalStorageSyncMeta'), false);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryProjectFile:my-project'), true);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLineSmithDrawing:abc'), true);
+});
+
+test('mergeQueuedDifferentials compacts all unsent differentials into one item', () => {
+  const merged = mergeQueuedDifferentials([
+    {
+      requestId: 'sync-a',
+      baseChecksum: 'base-1',
+      operations: [{ type: 'set', key: 'alpha', value: '1' }],
+    },
+    {
+      requestId: 'sync-b',
+      baseChecksum: 'base-2',
+      operations: [{ type: 'set', key: 'alpha', value: '2' }, { type: 'set', key: 'beta', value: '3' }],
+    },
+  ], {
+    requestId: 'sync-c',
+    baseChecksum: 'base-3',
+    operations: [{ type: 'remove', key: 'beta' }, { type: 'set', key: 'gamma', value: '4' }],
+  });
+
+  assert.deepEqual(merged, [
+    {
+      requestId: 'sync-a',
+      baseChecksum: 'base-1',
+      operations: [
+        { type: 'set', key: 'alpha', value: '2' },
+        { type: 'remove', key: 'beta' },
+        { type: 'set', key: 'gamma', value: '4' },
+      ],
+    },
+  ]);
+});
+
+test('mergeQueuedDifferentials preserves in-flight differential and compacts queued tail', () => {
+  const merged = mergeQueuedDifferentials([
+    {
+      requestId: 'sync-flight',
+      baseChecksum: 'base-flight',
+      operations: [{ type: 'set', key: 'locked', value: '1' }],
+    },
+    {
+      requestId: 'sync-tail-a',
+      baseChecksum: 'base-tail',
+      operations: [{ type: 'set', key: 'draft', value: '1' }],
+    },
+    {
+      requestId: 'sync-tail-b',
+      baseChecksum: 'base-tail-b',
+      operations: [{ type: 'set', key: 'draft', value: '2' }],
+    },
+  ], {
+    requestId: 'sync-next',
+    operations: [{ type: 'set', key: 'draft', value: '3' }, { type: 'set', key: 'notes', value: 'ok' }],
+  }, 'sync-flight');
+
+  assert.deepEqual(merged, [
+    {
+      requestId: 'sync-flight',
+      baseChecksum: 'base-flight',
+      operations: [{ type: 'set', key: 'locked', value: '1' }],
+    },
+    {
+      requestId: 'sync-tail-a',
+      baseChecksum: 'base-tail',
+      operations: [
+        { type: 'set', key: 'draft', value: '3' },
+        { type: 'set', key: 'notes', value: 'ok' },
+      ],
+    },
+  ]);
 });
 
 test('browser and server localStorage sync checksum algorithms stay aligned', () => {
