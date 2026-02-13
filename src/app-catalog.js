@@ -60,6 +60,16 @@ export const APP_CATALOG = [
     glyph: 'UP',
   },
   {
+    id: 'equipment-log',
+    name: 'EquipmentLog',
+    description: 'Record equipment setup logs: rodman, height, reference point, setup time, and job file.',
+    entryHtml: 'EquipmentLog.html',
+    iconPath: '/assets/icons/EquipmentLog.svg',
+    color: '#7C3AED',
+    accent: '#EDE9FE',
+    glyph: 'EL',
+  },
+  {
     id: 'arrowhead-ar',
     name: 'ArrowHead',
     description: 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.',
