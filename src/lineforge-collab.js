@@ -157,7 +157,12 @@ export function createLineforgeCollabService() {
 
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
     const url = new URL(req.url || '/', 'http://localhost');
-    if (url.pathname !== '/ws/lineforge') {
+    const pathname = url.pathname || '/';
+    const isLineforgePath = pathname === '/ws/lineforge'
+      || pathname === '/ws/lineforge/'
+      || pathname.endsWith('/ws/lineforge')
+      || pathname.endsWith('/ws/lineforge/');
+    if (!isLineforgePath) {
       socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
       socket.destroy();
       return false;

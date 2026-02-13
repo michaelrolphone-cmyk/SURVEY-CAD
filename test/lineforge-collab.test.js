@@ -114,6 +114,23 @@ test('lineforge websocket rejects non-collab upgrade path', () => {
   assert.equal(socket.destroyed, true);
 });
 
+test('lineforge websocket accepts base-path routed collab endpoint', () => {
+  const collab = createLineforgeCollabService();
+  const socket = new FakeSocket();
+  const handled = collab.handleUpgrade({
+    url: '/record-of-survey/ws/lineforge?room=base-path',
+    headers: {
+      upgrade: 'websocket',
+      'sec-websocket-key': 'route-key==',
+    },
+  }, socket, Buffer.alloc(0));
+
+  assert.equal(handled, true);
+  const welcome = parseServerTextMessage(socket, 1);
+  assert.equal(welcome.type, 'welcome');
+  assert.equal(welcome.revision, 0);
+});
+
 
 test('lineforge rejects stale state revisions and returns canonical room state', () => {
   const collab = createLineforgeCollabService();
