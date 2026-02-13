@@ -5267,7 +5267,7 @@
   }
 
   function getCurveMiddlePoint(line) {
-    if (!line || line.fieldToFinishType !== "curve") return null;
+    if (!line) return null;
     const middlePointId = Number(line.fieldToFinishCurveMiddlePointId);
     if (!Number.isFinite(middlePointId)) return null;
     return points.get(middlePointId) || null;
@@ -5312,6 +5312,39 @@
     while (normalized < 0) normalized += Math.PI * 2;
     while (normalized >= Math.PI * 2) normalized -= Math.PI * 2;
     return normalized;
+  }
+
+  function describeThreePointCurve(line) {
+    if (!line) return null;
+    const start = points.get(line.a);
+    const middle = getCurveMiddlePoint(line);
+    const end = points.get(line.b);
+    if (!start || !middle || !end) return null;
+
+    const circle = getCircleFromThreePoints(start, middle, end);
+    if (!circle) return null;
+
+    const startAngle = normalizeAngleRadians(Math.atan2(start.y - circle.centerY, start.x - circle.centerX));
+    const middleAngle = normalizeAngleRadians(Math.atan2(middle.y - circle.centerY, middle.x - circle.centerX));
+    const endAngle = normalizeAngleRadians(Math.atan2(end.y - circle.centerY, end.x - circle.centerX));
+    const ccwSweep = (endAngle - startAngle + Math.PI * 2) % (Math.PI * 2);
+    const ccwToMiddle = (middleAngle - startAngle + Math.PI * 2) % (Math.PI * 2);
+    const clockwise = ccwToMiddle > ccwSweep;
+    const sweepRad = clockwise
+      ? (startAngle - endAngle + Math.PI * 2) % (Math.PI * 2)
+      : ccwSweep;
+    if (!(sweepRad > 0)) return null;
+
+    const chord = lineMeasurement(start, end);
+    if (!chord) return null;
+
+    return {
+      radius: circle.radius,
+      arcLength: circle.radius * sweepRad,
+      chordBearing: chord.bearing,
+      chordDistance: chord.distance,
+      deltaAngleDeg: sweepRad * (180 / Math.PI),
+    };
   }
 
   function traceLinePath(context, line, startScreen, endScreen, projectPoint = worldToScreen) {
@@ -11501,9 +11534,11 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   function updateLineInspector() {
     let source = "";
     let measure = null;
+    let curveTable = null;
     if (lastSelectedLineId && lines.has(lastSelectedLineId)) {
       const ln = lines.get(lastSelectedLineId);
       measure = lineMeasurement(points.get(ln.a), points.get(ln.b));
+      curveTable = describeThreePointCurve(ln);
       source = "Selected line";
     } else if (selectedPointIds.length === 2) {
       const a = points.get(selectedPointIds[0]);
@@ -11520,6 +11555,15 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       `<div class="inspectorRow"><span>Source</span><b>${source}</b></div>` +
       `<div class="inspectorRow"><span>Distance</span><b>${measure.distance.toFixed(3)}</b></div>` +
       `<div class="inspectorRow"><span>Bearing</span><b>${measure.bearing}</b></div>`;
+
+    if (curveTable) {
+      lineInspector.innerHTML +=
+        `<div class="inspectorRow"><span>Radius</span><b>${curveTable.radius.toFixed(3)}</b></div>` +
+        `<div class="inspectorRow"><span>Arc Length</span><b>${curveTable.arcLength.toFixed(3)}</b></div>` +
+        `<div class="inspectorRow"><span>Chord Bearing</span><b>${curveTable.chordBearing}</b></div>` +
+        `<div class="inspectorRow"><span>Chord Distance</span><b>${curveTable.chordDistance.toFixed(3)}</b></div>` +
+        `<div class="inspectorRow"><span>Delta Angle</span><b>${curveTable.deltaAngleDeg.toFixed(4)}°</b></div>`;
+    }
   }
   setInterval(updateDerivedSelectionInfo, 250);
   setInterval(updateLineInspector, 250);

@@ -49,6 +49,15 @@ API and CLI surface area remains unchanged for this bug fix. Continue using:
 - API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
+## API and CLI Notes for this curve-inspector enhancement
+
+LineSmith now shows a curve table in the inspector drawer when a selected line is a 3-point curve. The table includes radius, arc length, chord bearing, chord distance, and delta angle for the fitted circular arc through start/middle/end points.
+
+API and CLI surface area remains unchanged for this UI/measurement enhancement. Continue using:
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI notes for this LineSmith collaboration frame-handling fix
 
 LineSmith collaboration websocket handling now correctly processes fragmented frames and multiple coalesced frames in a single TCP packet, which prevents missed point/code saves and stale peer point positions during concurrent editing.
