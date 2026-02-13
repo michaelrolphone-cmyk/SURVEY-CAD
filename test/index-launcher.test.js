@@ -213,7 +213,22 @@ test('launcher project manager is opened from a button and closes after activati
   assert.match(launcherHtml, /clientContact,\s*[\s\S]*billingRate,\s*[\s\S]*description,/, 'create flow should persist new metadata fields on saved project');
   assert.match(launcherHtml, /setActiveProject\(project\.id\);[\s\S]*saveProjects\(\);[\s\S]*renderProjects\(\);[\s\S]*closeProjectForm\(\);[\s\S]*closeProjectManager\(\);/, 'saving from create mode should auto-activate and close both form and manager modals');
   assert.match(launcherHtml, /activeProjectSummary\.textContent\s*=\s*activeProject[\s\S]*'No active project selected\.'/, 'launcher home should show active project summary text');
-  assert.match(launcherHtml, /activeProjectHeader\.textContent\s*=\s*activeProject\s*\?\s*`\$\{activeProject\.name\}`\s*:\s*'';/, 'launcher header should show only the active project name when selected and clear when none active');
+  assert.match(launcherHtml, /activeProjectHeader\.textContent\s*=\s*activeProject[\s\S]*Index \$\{activeProjectIndex\}/, 'launcher header should include survey index text when available and clear when no active project');
+});
+
+
+test('launcher enriches saved projects with township/range aliquots and survey index from address lookup', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /async\s+function\s+saveProjectFromForm\(event\)/, 'project save flow should be async so address enrichment can complete before persistence');
+  assert.match(launcherHtml, /function\s+normalizeTrsComponent\(value = '', padLength = 2\)/, 'launcher should include TRS normalization helper for index generation');
+  assert.match(launcherHtml, /function\s+buildSurveyIndexNumber\(project\)/, 'launcher should build SurveyFoundry index numbers from normalized PLSS metadata');
+  assert.match(launcherHtml, /async\s+function\s+fetchProjectPlssMetadata\(address = ''\)/, 'launcher should fetch PLSS metadata for the entered address');
+  assert.match(launcherHtml, /fetch\(`\/api\/lookup\?address=\$\{encodeURIComponent\(trimmedAddress\)\}`\)/, 'PLSS enrichment should resolve lookup coordinates via the address API');
+  assert.match(launcherHtml, /fetch\(`\/api\/aliquots\?lon=\$\{encodeURIComponent\(lon\)\}&lat=\$\{encodeURIComponent\(lat\)\}`\)/, 'PLSS enrichment should load aliquots for resolved coordinates');
+  assert.match(launcherHtml, /project\.surveyIndex\s*=\s*plssMetadata\?\.surveyIndex\s*\|\|\s*project\.surveyIndex\s*\|\|\s*'';/, 'editing a project should persist survey index metadata');
+  assert.match(launcherHtml, /surveyIndex:\s*plssMetadata\?\.surveyIndex\s*\|\|\s*''/, 'creating a project should persist survey index metadata');
+  assert.match(launcherHtml, /<small>PLSS: \$\{plssText\}<\/small><br\/><small>Index: \$\{surveyIndexText\}<\/small>/, 'project overview rows should display PLSS summary and survey index');
 });
 
 test('launcher project manager enforces sequential project status progression', async () => {
