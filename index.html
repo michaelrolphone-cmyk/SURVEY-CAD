@@ -636,6 +636,7 @@
     let editingProjectId = null;
     let projects = [];
     let activeProjectId = null;
+    let isSavingProjectForm = false;
     const backgroundMapUrlCache = new Map();
     let backgroundRequestToken = 0;
     let resolveLeaveLineSmithChoice = null;
@@ -1132,16 +1133,22 @@
 
     async function saveProjectFromForm(event) {
       event.preventDefault();
+      if (isSavingProjectForm) return;
+
       const name = projectNameInput.value.trim();
       const client = projectClientInput.value.trim();
       const clientContact = projectClientContactInput.value.trim();
       const billingRate = projectBillingRateInput.value.trim();
       const address = projectAddressInput.value.trim();
       const description = projectDescriptionInput.value.trim();
+      const projectIdBeingEdited = editingProjectId;
       if (!name || !address) {
         setProjectFormError('Please provide both a project name and project address before saving.');
         return;
       }
+
+      isSavingProjectForm = true;
+      saveProjectFormButton.disabled = true;
 
       let plssMetadata = null;
       try {
@@ -1150,48 +1157,53 @@
         console.warn('Unable to enrich project with township/range and aliquot metadata', err);
       }
 
-      if (editingProjectId) {
-        const project = projects.find((entry) => entry.id === editingProjectId);
-        if (!project) {
-          setProjectFormError('This project is no longer available. Close the form and try again.');
-          return;
+      try {
+        if (projectIdBeingEdited) {
+          const project = projects.find((entry) => entry.id === projectIdBeingEdited);
+          if (!project) {
+            setProjectFormError('This project is no longer available. Close the form and try again.');
+            return;
+          }
+
+          project.name = name;
+          project.client = client;
+          project.clientContact = clientContact;
+          project.billingRate = billingRate;
+          project.address = address;
+          project.description = description;
+          project.townshipRange = plssMetadata?.townshipRange || project.townshipRange || '';
+          project.aliquotLabel = plssMetadata?.aliquotLabel || project.aliquotLabel || '';
+          project.plssDescription = plssMetadata?.plssDescription || project.plssDescription || '';
+          project.surveyIndex = plssMetadata?.surveyIndex || project.surveyIndex || '';
+          project.updatedAt = new Date().toISOString();
+        } else {
+          const project = {
+            id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name,
+            client,
+            clientContact,
+            billingRate,
+            address,
+            description,
+            townshipRange: plssMetadata?.townshipRange || '',
+            aliquotLabel: plssMetadata?.aliquotLabel || '',
+            plssDescription: plssMetadata?.plssDescription || '',
+            surveyIndex: plssMetadata?.surveyIndex || '',
+            status: 'Proposed',
+            createdAt: new Date().toISOString(),
+          };
+          projects.unshift(project);
+          setActiveProject(project.id);
         }
 
-        project.name = name;
-        project.client = client;
-        project.clientContact = clientContact;
-        project.billingRate = billingRate;
-        project.address = address;
-        project.description = description;
-        project.townshipRange = plssMetadata?.townshipRange || project.townshipRange || '';
-        project.aliquotLabel = plssMetadata?.aliquotLabel || project.aliquotLabel || '';
-        project.plssDescription = plssMetadata?.plssDescription || project.plssDescription || '';
-        project.surveyIndex = plssMetadata?.surveyIndex || project.surveyIndex || '';
-        project.updatedAt = new Date().toISOString();
-      } else {
-        const project = {
-          id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          name,
-          client,
-          clientContact,
-          billingRate,
-          address,
-          description,
-          townshipRange: plssMetadata?.townshipRange || '',
-          aliquotLabel: plssMetadata?.aliquotLabel || '',
-          plssDescription: plssMetadata?.plssDescription || '',
-          surveyIndex: plssMetadata?.surveyIndex || '',
-          status: 'Proposed',
-          createdAt: new Date().toISOString(),
-        };
-        projects.unshift(project);
-        setActiveProject(project.id);
+        saveProjects();
+        renderProjects();
+        closeProjectForm();
+        closeProjectManager();
+      } finally {
+        isSavingProjectForm = false;
+        saveProjectFormButton.disabled = false;
       }
-
-      saveProjects();
-      renderProjects();
-      closeProjectForm();
-      closeProjectManager();
     }
 
     function writeHistoryState(nextState, mode = 'push') {
