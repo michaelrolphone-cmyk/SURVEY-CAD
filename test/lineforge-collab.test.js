@@ -220,3 +220,47 @@ test('lineforge lock handshake grants, denies, and releases object edit locks', 
   assert.equal(released2.type, 'lock-updated');
   assert.equal(released2.action, 'released');
 });
+
+test('lineforge processes fragmented and coalesced websocket frames', () => {
+  const collab = createLineforgeCollabService();
+  const s1 = new FakeSocket();
+  const s2 = new FakeSocket();
+
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?room=fragmented',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'frag-a==' },
+  }, s1, Buffer.alloc(0)), true);
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?room=fragmented',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'frag-b==' },
+  }, s2, Buffer.alloc(0)), true);
+
+  const welcome1 = parseServerTextMessage(s1, 1);
+  parseServerTextMessage(s2, 1);
+  parseServerTextMessage(s1); // peer-joined broadcast
+
+  const stateFrame = clientFrame({
+    type: 'state',
+    requestId: 'frag-state',
+    baseRevision: welcome1.revision,
+    state: '{"points":[42]}',
+  });
+  const splitAt = Math.floor(stateFrame.length / 2);
+  s1.emit('data', stateFrame.subarray(0, splitAt));
+  s1.emit('data', stateFrame.subarray(splitAt));
+
+  const ack = parseServerTextMessage(s1);
+  assert.equal(ack.type, 'state-ack');
+  const stateBroadcast = parseServerTextMessage(s2);
+  assert.equal(stateBroadcast.type, 'state');
+  assert.equal(stateBroadcast.state, '{"points":[42]}');
+
+  const cursorFrame = clientFrame({ type: 'cursor', cursor: { x: 5, y: 6 } });
+  const presenceFrame = clientFrame({ type: 'ar-presence', presence: { x: 1, y: 2, lat: 43.6, lon: -116.2 } });
+  s1.emit('data', Buffer.concat([cursorFrame, presenceFrame]));
+
+  const cursorMessage = parseServerTextMessage(s2, -2);
+  assert.equal(cursorMessage.type, 'cursor');
+  const presenceMessage = parseServerTextMessage(s2);
+  assert.equal(presenceMessage.type, 'ar-presence');
+});
