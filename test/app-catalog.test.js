@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 test('app catalog exposes one icon entry for each app', () => {
-  assert.equal(APP_CATALOG.length, 9);
+  assert.equal(APP_CATALOG.length, 10);
 
   const ids = new Set(APP_CATALOG.map((app) => app.id));
   assert.equal(ids.size, APP_CATALOG.length);
@@ -47,6 +47,7 @@ test('app catalog publishes updated core app descriptions', () => {
   assert.equal(byName.get('UtilitiesPack'), 'Fetches utility records, keeps state-plane coordinates, and exports power utility CSV bundles.');
   assert.equal(byName.get('BoundaryLab'), 'Traverse closure lab with ordered bearings/distances, live boundary preview, and misclosure metrics.');
   assert.equal(byName.get('EquipmentLog'), 'Record equipment setup logs: rodman, height, reference point, setup time, and job file.');
+  assert.equal(byName.get('CrewManager'), 'Manage field crew team member profiles, job titles, contact info, and roles.');
 });
 
 
