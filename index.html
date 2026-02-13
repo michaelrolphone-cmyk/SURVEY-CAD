@@ -276,6 +276,44 @@
       font-family: inherit;
     }
 
+    .project-form-modal {
+      width: min(640px, 100%);
+      max-height: calc(100vh - 7rem);
+    }
+
+    .project-form {
+      padding: 0.9rem;
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .project-form-help {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin: 0;
+    }
+
+    .project-form-error {
+      margin: 0;
+      border-radius: 8px;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid rgba(248, 113, 113, 0.5);
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.28);
+      font-size: 0.86rem;
+    }
+
+    .project-form-error.hidden {
+      display: none;
+    }
+
+    .project-form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
     .project-actions {
       display: flex;
       flex-wrap: wrap;
@@ -481,6 +519,20 @@
           </div>
           <div class="project-panel">
             <p class="subtitle" style="margin-top:0.1rem">Create SurveyFoundry projects for RecordQuarry, PointForge, and LineSmith.</p>
+            <button id="openProjectFormButton" type="button">Create project</button>
+            <div id="projectList" class="project-list"></div>
+          </div>
+        </div>
+      </div>
+      <div id="projectFormModalBackdrop" class="project-modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="Project details form">
+        <div class="project-modal project-form-modal">
+          <div class="project-modal-header">
+            <strong id="projectFormTitle">Create project</strong>
+            <button id="closeProjectFormButton" type="button">Close</button>
+          </div>
+          <form id="projectForm" class="project-form">
+            <p class="project-form-help">Use this form for both new and existing projects. Project name and address are required.</p>
+            <p id="projectFormError" class="project-form-error hidden" role="alert"></p>
             <div class="project-grid">
               <input id="projectName" type="text" placeholder="Project name" />
               <input id="projectClient" type="text" placeholder="Client name" />
@@ -489,9 +541,11 @@
               <input id="projectAddress" type="text" placeholder="Address" />
               <textarea id="projectDescription" placeholder="Project description"></textarea>
             </div>
-            <button id="createProjectButton" type="button">Create and activate project</button>
-            <div id="projectList" class="project-list"></div>
-          </div>
+            <div class="project-form-actions">
+              <button id="cancelProjectFormButton" type="button">Cancel</button>
+              <button id="saveProjectFormButton" type="submit">Create and activate project</button>
+            </div>
+          </form>
         </div>
       </div>
       <div id="leaveLineSmithModalBackdrop" class="project-modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="Unsaved LineSmith changes dialog">
@@ -532,11 +586,18 @@
     const projectBillingRateInput = document.getElementById('projectBillingRate');
     const projectAddressInput = document.getElementById('projectAddress');
     const projectDescriptionInput = document.getElementById('projectDescription');
-    const createProjectButton = document.getElementById('createProjectButton');
+    const openProjectFormButton = document.getElementById('openProjectFormButton');
     const projectList = document.getElementById('projectList');
     const openProjectManagerButton = document.getElementById('openProjectManagerButton');
     const closeProjectManagerButton = document.getElementById('closeProjectManagerButton');
     const projectModalBackdrop = document.getElementById('projectModalBackdrop');
+    const projectFormModalBackdrop = document.getElementById('projectFormModalBackdrop');
+    const projectFormTitle = document.getElementById('projectFormTitle');
+    const projectForm = document.getElementById('projectForm');
+    const projectFormError = document.getElementById('projectFormError');
+    const saveProjectFormButton = document.getElementById('saveProjectFormButton');
+    const closeProjectFormButton = document.getElementById('closeProjectFormButton');
+    const cancelProjectFormButton = document.getElementById('cancelProjectFormButton');
     const leaveLineSmithModalBackdrop = document.getElementById('leaveLineSmithModalBackdrop');
     const leaveLineSmithSaveButton = document.getElementById('leaveLineSmithSaveButton');
     const leaveLineSmithDiscardButton = document.getElementById('leaveLineSmithDiscardButton');
@@ -572,6 +633,7 @@
     ];
 
     let currentApp = null;
+    let editingProjectId = null;
     let projects = [];
     let activeProjectId = null;
     const backgroundMapUrlCache = new Map();
@@ -772,38 +834,48 @@
       openApp(`RecordQuarry.html?${params.toString()}`);
     }
 
-    function renameProject(projectId) {
-      const project = projects.find((entry) => entry.id === projectId);
-      if (!project) return;
-
-      const nextName = window.prompt('Rename project', project.name || '');
-      if (!nextName) return;
-      const trimmedName = nextName.trim();
-      if (!trimmedName) return;
-
-      project.name = trimmedName;
-      project.updatedAt = new Date().toISOString();
-      saveProjects();
-      renderProjects();
+    function resetProjectFormError() {
+      projectFormError.textContent = '';
+      projectFormError.classList.add('hidden');
     }
 
-    function editProject(projectId) {
-      const project = projects.find((entry) => entry.id === projectId);
-      if (!project) return;
+    function setProjectFormError(message) {
+      projectFormError.textContent = message;
+      projectFormError.classList.remove('hidden');
+    }
 
-      const clientContact = window.prompt('Client contact information', project.clientContact || '');
-      if (clientContact === null) return;
-      const billingRate = window.prompt('Billing rate (USD/hour)', project.billingRate || '');
-      if (billingRate === null) return;
-      const description = window.prompt('Project description', project.description || '');
-      if (description === null) return;
+    function resetProjectFormFields() {
+      projectNameInput.value = '';
+      projectClientInput.value = '';
+      projectClientContactInput.value = '';
+      projectBillingRateInput.value = '';
+      projectAddressInput.value = '';
+      projectDescriptionInput.value = '';
+    }
 
-      project.clientContact = clientContact.trim();
-      project.billingRate = billingRate.trim();
-      project.description = description.trim();
-      project.updatedAt = new Date().toISOString();
-      saveProjects();
-      renderProjects();
+    function openProjectForm(projectId = null) {
+      const project = projectId ? projects.find((entry) => entry.id === projectId) : null;
+      editingProjectId = project?.id || null;
+      projectFormTitle.textContent = project ? 'Edit project' : 'Create project';
+      saveProjectFormButton.textContent = project ? 'Save project changes' : 'Create and activate project';
+
+      projectNameInput.value = project?.name || '';
+      projectClientInput.value = project?.client || '';
+      projectClientContactInput.value = project?.clientContact || '';
+      projectBillingRateInput.value = project?.billingRate || '';
+      projectAddressInput.value = project?.address || '';
+      projectDescriptionInput.value = project?.description || '';
+
+      resetProjectFormError();
+      projectFormModalBackdrop.classList.remove('hidden');
+      window.requestAnimationFrame(() => projectNameInput.focus());
+    }
+
+    function closeProjectForm() {
+      editingProjectId = null;
+      resetProjectFormError();
+      resetProjectFormFields();
+      projectFormModalBackdrop.classList.add('hidden');
     }
 
     function advanceProjectStatus(projectId) {
@@ -877,15 +949,10 @@
           closeProjectManager();
         });
 
-        const rename = document.createElement('button');
-        rename.type = 'button';
-        rename.textContent = 'Rename';
-        rename.addEventListener('click', () => renameProject(project.id));
-
         const edit = document.createElement('button');
         edit.type = 'button';
-        edit.textContent = 'Edit details';
-        edit.addEventListener('click', () => editProject(project.id));
+        edit.textContent = 'Edit project';
+        edit.addEventListener('click', () => openProjectForm(project.id));
 
         const advanceStatus = document.createElement('button');
         advanceStatus.type = 'button';
@@ -903,7 +970,6 @@
         actions.className = 'project-actions';
         actions.appendChild(start);
         actions.appendChild(makeActive);
-        actions.appendChild(rename);
         actions.appendChild(edit);
         actions.appendChild(advanceStatus);
         actions.appendChild(remove);
@@ -914,38 +980,53 @@
       });
     }
 
-    function createProject() {
+    function saveProjectFromForm(event) {
+      event.preventDefault();
       const name = projectNameInput.value.trim();
       const client = projectClientInput.value.trim();
       const clientContact = projectClientContactInput.value.trim();
       const billingRate = projectBillingRateInput.value.trim();
       const address = projectAddressInput.value.trim();
       const description = projectDescriptionInput.value.trim();
-      if (!name || !address) return;
+      if (!name || !address) {
+        setProjectFormError('Please provide both a project name and project address before saving.');
+        return;
+      }
 
-      const project = {
-        id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        name,
-        client,
-        clientContact,
-        billingRate,
-        address,
-        description,
-        status: 'Proposed',
-        createdAt: new Date().toISOString(),
-      };
-      projects.unshift(project);
-      setActiveProject(project.id);
+      if (editingProjectId) {
+        const project = projects.find((entry) => entry.id === editingProjectId);
+        if (!project) {
+          setProjectFormError('This project is no longer available. Close the form and try again.');
+          return;
+        }
+
+        project.name = name;
+        project.client = client;
+        project.clientContact = clientContact;
+        project.billingRate = billingRate;
+        project.address = address;
+        project.description = description;
+        project.updatedAt = new Date().toISOString();
+      } else {
+        const project = {
+          id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name,
+          client,
+          clientContact,
+          billingRate,
+          address,
+          description,
+          status: 'Proposed',
+          createdAt: new Date().toISOString(),
+        };
+        projects.unshift(project);
+        setActiveProject(project.id);
+      }
+
       saveProjects();
       renderProjects();
+      closeProjectForm();
       closeProjectManager();
-
-      projectNameInput.value = '';
-      projectClientInput.value = '';
-      projectClientContactInput.value = '';
-      projectBillingRateInput.value = '';
-      projectAddressInput.value = '';
-      projectDescriptionInput.value = '';
     }
 
     function writeHistoryState(nextState, mode = 'push') {
@@ -1095,7 +1176,10 @@
       }
     });
 
-    createProjectButton.addEventListener('click', createProject);
+    openProjectFormButton.addEventListener('click', () => openProjectForm());
+    projectForm.addEventListener('submit', saveProjectFromForm);
+    closeProjectFormButton.addEventListener('click', closeProjectForm);
+    cancelProjectFormButton.addEventListener('click', closeProjectForm);
     openProjectManagerButton.addEventListener('click', openProjectManager);
     closeProjectManagerButton.addEventListener('click', closeProjectManager);
     launcherHomeLink.addEventListener('click', (event) => {
@@ -1123,8 +1207,17 @@
         closeProjectManager();
       }
     });
+    projectFormModalBackdrop.addEventListener('click', (event) => {
+      if (event.target === projectFormModalBackdrop) {
+        closeProjectForm();
+      }
+    });
     window.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
+      if (!projectFormModalBackdrop.classList.contains('hidden')) {
+        closeProjectForm();
+        return;
+      }
       if (!leaveLineSmithModalBackdrop.classList.contains('hidden')) {
         closeLeaveLineSmithModal('cancel');
       }
