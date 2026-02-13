@@ -41,6 +41,12 @@ API and CLI surface area remains unchanged for this fix. Sync continues to use:
 
 ## API and CLI Notes for this change
 
+SurveyFoundry PLSS index generation now normalizes township/range values to single-digit components before composing the first index segment so the prefix remains at the expected three-digit maximum (`TRQ`). This prevents malformed four-digit prefixes when upstream PLSS values arrive zero-padded.
+
+API endpoints and CLI commands remain unchanged for this bug fix. Continue using the existing routes (`GET /api/lookup`, `GET /api/aliquots`) and command references documented below.
+
+## API and CLI Notes for this change
+
 SurveyFoundry Launcher now automatically backfills project PLSS and SurveyFoundry Index metadata when an active project is loaded (including launcher startup and active-project switches) and either field is missing. The launcher uses the existing address-based lookup endpoints (`/api/lookup` and `/api/aliquots`) and does not introduce any new API or CLI surface area.
 
 The SurveyFoundry launcher has been visually redesigned around a rustic survey workshop motif (hand-painted texture layering, warm lamplight earth tones, and subtle futuristic cyan/amber glow accents). This is a UI-only refresh and does not add, remove, or modify server API endpoints or CLI commands; the endpoint and command references below remain current for this release.

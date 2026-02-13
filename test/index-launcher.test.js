@@ -225,8 +225,10 @@ test('launcher enriches saved projects with township/range aliquots and survey i
   assert.match(launcherHtml, /const\s+projectIdBeingEdited\s*=\s*editingProjectId;/, 'project save flow should capture edit target before async enrichment starts');
   assert.match(launcherHtml, /if \(projectIdBeingEdited\) \{[\s\S]*projects\.find\(\(entry\) => entry\.id === projectIdBeingEdited\)/, 'edit saves should resolve the original project id captured at submit time to avoid create-mode fallthrough');
   assert.match(launcherHtml, /saveProjectFormButton\.disabled\s*=\s*true;[\s\S]*finally\s*\{[\s\S]*saveProjectFormButton\.disabled\s*=\s*false;/, 'project form submit button should be disabled during async save and restored afterwards');
-  assert.match(launcherHtml, /function\s+normalizeTrsComponent\(value = '', padLength = 2\)/, 'launcher should include TRS normalization helper for index generation');
+  assert.match(launcherHtml, /function\s+normalizeTrsComponent\(value = '', padLength = 2, maxLength = 0\)/, 'launcher should include TRS normalization helper for index generation');
   assert.match(launcherHtml, /function\s+buildSurveyIndexNumber\(project\)/, 'launcher should build SurveyFoundry index numbers from normalized PLSS metadata');
+  assert.match(launcherHtml, /normalizeTrsComponent\(project\.townships\?\.\[0\], 0, 1\)/, 'launcher should constrain township index component to one digit');
+  assert.match(launcherHtml, /normalizeTrsComponent\(project\.ranges\?\.\[0\], 0, 1\)/, 'launcher should constrain range index component to one digit');
   assert.match(launcherHtml, /async\s+function\s+fetchProjectPlssMetadata\(address = ''\)/, 'launcher should fetch PLSS metadata for the entered address');
   assert.match(launcherHtml, /fetch\(`\/api\/lookup\?address=\$\{encodeURIComponent\(trimmedAddress\)\}`\)/, 'PLSS enrichment should resolve lookup coordinates via the address API');
   assert.match(launcherHtml, /fetch\(`\/api\/aliquots\?lon=\$\{encodeURIComponent\(lon\)\}&lat=\$\{encodeURIComponent\(lat\)\}`\)/, 'PLSS enrichment should load aliquots for resolved coordinates');

@@ -755,10 +755,13 @@
       return code;
     }
 
-    function normalizeTrsComponent(value = '', padLength = 2) {
+    function normalizeTrsComponent(value = '', padLength = 2, maxLength = 0) {
       const digits = (String(value || '').match(/\d+/g) || []).join('');
       if (!digits) return '';
-      return padLength > 0 ? digits.padStart(padLength, '0') : digits;
+      const normalized = padLength > 0
+        ? digits.padStart(padLength, '0')
+        : digits.replace(/^0+(?=\d)/, '');
+      return maxLength > 0 ? normalized.slice(-maxLength) : normalized;
     }
 
     function normalizeBookOrPage(value = '') {
@@ -778,8 +781,8 @@
 
     function buildSurveyIndexNumber(project) {
       if (!project) return '';
-      const township = normalizeTrsComponent(project.townships?.[0], 0) || '0';
-      const range = normalizeTrsComponent(project.ranges?.[0], 0) || '0';
+      const township = normalizeTrsComponent(project.townships?.[0], 0, 1) || '0';
+      const range = normalizeTrsComponent(project.ranges?.[0], 0, 1) || '0';
       const section = normalizeTrsComponent(project.sections?.[0]) || '00';
       const quadrant = aliquotToCode(project.sectionQuadrant) || '0';
       const aliquotCodes = buildAliquotCodes(project.aliquots) || '000';
