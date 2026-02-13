@@ -31,6 +31,13 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
 
+## API and CLI notes for this LineSmith collaboration frame-handling fix
+
+LineSmith collaboration websocket handling now correctly processes fragmented frames, upgrade `head` bytes, and multiple coalesced frames in a single TCP packet, which prevents missed point/code saves and stale peer point positions during concurrent editing.
+
+- Collaboration endpoint (unchanged): `GET /ws/lineforge?room=<roomId>`
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`
+
 ## LocalStorage sync architecture reference
 
 For a focused, implementation-level explanation of browser-to-browser sync over websocket (including **initial state loading on connect**, queueing, checksum reconciliation, HTTP fallback, and sequence diagrams), see:

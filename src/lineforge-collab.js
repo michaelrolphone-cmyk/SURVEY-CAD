@@ -39,6 +39,38 @@ function decodeFrame(buffer) {
   return { opcode, payload: buffer.subarray(offset, offset + payloadLen) };
 }
 
+function decodeNextFrame(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 2) return null;
+  const first = buffer[0];
+  const second = buffer[1];
+  const masked = (second & 0x80) !== 0;
+  let payloadLen = second & 0x7f;
+  let offset = 2;
+
+  if (payloadLen === 126) {
+    if (buffer.length < offset + 2) return null;
+    payloadLen = buffer.readUInt16BE(offset);
+    offset += 2;
+  } else if (payloadLen === 127) {
+    if (buffer.length < offset + 8) return null;
+    const value = Number(buffer.readBigUInt64BE(offset));
+    if (!Number.isSafeInteger(value)) return null;
+    payloadLen = value;
+    offset += 8;
+  }
+
+  if (masked) offset += 4;
+  const totalLength = offset + payloadLen;
+  if (buffer.length < totalLength) return null;
+
+  const frame = decodeFrame(buffer.subarray(0, totalLength));
+  if (!frame) return null;
+  return {
+    ...frame,
+    consumed: totalLength,
+  };
+}
+
 function encodeTextFrame(text) {
   const payload = Buffer.from(String(text), 'utf8');
   const len = payload.length;
@@ -160,10 +192,7 @@ export function createLineforgeCollabService() {
     ];
     socket.write(responseHeaders.join('\r\n'));
 
-    if (head.length) {
-      const frame = decodeFrame(head);
-      if (frame?.opcode === 0x8) socket.end();
-    }
+    client.buffer = head.length ? Buffer.from(head) : Buffer.alloc(0);
 
     const peers = Array.from(room.clients.values())
       .filter((peer) => peer.id !== clientId)
@@ -186,185 +215,197 @@ export function createLineforgeCollabService() {
 
     broadcast(room, { type: 'peer-joined', clientId, color }, clientId);
 
-    socket.on('data', (chunk) => {
-      const frame = decodeFrame(chunk);
-      if (!frame) return;
-      if (frame.opcode === 0x8) {
-        socket.end();
-        return;
-      }
-      if (frame.opcode !== 0x1) return;
-
-      let message;
-      try {
-        message = JSON.parse(frame.payload.toString('utf8'));
-      } catch {
-        return;
+    function processBufferedFrames(chunk = null) {
+      if (chunk && chunk.length) {
+        client.buffer = client.buffer.length ? Buffer.concat([client.buffer, chunk]) : Buffer.from(chunk);
       }
 
-      if (message?.type === 'cursor' && message.cursor) {
-        broadcast(room, {
-          type: 'cursor',
-          clientId,
-          color,
-          cursor: {
-            x: Number(message.cursor.x) || 0,
-            y: Number(message.cursor.y) || 0,
-          },
-          at: Date.now(),
-        }, clientId);
-        return;
-      }
+      while (client.buffer.length) {
+        const frame = decodeNextFrame(client.buffer);
+        if (!frame) break;
+        client.buffer = client.buffer.subarray(frame.consumed);
+        if (frame.opcode === 0x8) {
+          socket.end();
+          return;
+        }
+        if (frame.opcode !== 0x1) continue;
 
-      if (message?.type === 'state' && message.state) {
-        const baseRevision = Number(message.baseRevision);
-        if (!Number.isInteger(baseRevision) || baseRevision !== room.revision) {
+        let message;
+        try {
+          message = JSON.parse(frame.payload.toString('utf8'));
+        } catch {
+          continue;
+        }
+
+        if (message?.type === 'cursor' && message.cursor) {
+          broadcast(room, {
+            type: 'cursor',
+            clientId,
+            color,
+            cursor: {
+              x: Number(message.cursor.x) || 0,
+              y: Number(message.cursor.y) || 0,
+            },
+            at: Date.now(),
+          }, clientId);
+          continue;
+        }
+
+        if (message?.type === 'state' && message.state) {
+          const baseRevision = Number(message.baseRevision);
+          if (!Number.isInteger(baseRevision) || baseRevision !== room.revision) {
+            send(client, {
+              type: 'state-rejected',
+              requestId: message.requestId || null,
+              reason: 'revision-mismatch',
+              expectedRevision: room.revision,
+              state: room.latestState,
+              revision: room.revision,
+              at: Date.now(),
+            });
+            continue;
+          }
+
+          room.latestState = message.state;
+          room.revision += 1;
+
           send(client, {
-            type: 'state-rejected',
+            type: 'state-ack',
             requestId: message.requestId || null,
-            reason: 'revision-mismatch',
-            expectedRevision: room.revision,
-            state: room.latestState,
             revision: room.revision,
+            state: room.latestState,
             at: Date.now(),
           });
-          return;
-        }
 
-        room.latestState = message.state;
-        room.revision += 1;
-
-        send(client, {
-          type: 'state-ack',
-          requestId: message.requestId || null,
-          revision: room.revision,
-          state: room.latestState,
-          at: Date.now(),
-        });
-
-        broadcast(room, {
-          type: 'state',
-          clientId,
-          state: message.state,
-          revision: room.revision,
-          requestId: message.requestId || null,
-          at: Date.now(),
-        }, clientId);
-        return;
-      }
-
-
-      if (message?.type === 'lock-request' && message.entityType && message.entityId) {
-        const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
-        const entityId = String(message.entityId || '').trim();
-        if (!entityType || !entityId) {
-          send(client, {
-            type: 'lock-denied',
+          broadcast(room, {
+            type: 'state',
+            clientId,
+            state: message.state,
+            revision: room.revision,
             requestId: message.requestId || null,
-            reason: 'invalid-entity',
             at: Date.now(),
-          });
-          return;
+          }, clientId);
+          continue;
         }
 
-        const lockKey = `${entityType}:${entityId}`;
-        const existing = room.locks.get(lockKey);
-        if (existing && existing.ownerClientId !== clientId) {
-          send(client, {
-            type: 'lock-denied',
-            requestId: message.requestId || null,
-            reason: 'already-locked',
+        if (message?.type === 'lock-request' && message.entityType && message.entityId) {
+          const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
+          const entityId = String(message.entityId || '').trim();
+          if (!entityType || !entityId) {
+            send(client, {
+              type: 'lock-denied',
+              requestId: message.requestId || null,
+              reason: 'invalid-entity',
+              at: Date.now(),
+            });
+            continue;
+          }
+
+          const lockKey = `${entityType}:${entityId}`;
+          const existing = room.locks.get(lockKey);
+          if (existing && existing.ownerClientId !== clientId) {
+            send(client, {
+              type: 'lock-denied',
+              requestId: message.requestId || null,
+              reason: 'already-locked',
+              entityType,
+              entityId,
+              ownerClientId: existing.ownerClientId,
+              ownerColor: existing.ownerColor,
+              at: Date.now(),
+            });
+            continue;
+          }
+
+          const lock = {
             entityType,
             entityId,
-            ownerClientId: existing.ownerClientId,
-            ownerColor: existing.ownerColor,
+            ownerClientId: clientId,
+            ownerColor: color,
+            at: Date.now(),
+          };
+          room.locks.set(lockKey, lock);
+
+          send(client, {
+            type: 'lock-granted',
+            requestId: message.requestId || null,
+            entityType,
+            entityId,
+            ownerClientId: clientId,
+            ownerColor: color,
             at: Date.now(),
           });
-          return;
+
+          broadcast(room, {
+            type: 'lock-updated',
+            action: 'locked',
+            entityType,
+            entityId,
+            ownerClientId: clientId,
+            ownerColor: color,
+            at: Date.now(),
+          }, clientId);
+          continue;
         }
 
-        const lock = {
-          entityType,
-          entityId,
-          ownerClientId: clientId,
-          ownerColor: color,
-          at: Date.now(),
-        };
-        room.locks.set(lockKey, lock);
+        if (message?.type === 'lock-release' && message.entityType && message.entityId) {
+          const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
+          const entityId = String(message.entityId || '').trim();
+          if (!entityType || !entityId) continue;
 
-        send(client, {
-          type: 'lock-granted',
-          requestId: message.requestId || null,
-          entityType,
-          entityId,
-          ownerClientId: clientId,
-          ownerColor: color,
-          at: Date.now(),
-        });
+          const lockKey = `${entityType}:${entityId}`;
+          const existing = room.locks.get(lockKey);
+          if (!existing || existing.ownerClientId !== clientId) continue;
 
-        broadcast(room, {
-          type: 'lock-updated',
-          action: 'locked',
-          entityType,
-          entityId,
-          ownerClientId: clientId,
-          ownerColor: color,
-          at: Date.now(),
-        }, clientId);
-        return;
+          room.locks.delete(lockKey);
+          broadcast(room, {
+            type: 'lock-updated',
+            action: 'released',
+            entityType,
+            entityId,
+            ownerClientId: clientId,
+            ownerColor: color,
+            at: Date.now(),
+          });
+          continue;
+        }
+
+        if (message?.type === 'ar-presence' && message.presence) {
+          const presence = message.presence;
+          const projected = {
+            type: 'ar-presence',
+            clientId,
+            color,
+            presence: {
+              x: Number(presence.x),
+              y: Number(presence.y),
+              lat: Number(presence.lat),
+              lon: Number(presence.lon),
+              altFeet: Number(presence.altFeet),
+              headingRad: Number(presence.headingRad),
+              pitchRad: Number(presence.pitchRad),
+              rollRad: Number(presence.rollRad),
+            },
+            at: Date.now(),
+          };
+          if (!Number.isFinite(projected.presence.x)) delete projected.presence.x;
+          if (!Number.isFinite(projected.presence.y)) delete projected.presence.y;
+          if (!Number.isFinite(projected.presence.lat)) delete projected.presence.lat;
+          if (!Number.isFinite(projected.presence.lon)) delete projected.presence.lon;
+          if (!Number.isFinite(projected.presence.altFeet)) delete projected.presence.altFeet;
+          if (!Number.isFinite(projected.presence.headingRad)) delete projected.presence.headingRad;
+          if (!Number.isFinite(projected.presence.pitchRad)) delete projected.presence.pitchRad;
+          if (!Number.isFinite(projected.presence.rollRad)) delete projected.presence.rollRad;
+          broadcast(room, projected, clientId);
+        }
       }
+    }
 
-      if (message?.type === 'lock-release' && message.entityType && message.entityId) {
-        const entityType = message.entityType === 'point' ? 'point' : message.entityType === 'line' ? 'line' : null;
-        const entityId = String(message.entityId || '').trim();
-        if (!entityType || !entityId) return;
-
-        const lockKey = `${entityType}:${entityId}`;
-        const existing = room.locks.get(lockKey);
-        if (!existing || existing.ownerClientId !== clientId) return;
-
-        room.locks.delete(lockKey);
-        broadcast(room, {
-          type: 'lock-updated',
-          action: 'released',
-          entityType,
-          entityId,
-          ownerClientId: clientId,
-          ownerColor: color,
-          at: Date.now(),
-        });
-        return;
-      }
-
-      if (message?.type === 'ar-presence' && message.presence) {
-        const presence = message.presence;
-        const projected = {
-          type: 'ar-presence',
-          clientId,
-          color,
-          presence: {
-            x: Number(presence.x),
-            y: Number(presence.y),
-            lat: Number(presence.lat),
-            lon: Number(presence.lon),
-            altFeet: Number(presence.altFeet),
-            headingRad: Number(presence.headingRad),
-            pitchRad: Number(presence.pitchRad),
-            rollRad: Number(presence.rollRad),
-          },
-          at: Date.now(),
-        };
-        if (!Number.isFinite(projected.presence.x)) delete projected.presence.x;
-        if (!Number.isFinite(projected.presence.y)) delete projected.presence.y;
-        if (!Number.isFinite(projected.presence.lat)) delete projected.presence.lat;
-        if (!Number.isFinite(projected.presence.lon)) delete projected.presence.lon;
-        if (!Number.isFinite(projected.presence.altFeet)) delete projected.presence.altFeet;
-        if (!Number.isFinite(projected.presence.headingRad)) delete projected.presence.headingRad;
-        if (!Number.isFinite(projected.presence.pitchRad)) delete projected.presence.pitchRad;
-        if (!Number.isFinite(projected.presence.rollRad)) delete projected.presence.rollRad;
-        broadcast(room, projected, clientId);
-      }
+    socket.on('data', (chunk) => {
+      processBufferedFrames(chunk);
     });
+
+    processBufferedFrames();
 
     socket.on('close', () => {
       room.clients.delete(clientId);
