@@ -114,7 +114,7 @@ This websocket reconnect-backoff reliability update also does not add, remove, o
 
 This localStorage sync checksum-alignment fix also does not add, remove, or rename API endpoints or CLI commands; existing endpoint and command references below remain current.
 
-This localStorage sync reliability fix now compacts queued browser sync differentials while offline/unavailable to prevent localStorage quota overflows (`surveyfoundryLocalStoragePendingDiffs`) when collaboration sync cannot connect; API endpoints and CLI commands remain unchanged.
+This localStorage sync reliability fix now compacts queued browser sync differentials while offline/unavailable to prevent localStorage quota overflows (`surveyfoundryLocalStoragePendingDiffs`) when collaboration sync cannot connect. When websocket sync is unavailable, clients now continue syncing queued local changes through the existing REST endpoints (`GET /api/localstorage-sync` + `POST /api/localstorage-sync`) until websocket transport recovers. CLI commands remain unchanged (`npm run cli -- --help`, `npm run ros:cli -- --help`).
 
 ## LineSmith Layer Reassignment Shortcut
 

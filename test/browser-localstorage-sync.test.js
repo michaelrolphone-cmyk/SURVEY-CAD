@@ -9,6 +9,7 @@ import {
   shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldFallbackToHttpSync,
+  shouldPushSnapshotOverHttp,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -79,6 +80,43 @@ test('shouldFallbackToHttpSync only enables polling fallback after repeated pre-
   assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 3 }), true);
   assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 2 }), false);
   assert.equal(shouldFallbackToHttpSync({ hasEverConnected: true, consecutiveFailures: 10 }), false);
+});
+
+test('shouldPushSnapshotOverHttp only when there are pending local changes and no open socket', () => {
+  assert.equal(shouldPushSnapshotOverHttp({
+    queueLength: 1,
+    hasPendingBatch: false,
+    socketReadyState: 3,
+    online: true,
+  }), true);
+
+  assert.equal(shouldPushSnapshotOverHttp({
+    queueLength: 0,
+    hasPendingBatch: true,
+    socketReadyState: 3,
+    online: true,
+  }), true);
+
+  assert.equal(shouldPushSnapshotOverHttp({
+    queueLength: 0,
+    hasPendingBatch: false,
+    socketReadyState: 3,
+    online: true,
+  }), false);
+
+  assert.equal(shouldPushSnapshotOverHttp({
+    queueLength: 2,
+    hasPendingBatch: false,
+    socketReadyState: 1,
+    online: true,
+  }), false);
+
+  assert.equal(shouldPushSnapshotOverHttp({
+    queueLength: 2,
+    hasPendingBatch: false,
+    socketReadyState: 3,
+    online: false,
+  }), false);
 });
 
 test('coalesceQueuedOperations keeps only the latest operation per key and preserves clear ordering', () => {

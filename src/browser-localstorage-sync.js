@@ -121,6 +121,17 @@ function shouldFallbackToHttpSync({
   return !hasEverConnected && consecutiveFailures >= maxFailures;
 }
 
+function shouldPushSnapshotOverHttp({
+  queueLength = 0,
+  hasPendingBatch = false,
+  socketReadyState = 3,
+  online = true,
+} = {}) {
+  if (!online) return false;
+  if (socketReadyState === 1) return false;
+  return queueLength > 0 || hasPendingBatch;
+}
+
 function normalizeQueuedDifferential(diff = {}) {
   const operationsRaw = Array.isArray(diff?.operations) ? diff.operations : [];
   const operations = operationsRaw
@@ -520,16 +531,62 @@ class LocalStorageSocketSync {
     if (!response.ok) return null;
     const payload = await response.json();
     return {
+      version: Number(payload?.version || 0),
       checksum: String(payload?.checksum || ''),
       snapshot: normalizeSnapshot(payload?.snapshot || {}),
     };
+  }
+
+  async #pushSnapshotViaHttp() {
+    if (!shouldPushSnapshotOverHttp({
+      queueLength: this.queue.length,
+      hasPendingBatch: Boolean(this.pendingBatch?.operations?.length),
+      socketReadyState: this.socket?.readyState,
+      online: navigator.onLine,
+    })) {
+      return false;
+    }
+
+    if (this.batchTimer !== null) {
+      window.clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+      this.#commitPendingBatch();
+    }
+
+    const serverState = await this.#fetchServerState();
+    if (!serverState) return false;
+
+    const snapshot = buildSnapshot();
+    const response = await fetch('/api/localstorage-sync', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        version: (Number.isFinite(serverState.version) ? serverState.version : 0) + 1,
+        snapshot,
+      }),
+    });
+    if (!response.ok) return false;
+    const payload = await response.json();
+    const nextState = payload?.state;
+    if (!nextState?.checksum) return false;
+
+    this.serverChecksum = String(nextState.checksum);
+    this.#persistMeta();
+    this.inFlight = null;
+    this.pendingBatch = null;
+    this.queue = [];
+    this.#persistQueue();
+    return true;
   }
 
   #scheduleSnapshotPoll() {
     if (this.snapshotPollTimer !== null) return;
     this.snapshotPollTimer = window.setInterval(async () => {
       if (!navigator.onLine) return;
-      if (this.queue.length || this.pendingBatch?.operations?.length) return;
+      if (this.queue.length || this.pendingBatch?.operations?.length) {
+        await this.#pushSnapshotViaHttp();
+        return;
+      }
       const localChecksum = checksumSnapshot(buildSnapshot());
       const state = await this.#fetchServerState();
       if (!state?.checksum) return;
@@ -623,4 +680,5 @@ export {
   shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldFallbackToHttpSync,
+  shouldPushSnapshotOverHttp,
 };
