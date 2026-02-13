@@ -359,6 +359,8 @@ test('VIEWPORT.HTML includes line inspector card for selected line or two points
   assert.match(html, /id="lineInspector"\s+class="inspectorCard"/, 'selection panel should include the line inspector card');
   assert.match(html, /else if \(selectedPointIds\.length === 2\)/, 'inspector should support computing measurements from two selected points');
   assert.match(html, /lineInspector\.innerHTML\s*=\s*[\s\S]*Distance[\s\S]*Bearing/, 'inspector should render distance and bearing rows');
+  assert.match(html, /function\s+describeThreePointCurve\(line\)/, 'inspector should expose a dedicated curve-table calculator for 3-point curves');
+  assert.match(html, /if \(curveTable\) \{[\s\S]*Radius[\s\S]*Arc Length[\s\S]*Chord Bearing[\s\S]*Chord Distance[\s\S]*Delta Angle/, 'inspector should append the curve table rows when a 3-point curve line is selected');
 });
 
 
