@@ -173,6 +173,8 @@ test('launcher includes SurveyFoundry project manager and RecordQuarry start wor
   assert.match(launcherHtml, /id="projectClientContact"/, 'launcher should include project client contact input');
   assert.match(launcherHtml, /id="projectBillingRate"/, 'launcher should include project billing rate input');
   assert.match(launcherHtml, /id="projectAddress"/, 'launcher should include project address input');
+  assert.match(launcherHtml, /id="projectTsr"/, 'launcher should include project TSR input');
+  assert.match(launcherHtml, /id="projectSection"/, 'launcher should include project section input');
   assert.match(launcherHtml, /id="projectDescription"/, 'launcher should include project description input');
   assert.match(launcherHtml, /const\s+PROJECT_STORAGE_KEY\s*=\s*'surveyfoundryProjects'/, 'launcher should persist project metadata in localStorage');
   assert.match(launcherHtml, /function\s+openProject\(project\)/, 'launcher should define project start helper');
@@ -189,6 +191,8 @@ test('launcher project manager supports shared modal editing and delete actions'
   assert.match(launcherHtml, /function\s+openProjectForm\(projectId = null\)/, 'launcher should use a single modal form helper for create/edit workflows');
   assert.match(launcherHtml, /saveProjectFormButton\.textContent\s*=\s*project\s*\?\s*'Save project changes'\s*:\s*'Create and activate project';/, 'project form should switch submit button text between edit and create modes');
   assert.match(launcherHtml, /projectNameInput\.value\s*=\s*project\?\.name\s*\|\|\s*'';/, 'edit mode should prefill project form values from selected project');
+  assert.match(launcherHtml, /projectTsrInput\.value\s*=\s*project\?\.tsr\s*\|\|\s*project\?\.townshipRange\s*\|\|\s*'';/, 'edit mode should prefill TSR override field');
+  assert.match(launcherHtml, /projectSectionInput\.value\s*=\s*project\?\.section\s*\|\|\s*project\?\.sections\?\.\[0\]\s*\|\|\s*'';/, 'edit mode should prefill section override field');
   assert.match(launcherHtml, /setProjectFormError\('Please provide both a project name and project address before saving\.'\);/, 'shared form should render inline validation when required fields are missing');
   assert.doesNotMatch(launcherHtml, /window\.prompt\(/, 'project create/edit flow should no longer rely on browser prompts');
   assert.match(launcherHtml, /function\s+deleteProject\(projectId\)/, 'launcher should define a delete project helper');
@@ -209,7 +213,10 @@ test('launcher project manager is opened from a button and closes after activati
   assert.match(launcherHtml, /projectForm\.addEventListener\('submit',\s*saveProjectFromForm\);/, 'project form submit should be wired to the shared save handler');
   assert.match(launcherHtml, /const\s+clientContact\s*=\s*projectClientContactInput\.value\.trim\(\);/, 'create flow should read client contact metadata');
   assert.match(launcherHtml, /const\s+billingRate\s*=\s*projectBillingRateInput\.value\.trim\(\);/, 'create flow should read billing rate metadata');
+  assert.match(launcherHtml, /const\s+tsr\s*=\s*projectTsrInput\.value\.trim\(\);/, 'create flow should read TSR metadata from the shared form');
+  assert.match(launcherHtml, /const\s+section\s*=\s*projectSectionInput\.value\.trim\(\);/, 'create flow should read section metadata from the shared form');
   assert.match(launcherHtml, /const\s+description\s*=\s*projectDescriptionInput\.value\.trim\(\);/, 'create flow should read project description metadata');
+  assert.match(launcherHtml, /tsr,\s*[\s\S]*section,\s*[\s\S]*sections:\s*section\s*\?\s*\[section\]\s*:\s*\[\],/, 'create flow should persist TSR and section metadata on saved project');
   assert.match(launcherHtml, /clientContact,\s*[\s\S]*billingRate,\s*[\s\S]*description,/, 'create flow should persist new metadata fields on saved project');
   assert.match(launcherHtml, /setActiveProject\(project\.id\);[\s\S]*saveProjects\(\);[\s\S]*renderProjects\(\);[\s\S]*closeProjectForm\(\);[\s\S]*closeProjectManager\(\);/, 'saving from create mode should auto-activate and close both form and manager modals');
   assert.match(launcherHtml, /activeProjectSummary\.textContent\s*=\s*activeProject[\s\S]*'No active project selected\.'/, 'launcher home should show active project summary text');
@@ -252,7 +259,9 @@ test('launcher enriches saved projects with township/range aliquots and survey i
   assert.match(launcherHtml, /fetch\(`\/api\/lookup\?address=\$\{encodeURIComponent\(trimmedAddress\)\}`\)/, 'PLSS enrichment should resolve lookup coordinates via the address API');
   assert.match(launcherHtml, /fetch\(`\/api\/aliquots\?lon=\$\{encodeURIComponent\(lon\)\}&lat=\$\{encodeURIComponent\(lat\)\}`\)/, 'PLSS enrichment should load aliquots for resolved coordinates');
   assert.match(launcherHtml, /const\s+addressChanged\s*=\s*String\(project\.address \|\| ''\)\.trim\(\) !== address;/, 'editing a project should detect address changes so stale metadata can be cleared');
-  assert.match(launcherHtml, /if \(addressChanged\) \{[\s\S]*project\.surveyIndex\s*=\s*'';/, 'editing with a new address should clear stale PLSS/index fields before background backfill');
+  assert.match(launcherHtml, /const\s+plssEdited\s*=\s*tsr !== previousTsr \|\| section !== previousSection;/, 'editing should detect manual TSR/section corrections');
+  assert.match(launcherHtml, /if \(plssEdited\) \{[\s\S]*project\.manualPlssOverride\s*=\s*true;/, 'editing TSR/section should enable manual override mode to preserve operator corrections');
+  assert.match(launcherHtml, /if \(addressChanged && !project\.manualPlssOverride\) \{[\s\S]*project\.surveyIndex\s*=\s*'';/, 'editing with a new address should only clear auto metadata when manual override is not enabled');
   assert.match(launcherHtml, /surveyIndex:\s*''/, 'creating a project should initialize survey index metadata as empty until backfill resolves');
   assert.match(launcherHtml, /if \(shouldBackfillMetadata && savedProjectId\) \{[\s\S]*syncProjectPlssMetadata\(savedProjectId\);/, 'project saves should trigger non-blocking background metadata enrichment');
   assert.match(launcherHtml, /<small>PLSS: \$\{plssText\}<\/small><br\/><small>Index: \$\{surveyIndexText\}<\/small>/, 'project overview rows should display PLSS summary and survey index');
