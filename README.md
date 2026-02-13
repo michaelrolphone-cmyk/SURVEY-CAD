@@ -160,6 +160,9 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 - `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
   - CIR circles render with a 35% opacity primary stroke and no black underlay so map content remains visible through the circle interior.
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
+- `PC` / `PT`: curve start/end markers for field-to-finish curve chains.
+  - `PC` marks the **Point of Curve** and `PT` marks the **Point of Tangent**.
+  - Every point between `PC` and `PT` is connected as an approximated curve segment, supporting both classic 3-point curves and denser multi-point approximations.
 - Manual LineSmith line connections now persist to point codes:
   - When a user manually connects two points, LineSmith appends `JPN<targetPointNumber>` to the source point unless that pair is already connected by sequential linework rules.
   - Deleting a line removes matching `JPN` directives when present.
@@ -178,6 +181,7 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 - `<code> BEG/END/CLO`: start/end/close sequential linework for a linework code.
 - `CIR <radius>`: draw a circle centered on the point with a radius in drawing units (feet in typical jobs).
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
+- `PC` / `PT`: mark field-to-finish curve runs from Point of Curve to Point of Tangent, connecting all intermediate points as curve-approximation segments.
 
 
 ## LineSmith Symbol Point Markers
