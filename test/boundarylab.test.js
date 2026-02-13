@@ -47,6 +47,18 @@ test('calculateTraverseFromOrderedCalls computes closure and error metrics', () 
   assert.ok((closureRatio(open.totalLength, open.linearMisclosure) || 0) > 1);
 });
 
+test('calculateTraverseFromOrderedCalls reports zero angular misclosure for linearly closed reversals', () => {
+  const closedOutAndBack = calculateTraverseFromOrderedCalls({
+    orderedCalls: [
+      { bearing: 'N45E', distance: 125 },
+      { bearing: 'S45W', distance: 125 },
+    ],
+  });
+
+  assert.ok((closedOutAndBack.linearMisclosure || 0) <= 1e-6);
+  assert.equal(closedOutAndBack.angularMisclosure, 0);
+});
+
 
 test('formatDms renders angular errors in DMS text with rollover-safe precision', () => {
   assert.equal(formatDms(90), `90°00'00.00"`);
