@@ -589,5 +589,6 @@ LineSmith now renders field-to-finish PC/PT curve runs as a true 3-point curve i
 - Curve linework stores the middle tangent point so redraws/prints preserve the same shape.
 - PC→PT runs suppress their straight start→middle and middle→end auto-segments so only the curve is drawn, including on first sync (no edit-triggered redraw needed).
 - If an older auto-generated straight segment already exists between PC and PT, LineSmith now upgrades it to curve metadata during sync so the curve renders immediately without requiring point-code edits.
+- Sync now always backfills legacy auto-line metadata before evaluating curve commands, so saved drawings and point moves render PC→PT curves immediately without requiring a point-code edit trigger.
 
 API/CLI impact: no endpoint or command changes; continue using the API and CLI commands documented in this README.
