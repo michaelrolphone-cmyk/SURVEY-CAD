@@ -110,6 +110,15 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 
 This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify API endpoints or CLI commands; continue using the endpoints and commands listed above.
 
+
+## API and CLI Notes for this change
+
+LineSmith now re-syncs field-to-finish linework metadata (including PC→PT three-point curve middle-point metadata) immediately after restoring a drawing state. This ensures curve segments render on first open and continue updating predictably after point moves/refresh flows without requiring a follow-up point-code edit.
+
+API endpoints and CLI commands remain unchanged for this bug fix. Continue using:
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI Notes for this change
 
 LineSmith point edits now schedule collaboration state sync immediately from both Point Manager inline edits and Point Inspector apply flows (including shared-field applies and pending primary point-editor applies), so connected clients receive `num`/`x`/`y`/`z`/`code`/`notes` updates without waiting for later actions. Drag lock release is now deferred until queued/in-flight collaboration state sync is flushed, preventing two clients from immediately re-locking and diverging point locations before the final drag position publishes. The save-path behavior remains: pending primary point-editor edits are applied before `Save Drawing to Project` snapshots state so saved history and collaboration state stay aligned.
