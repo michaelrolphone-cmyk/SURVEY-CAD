@@ -77,3 +77,79 @@ test('createRedisLocalStorageSyncStore can use injected redis client factory', a
   await store.close();
   assert.equal(fakeClient.quitCalled, true);
 });
+
+
+test('createRedisLocalStorageSyncStore retries until redis connect succeeds', async () => {
+  let attempt = 0;
+  const createClient = () => ({
+    async connect() {
+      attempt += 1;
+      if (attempt < 3) {
+        throw new Error('connect not ready');
+      }
+    },
+    async get() {
+      return null;
+    },
+    async set() {
+      return 'OK';
+    },
+    async quit() {
+      return undefined;
+    },
+    async disconnect() {
+      return undefined;
+    },
+  });
+
+  const store = await createRedisLocalStorageSyncStore({
+    redisUrl: 'redis://localhost:6379',
+    redisConnectMaxWaitMs: 200,
+    redisConnectRetryDelayMs: 10,
+    createClient,
+  });
+
+  assert.ok(store);
+  assert.equal(attempt, 3);
+  await store.close();
+});
+
+test('createRedisLocalStorageSyncStore configures tls options for rediss urls', async () => {
+  let receivedOptions;
+  const fakeClient = new FakeRedisClient();
+
+  const store = await createRedisLocalStorageSyncStore({
+    redisUrl: 'rediss://example.com:6379',
+    redisTlsRejectUnauthorized: false,
+    createClient: (options) => {
+      receivedOptions = options;
+      return fakeClient;
+    },
+  });
+
+  assert.ok(store);
+  assert.equal(receivedOptions.url, 'rediss://example.com:6379');
+  assert.equal(receivedOptions.socket.tls, true);
+  assert.equal(receivedOptions.socket.rejectUnauthorized, false);
+
+  await store.close();
+});
+
+test('createRedisLocalStorageSyncStore throws after retry window is exhausted', async () => {
+  await assert.rejects(
+    () => createRedisLocalStorageSyncStore({
+      redisUrl: 'redis://localhost:6379',
+      redisConnectMaxWaitMs: 80,
+      redisConnectRetryDelayMs: 10,
+      createClient: () => ({
+        async connect() {
+          throw new Error('still down');
+        },
+        async disconnect() {
+          return undefined;
+        },
+      }),
+    }),
+    /Unable to initialize Redis localstorage sync store after/,
+  );
+});

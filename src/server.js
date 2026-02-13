@@ -511,20 +511,13 @@ export async function startServer({
   port = Number(process.env.PORT) || 3000,
   host = '0.0.0.0',
   redisStoreFactory = createRedisLocalStorageSyncStore,
-  redisInitTimeoutMs = Number(process.env.REDIS_INIT_TIMEOUT_MS) || 5000,
   ...opts
 } = {}) {
   const resolvedOpts = { ...opts };
 
   if (!resolvedOpts.localStorageSyncStore) {
     try {
-      const redisBackedStore = await Promise.race([
-        Promise.resolve(redisStoreFactory()),
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error(`Redis store initialization timed out after ${redisInitTimeoutMs}ms`)), redisInitTimeoutMs);
-        }),
-      ]);
-
+      const redisBackedStore = await redisStoreFactory();
       if (redisBackedStore) {
         resolvedOpts.localStorageSyncStore = redisBackedStore;
       }
