@@ -7,6 +7,7 @@ import {
   mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
+  shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
 } from '../src/browser-localstorage-sync.js';
@@ -69,6 +70,37 @@ test('shouldHydrateFromServerOnWelcome requests server snapshot only when safe a
   assert.equal(shouldHydrateFromServerOnWelcome({
     localChecksum: 'fnv1a-same',
     serverChecksum: 'fnv1a-same',
+    queueLength: 0,
+    hasPendingBatch: false,
+  }), false);
+});
+
+
+test('shouldRebaseQueueFromServerOnWelcome enables server-hydrate+rebase when queued local changes exist and checksums diverge', () => {
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 1,
+    hasPendingBatch: false,
+  }), true);
+
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: true,
+  }), true);
+
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-same',
+    serverChecksum: 'fnv1a-same',
+    queueLength: 1,
+    hasPendingBatch: false,
+  }), false);
+
+  assert.equal(shouldRebaseQueueFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
     queueLength: 0,
     hasPendingBatch: false,
   }), false);

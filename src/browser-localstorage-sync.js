@@ -112,6 +112,18 @@ function shouldHydrateFromServerOnWelcome({
 }
 
 
+
+function shouldRebaseQueueFromServerOnWelcome({
+  localChecksum = '',
+  serverChecksum = '',
+  queueLength = 0,
+  hasPendingBatch = false,
+} = {}) {
+  if (!serverChecksum) return false;
+  if (!queueLength && !hasPendingBatch) return false;
+  return String(localChecksum) !== String(serverChecksum);
+}
+
 function shouldReplayInFlightOnSocketClose({
   inFlightRequestId = '',
   queueHeadRequestId = '',
@@ -412,11 +424,28 @@ class LocalStorageSocketSync {
         this.#persistMeta();
 
         const localChecksum = checksumSnapshot(buildSnapshot());
-        if (shouldHydrateFromServerOnWelcome({
+        const queueLength = this.queue.length;
+        const hasPendingBatch = Boolean(this.pendingBatch?.operations?.length);
+
+        if (shouldRebaseQueueFromServerOnWelcome({
           localChecksum,
           serverChecksum: this.serverChecksum,
-          queueLength: this.queue.length,
-          hasPendingBatch: Boolean(this.pendingBatch?.operations?.length),
+          queueLength,
+          hasPendingBatch,
+        })) {
+          if (this.batchTimer !== null) {
+            window.clearTimeout(this.batchTimer);
+            this.batchTimer = null;
+            this.#commitPendingBatch();
+          }
+          const localSnapshotBeforeHydrate = buildSnapshot();
+          const serverSnapshot = await this.#fetchAndApplyServerSnapshot();
+          this.#rebasePendingQueue(serverSnapshot, localSnapshotBeforeHydrate);
+        } else if (shouldHydrateFromServerOnWelcome({
+          localChecksum,
+          serverChecksum: this.serverChecksum,
+          queueLength,
+          hasPendingBatch,
         })) {
           await this.#fetchAndApplyServerSnapshot();
         }
@@ -482,10 +511,12 @@ class LocalStorageSocketSync {
     }
   }
 
-  #rebasePendingQueue(serverSnapshot = {}) {
+  #rebasePendingQueue(serverSnapshot = {}, localSnapshotOverride = null) {
     if (!this.queue.length) return;
 
-    const localSnapshot = buildSnapshot();
+    const localSnapshot = localSnapshotOverride && typeof localSnapshotOverride === 'object'
+      ? normalizeSnapshot(localSnapshotOverride)
+      : buildSnapshot();
     const operations = buildDifferentialOperations(serverSnapshot || {}, localSnapshot);
     if (!operations.length) {
       this.queue = [];
@@ -619,6 +650,7 @@ export {
   mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
+  shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
 };

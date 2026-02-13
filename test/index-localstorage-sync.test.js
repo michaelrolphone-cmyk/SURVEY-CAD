@@ -30,6 +30,6 @@ test('browser localStorage sync module patches localStorage and queues offline d
   assert.match(source, /surveyfoundryLocalStoragePendingDiffs/, 'sync module should persist pending differentials locally while offline');
   assert.match(source, /type:\s*'sync-differential'/, 'sync module should send differential websocket messages');
   assert.match(source, /baseChecksum:\s*next\.baseChecksum/, 'sync module should replay queued differentials with their original base checksums');
-  assert.match(source, /#rebasePendingQueue\(serverSnapshot = \{\}\)/, 'sync module should rebase queued differentials onto server state after mismatch');
+  assert.match(source, /#rebasePendingQueue\(serverSnapshot = \{\}, localSnapshotOverride = null\)/, 'sync module should rebase queued differentials onto server state after mismatch');
   assert.match(source, /fetch\('\/api\/localstorage-sync'\)/, 'sync module should fall back to server API snapshot fetch for checksum recovery');
 });
