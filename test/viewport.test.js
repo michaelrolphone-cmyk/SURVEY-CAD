@@ -804,11 +804,12 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
   assert.match(html, /Auto-updated linework for point \$\{p\.num\}: \+\$\{addedJpn\} JPN, \+\$\{addedSequential\} sequential, \+\$\{addedCurve\} curve, -\$\{removed\} removed\./, 'LineSmith should report add/remove totals when code edits re-sync field-to-finish linework');
 });
 
-test('VIEWPORT.HTML save applies pending single-point editor edits before snapshotting project history', async () => {
+test('VIEWPORT.HTML save applies pending primary point editor edits before snapshotting project history', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*if \(selectedPointIds\.length === 1\) \{[\s\S]*const\s+hasPendingEditorEdits\s*=\s*!!point[\s\S]*normalizePointCode\(String\(\$\("#ptCode"\)\?\.value/, 'save workflow should detect pending single-point editor values including normalized point code changes before snapshotting');
-  assert.match(html, /applySelectedPointEdits\(\{[\s\S]*num:\s*\$\("#ptNum"\),[\s\S]*code:\s*\$\("#ptCode"\),[\s\S]*\},\s*"point editor",\s*\{\s*lockDuringSinglePointCollabEdit:\s*false\s*\}\);[\s\S]*if \(!appliedPendingEdits\) return false;/, 'saving should commit pending point-editor field values (including code edits) so saved state and collaboration sync include the latest point data');
+  assert.match(html, /function\s+hasPendingPrimaryPointEditorEdits\(point\)\s*\{[\s\S]*normalizePointCode\(String\(\$\("#ptCode"\)\?\.value/, 'save workflow should detect pending primary point-editor values including normalized point-code changes before snapshotting');
+  assert.match(html, /function\s+applyPendingPrimaryPointEditorEdits\(sourceLabel\s*=\s*"point editor"\)\s*\{[\s\S]*const\s+point\s*=\s*selectedPointId\s*\?\s*points\.get\(selectedPointId\)\s*:\s*null;[\s\S]*history\.push\("edit point"\);[\s\S]*syncFieldToFinishLinework\(\);/, 'save-triggered primary point editor apply should commit through history and linework sync so collaboration receives code updates');
+  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*const\s+appliedPendingEdits\s*=\s*applyPendingPrimaryPointEditorEdits\("point editor save"\);[\s\S]*if \(!appliedPendingEdits\) return false;/, 'saving should always commit pending primary point-editor field values before writing project history');
 });
 
 
