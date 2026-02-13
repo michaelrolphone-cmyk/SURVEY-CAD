@@ -1661,6 +1661,7 @@
 
 
     window.addEventListener('storage', syncLauncherStateFromStorageEvent);
+    window.addEventListener('surveyfoundry-localstorage-sync', syncLauncherStateFromStorageEvent);
     window.addEventListener('message', (event) => {
       if (event.origin !== window.location.origin) return;
 
