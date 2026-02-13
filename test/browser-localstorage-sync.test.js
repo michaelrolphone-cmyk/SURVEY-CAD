@@ -10,6 +10,7 @@ import {
   shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
+  shouldEnterDormantReconnect,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -103,6 +104,24 @@ test('shouldRebaseQueueFromServerOnWelcome enables server-hydrate+rebase when qu
     serverChecksum: 'fnv1a-server',
     queueLength: 0,
     hasPendingBatch: false,
+  }), false);
+});
+
+
+test('shouldEnterDormantReconnect enables cooldown only before first successful connection', () => {
+  assert.equal(shouldEnterDormantReconnect({
+    hasEverConnected: false,
+    consecutiveFailures: 3,
+  }), true);
+
+  assert.equal(shouldEnterDormantReconnect({
+    hasEverConnected: false,
+    consecutiveFailures: 2,
+  }), false);
+
+  assert.equal(shouldEnterDormantReconnect({
+    hasEverConnected: true,
+    consecutiveFailures: 10,
   }), false);
 });
 

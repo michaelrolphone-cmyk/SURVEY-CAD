@@ -32,4 +32,5 @@ test('browser localStorage sync module patches localStorage and queues offline d
   assert.match(source, /baseChecksum:\s*next\.baseChecksum/, 'sync module should replay queued differentials with their original base checksums');
   assert.match(source, /#rebasePendingQueue\(serverSnapshot = \{\}, localSnapshotOverride = null\)/, 'sync module should rebase queued differentials onto server state after mismatch');
   assert.match(source, /fetch\('\/api\/localstorage-sync'\)/, 'sync module should fall back to server API snapshot fetch for checksum recovery');
+  assert.match(source, /MAX_PRECONNECT_FAILURES_BEFORE_DORMANT/, 'sync module should reduce repeated websocket-failed reconnect spam before first successful connection');
 });

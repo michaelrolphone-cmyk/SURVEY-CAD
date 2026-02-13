@@ -8,6 +8,8 @@ const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
 const INITIAL_RECONNECT_DELAY_MS = 1500;
 const MAX_RECONNECT_DELAY_MS = 60000;
 const OPERATION_BATCH_DELAY_MS = 120;
+const MAX_PRECONNECT_FAILURES_BEFORE_DORMANT = 3;
+const DORMANT_RETRY_DELAY_MS = 60000;
 
 function shouldSyncLocalStorageKey(key) {
   const keyString = String(key || '');
@@ -112,6 +114,16 @@ function shouldHydrateFromServerOnWelcome({
 }
 
 
+
+
+function shouldEnterDormantReconnect({
+  hasEverConnected = false,
+  consecutiveFailures = 0,
+  maxPreconnectFailures = MAX_PRECONNECT_FAILURES_BEFORE_DORMANT,
+} = {}) {
+  if (hasEverConnected) return false;
+  return consecutiveFailures >= maxPreconnectFailures;
+}
 
 function shouldRebaseQueueFromServerOnWelcome({
   localChecksum = '',
@@ -239,11 +251,13 @@ class LocalStorageSocketSync {
     this.batchTimer = null;
     this.hasEverConnected = false;
     this.consecutiveConnectFailures = 0;
+    this.dormantUntilMs = 0;
 
     this.#patchStorage();
     this.#connect();
 
     window.addEventListener('online', () => {
+      this.dormantUntilMs = 0;
       if (!this.socket || this.socket.readyState >= WebSocket.CLOSING) {
         this.#connect();
       }
@@ -262,6 +276,11 @@ class LocalStorageSocketSync {
       return;
     }
 
+    if (this.dormantUntilMs > Date.now()) {
+      this.#scheduleReconnect(this.dormantUntilMs - Date.now());
+      return;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     try {
       this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
@@ -273,6 +292,7 @@ class LocalStorageSocketSync {
     this.socket.addEventListener('open', () => {
       this.hasEverConnected = true;
       this.consecutiveConnectFailures = 0;
+    this.dormantUntilMs = 0;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
       this.flush();
     });
@@ -288,17 +308,36 @@ class LocalStorageSocketSync {
 
       this.socket = null;
       if (!navigator.onLine) return;
+
+      if (shouldEnterDormantReconnect({
+        hasEverConnected: this.hasEverConnected,
+        consecutiveFailures: this.consecutiveConnectFailures,
+      })) {
+        this.dormantUntilMs = Date.now() + DORMANT_RETRY_DELAY_MS;
+        this.#scheduleReconnect(DORMANT_RETRY_DELAY_MS);
+        return;
+      }
+
       this.#scheduleReconnect();
     });
   }
 
 
-  #scheduleReconnect() {
+  #scheduleReconnect(delayOverrideMs = null) {
+    if (this.reconnectTimer !== null) return;
+
+    const delayMs = Number.isFinite(delayOverrideMs)
+      ? Math.max(0, Math.trunc(delayOverrideMs))
+      : this.reconnectDelayMs;
+
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       this.#connect();
-    }, this.reconnectDelayMs);
-    this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
+    }, delayMs);
+
+    if (delayOverrideMs === null) {
+      this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
+    }
   }
 
   #patchStorage() {
@@ -653,4 +692,5 @@ export {
   shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
+  shouldEnterDormantReconnect,
 };

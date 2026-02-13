@@ -64,7 +64,7 @@ When `VIEWPORT.HTML` (LineSmith) opens, a modern non-blocking loading indicator 
 LineSmith (`VIEWPORT.HTML`) and ArrowHead (`ArrowHead.html`) now auto-retry collaboration room connections when a websocket disconnects:
 
 - Both apps reconnect to `/ws/lineforge?room=...` with exponential backoff (3s doubling up to 60s) after an unexpected close, reducing excessive reconnect churn when a room endpoint is down.
-- Launcher/app localStorage sync websocket clients now reconnect with exponential backoff (1.5s up to 60s) to reduce repeated connection-error spam when `/ws/localstorage-sync` is temporarily unavailable.
+- Launcher/app localStorage sync websocket clients now reconnect with exponential backoff (1.5s up to 60s), and after repeated pre-connect failures enter a brief dormant retry window (60s) to reduce repeated connection-error spam when `/ws/localstorage-sync` is temporarily unavailable.
 - If `/ws/localstorage-sync` disconnects, clients keep queued differentials locally, reset any interrupted in-flight differential safely, and replay changes in-order after reconnecting to websocket sync. On checksum mismatch during reconnect, clients hydrate from `GET /api/localstorage-sync` first and then rebase queued local edits before replay so browser states converge instead of drifting.
 - Presence/cursor overlays are cleared when a disconnect occurs, then restored as peers rejoin.
 - This reconnect loop helps collaboration recover from transient network drops without requiring a manual page refresh.
@@ -114,7 +114,7 @@ This websocket reconnect-backoff reliability update also does not add, remove, o
 
 This localStorage sync checksum-alignment fix also does not add, remove, or rename API endpoints or CLI commands; existing endpoint and command references below remain current.
 
-This localStorage sync reliability fix now compacts queued browser sync differentials while offline/unavailable to prevent localStorage quota overflows (`surveyfoundryLocalStoragePendingDiffs`) when collaboration sync cannot connect. Differential replay remains websocket-first (`GET /ws/localstorage-sync`), and clients continue to reconcile checksum mismatches using `GET /api/localstorage-sync`. CLI commands remain unchanged (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+This localStorage sync reliability fix now compacts queued browser sync differentials while offline/unavailable to prevent localStorage quota overflows (`surveyfoundryLocalStoragePendingDiffs`) when collaboration sync cannot connect. Differential replay remains websocket-first (`GET /ws/localstorage-sync`), and clients continue to reconcile checksum mismatches using `GET /api/localstorage-sync`. CLI commands remain unchanged (`npm run cli -- --help`, `npm run ros:cli -- --help`). No new API endpoints or CLI commands were added for reconnect-dormant throttling.
 
 ## LineSmith Layer Reassignment Shortcut
 
