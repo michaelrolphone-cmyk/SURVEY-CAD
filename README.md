@@ -56,6 +56,12 @@ This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify A
 
 ## API and CLI Notes for this change
 
+RecordQuarry now resolves project name, client, and address from `surveyfoundryProjects` by `projectId` before falling back to URL query parameters. This keeps connected clients aligned after launcher-side project edits (including client info changes) even when older tabs refresh with stale query strings.
+
+API and CLI surface area remains unchanged for this bug fix. Continue using the existing sync endpoints (`GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`) and CLI commands (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+## API and CLI Notes for this change
+
 SurveyFoundry Launcher now shows an on-home active project metadata overview (Project, Client, Contact info, Address, PLSS, and Index) directly inside the `project-manager-launch` section and adds tap-friendly deep links for phone (`tel:`), email (`mailto:`), and address (`geo:` native maps deep link) from the project manager section. This is a launcher UI behavior update only and does not add or change API endpoints or CLI commands.
 The browser localStorage real-time sync bootstrap now hydrates a newly opened browser session from the server snapshot when checksums differ and there are no unsent local edits. This fixes stale local browser state when multiple browser windows/devices are open on the same project.
 
