@@ -2113,7 +2113,8 @@
     lastQueuedState: "",
     objectLocks: new Map(),
     pendingLockRequests: new Map(),
-    activeDragLock: null
+    activeDragLock: null,
+    pendingDragLockRelease: null
   };
 
   function nextCollabReconnectDelay(previousDelayMs, maxDelayMs) {
@@ -3719,6 +3720,14 @@
     releaseObjectLock(entityType, entityId);
   }
 
+  function flushPendingDragLockRelease() {
+    const pendingLock = collab.pendingDragLockRelease;
+    if (!pendingLock) return;
+    if (collab.stateDebounce || collab.pendingState || collab.stateInFlight) return;
+    collab.pendingDragLockRelease = null;
+    sendLockRelease(pendingLock);
+  }
+
   const LOCK_REQUEST_TIMEOUT_MS = 5000;
 
   function requestObjectEditLock({ entityType, entityId, onGranted, onDenied } = {}) {
@@ -3811,12 +3820,21 @@
   }
 
   function flushCollabStateSync() {
-    if (!collab.enabled || collab.applyingRemoteState) return;
-    if (collab.stateInFlight || !collab.pendingState) return;
+    if (!collab.enabled || collab.applyingRemoteState) {
+      flushPendingDragLockRelease();
+      return;
+    }
+    if (collab.stateInFlight || !collab.pendingState) {
+      flushPendingDragLockRelease();
+      return;
+    }
 
     const statePayload = collab.pendingState;
     collab.pendingState = "";
-    if (statePayload === collab.latestServerState) return;
+    if (statePayload === collab.latestServerState) {
+      flushPendingDragLockRelease();
+      return;
+    }
 
     const requestId = `state-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     collab.stateInFlight = {
@@ -3891,6 +3909,7 @@
       collab.peers.clear();
       collab.stateInFlight = null;
       collab.pendingState = "";
+      collab.pendingDragLockRelease = null;
       for (const pending of collab.pendingLockRequests.values()) {
         if (pending.timeoutId) window.clearTimeout(pending.timeoutId);
       }
@@ -3935,6 +3954,7 @@
           collab.applyingRemoteState = false;
         }
         flushCollabStateSync();
+        flushPendingDragLockRelease();
         return;
       }
 
@@ -4001,6 +4021,7 @@
           collab.stateInFlight = null;
         }
         flushCollabStateSync();
+        flushPendingDragLockRelease();
         return;
       }
 
@@ -7885,6 +7906,7 @@
         syncFieldToFinishLinework();
       }
 
+      scheduleCollabStateSync();
       schedulePointsTableRender();
       setStatus(`Updated ${editsByPoint.length} selected point${editsByPoint.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
       updateCounts();
@@ -7915,6 +7937,46 @@
     return applyEditsToMultiplePoints(fields, sourceLabel, options);
   }
 
+  function hasPendingPrimaryPointEditorEdits(point) {
+    if (!point) return false;
+    return String($("#ptNum")?.value ?? point.num).trim() !== String(point.num ?? "")
+      || String($("#ptX")?.value ?? point?.x).trim() !== String(point?.x ?? "")
+      || String($("#ptY")?.value ?? point?.y).trim() !== String(point?.y ?? "")
+      || String($("#ptZ")?.value ?? point?.z).trim() !== String(point?.z ?? "")
+      || normalizePointCode(String($("#ptCode")?.value ?? point?.code ?? "")) !== String(point?.code ?? "")
+      || String($("#ptNotes")?.value ?? point?.notes ?? "") !== String(point?.notes ?? "");
+  }
+
+  function applyPendingPrimaryPointEditorEdits(sourceLabel = "point editor") {
+    const point = selectedPointId ? points.get(selectedPointId) : null;
+    if (!point || !hasPendingPrimaryPointEditorEdits(point)) return true;
+    if (isObjectLockedByOther("point", point.id)) {
+      setStatus(`Point ${point.num} is locked by another collaborator.`, "warn");
+      triggerLockDeniedFlash();
+      return false;
+    }
+
+    history.push("edit point");
+    point.num = String($("#ptNum")?.value ?? point.num).trim();
+    point.x = parseNum($("#ptX")?.value, point.x);
+    point.y = parseNum($("#ptY")?.value, point.y);
+    point.z = parseNum($("#ptZ")?.value, point.z);
+    const pointCodeChanged = setPointCode(point, String($("#ptCode")?.value ?? point.code));
+    point.notes = String($("#ptNotes")?.value ?? point.notes);
+
+    if (pointCodeChanged) {
+      ensureLegacyAutoFieldToFinishLineMetadata();
+      syncFieldToFinishLinework();
+    }
+
+    scheduleCollabStateSync();
+    schedulePointsTableRender();
+    setStatus(`Updated point ${point.num} from ${sourceLabel}.`, "ok");
+    updateCounts();
+    updatePointEditorFromSelection();
+    return true;
+  }
+
   function applySharedFieldToSelectedPoints(key, rawValue, sourceLabel = "point inspector") {
     const selectedPoints = getSelectedPoints();
     if (!selectedPoints.length) return false;
@@ -7940,6 +8002,7 @@
       ensureLegacyAutoFieldToFinishLineMetadata();
       syncFieldToFinishLinework();
     }
+    scheduleCollabStateSync();
     schedulePointsTableRender();
     setStatus(`Updated ${key.toUpperCase()} for ${selectedPoints.length} selected point${selectedPoints.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
     updateCounts();
@@ -8837,28 +8900,8 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   }
 
   function saveDrawingToProject() {
-    if (selectedPointIds.length === 1) {
-      const point = points.get(selectedPointIds[0]);
-      const hasPendingEditorEdits = !!point && (
-        String($("#ptNum")?.value ?? point.num).trim() !== String(point.num ?? "")
-        || String($("#ptX")?.value ?? point?.x).trim() !== String(point?.x ?? "")
-        || String($("#ptY")?.value ?? point?.y).trim() !== String(point?.y ?? "")
-        || String($("#ptZ")?.value ?? point?.z).trim() !== String(point?.z ?? "")
-        || normalizePointCode(String($("#ptCode")?.value ?? point?.code ?? "")) !== String(point?.code ?? "")
-        || String($("#ptNotes")?.value ?? point?.notes ?? "") !== String(point?.notes ?? "")
-      );
-      if (hasPendingEditorEdits) {
-        const appliedPendingEdits = applySelectedPointEdits({
-          num: $("#ptNum"),
-          x: $("#ptX"),
-          y: $("#ptY"),
-          z: $("#ptZ"),
-          code: $("#ptCode"),
-          notes: $("#ptNotes")
-        }, "point editor", { lockDuringSinglePointCollabEdit: false });
-        if (!appliedPendingEdits) return false;
-      }
-    }
+    const appliedPendingEdits = applyPendingPrimaryPointEditorEdits("point editor save");
+    if (!appliedPendingEdits) return false;
 
     if (!activeProjectId) {
       setStatus("Open LineSmith from an active project to save drawing history.", "warn");
@@ -9384,6 +9427,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       p.num = raw;
       if (selectedPointId === pid) $("#ptNum").value = raw;
       updateCounts();
+      scheduleCollabStateSync();
       return;
     }
 
@@ -9397,6 +9441,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
         if (field === "y") $("#ptY").value = val;
         if (field === "z") $("#ptZ").value = val;
       }
+      scheduleCollabStateSync();
       return;
     }
 
@@ -9415,6 +9460,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
           setStatus(`Auto-updated linework for point ${p.num}: +${addedJpn} JPN, +${addedSequential} sequential, +${addedCurve} curve, -${removed} removed.`, "ok");
         }
       }
+      scheduleCollabStateSync();
       return;
     }
   }
@@ -9978,8 +10024,15 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     mouse.drag = false;
     mouse.dragObj = null;
     if (collab.activeDragLock) {
-      sendLockRelease(collab.activeDragLock);
+      const activeLock = collab.activeDragLock;
       collab.activeDragLock = null;
+      if (collab.enabled && collab.socket?.readyState === WebSocket.OPEN
+        && (collab.stateDebounce || collab.pendingState || collab.stateInFlight)) {
+        collab.pendingDragLockRelease = activeLock;
+        flushPendingDragLockRelease();
+      } else {
+        sendLockRelease(activeLock);
+      }
     }
   }
 

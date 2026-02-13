@@ -741,12 +741,21 @@ test('VIEWPORT.HTML syncs collaboration state during live drag and mobile touch 
   assert.match(html, /if \(mouse\.dragObj && mouse\.dragObj\.type !== "pan"\) \{[\s\S]*if \(!mouse\.dragObj\._moved\) \{[\s\S]*\} else \{[\s\S]*scheduleCollabStateSync\(\);/, 'drag commit should force a final collaboration state sync after movement');
 
   assert.match(html, /sendCollabMessage\(\{[\s\S]*type: "state",[\s\S]*baseRevision: collab\.lastKnownRevision,[\s\S]*state: statePayload,[\s\S]*\}\);/, 'collaboration state sync should include base revision and state payload for optimistic concurrency');
-  assert.match(html, /const\s+statePayload\s*=\s*collab\.pendingState;[\s\S]*if \(statePayload === collab\.latestServerState\) return;/, 'flush should drop queued payloads that already match latest server state to avoid repeat-send loops');
+  assert.match(html, /const\s+statePayload\s*=\s*collab\.pendingState;[\s\S]*if \(statePayload === collab\.latestServerState\) \{[\s\S]*return;[\s\S]*\}/, 'flush should drop queued payloads that already match latest server state to avoid repeat-send loops');
   assert.match(html, /if \(message\.type === "state" && message\.state\) \{[\s\S]*restoreState\(message\.state, \{ skipSync: true, applyView: false \}\);/, 'remote collaboration state restores should not overwrite local user view pan/zoom');
   assert.match(html, /if \(message\.type === "state-rejected"\) \{[\s\S]*const\s+localDiff\s*=\s*diffState\(baseObj, localObj\);[\s\S]*applyStateDiff\(serverObj, localDiff\);/, 'LineSmith should rebase unsent local edits on top of canonical server state when revisions conflict');
 });
 
 
+
+test('VIEWPORT.HTML defers drag lock release until queued collaboration state sync is flushed', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /pendingDragLockRelease\s*:\s*null/, 'collaboration state should track pending drag lock release while state sync is in-flight');
+  assert.match(html, /function\s+flushPendingDragLockRelease\(\)\s*\{[\s\S]*if \(collab\.stateDebounce \|\| collab\.pendingState \|\| collab\.stateInFlight\) return;[\s\S]*sendLockRelease\(pendingLock\);/, 'drag lock release helper should wait until no queued/in-flight state sync remains before releasing lock');
+  assert.match(html, /function\s+endDrag\(\)\s*\{[\s\S]*if \(collab\.activeDragLock\) \{[\s\S]*if \(collab\.enabled && collab\.socket\?\.readyState === WebSocket\.OPEN[\s\S]*collab\.pendingDragLockRelease = activeLock;[\s\S]*flushPendingDragLockRelease\(\);[\s\S]*\} else \{[\s\S]*sendLockRelease\(activeLock\);/, 'endDrag should defer lock release while drag state sync is queued so other clients cannot acquire stale point/line edits before final state publishes');
+  assert.match(html, /if \(message\.type === "state-ack"\) \{[\s\S]*flushCollabStateSync\(\);[\s\S]*flushPendingDragLockRelease\(\);/, 'state acknowledgements should flush any deferred drag lock release after queued state sync processing');
+});
 
 test('VIEWPORT.HTML collaboration includes object lock handshake and lock flash visuals', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
@@ -795,6 +804,15 @@ test('VIEWPORT.HTML continuously syncs ArrowHead handoff payload while LineSmith
   assert.match(html, /updateUndoRedoHUD\(\);[\s\S]*syncArrowHeadPayloadToStorage\(\);[\s\S]*requestAnimationFrame\(draw\);/, 'draw loop should keep syncing ArrowHead payload so point\/line edits appear in AR without reopening');
 });
 
+
+
+test('VIEWPORT.HTML point manager cell edits schedule collaboration sync for each committed field update', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+onPointCellInput\(e\)\s*\{[\s\S]*if \(!raw \|\| pointNumberExists\(raw, p\.id\)\) \{ inp\.classList\.add\("bad"\); return; \}[\s\S]*p\.num = raw;[\s\S]*scheduleCollabStateSync\(\);[\s\S]*return;/, 'point manager number edits should sync collaboration state after valid commits so remote clients update point labels/codes immediately');
+  assert.match(html, /if \(field === "x" \|\| field === "y" \|\| field === "z"\) \{[\s\S]*if \(!Number\.isFinite\(val\)\) \{ inp\.classList\.add\("bad"\); return; \}[\s\S]*p\[field\] = val;[\s\S]*scheduleCollabStateSync\(\);[\s\S]*return;/, 'point manager coordinate edits should sync collaboration state after valid numeric changes');
+  assert.match(html, /if \(field === "code" \|\| field === "notes"\) \{[\s\S]*if \(field === "code"\) setPointCode\(p, String\(inp\.value\)\);[\s\S]*scheduleCollabStateSync\(\);[\s\S]*return;/, 'point manager code/notes edits should sync collaboration state after each committed change, including normalized code edits');
+});
 test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
@@ -804,11 +822,20 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
   assert.match(html, /Auto-updated linework for point \$\{p\.num\}: \+\$\{addedJpn\} JPN, \+\$\{addedSequential\} sequential, \+\$\{addedCurve\} curve, -\$\{removed\} removed\./, 'LineSmith should report add/remove totals when code edits re-sync field-to-finish linework');
 });
 
-test('VIEWPORT.HTML save applies pending single-point editor edits before snapshotting project history', async () => {
+test('VIEWPORT.HTML point inspector apply paths explicitly schedule collaboration sync after committing edits', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*if \(selectedPointIds\.length === 1\) \{[\s\S]*const\s+hasPendingEditorEdits\s*=\s*!!point[\s\S]*normalizePointCode\(String\(\$\("#ptCode"\)\?\.value/, 'save workflow should detect pending single-point editor values including normalized point code changes before snapshotting');
-  assert.match(html, /applySelectedPointEdits\(\{[\s\S]*num:\s*\$\("#ptNum"\),[\s\S]*code:\s*\$\("#ptCode"\),[\s\S]*\},\s*"point editor",\s*\{\s*lockDuringSinglePointCollabEdit:\s*false\s*\}\);[\s\S]*if \(!appliedPendingEdits\) return false;/, 'saving should commit pending point-editor field values (including code edits) so saved state and collaboration sync include the latest point data');
+  assert.match(html, /function\s+applyEditsToMultiplePoints\(fields,\s*sourceLabel\s*=\s*"inspector",\s*options\s*=\s*\{\}\)\s*\{[\s\S]*function\s+commitEdits\(\)\s*\{[\s\S]*setPointCode\(point, String\(values\.code \?\? point\.code\)\)[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'point inspector apply edits should schedule collab sync immediately after committing point updates');
+  assert.match(html, /function\s+applyPendingPrimaryPointEditorEdits\(sourceLabel\s*=\s*"point editor"\)\s*\{[\s\S]*setPointCode\(point, String\(\$\("#ptCode"\)\?\.value \?\? point\.code\)\)[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'primary inspector/save pending edits should schedule collab sync after committing the edited point');
+  assert.match(html, /function\s+applySharedFieldToSelectedPoints\(key, rawValue, sourceLabel\s*=\s*"point inspector"\)\s*\{[\s\S]*history\.push\(selectedPoints\.length === 1 \? "edit point" : "edit points"\);[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'shared inspector field apply should schedule collab sync so bulk inspector updates propagate to connected clients');
+});
+
+test('VIEWPORT.HTML save applies pending primary point editor edits before snapshotting project history', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+hasPendingPrimaryPointEditorEdits\(point\)\s*\{[\s\S]*normalizePointCode\(String\(\$\("#ptCode"\)\?\.value/, 'save workflow should detect pending primary point-editor values including normalized point-code changes before snapshotting');
+  assert.match(html, /function\s+applyPendingPrimaryPointEditorEdits\(sourceLabel\s*=\s*"point editor"\)\s*\{[\s\S]*const\s+point\s*=\s*selectedPointId\s*\?\s*points\.get\(selectedPointId\)\s*:\s*null;[\s\S]*history\.push\("edit point"\);[\s\S]*syncFieldToFinishLinework\(\);/, 'save-triggered primary point editor apply should commit through history and linework sync so collaboration receives code updates');
+  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*const\s+appliedPendingEdits\s*=\s*applyPendingPrimaryPointEditorEdits\("point editor save"\);[\s\S]*if \(!appliedPendingEdits\) return false;/, 'saving should always commit pending primary point-editor field values before writing project history');
 });
 
 
