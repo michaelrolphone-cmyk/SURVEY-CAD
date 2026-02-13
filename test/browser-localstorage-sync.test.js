@@ -12,6 +12,7 @@ import {
   shouldReplayInFlightOnSocketClose,
   shouldEnterDormantReconnect,
   shouldRunHttpFallbackSync,
+  buildSocketEndpointCandidates,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -124,6 +125,26 @@ test('shouldEnterDormantReconnect enables cooldown only before first successful 
     hasEverConnected: true,
     consecutiveFailures: 10,
   }), false);
+});
+
+
+test('buildSocketEndpointCandidates includes root and base-path websocket URLs', () => {
+  assert.deepEqual(buildSocketEndpointCandidates({
+    protocol: 'https:',
+    host: 'example.com',
+    pathname: '/record-of-survey/index.html',
+  }), [
+    'wss://example.com/ws/localstorage-sync',
+    'wss://example.com/record-of-survey/ws/localstorage-sync',
+  ]);
+
+  assert.deepEqual(buildSocketEndpointCandidates({
+    protocol: 'http:',
+    host: 'localhost:3000',
+    pathname: '/index.html',
+  }), [
+    'ws://localhost:3000/ws/localstorage-sync',
+  ]);
 });
 
 

@@ -27,6 +27,25 @@ function normalizeSnapshot(snapshot = {}) {
   return Object.fromEntries(Object.entries(snapshot).map(([key, value]) => [String(key), String(value)]));
 }
 
+
+function buildSocketEndpointCandidates({
+  protocol = 'https:',
+  host = '',
+  pathname = '/',
+} = {}) {
+  const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+  const normalizedPathname = typeof pathname === 'string' && pathname ? pathname : '/';
+  const baseDir = normalizedPathname.endsWith('/')
+    ? normalizedPathname.slice(0, -1)
+    : normalizedPathname.replace(/\/[^/]*$/, '');
+
+  const candidates = [`${wsProtocol}//${host}/ws/localstorage-sync`];
+  if (baseDir && baseDir !== '/') {
+    candidates.push(`${wsProtocol}//${host}${baseDir}/ws/localstorage-sync`);
+  }
+  return [...new Set(candidates)];
+}
+
 function buildSnapshot() {
   const snapshot = {};
   for (let i = 0; i < window.localStorage.length; i += 1) {
@@ -264,14 +283,17 @@ class LocalStorageSocketSync {
     this.dormantUntilMs = 0;
     this.httpFallbackTimer = null;
     this.httpFallbackInProgress = false;
+    this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+    this.socketEndpointIndex = 0;
 
     this.#patchStorage();
     this.#connect();
 
     window.addEventListener('online', () => {
       this.dormantUntilMs = 0;
-    this.httpFallbackTimer = null;
-    this.httpFallbackInProgress = false;
+      this.httpFallbackInProgress = false;
+      this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+      this.socketEndpointIndex = 0;
       if (!this.socket || this.socket.readyState >= WebSocket.CLOSING) {
         this.#connect();
       }
@@ -295,9 +317,12 @@ class LocalStorageSocketSync {
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socketUrl = this.socketEndpointCandidates[this.socketEndpointIndex]
+      || this.socketEndpointCandidates[0]
+      || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/localstorage-sync`;
+
     try {
-      this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
+      this.socket = new WebSocket(socketUrl);
     } catch {
       this.#scheduleHttpFallbackSync();
       this.#scheduleReconnect();
@@ -307,9 +332,10 @@ class LocalStorageSocketSync {
     this.socket.addEventListener('open', () => {
       this.hasEverConnected = true;
       this.consecutiveConnectFailures = 0;
-    this.dormantUntilMs = 0;
-    this.httpFallbackTimer = null;
-    this.httpFallbackInProgress = false;
+      this.dormantUntilMs = 0;
+      this.httpFallbackInProgress = false;
+      this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+      this.socketEndpointIndex = 0;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
       this.#cancelHttpFallbackSync();
       this.flush();
@@ -322,6 +348,10 @@ class LocalStorageSocketSync {
         queueHeadRequestId: this.queue[0]?.requestId,
       })) {
         this.inFlight = null;
+      }
+
+      if (!this.hasEverConnected && this.socketEndpointCandidates.length > 1) {
+        this.socketEndpointIndex = (this.socketEndpointIndex + 1) % this.socketEndpointCandidates.length;
       }
 
       this.socket = null;
@@ -790,4 +820,5 @@ export {
   shouldReplayInFlightOnSocketClose,
   shouldEnterDormantReconnect,
   shouldRunHttpFallbackSync,
+  buildSocketEndpointCandidates,
 };

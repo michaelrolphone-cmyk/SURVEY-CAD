@@ -17,7 +17,12 @@ export function createLocalStorageSyncWsService({ store }) {
 
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
     const url = new URL(req.url || '/', 'http://localhost');
-    if (url.pathname !== '/ws/localstorage-sync') return false;
+    const pathname = url.pathname || '/';
+    const isLocalStorageSyncPath = pathname === '/ws/localstorage-sync'
+      || pathname === '/ws/localstorage-sync/'
+      || pathname.endsWith('/ws/localstorage-sync')
+      || pathname.endsWith('/ws/localstorage-sync/');
+    if (!isLocalStorageSyncPath) return false;
 
     if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
       socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');

@@ -80,3 +80,18 @@ test('localstorage sync websocket applies differentials and broadcasts checksums
   assert.equal(b1.state.checksum, store.getState().checksum);
   assert.equal(store.getState().snapshot.beta, '2');
 });
+
+
+test('localstorage websocket upgrade accepts prefixed router paths', () => {
+  const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
+  const service = createLocalStorageSyncWsService({ store });
+  const socket = new FakeSocket();
+
+  assert.equal(service.handleUpgrade({
+    url: '/record-of-survey/ws/localstorage-sync',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'k-pref==' },
+  }, socket), true);
+
+  const welcome = parseServerTextMessage(socket, 1);
+  assert.equal(welcome.type, 'sync-welcome');
+});
