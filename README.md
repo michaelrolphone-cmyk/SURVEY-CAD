@@ -128,6 +128,13 @@ BoundaryLab now preserves keyboard focus/caret position while you type in call b
 - API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
+### API/CLI endpoints and commands for this BoundaryLab mobile preview fix
+
+BoundaryLab now switches to a single-column layout on narrow screens and keeps the closure preview canvas visible below the call editor, with high-DPI canvas resizing so the preview remains sharp and correctly scaled on mobile devices.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ### API/CLI endpoints and commands for this change
 
 BoundaryLab is a browser-only feature and does not introduce new server endpoints or CLI commands. Continue using:
