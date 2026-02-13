@@ -29,6 +29,31 @@ npm start
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
+
+## Redis-backed shared platform state
+
+To persist shared browser/platform state across dyno restarts and deploys, the server can use Heroku Key-Value Store (Redis) for `/api/localstorage-sync` and `/ws/localstorage-sync`.
+
+Set these environment variables in Heroku:
+
+- `REDIS_URL` (provided by Heroku Key-Value Store)
+- `LOCALSTORAGE_SYNC_REDIS_KEY` (optional, default: `survey-cad:localstorage-sync:state`)
+
+When `REDIS_URL` is set, `npm start` will automatically hydrate and persist shared sync state in Redis. Without it, the server uses in-memory state.
+
+### API endpoints (state sync)
+
+- `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum.
+- `POST /api/localstorage-sync` – pushes a client snapshot and resolves stale/conflict state.
+- `GET /ws/localstorage-sync` (websocket upgrade) – real-time differential sync for all connected clients.
+
+### CLI / server commands
+
+- `npm start` – starts the server with optional Redis persistence via `REDIS_URL`.
+- `npm test` – runs the full unit/integration test suite.
+- `npm run cli -- --help` – survey CLI entrypoint and subcommands.
+- `npm run ros:cli -- --help` – ROS basis extraction CLI.
+
 ## BoundaryLab
 
 A new launcher app, **BoundaryLab** (`/BoundaryLab.html`), helps you validate boundary closure from an ordered list of bearings and distances.
