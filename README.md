@@ -59,6 +59,7 @@ LineSmith (`VIEWPORT.HTML`) and ArrowHead (`ArrowHead.html`) now auto-retry coll
 
 - Both apps reconnect to `/ws/lineforge?room=...` with exponential backoff (3s doubling up to 60s) after an unexpected close, reducing excessive reconnect churn when a room endpoint is down.
 - Launcher/app localStorage sync websocket clients now reconnect with exponential backoff (1.5s up to 60s) to reduce repeated connection-error spam when `/ws/localstorage-sync` is temporarily unavailable.
+- If `/ws/localstorage-sync` fails repeatedly before the first successful connection, the browser now stops aggressive websocket retries and switches to periodic REST snapshot polling (`GET /api/localstorage-sync`) every 30s until realtime sync becomes available again.
 - Presence/cursor overlays are cleared when a disconnect occurs, then restored as peers rejoin.
 - This reconnect loop helps collaboration recover from transient network drops without requiring a manual page refresh.
 - LineSmith now uses object-level edit locks for the most common simultaneous-edit collision: client sends `lock-request`, waits for `lock-granted`, and sends `lock-release` when edit is complete. If lock is denied (`lock-denied`), the UI flashes red/blue and blocks the edit attempt.
