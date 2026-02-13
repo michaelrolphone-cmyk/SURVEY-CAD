@@ -705,3 +705,10 @@ LineSmith now renders field-to-finish PC/PT curve runs as a true 3-point curve i
 - Sync now always backfills legacy auto-line metadata before evaluating curve commands, so saved drawings and point moves render PC→PT curves immediately without requiring a point-code edit trigger.
 
 API/CLI impact: no endpoint or command changes; continue using the API and CLI commands documented in this README.
+
+## API and CLI notes for this BoundaryLab closure-angle fix
+
+BoundaryLab now reports **0°00'00.00" angular misclosure** whenever the traverse is already linearly closed within tolerance, preventing false reverse-angle errors on valid out-and-back closures.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.

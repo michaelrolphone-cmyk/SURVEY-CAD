@@ -113,8 +113,9 @@ export function calculateTraverseFromOrderedCalls({
   const closureDx = current.x - base.x;
   const closureDy = current.y - base.y;
   const linearMisclosure = points.length > 1 ? Math.hypot(closureDx, closureDy) : null;
+  const closureIsLinear = Number.isFinite(linearMisclosure) && linearMisclosure <= 1e-6;
   const angularMisclosure = Number.isFinite(startAzimuth) && Number.isFinite(endAzimuth)
-    ? Math.abs(normalizeAngleDiff(endAzimuth - startAzimuth))
+    ? (closureIsLinear ? 0 : Math.abs(normalizeAngleDiff(endAzimuth - startAzimuth)))
     : null;
 
   return {
