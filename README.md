@@ -578,3 +578,14 @@ heroku open
 ## API and CLI Notes for this change
 
 LineSmith map-layer and loading-modal animation polish is a visual UX update in `VIEWPORT.HTML` only. No API endpoints or CLI commands changed in this release; use the existing endpoint and command references in this README.
+
+
+## LineSmith Field-to-Finish 3-Point Curves
+
+LineSmith now renders field-to-finish PC/PT curve runs as a true 3-point curve instead of two straight segments:
+
+- Any FLD-configured linework code can participate (not only `CPAD`).
+- For a point-code run like `CODE PC`, `CODE`, `CODE PT`, LineSmith now draws a smooth curve from **PC** to **PT** that passes through the middle point.
+- Curve linework stores the middle tangent point so redraws/prints preserve the same shape.
+
+API/CLI impact: no endpoint or command changes; continue using the API and CLI commands documented in this README.
