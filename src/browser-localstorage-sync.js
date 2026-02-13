@@ -8,6 +8,8 @@ const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
 const INITIAL_RECONNECT_DELAY_MS = 1500;
 const MAX_RECONNECT_DELAY_MS = 60000;
 const OPERATION_BATCH_DELAY_MS = 120;
+const MAX_INITIAL_CONNECT_FAILURES = 3;
+const SNAPSHOT_POLL_INTERVAL_MS = 30000;
 
 function shouldSyncLocalStorageKey(key) {
   const keyString = String(key || '');
@@ -109,6 +111,14 @@ function shouldHydrateFromServerOnWelcome({
   if (!serverChecksum) return false;
   if (queueLength > 0 || hasPendingBatch) return false;
   return String(localChecksum) !== String(serverChecksum);
+}
+
+function shouldFallbackToHttpSync({
+  hasEverConnected = false,
+  consecutiveFailures = 0,
+  maxFailures = MAX_INITIAL_CONNECT_FAILURES,
+} = {}) {
+  return !hasEverConnected && consecutiveFailures >= maxFailures;
 }
 
 function normalizeQueuedDifferential(diff = {}) {
@@ -216,6 +226,9 @@ class LocalStorageSocketSync {
     this.reconnectTimer = null;
     this.pendingBatch = null;
     this.batchTimer = null;
+    this.hasEverConnected = false;
+    this.consecutiveConnectFailures = 0;
+    this.snapshotPollTimer = null;
 
     this.#patchStorage();
     this.#connect();
@@ -231,14 +244,31 @@ class LocalStorageSocketSync {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
+    try {
+      this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
+    } catch {
+      this.#scheduleSnapshotPoll();
+      return;
+    }
 
     this.socket.addEventListener('open', () => {
+      this.hasEverConnected = true;
+      this.consecutiveConnectFailures = 0;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+      this.#cancelSnapshotPoll();
       this.flush();
     });
     this.socket.addEventListener('message', (event) => this.#onMessage(event));
     this.socket.addEventListener('close', () => {
+      this.consecutiveConnectFailures += 1;
+      if (shouldFallbackToHttpSync({
+        hasEverConnected: this.hasEverConnected,
+        consecutiveFailures: this.consecutiveConnectFailures,
+      })) {
+        this.#scheduleSnapshotPoll();
+        return;
+      }
+
       this.reconnectTimer = window.setTimeout(() => {
         this.reconnectTimer = null;
         this.#connect();
@@ -455,10 +485,9 @@ class LocalStorageSocketSync {
   }
 
   async #fetchAndApplyServerSnapshot() {
-    const response = await fetch('/api/localstorage-sync');
-    if (!response.ok) return {};
-    const payload = await response.json();
-    const snapshot = normalizeSnapshot(payload?.snapshot || {});
+    const payload = await this.#fetchServerState();
+    if (!payload) return {};
+    const snapshot = normalizeSnapshot(payload.snapshot || {});
 
     this.suppress = true;
     try {
@@ -481,9 +510,38 @@ class LocalStorageSocketSync {
       this.suppress = false;
     }
 
-    this.serverChecksum = String(payload?.checksum || checksumSnapshot(buildSnapshot()));
+    this.serverChecksum = String(payload.checksum || checksumSnapshot(buildSnapshot()));
     this.#persistMeta();
     return snapshot;
+  }
+
+  async #fetchServerState() {
+    const response = await fetch('/api/localstorage-sync');
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return {
+      checksum: String(payload?.checksum || ''),
+      snapshot: normalizeSnapshot(payload?.snapshot || {}),
+    };
+  }
+
+  #scheduleSnapshotPoll() {
+    if (this.snapshotPollTimer !== null) return;
+    this.snapshotPollTimer = window.setInterval(async () => {
+      if (!navigator.onLine) return;
+      if (this.queue.length || this.pendingBatch?.operations?.length) return;
+      const localChecksum = checksumSnapshot(buildSnapshot());
+      const state = await this.#fetchServerState();
+      if (!state?.checksum) return;
+      if (state.checksum === localChecksum) return;
+      await this.#fetchAndApplyServerSnapshot();
+    }, SNAPSHOT_POLL_INTERVAL_MS);
+  }
+
+  #cancelSnapshotPoll() {
+    if (this.snapshotPollTimer === null) return;
+    window.clearInterval(this.snapshotPollTimer);
+    this.snapshotPollTimer = null;
   }
 
   #persistQueue() {
@@ -564,4 +622,5 @@ export {
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
+  shouldFallbackToHttpSync,
 };

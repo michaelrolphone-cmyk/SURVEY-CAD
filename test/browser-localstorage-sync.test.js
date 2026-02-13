@@ -8,6 +8,7 @@ import {
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
+  shouldFallbackToHttpSync,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -73,6 +74,12 @@ test('shouldHydrateFromServerOnWelcome requests server snapshot only when safe a
   }), false);
 });
 
+
+test('shouldFallbackToHttpSync only enables polling fallback after repeated pre-connect failures', () => {
+  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 3 }), true);
+  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 2 }), false);
+  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: true, consecutiveFailures: 10 }), false);
+});
 
 test('coalesceQueuedOperations keeps only the latest operation per key and preserves clear ordering', () => {
   const operations = coalesceQueuedOperations(
