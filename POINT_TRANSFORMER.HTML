@@ -1008,6 +1008,7 @@
     const SURVEY_SKETCH_IMPORT_STORAGE_KEY = "lineSmithPointforgeImport";
     const ROS_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeRosImport";
     const PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeProjectBrowserImport";
+    const BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY = "pointforgeBoundaryLabImport";
     const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
     const POINTFORGE_POINT_SET_STORAGE_PREFIX = "pointforgePointSet";
     const PROJECT_LAST_POINT_SET_PREFIX = "surveyfoundryLastPointforgePointSet";
@@ -1922,6 +1923,38 @@
       }
     }
 
+    function tryImportBoundaryLabPayload(){
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("source") !== "boundary-lab") return false;
+
+      const raw = localStorage.getItem(BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY);
+      if (!raw) return false;
+
+      try {
+        const payload = JSON.parse(raw);
+        if (!payload?.csv || !String(payload.csv).trim()){
+          localStorage.removeItem(BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY);
+          return false;
+        }
+        currentImportContext = {
+          sourceType: "boundary-lab",
+          sourceLabel: "Exported from BoundaryLab",
+          baseName: "BoundaryLab Traversal",
+          extension: ".csv",
+        };
+        elIn.value = String(payload.csv);
+        persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context: currentImportContext, timestamp: new Date() });
+        processNow();
+        refreshPointEditorTables();
+        elMapHint.innerHTML = `<span class="ok">Imported traversal from BoundaryLab.</span>`;
+        localStorage.removeItem(BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY);
+        return true;
+      } catch {
+        localStorage.removeItem(BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY);
+        return false;
+      }
+    }
+
     // Init: blank textarea (no sample data), locked defaults already set in HTML
     initMap();
     setLocalizationInputsEnabled(false);
@@ -1939,6 +1972,7 @@
     });
     tryImportRosPayload();
     tryImportProjectBrowserPayload();
+    tryImportBoundaryLabPayload();
     tryRestoreLastOpenedProjectPointSet();
   </script>
 </body>

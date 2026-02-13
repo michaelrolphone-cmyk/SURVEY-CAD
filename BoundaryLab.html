@@ -42,6 +42,7 @@
       <div class="toolbar">
         <button id="addCall" class="primary" type="button">Add Call</button>
         <button id="clearCalls" type="button">Clear</button>
+        <button id="exportPointForge" type="button">Export to PointForge</button>
       </div>
       <table>
         <thead>
@@ -66,6 +67,7 @@
     import {
       calculateTraverseFromOrderedCalls,
       closureRatio,
+      buildTraverseCsvPNEZD,
     } from './src/boundarylab.js';
 
     const state = {
@@ -230,6 +232,38 @@
     clearCallsButton.addEventListener('click', () => {
       state.calls = [];
       render();
+    });
+
+    const BOUNDARYLAB_POINTFORGE_IMPORT_KEY = 'pointforgeBoundaryLabImport';
+    const exportButton = document.getElementById('exportPointForge');
+
+    exportButton.addEventListener('click', () => {
+      const traversal = calculateTraverseFromOrderedCalls({
+        orderedCalls: state.calls,
+        startPoint: { x: 10000, y: 10000, pointNumber: 1 },
+      });
+
+      if (!traversal.points || traversal.points.length < 2) return;
+
+      const csv = buildTraverseCsvPNEZD(traversal.points);
+      if (!csv) return;
+
+      localStorage.setItem(BOUNDARYLAB_POINTFORGE_IMPORT_KEY, JSON.stringify({
+        csv,
+        exportedAt: new Date().toISOString(),
+        source: 'boundary-lab',
+      }));
+
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'survey-cad:navigate-app',
+            path: '/POINT_TRANSFORMER.HTML?source=boundary-lab',
+          }, window.location.origin);
+          return;
+        }
+      } catch (_e) { /* fallback below */ }
+      window.location.assign('/POINT_TRANSFORMER.HTML?source=boundary-lab');
     });
 
     window.addEventListener('resize', render);
