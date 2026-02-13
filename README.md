@@ -33,6 +33,20 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 ## API and CLI Notes for this change
 
 SurveyFoundry Launcher now shows an on-home active project metadata overview (Project, Client, Contact info, Address, PLSS, and Index) directly inside the `project-manager-launch` section and adds tap-friendly deep links for phone (`tel:`), email (`mailto:`), and address (`geo:` native maps deep link) from the project manager section. This is a launcher UI behavior update only and does not add or change API endpoints or CLI commands.
+The browser localStorage real-time sync bootstrap now hydrates a newly opened browser session from the server snapshot when checksums differ and there are no unsent local edits. This fixes stale local browser state when multiple browser windows/devices are open on the same project.
+
+API and CLI surface area remains unchanged for this fix. Sync continues to use:
+- REST snapshot endpoint: `GET /api/localstorage-sync`
+- WebSocket endpoint: `GET /ws/localstorage-sync` (upgrade)
+- Existing CLI commands listed below (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+## API and CLI Notes for this change
+
+SurveyFoundry PLSS index generation now normalizes township/range values to single-digit components before composing the first index segment so the prefix remains at the expected three-digit maximum (`TRQ`). This prevents malformed four-digit prefixes when upstream PLSS values arrive zero-padded.
+
+API endpoints and CLI commands remain unchanged for this bug fix. Continue using the existing routes (`GET /api/lookup`, `GET /api/aliquots`) and command references documented below.
+
+## API and CLI Notes for this change
 
 SurveyFoundry Launcher now automatically backfills project PLSS and SurveyFoundry Index metadata when an active project is loaded (including launcher startup and active-project switches) and either field is missing. The launcher uses the existing address-based lookup endpoints (`/api/lookup` and `/api/aliquots`) and does not introduce any new API or CLI surface area.
 
@@ -52,6 +66,7 @@ LineSmith (`VIEWPORT.HTML`) and ArrowHead (`ArrowHead.html`) now auto-retry coll
 
 - Both apps reconnect to `/ws/lineforge?room=...` with exponential backoff (3s doubling up to 60s) after an unexpected close, reducing excessive reconnect churn when a room endpoint is down.
 - Launcher/app localStorage sync websocket clients now reconnect with exponential backoff (1.5s up to 60s) to reduce repeated connection-error spam when `/ws/localstorage-sync` is temporarily unavailable.
+- If `/ws/localstorage-sync` fails repeatedly before the first successful connection, the browser now stops aggressive websocket retries and switches to periodic REST snapshot polling (`GET /api/localstorage-sync`) every 30s until realtime sync becomes available again.
 - Presence/cursor overlays are cleared when a disconnect occurs, then restored as peers rejoin.
 - This reconnect loop helps collaboration recover from transient network drops without requiring a manual page refresh.
 - LineSmith now uses object-level edit locks for the most common simultaneous-edit collision: client sends `lock-request`, waits for `lock-granted`, and sends `lock-release` when edit is complete. If lock is denied (`lock-denied`), the UI flashes red/blue and blocks the edit attempt.
@@ -359,9 +374,9 @@ Base URL (local): `http://localhost:3000`
 - `UtilitiesPack.html` — utilities-only workflow that fetches utility records for an address, stores state-plane coordinates in app state, and exports power utility CSV rows in `name,northing,easting,elevation,code,description` format.
 
 - Launcher project management now uses a shared modal form for both create and edit flows with inline required-field validation (project name + address) instead of browser prompt/alert dialogs.
-- Launcher project saves now enrich the project overview with PLSS township/range and first aliquot text by chaining `GET /api/lookup` + `GET /api/aliquots` for the entered address coordinates before persisting local project metadata.
+- Launcher project saves now persist project edits immediately, then trigger a non-blocking PLSS/index backfill via `GET /api/lookup` + `GET /api/aliquots` so Save still works when lookup services are degraded.
 - SurveyFoundry header now renders an Index value derived from normalized PLSS metadata using township/range/section + aliquot coding (for example `44-01-430-0-0`) when an active project has indexed data.
-- Launcher project edits now lock the form while async PLSS enrichment runs and bind updates to the originally edited project id, preventing duplicate project creation when users submit rapidly.
+- Launcher project edits bind updates to the originally edited project id, clear stale PLSS/index values when the address changes, and queue background metadata refreshes without requiring a full app reload.
 
 
 - `GET /health`

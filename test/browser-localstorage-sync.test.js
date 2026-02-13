@@ -6,7 +6,9 @@ import {
   coalesceQueuedOperations,
   mergeQueuedDifferentials,
   nextReconnectDelay,
+  shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
+  shouldFallbackToHttpSync,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -42,6 +44,42 @@ test('nextReconnectDelay normalizes invalid delay inputs to safe defaults', () =
   assert.equal(nextReconnectDelay(1500, 1000), 1500);
 });
 
+test('shouldHydrateFromServerOnWelcome requests server snapshot only when safe and out-of-sync', () => {
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+  }), true);
+
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 1,
+    hasPendingBatch: false,
+  }), false);
+
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: true,
+  }), false);
+
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-same',
+    serverChecksum: 'fnv1a-same',
+    queueLength: 0,
+    hasPendingBatch: false,
+  }), false);
+});
+
+
+test('shouldFallbackToHttpSync only enables polling fallback after repeated pre-connect failures', () => {
+  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 3 }), true);
+  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: false, consecutiveFailures: 2 }), false);
+  assert.equal(shouldFallbackToHttpSync({ hasEverConnected: true, consecutiveFailures: 10 }), false);
+});
 
 test('coalesceQueuedOperations keeps only the latest operation per key and preserves clear ordering', () => {
   const operations = coalesceQueuedOperations(

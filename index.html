@@ -859,10 +859,13 @@
       return code;
     }
 
-    function normalizeTrsComponent(value = '', padLength = 2) {
+    function normalizeTrsComponent(value = '', padLength = 2, maxLength = 0) {
       const digits = (String(value || '').match(/\d+/g) || []).join('');
       if (!digits) return '';
-      return padLength > 0 ? digits.padStart(padLength, '0') : digits;
+      const normalized = padLength > 0
+        ? digits.padStart(padLength, '0')
+        : digits.replace(/^0+(?=\d)/, '');
+      return maxLength > 0 ? normalized.slice(-maxLength) : normalized;
     }
 
     function normalizeBookOrPage(value = '') {
@@ -882,8 +885,8 @@
 
     function buildSurveyIndexNumber(project) {
       if (!project) return '';
-      const township = normalizeTrsComponent(project.townships?.[0], 0) || '0';
-      const range = normalizeTrsComponent(project.ranges?.[0], 0) || '0';
+      const township = normalizeTrsComponent(project.townships?.[0], 0, 1) || '0';
+      const range = normalizeTrsComponent(project.ranges?.[0], 0, 1) || '0';
       const section = normalizeTrsComponent(project.sections?.[0]) || '00';
       const quadrant = aliquotToCode(project.sectionQuadrant) || '0';
       const aliquotCodes = buildAliquotCodes(project.aliquots) || '000';
@@ -1399,14 +1402,10 @@
       isSavingProjectForm = true;
       saveProjectFormButton.disabled = true;
 
-      let plssMetadata = null;
       try {
-        plssMetadata = await fetchProjectPlssMetadata(address);
-      } catch (err) {
-        console.warn('Unable to enrich project with township/range and aliquot metadata', err);
-      }
+        let savedProjectId = null;
+        let shouldBackfillMetadata = false;
 
-      try {
         if (projectIdBeingEdited) {
           const project = projects.find((entry) => entry.id === projectIdBeingEdited);
           if (!project) {
@@ -1414,17 +1413,23 @@
             return;
           }
 
+          const addressChanged = String(project.address || '').trim() !== address;
+
           project.name = name;
           project.client = client;
           project.clientContact = clientContact;
           project.billingRate = billingRate;
           project.address = address;
           project.description = description;
-          project.townshipRange = plssMetadata?.townshipRange || project.townshipRange || '';
-          project.aliquotLabel = plssMetadata?.aliquotLabel || project.aliquotLabel || '';
-          project.plssDescription = plssMetadata?.plssDescription || project.plssDescription || '';
-          project.surveyIndex = plssMetadata?.surveyIndex || project.surveyIndex || '';
+          if (addressChanged) {
+            project.townshipRange = '';
+            project.aliquotLabel = '';
+            project.plssDescription = '';
+            project.surveyIndex = '';
+          }
           project.updatedAt = new Date().toISOString();
+          savedProjectId = project.id;
+          shouldBackfillMetadata = addressChanged || projectNeedsPlssMetadata(project);
         } else {
           const project = {
             id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -1434,19 +1439,24 @@
             billingRate,
             address,
             description,
-            townshipRange: plssMetadata?.townshipRange || '',
-            aliquotLabel: plssMetadata?.aliquotLabel || '',
-            plssDescription: plssMetadata?.plssDescription || '',
-            surveyIndex: plssMetadata?.surveyIndex || '',
+            townshipRange: '',
+            aliquotLabel: '',
+            plssDescription: '',
+            surveyIndex: '',
             status: 'Proposed',
             createdAt: new Date().toISOString(),
           };
           projects.unshift(project);
+          savedProjectId = project.id;
+          shouldBackfillMetadata = true;
           setActiveProject(project.id);
         }
 
         saveProjects();
         renderProjects();
+        if (shouldBackfillMetadata && savedProjectId) {
+          syncProjectPlssMetadata(savedProjectId);
+        }
         closeProjectForm();
         closeProjectManager();
       } finally {
