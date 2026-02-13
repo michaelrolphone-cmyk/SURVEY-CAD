@@ -38,8 +38,9 @@ Set these environment variables in Heroku:
 
 - `REDIS_URL` (provided by Heroku Key-Value Store)
 - `LOCALSTORAGE_SYNC_REDIS_KEY` (optional, default: `survey-cad:localstorage-sync:state`)
+- `REDIS_INIT_TIMEOUT_MS` (optional, default: `5000`) — max Redis initialization wait before falling back to in-memory sync state.
 
-When `REDIS_URL` is set, `npm start` attempts to hydrate and persist shared sync state in Redis. If Redis is unavailable at startup (connection/auth/TLS failure) or `REDIS_URL` is not set, the server now falls back to in-memory sync state instead of crashing.
+When `REDIS_URL` is set, `npm start` attempts to hydrate and persist shared sync state in Redis. If Redis is unavailable at startup (connection/auth/TLS failure), hangs past `REDIS_INIT_TIMEOUT_MS`, or `REDIS_URL` is not set, the server falls back to in-memory sync state instead of crashing.
 
 ### API endpoints (state sync)
 

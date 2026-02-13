@@ -511,13 +511,20 @@ export async function startServer({
   port = Number(process.env.PORT) || 3000,
   host = '0.0.0.0',
   redisStoreFactory = createRedisLocalStorageSyncStore,
+  redisInitTimeoutMs = Number(process.env.REDIS_INIT_TIMEOUT_MS) || 5000,
   ...opts
 } = {}) {
   const resolvedOpts = { ...opts };
 
   if (!resolvedOpts.localStorageSyncStore) {
     try {
-      const redisBackedStore = await redisStoreFactory();
+      const redisBackedStore = await Promise.race([
+        Promise.resolve(redisStoreFactory()),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`Redis store initialization timed out after ${redisInitTimeoutMs}ms`)), redisInitTimeoutMs);
+        }),
+      ]);
+
       if (redisBackedStore) {
         resolvedOpts.localStorageSyncStore = redisBackedStore;
       }
@@ -535,8 +542,12 @@ export async function startServer({
     });
   }
 
-  return new Promise((resolve) => {
-    server.listen(port, host, () => resolve(server));
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, host, () => {
+      server.off('error', reject);
+      resolve(server);
+    });
   });
 }
 
@@ -545,5 +556,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const addr = server.address();
     const display = typeof addr === 'string' ? addr : `${addr.address}:${addr.port}`;
     console.log(`survey-cad server listening on ${display}`);
+  }).catch((err) => {
+    const message = err?.stack || err?.message || String(err);
+    console.error(`Failed to start survey-cad server: ${message}`);
+    process.exitCode = 1;
   });
 }

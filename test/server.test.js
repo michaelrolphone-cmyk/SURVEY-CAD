@@ -324,6 +324,36 @@ test('startServer falls back to in-memory sync store when redis setup fails', as
   }
 });
 
+
+test('startServer falls back when redis setup hangs beyond timeout', async () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(String(message));
+
+  const startedAt = Date.now();
+  const server = await startServer({
+    host: '127.0.0.1',
+    port: 0,
+    redisInitTimeoutMs: 25,
+    redisStoreFactory: () => new Promise(() => {}),
+  });
+
+  try {
+    const startupElapsedMs = Date.now() - startedAt;
+    assert.ok(startupElapsedMs < 1000);
+
+    const port = server.address().port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/localstorage-sync`);
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.version, 0);
+    assert.ok(warnings.some((entry) => entry.includes('timed out')));
+  } finally {
+    console.warn = originalWarn;
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('server returns empty utility payload when upstream utility endpoint is unavailable', async () => {
   const upstream = await createMockServer({ estimateCalculate404: true });
   const base = `http://127.0.0.1:${upstream.port}`;
