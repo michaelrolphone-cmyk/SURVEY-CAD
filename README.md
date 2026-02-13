@@ -30,6 +30,21 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
 
+
+## LocalStorage sync architecture reference
+
+For a focused, implementation-level explanation of browser-to-browser sync over websocket (including **initial state loading on connect**, queueing, checksum reconciliation, HTTP fallback, and sequence diagrams), see:
+
+- `docs/localstorage-sync-architecture.md`
+
+### API endpoints and commands used by sync
+
+- WebSocket endpoint: `GET /ws/localstorage-sync`
+- REST endpoints: `GET /api/localstorage-sync`, `POST /api/localstorage-sync`
+- New browser with empty localStorage: if server state exists, bootstrap hydration runs via `GET /api/localstorage-sync` after websocket welcome checksum comparison.
+- Run server: `npm start`
+- Run tests: `npm test`
+
 ## Redis-backed shared platform state
 
 To persist shared browser/platform state across dyno restarts and deploys, the server can use Heroku Key-Value Store (Redis) for `/api/localstorage-sync` and `/ws/localstorage-sync`.
