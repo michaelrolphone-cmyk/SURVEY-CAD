@@ -32,6 +32,8 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 
 ## API and CLI Notes for this change
 
+SurveyFoundry Launcher now automatically backfills project PLSS and SurveyFoundry Index metadata when an active project is loaded (including launcher startup and active-project switches) and either field is missing. The launcher uses the existing address-based lookup endpoints (`/api/lookup` and `/api/aliquots`) and does not introduce any new API or CLI surface area.
+
 The SurveyFoundry launcher has been visually redesigned around a rustic survey workshop motif (hand-painted texture layering, warm lamplight earth tones, and subtle futuristic cyan/amber glow accents). This is a UI-only refresh and does not add, remove, or modify server API endpoints or CLI commands; the endpoint and command references below remain current for this release.
 
 ## LineSmith Loading Experience

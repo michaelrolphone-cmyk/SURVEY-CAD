@@ -638,6 +638,7 @@
     let activeProjectId = null;
     const backgroundMapUrlCache = new Map();
     let backgroundRequestToken = 0;
+    const projectMetadataSyncInFlight = new Map();
     let resolveLeaveLineSmithChoice = null;
 
     function requestAppFrameMessage(messageType, extraPayload = {}) {
@@ -897,6 +898,56 @@
       }
     }
 
+    function projectNeedsPlssMetadata(project) {
+      if (!project) return false;
+      const address = String(project.address || '').trim();
+      if (!address) return false;
+      const plssDescription = String(project.plssDescription || '').trim();
+      const surveyIndex = String(project.surveyIndex || '').trim();
+      return !plssDescription || !surveyIndex;
+    }
+
+    async function syncProjectPlssMetadata(projectId) {
+      if (!projectId) return false;
+      const syncKey = String(projectId);
+      if (projectMetadataSyncInFlight.has(syncKey)) {
+        return projectMetadataSyncInFlight.get(syncKey);
+      }
+
+      const syncPromise = (async () => {
+        const project = projects.find((entry) => entry.id === projectId);
+        if (!projectNeedsPlssMetadata(project)) return false;
+
+        try {
+          const plssMetadata = await fetchProjectPlssMetadata(project.address);
+          if (!plssMetadata) return false;
+
+          const targetProject = projects.find((entry) => entry.id === projectId);
+          if (!projectNeedsPlssMetadata(targetProject)) return false;
+
+          targetProject.townshipRange = plssMetadata?.townshipRange || targetProject.townshipRange || '';
+          targetProject.aliquotLabel = plssMetadata?.aliquotLabel || targetProject.aliquotLabel || '';
+          targetProject.plssDescription = plssMetadata?.plssDescription || targetProject.plssDescription || '';
+          targetProject.surveyIndex = plssMetadata?.surveyIndex || targetProject.surveyIndex || '';
+          targetProject.updatedAt = new Date().toISOString();
+
+          saveProjects();
+          renderProjects();
+          return true;
+        } catch (err) {
+          console.warn('Unable to backfill project PLSS/index metadata', err);
+          return false;
+        }
+      })();
+
+      projectMetadataSyncInFlight.set(syncKey, syncPromise);
+      try {
+        return await syncPromise;
+      } finally {
+        projectMetadataSyncInFlight.delete(syncKey);
+      }
+    }
+
 
 
     function syncLauncherStateFromStorageEvent() {
@@ -947,6 +998,7 @@
         localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
       }
       renderProjects();
+      syncProjectPlssMetadata(activeProjectId);
     }
 
     function openProjectManager() {
@@ -1410,6 +1462,7 @@
     loadProjects();
     loadActiveProject();
     renderProjects();
+    syncProjectPlssMetadata(activeProjectId);
 
 
     loadApps().then(() => {
