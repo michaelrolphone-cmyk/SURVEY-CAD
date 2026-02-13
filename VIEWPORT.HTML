@@ -2108,16 +2108,29 @@
     applyingRemoteState: false,
     enabled: false,
     reconnectDelayMs: 3000,
+    maxReconnectDelayMs: 60000,
     reconnectTimer: null,
     connectToken: 0,
     stateInFlight: null,
     pendingState: "",
     lastKnownRevision: 0,
     latestServerState: "",
+    lastQueuedState: "",
     objectLocks: new Map(),
     pendingLockRequests: new Map(),
     activeDragLock: null
   };
+
+  function nextCollabReconnectDelay(previousDelayMs, maxDelayMs) {
+    const baseDelayMs = 3000;
+    const normalizedPrevious = Number.isFinite(previousDelayMs)
+      ? Math.max(baseDelayMs, Math.trunc(previousDelayMs))
+      : baseDelayMs;
+    const normalizedMax = Number.isFinite(maxDelayMs)
+      ? Math.max(baseDelayMs, Math.trunc(maxDelayMs))
+      : 60000;
+    return Math.min(normalizedPrevious * 2, normalizedMax);
+  }
 
   function setStatus(msg, kind="") {
     const el = $("#status");
@@ -3779,13 +3792,24 @@
     }
   }
 
+  function shouldSkipQueuedCollabState(statePayload) {
+    if (typeof statePayload !== "string" || !statePayload) return true;
+    if (statePayload === collab.pendingState) return true;
+    if (statePayload === collab.lastQueuedState) return true;
+    if (statePayload === collab.latestServerState) return true;
+    if (collab.stateInFlight && statePayload === collab.stateInFlight.localState) return true;
+    return false;
+  }
+
   function flushCollabStateSync() {
     if (!collab.enabled || collab.applyingRemoteState) return;
     if (collab.stateInFlight || !collab.pendingState) return;
 
-    const requestId = `state-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const statePayload = collab.pendingState;
     collab.pendingState = "";
+    if (statePayload === collab.latestServerState) return;
+
+    const requestId = `state-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     collab.stateInFlight = {
       requestId,
       baseRevision: collab.lastKnownRevision,
@@ -3806,7 +3830,10 @@
     if (collab.stateDebounce) clearTimeout(collab.stateDebounce);
     collab.stateDebounce = setTimeout(() => {
       collab.stateDebounce = null;
-      collab.pendingState = serializeState({ includeView: false });
+      const serializedState = serializeState({ includeView: false });
+      if (shouldSkipQueuedCollabState(serializedState)) return;
+      collab.pendingState = serializedState;
+      collab.lastQueuedState = serializedState;
       flushCollabStateSync();
     }, 120);
   }
@@ -3834,10 +3861,15 @@
         socket.close();
         return;
       }
+      collab.reconnectDelayMs = 3000;
       setCollabStatus(`connected (${roomId})`);
       if (syncLocalStateOnConnect) {
-        collab.pendingState = serializeState({ includeView: false });
-        flushCollabStateSync();
+        const connectState = serializeState({ includeView: false });
+        if (!shouldSkipQueuedCollabState(connectState)) {
+          collab.pendingState = connectState;
+          collab.lastQueuedState = connectState;
+          flushCollabStateSync();
+        }
       }
     });
 
@@ -3849,14 +3881,17 @@
       collab.remoteArPresence.clear();
       collab.peers.clear();
       collab.stateInFlight = null;
+      collab.pendingState = "";
       collab.pendingLockRequests.clear();
       collab.objectLocks.clear();
       clearMapArPresence();
       if (collab.enabled && collab.roomId && !collab.reconnectTimer) {
+        const scheduledDelayMs = collab.reconnectDelayMs;
         collab.reconnectTimer = setTimeout(() => {
           collab.reconnectTimer = null;
           connectCollaboration({ skipInitialStateHydration, syncLocalStateOnConnect });
-        }, collab.reconnectDelayMs);
+        }, scheduledDelayMs);
+        collab.reconnectDelayMs = nextCollabReconnectDelay(scheduledDelayMs, collab.maxReconnectDelayMs);
       }
     });
 
@@ -3873,6 +3908,7 @@
         collab.color = message.color || "#ffffff";
         collab.lastKnownRevision = Number.isInteger(Number(message.revision)) ? Number(message.revision) : 0;
         collab.latestServerState = typeof message.state === "string" ? message.state : "";
+        collab.lastQueuedState = collab.latestServerState || collab.lastQueuedState;
         collab.peers.clear();
         for (const peer of (message.peers || [])) {
           collab.peers.set(peer.clientId, { color: peer.color || "#ffffff" });
@@ -3972,6 +4008,7 @@
           const rebasedSerialized = JSON.stringify(rebasedState);
           if (rebasedSerialized && rebasedSerialized !== rejectedState) {
             collab.pendingState = rebasedSerialized;
+            collab.lastQueuedState = rebasedSerialized;
             collab.applyingRemoteState = true;
             restoreState(rebasedSerialized, { skipSync: true, applyView: false });
             collab.applyingRemoteState = false;

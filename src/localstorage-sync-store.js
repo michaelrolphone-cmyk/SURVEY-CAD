@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 const DEFAULT_STATE = Object.freeze({
   version: 0,
   snapshot: {},
@@ -30,7 +28,12 @@ function sortedSnapshot(snapshot = {}) {
 
 export function computeSnapshotChecksum(snapshot = {}) {
   const canonical = JSON.stringify(sortedSnapshot(cloneSnapshot(snapshot)));
-  return createHash('sha256').update(canonical, 'utf8').digest('hex');
+  let hash = 2166136261;
+  for (let i = 0; i < canonical.length; i += 1) {
+    hash ^= canonical.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 
 function normalizeOperation(operation = {}) {
