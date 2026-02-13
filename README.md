@@ -32,6 +32,14 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
 
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI Notes for this change
 
 LineSmith 3-point PC/PT curve rendering now draws a true circular arc fit through the start, middle, and end points instead of approximating the path with a Bezier segment.
@@ -121,6 +129,14 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify API endpoints or CLI commands; continue using the endpoints and commands listed above.
 
 
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI Notes for this change
 
 LineSmith now re-syncs field-to-finish linework metadata (including PC→PT three-point curve middle-point metadata) immediately after restoring a drawing state. This ensures curve segments render on first open and continue updating predictably after point moves/refresh flows without requiring a follow-up point-code edit.
@@ -128,6 +144,14 @@ LineSmith now re-syncs field-to-finish linework metadata (including PC→PT thre
 API endpoints and CLI commands remain unchanged for this bug fix. Continue using:
 - API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 ## API and CLI Notes for this change
 
@@ -139,11 +163,27 @@ API and CLI surface area remains unchanged for this bug fix. Continue using:
 - CLI commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI Notes for this change
 
 RecordQuarry now resolves project name, client, and address from `surveyfoundryProjects` by `projectId` before falling back to URL query parameters. This keeps connected clients aligned after launcher-side project edits (including client info changes) even when older tabs refresh with stale query strings.
 
 API and CLI surface area remains unchanged for this bug fix. Continue using the existing sync endpoints (`GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`) and CLI commands (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 ## API and CLI Notes for this change
 
@@ -155,11 +195,27 @@ API and CLI surface area remains unchanged for this fix. Sync continues to use:
 - WebSocket endpoint: `GET /ws/localstorage-sync` (upgrade)
 - Existing CLI commands listed below (`npm run cli -- --help`, `npm run ros:cli -- --help`).
 
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI Notes for this change
 
 SurveyFoundry PLSS index generation now normalizes township/range values to single-digit components before composing the first index segment so the prefix remains at the expected three-digit maximum (`TRQ`). This prevents malformed four-digit prefixes when upstream PLSS values arrive zero-padded.
 
 API endpoints and CLI commands remain unchanged for this bug fix. Continue using the existing routes (`GET /api/lookup`, `GET /api/aliquots`) and command references documented below.
+
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 ## API and CLI Notes for this change
 
@@ -222,6 +278,14 @@ When using the **Line by 2 points** tool, LineSmith now treats only `null`/`unde
 ## LineSmith Mobile Pinch Zoom Stability
 
 LineSmith pinch gestures in `VIEWPORT.HTML` now anchor zoom to the gesture midpoint so two-finger zoom/pan stays stable on mobile instead of drifting across the map.
+
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 ## API and CLI Notes for this change
 
@@ -363,6 +427,14 @@ node -e "const m=require('./assets/survey-symbols/index.json'); console.table(m.
 ## UtilitiesPack Export Control
 
 `UtilitiesPack.html` now uses `assets/icons/download/Download-CSV.png` directly for the power CSV download action, rendered at `125px` tall in the export control. The export icon/button is laid out independently so the address input and fetch button keep natural control heights. The SurveyFoundry launcher app tile for UtilitiesPack has been restored to `assets/icons/UtilitiesPack.png` and uses natural icon sizing like the other app tiles.
+
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 ## API and CLI Notes for this change
 
@@ -600,6 +672,14 @@ heroku create <your-app-name>
 git push heroku <your-branch>:main
 heroku open
 ```
+
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 ## API and CLI Notes for this change
 
