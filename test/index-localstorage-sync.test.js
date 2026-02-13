@@ -37,4 +37,7 @@ test('browser localStorage sync module patches localStorage and queues offline d
   assert.match(source, /buildSocketEndpointCandidates/, 'sync module should try root and base-path websocket endpoint candidates behind routers/proxies');
   assert.match(source, /method:\s*'POST'/, 'sync module should publish queued local changes through POST /api/localstorage-sync while websocket transport is unavailable');
   assert.match(source, /checksum-conflict/, 'sync module should rehydrate and rebase queued local updates when fallback POST detects a same-version conflict');
+  assert.match(source, /#bootstrapFromApi\(\)/, 'sync module should bootstrap from REST sync API on startup without waiting for websocket welcome');
+  assert.match(source, /shouldApplyStartupServerState/, 'sync module startup bootstrap should compare versions/checksums before hydrating local storage state');
+  assert.match(source, /serverVersion/, 'sync module should persist server version metadata with sync meta state');
 });

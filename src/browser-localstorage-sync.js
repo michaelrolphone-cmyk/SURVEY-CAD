@@ -149,6 +149,29 @@ function shouldHydrateFromServerOnWelcome({
   return String(localChecksum) !== String(serverChecksum);
 }
 
+function shouldApplyStartupServerState({
+  localVersion = 0,
+  serverVersion = 0,
+  localChecksum = '',
+  serverChecksum = '',
+  queueLength = 0,
+  hasPendingBatch = false,
+  localEntryCount = 0,
+  serverEntryCount = 0,
+} = {}) {
+  if (queueLength > 0 || hasPendingBatch) return false;
+  if (serverEntryCount <= 0) return false;
+  if (localEntryCount <= 0) return true;
+  if (Number(serverVersion) > Number(localVersion)) return true;
+
+  // Backwards-compatible bootstrap for clients that have not persisted local version metadata yet.
+  if (!Number(localVersion) && serverChecksum && String(serverChecksum) !== String(localChecksum)) {
+    return true;
+  }
+
+  return false;
+}
+
 
 
 
@@ -289,6 +312,7 @@ class LocalStorageSocketSync {
     this.inFlight = null;
     this.queue = this.#loadPendingQueue();
     this.serverChecksum = this.#loadMetaChecksum();
+    this.serverVersion = this.#loadMetaVersion();
     this.flushTimer = null;
     this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
     this.reconnectTimer = null;
@@ -306,6 +330,9 @@ class LocalStorageSocketSync {
     this.apiEndpointIndex = 0;
 
     this.#patchStorage();
+    this.#bootstrapFromApi().catch(() => {
+      // Ignore startup bootstrap failures and continue websocket connect/retry flow.
+    });
     this.#connect();
 
     window.addEventListener('online', () => {
@@ -427,6 +454,35 @@ class LocalStorageSocketSync {
     if (this.httpFallbackTimer === null) return;
     window.clearInterval(this.httpFallbackTimer);
     this.httpFallbackTimer = null;
+  }
+
+  async #bootstrapFromApi() {
+    if (!navigator.onLine) return;
+    if (this.queue.length > 0 || this.pendingBatch?.operations?.length) return;
+
+    const serverState = await this.#fetchServerState();
+    if (!serverState) return;
+
+    const localSnapshot = buildSnapshot();
+    const localChecksum = checksumSnapshot(localSnapshot);
+
+    if (!shouldApplyStartupServerState({
+      localVersion: this.serverVersion,
+      serverVersion: serverState.version,
+      localChecksum,
+      serverChecksum: serverState.checksum,
+      queueLength: this.queue.length,
+      hasPendingBatch: Boolean(this.pendingBatch?.operations?.length),
+      localEntryCount: Object.keys(localSnapshot).length,
+      serverEntryCount: Object.keys(serverState.snapshot || {}).length,
+    })) {
+      this.serverVersion = Number(serverState.version || this.serverVersion || 0);
+      this.serverChecksum = String(serverState.checksum || this.serverChecksum || '');
+      this.#persistMeta();
+      return;
+    }
+
+    await this.#fetchAndApplyServerSnapshot();
   }
 
   async #syncViaHttpFallback() {
@@ -665,6 +721,10 @@ class LocalStorageSocketSync {
         })) {
           await this.#fetchAndApplyServerSnapshot();
         }
+        if (Number.isFinite(message?.state?.version)) {
+          this.serverVersion = Number(message.state.version);
+          this.#persistMeta();
+        }
       }
       this.flush();
       return;
@@ -704,6 +764,9 @@ class LocalStorageSocketSync {
     const computed = checksumSnapshot(buildSnapshot());
     const expected = String(message?.state?.checksum || '');
     this.serverChecksum = expected;
+    if (Number.isFinite(message?.state?.version)) {
+      this.serverVersion = Number(message.state.version);
+    }
     this.#persistMeta();
 
     if (!expected || computed !== expected) {
@@ -789,6 +852,7 @@ class LocalStorageSocketSync {
     }
 
     this.serverChecksum = String(payload.checksum || checksumSnapshot(buildSnapshot()));
+    this.serverVersion = Number(payload.version || 0);
     this.#persistMeta();
     this.#notifyLocalStorageChanged();
     return snapshot;
@@ -868,7 +932,10 @@ class LocalStorageSocketSync {
   #persistMeta() {
     this.suppress = true;
     try {
-      window.localStorage.setItem(SYNC_META_KEY, JSON.stringify({ serverChecksum: this.serverChecksum || '' }));
+      window.localStorage.setItem(SYNC_META_KEY, JSON.stringify({
+        serverChecksum: this.serverChecksum || '',
+        serverVersion: Number(this.serverVersion || 0),
+      }));
     } finally {
       this.suppress = false;
     }
@@ -881,6 +948,16 @@ class LocalStorageSocketSync {
       return typeof parsed?.serverChecksum === 'string' ? parsed.serverChecksum : '';
     } catch {
       return '';
+    }
+  }
+
+  #loadMetaVersion() {
+    try {
+      const raw = window.localStorage.getItem(SYNC_META_KEY);
+      const parsed = JSON.parse(raw || '{}');
+      return Number.isFinite(parsed?.serverVersion) ? Number(parsed.serverVersion) : 0;
+    } catch {
+      return 0;
     }
   }
 
@@ -918,6 +995,7 @@ export {
   mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
+  shouldApplyStartupServerState,
   shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
