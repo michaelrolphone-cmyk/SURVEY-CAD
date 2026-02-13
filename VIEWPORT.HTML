@@ -6324,7 +6324,43 @@
       const pb = points.get(ln.b);
       if (!pa || !pb || !isLayerVisible(pa.layerId) || !isLayerVisible(pb.layerId)) continue;
 
-      const cp = segmentClosestPoint({x:w.x,y:w.y}, pa, pb);
+      let cp = null;
+      const middle = getCurveMiddlePoint(ln);
+      if (middle && isLayerVisible(middle.layerId)) {
+        const circle = getCircleFromThreePoints(pa, middle, pb);
+        if (circle) {
+          const startAngle = normalizeAngleRadians(Math.atan2(pa.y - circle.centerY, pa.x - circle.centerX));
+          const middleAngle = normalizeAngleRadians(Math.atan2(middle.y - circle.centerY, middle.x - circle.centerX));
+          const endAngle = normalizeAngleRadians(Math.atan2(pb.y - circle.centerY, pb.x - circle.centerX));
+          const targetAngle = normalizeAngleRadians(Math.atan2(w.y - circle.centerY, w.x - circle.centerX));
+
+          const ccwSweep = (endAngle - startAngle + Math.PI * 2) % (Math.PI * 2);
+          const ccwToMiddle = (middleAngle - startAngle + Math.PI * 2) % (Math.PI * 2);
+          const clockwise = ccwToMiddle > ccwSweep;
+          const sweepRad = clockwise
+            ? (startAngle - endAngle + Math.PI * 2) % (Math.PI * 2)
+            : ccwSweep;
+          const sweepToTarget = clockwise
+            ? (startAngle - targetAngle + Math.PI * 2) % (Math.PI * 2)
+            : (targetAngle - startAngle + Math.PI * 2) % (Math.PI * 2);
+
+          if (sweepRad > 0 && sweepToTarget <= sweepRad) {
+            cp = {
+              x: circle.centerX + Math.cos(targetAngle) * circle.radius,
+              y: circle.centerY + Math.sin(targetAngle) * circle.radius,
+              t: sweepToTarget / sweepRad,
+            };
+          } else {
+            const da = dist(w.x, w.y, pa.x, pa.y);
+            const db = dist(w.x, w.y, pb.x, pb.y);
+            cp = da <= db
+              ? { x: pa.x, y: pa.y, t: 0 }
+              : { x: pb.x, y: pb.y, t: 1 };
+          }
+        }
+      }
+
+      if (!cp) cp = segmentClosestPoint({x:w.x,y:w.y}, pa, pb);
       const d = dist(w.x, w.y, cp.x, cp.y);
       if (d <= bestDist) {
         bestDist = d;

@@ -1077,3 +1077,11 @@ test('VIEWPORT.HTML fades map layer visibility and centers/fades the loading mod
   assert.match(html, /\.linesmith-loading-overlay\{[\s\S]*display:flex;[\s\S]*align-items:center;[\s\S]*justify-content:center;/, 'loading overlay should center the modal both vertically and horizontally');
   assert.match(html, /\.linesmith-loading-overlay\.hidden\s+\.linesmith-loading-card\{[\s\S]*opacity:0;[\s\S]*transform:translateY\(8px\) scale\(0\.985\);/, 'loading modal card should fade and ease out when the overlay is hidden');
 });
+
+test('VIEWPORT.HTML pickLine hit-testing follows three-point curve arc geometry for mobile tap selection', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+pickLine\(screenX, screenY, thresholdPx=8\)\s*\{[\s\S]*const\s+middle\s*=\s*getCurveMiddlePoint\(ln\);[\s\S]*const\s+circle\s*=\s*getCircleFromThreePoints\(pa, middle, pb\);/, 'pickLine should detect when a line is a 3-point curve and compute a circle fit for hit testing');
+  assert.match(html, /const\s+sweepToTarget\s*=\s*clockwise[\s\S]*if\s*\(sweepRad > 0 && sweepToTarget <= sweepRad\)\s*\{[\s\S]*cp\s*=\s*\{[\s\S]*t:\s*sweepToTarget \/ sweepRad,/, 'pickLine should project taps onto the valid arc sweep and preserve grip interpolation for curve selections');
+  assert.match(html, /if\s*\(!cp\)\s*cp\s*=\s*segmentClosestPoint\(\{x:w\.x,y:w\.y\}, pa, pb\);/, 'pickLine should keep linear-segment fallback behavior for non-curve lines and degenerate arcs');
+});

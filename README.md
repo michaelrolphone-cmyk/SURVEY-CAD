@@ -58,6 +58,13 @@ API and CLI surface area remains unchanged for this UI/measurement enhancement. 
 - API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
+## API and CLI notes for this LineSmith curve tap-selection fix
+
+LineSmith line hit-testing now follows the true three-point arc geometry when a line has PC/PT middle-point metadata, so tapping directly on a curve on touch devices selects that curve and opens the curve table in the inspector.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI notes for this LineSmith collaboration frame-handling fix
 
 LineSmith collaboration websocket handling now correctly processes fragmented frames and multiple coalesced frames in a single TCP packet, which prevents missed point/code saves and stale peer point positions during concurrent editing.
