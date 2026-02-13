@@ -103,6 +103,15 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 
 This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify API endpoints or CLI commands; continue using the endpoints and commands listed above.
 
+## API and CLI Notes for this change
+
+LineSmith now applies pending single-point editor field edits (including point code updates) before `Save Drawing to Project` snapshots state, ensuring saves include the latest in-panel edits and collaboration state sync emits those updates to connected users. Save-triggered point editor apply now commits immediately (without waiting for async single-point lock handshake), so the saved snapshot and outgoing shared state stay aligned.
+
+API and CLI surface area remains unchanged for this bug fix. Continue using:
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 
 ## API and CLI Notes for this change
 
