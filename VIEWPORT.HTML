@@ -5000,6 +5000,7 @@
   }
 
   function syncFieldToFinishLinework() {
+    ensureLegacyAutoFieldToFinishLineMetadata();
     const curveCommands = buildFieldToFinishCurveLineCommands();
     const curveSuppressedSequentialKeys = buildCurveSuppressedSequentialLineKeys(curveCommands);
     const expected = new Map();
