@@ -8800,6 +8800,29 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   }
 
   function saveDrawingToProject() {
+    if (selectedPointIds.length === 1) {
+      const point = points.get(selectedPointIds[0]);
+      const hasPendingEditorEdits = !!point && (
+        String($("#ptNum")?.value ?? point.num).trim() !== String(point.num ?? "")
+        || String($("#ptX")?.value ?? point?.x).trim() !== String(point?.x ?? "")
+        || String($("#ptY")?.value ?? point?.y).trim() !== String(point?.y ?? "")
+        || String($("#ptZ")?.value ?? point?.z).trim() !== String(point?.z ?? "")
+        || normalizePointCode(String($("#ptCode")?.value ?? point?.code ?? "")) !== String(point?.code ?? "")
+        || String($("#ptNotes")?.value ?? point?.notes ?? "") !== String(point?.notes ?? "")
+      );
+      if (hasPendingEditorEdits) {
+        const appliedPendingEdits = applySelectedPointEdits({
+          num: $("#ptNum"),
+          x: $("#ptX"),
+          y: $("#ptY"),
+          z: $("#ptZ"),
+          code: $("#ptCode"),
+          notes: $("#ptNotes")
+        }, "point editor");
+        if (!appliedPendingEdits) return false;
+      }
+    }
+
     if (!activeProjectId) {
       setStatus("Open LineSmith from an active project to save drawing history.", "warn");
       return false;

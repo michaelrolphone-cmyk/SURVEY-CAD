@@ -803,6 +803,12 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
   assert.match(html, /Auto-updated linework for point \$\{p\.num\}: \+\$\{addedJpn\} JPN, \+\$\{addedSequential\} sequential, \+\$\{addedCurve\} curve, -\$\{removed\} removed\./, 'LineSmith should report add/remove totals when code edits re-sync field-to-finish linework');
 });
 
+test('VIEWPORT.HTML save applies pending single-point editor edits before snapshotting project history', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*if \(selectedPointIds\.length === 1\) \{[\s\S]*const\s+hasPendingEditorEdits\s*=\s*!!point\s*&&\s*\([\s\S]*normalizePointCode\(String\(\$\("#ptCode"\)\?\.value[\s\S]*if \(hasPendingEditorEdits\) \{[\s\S]*applySelectedPointEdits\(\{[\s\S]*code:\s*\$\("#ptCode"\),[\s\S]*\},\s*"point editor"\);[\s\S]*if \(!appliedPendingEdits\) return false;/, 'saving should commit pending point-editor field values (including code edits) so saved state and collaboration sync include the latest point data');
+});
+
 
 test('VIEWPORT.HTML normalizes point code token ordering and deduplicates linework directives', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
