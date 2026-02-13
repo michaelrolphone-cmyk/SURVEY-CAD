@@ -5030,6 +5030,7 @@
       const { tokensUpper, commands } = parseFieldToFinishCommands(point.code);
       const tokenSet = new Set(tokensUpper);
       const lineworkCodes = fieldToFinishRuleState.lineworkCodes;
+      const curveLineworkCodes = extractCurveLineworkCodes(point.code);
 
       const explicitActions = new Set();
       for (const cmd of commands) {
@@ -5055,7 +5056,8 @@
       }
 
       const pointImplicitSequenceCodes = [...tokenSet].filter((token) => (
-        lineworkCodes.has(token) || explicitSequentialBaseCodes.has(token)
+        (lineworkCodes.has(token) || explicitSequentialBaseCodes.has(token))
+        && !curveLineworkCodes.has(token)
       ));
 
       const hasGlobalEndDirective = tokenSet.has("END") && !commands.some((cmd) => cmd.type === "sequential-line");
@@ -5128,6 +5130,37 @@
 
   function pointHasCurveEndToken(pointCode = "") {
     return pointHasCurveMarker(pointCode, "PT");
+  }
+
+  function extractCurveLineworkCodes(pointCode = "") {
+    const { tokensUpper } = parseFieldToFinishCommands(pointCode);
+    const curveLineworkCodes = new Set();
+    const hasStandaloneCurveMarker = tokensUpper.includes("PC") || tokensUpper.includes("PT");
+
+    if (hasStandaloneCurveMarker) {
+      for (const token of tokensUpper) {
+        if (fieldToFinishRuleState.lineworkCodes.has(token)) curveLineworkCodes.add(token);
+      }
+    }
+
+    const collectCurveBaseCode = (token = "", marker = "PC") => {
+      if (!token || token === marker) return;
+      if (token.startsWith(marker)) {
+        const base = token.slice(marker.length);
+        if (fieldToFinishRuleState.lineworkCodes.has(base)) curveLineworkCodes.add(base);
+      }
+      if (token.endsWith(marker)) {
+        const base = token.slice(0, -marker.length);
+        if (fieldToFinishRuleState.lineworkCodes.has(base)) curveLineworkCodes.add(base);
+      }
+    };
+
+    for (const token of tokensUpper) {
+      collectCurveBaseCode(token, "PC");
+      collectCurveBaseCode(token, "PT");
+    }
+
+    return curveLineworkCodes;
   }
 
   function buildFieldToFinishCurveLineCommands() {
