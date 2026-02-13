@@ -8,8 +8,6 @@ const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
 const INITIAL_RECONNECT_DELAY_MS = 1500;
 const MAX_RECONNECT_DELAY_MS = 60000;
 const OPERATION_BATCH_DELAY_MS = 120;
-const MAX_INITIAL_CONNECT_FAILURES = 3;
-const SNAPSHOT_POLL_INTERVAL_MS = 30000;
 
 function shouldSyncLocalStorageKey(key) {
   const keyString = String(key || '');
@@ -111,25 +109,6 @@ function shouldHydrateFromServerOnWelcome({
   if (!serverChecksum) return false;
   if (queueLength > 0 || hasPendingBatch) return false;
   return String(localChecksum) !== String(serverChecksum);
-}
-
-function shouldFallbackToHttpSync({
-  hasEverConnected = false,
-  consecutiveFailures = 0,
-  maxFailures = MAX_INITIAL_CONNECT_FAILURES,
-} = {}) {
-  return !hasEverConnected && consecutiveFailures >= maxFailures;
-}
-
-function shouldPushSnapshotOverHttp({
-  queueLength = 0,
-  hasPendingBatch = false,
-  socketReadyState = 3,
-  online = true,
-} = {}) {
-  if (!online) return false;
-  if (socketReadyState === 1) return false;
-  return queueLength > 0 || hasPendingBatch;
 }
 
 function normalizeQueuedDifferential(diff = {}) {
@@ -239,12 +218,16 @@ class LocalStorageSocketSync {
     this.batchTimer = null;
     this.hasEverConnected = false;
     this.consecutiveConnectFailures = 0;
-    this.snapshotPollTimer = null;
 
     this.#patchStorage();
     this.#connect();
 
-    window.addEventListener('online', () => this.flush());
+    window.addEventListener('online', () => {
+      if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
+        this.#connect();
+      }
+      this.flush();
+    });
     window.addEventListener('offline', () => this.#scheduleFlush());
   }
 
@@ -258,7 +241,7 @@ class LocalStorageSocketSync {
     try {
       this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/localstorage-sync`);
     } catch {
-      this.#scheduleSnapshotPoll();
+      this.#scheduleReconnect();
       return;
     }
 
@@ -266,26 +249,23 @@ class LocalStorageSocketSync {
       this.hasEverConnected = true;
       this.consecutiveConnectFailures = 0;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
-      this.#cancelSnapshotPoll();
       this.flush();
     });
     this.socket.addEventListener('message', (event) => this.#onMessage(event));
     this.socket.addEventListener('close', () => {
       this.consecutiveConnectFailures += 1;
-      if (shouldFallbackToHttpSync({
-        hasEverConnected: this.hasEverConnected,
-        consecutiveFailures: this.consecutiveConnectFailures,
-      })) {
-        this.#scheduleSnapshotPoll();
-        return;
-      }
-
-      this.reconnectTimer = window.setTimeout(() => {
-        this.reconnectTimer = null;
-        this.#connect();
-      }, this.reconnectDelayMs);
-      this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
+      if (!navigator.onLine) return;
+      this.#scheduleReconnect();
     });
+  }
+
+
+  #scheduleReconnect() {
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.#connect();
+    }, this.reconnectDelayMs);
+    this.reconnectDelayMs = nextReconnectDelay(this.reconnectDelayMs);
   }
 
   #patchStorage() {
@@ -531,74 +511,9 @@ class LocalStorageSocketSync {
     if (!response.ok) return null;
     const payload = await response.json();
     return {
-      version: Number(payload?.version || 0),
       checksum: String(payload?.checksum || ''),
       snapshot: normalizeSnapshot(payload?.snapshot || {}),
     };
-  }
-
-  async #pushSnapshotViaHttp() {
-    if (!shouldPushSnapshotOverHttp({
-      queueLength: this.queue.length,
-      hasPendingBatch: Boolean(this.pendingBatch?.operations?.length),
-      socketReadyState: this.socket?.readyState,
-      online: navigator.onLine,
-    })) {
-      return false;
-    }
-
-    if (this.batchTimer !== null) {
-      window.clearTimeout(this.batchTimer);
-      this.batchTimer = null;
-      this.#commitPendingBatch();
-    }
-
-    const serverState = await this.#fetchServerState();
-    if (!serverState) return false;
-
-    const snapshot = buildSnapshot();
-    const response = await fetch('/api/localstorage-sync', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        version: (Number.isFinite(serverState.version) ? serverState.version : 0) + 1,
-        snapshot,
-      }),
-    });
-    if (!response.ok) return false;
-    const payload = await response.json();
-    const nextState = payload?.state;
-    if (!nextState?.checksum) return false;
-
-    this.serverChecksum = String(nextState.checksum);
-    this.#persistMeta();
-    this.inFlight = null;
-    this.pendingBatch = null;
-    this.queue = [];
-    this.#persistQueue();
-    return true;
-  }
-
-  #scheduleSnapshotPoll() {
-    if (this.snapshotPollTimer !== null) return;
-    this.snapshotPollTimer = window.setInterval(async () => {
-      if (!navigator.onLine) return;
-      if (this.queue.length || this.pendingBatch?.operations?.length) {
-        await this.#pushSnapshotViaHttp();
-        return;
-      }
-      const localChecksum = checksumSnapshot(buildSnapshot());
-      const state = await this.#fetchServerState();
-      if (!state?.checksum) return;
-      if (state.checksum === localChecksum) return;
-      await this.#fetchAndApplyServerSnapshot();
-    }, SNAPSHOT_POLL_INTERVAL_MS);
-  }
-
-  #cancelSnapshotPoll() {
-    if (this.snapshotPollTimer === null) return;
-    window.clearInterval(this.snapshotPollTimer);
-    this.snapshotPollTimer = null;
   }
 
   #persistQueue() {
@@ -679,6 +594,4 @@ export {
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
-  shouldFallbackToHttpSync,
-  shouldPushSnapshotOverHttp,
 };
