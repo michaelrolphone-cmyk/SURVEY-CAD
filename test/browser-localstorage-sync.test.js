@@ -8,6 +8,7 @@ import {
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
+  shouldReplayInFlightOnSocketClose,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -70,6 +71,24 @@ test('shouldHydrateFromServerOnWelcome requests server snapshot only when safe a
     serverChecksum: 'fnv1a-same',
     queueLength: 0,
     hasPendingBatch: false,
+  }), false);
+});
+
+
+test('shouldReplayInFlightOnSocketClose only resets in-flight request when queue head matches', () => {
+  assert.equal(shouldReplayInFlightOnSocketClose({
+    inFlightRequestId: 'sync-a',
+    queueHeadRequestId: 'sync-a',
+  }), true);
+
+  assert.equal(shouldReplayInFlightOnSocketClose({
+    inFlightRequestId: 'sync-a',
+    queueHeadRequestId: 'sync-b',
+  }), false);
+
+  assert.equal(shouldReplayInFlightOnSocketClose({
+    inFlightRequestId: '',
+    queueHeadRequestId: 'sync-a',
   }), false);
 });
 

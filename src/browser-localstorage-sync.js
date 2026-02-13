@@ -111,6 +111,15 @@ function shouldHydrateFromServerOnWelcome({
   return String(localChecksum) !== String(serverChecksum);
 }
 
+
+function shouldReplayInFlightOnSocketClose({
+  inFlightRequestId = '',
+  queueHeadRequestId = '',
+} = {}) {
+  if (!inFlightRequestId || !queueHeadRequestId) return false;
+  return String(inFlightRequestId) === String(queueHeadRequestId);
+}
+
 function normalizeQueuedDifferential(diff = {}) {
   const operationsRaw = Array.isArray(diff?.operations) ? diff.operations : [];
   const operations = operationsRaw
@@ -223,7 +232,7 @@ class LocalStorageSocketSync {
     this.#connect();
 
     window.addEventListener('online', () => {
-      if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
+      if (!this.socket || this.socket.readyState >= WebSocket.CLOSING) {
         this.#connect();
       }
       this.flush();
@@ -235,6 +244,10 @@ class LocalStorageSocketSync {
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+
+    if (this.socket && this.socket.readyState < WebSocket.CLOSING) {
+      return;
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -254,6 +267,14 @@ class LocalStorageSocketSync {
     this.socket.addEventListener('message', (event) => this.#onMessage(event));
     this.socket.addEventListener('close', () => {
       this.consecutiveConnectFailures += 1;
+      if (shouldReplayInFlightOnSocketClose({
+        inFlightRequestId: this.inFlight,
+        queueHeadRequestId: this.queue[0]?.requestId,
+      })) {
+        this.inFlight = null;
+      }
+
+      this.socket = null;
       if (!navigator.onLine) return;
       this.#scheduleReconnect();
     });
@@ -363,12 +384,17 @@ class LocalStorageSocketSync {
 
     const next = this.queue[0];
     this.inFlight = next.requestId;
-    this.socket.send(JSON.stringify({
-      type: 'sync-differential',
-      requestId: next.requestId,
-      baseChecksum: next.baseChecksum || '',
-      operations: next.operations,
-    }));
+    try {
+      this.socket.send(JSON.stringify({
+        type: 'sync-differential',
+        requestId: next.requestId,
+        baseChecksum: next.baseChecksum || '',
+        operations: next.operations,
+      }));
+    } catch {
+      this.inFlight = null;
+      this.#scheduleFlush();
+    }
   }
 
   async #onMessage(event) {
@@ -594,4 +620,5 @@ export {
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
+  shouldReplayInFlightOnSocketClose,
 };
