@@ -3636,6 +3636,9 @@
 
     mapGeoreference = sanitizeMapGeoreference(s.mapGeoreference);
 
+    ensureLegacyAutoFieldToFinishLineMetadata();
+    syncFieldToFinishLinework();
+
     updatePointEditorFromSelection();
     schedulePointsTableRender();
     updateUndoRedoHUD();
@@ -5036,11 +5039,22 @@
       if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
       const existingLine = findDirectConnectionLine(cmd.a, cmd.b);
       if (existingLine) {
-        if (cmd.type === "curve" && existingLine.generatedBy === "field-to-finish" && existingLine.fieldToFinishType !== "curve") {
-          existingLine.fieldToFinishType = "curve";
-          existingLine.fieldToFinishBaseCode = String(cmd.baseCode || "").trim().toUpperCase();
-          existingLine.fieldToFinishCurveMiddlePointId = Number.isFinite(Number(cmd.middlePointId)) ? Number(cmd.middlePointId) : null;
-          addedCurve++;
+        if (cmd.type === "curve" && existingLine.generatedBy === "field-to-finish") {
+          const nextMiddlePointId = Number.isFinite(Number(cmd.middlePointId)) ? Number(cmd.middlePointId) : null;
+          const prevMiddlePointId = Number.isFinite(Number(existingLine.fieldToFinishCurveMiddlePointId))
+            ? Number(existingLine.fieldToFinishCurveMiddlePointId)
+            : null;
+          const nextBaseCode = String(cmd.baseCode || "").trim().toUpperCase();
+          if (
+            existingLine.fieldToFinishType !== "curve"
+            || existingLine.fieldToFinishBaseCode !== nextBaseCode
+            || prevMiddlePointId !== nextMiddlePointId
+          ) {
+            existingLine.fieldToFinishType = "curve";
+            existingLine.fieldToFinishBaseCode = nextBaseCode;
+            existingLine.fieldToFinishCurveMiddlePointId = nextMiddlePointId;
+            addedCurve++;
+          }
         }
         continue;
       }
