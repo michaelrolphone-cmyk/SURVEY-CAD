@@ -912,7 +912,15 @@
       const townshipDir = firstAttributeValue(townshipFeature, ['TWNSHPDIR', 'TOWNSHPDIR', 'TWPDIR', 'TOWNSHIP_DIR', 'TDIR'], /TWP.*DIR|TOWNSHIP.*DIR|TWNSHP.*DIR/i).toUpperCase();
       const range = firstAttributeValue(townshipFeature, ['RANGENO', 'RANGE', 'RNG', 'RANGE_NO'], /RNG|RANGE/i);
       const rangeDir = firstAttributeValue(townshipFeature, ['RANGEDIR', 'RNGDIR', 'RANGE_DIR', 'RDIR'], /RANGE.*DIR|RNG.*DIR/i).toUpperCase();
-      const section = firstAttributeValue(sectionFeature, ['FRSTDIVNO', 'SEC', 'SECTION', 'SECNO'], /SEC|SECTION/i);
+      const rawSection = firstAttributeValue(sectionFeature, ['SEC', 'SECTION', 'SECNO'], /SEC|SECTION/i);
+      const section = (() => {
+        const normalized = String(rawSection || '').trim();
+        if (!normalized) return '';
+        if (/^\d{1,2}$/.test(normalized)) return normalized;
+
+        const embeddedSectionMatch = normalized.match(/(?:^|\b)SEC(?:TION)?\s*#?\s*(\d{1,2})(?:\b|$)/i);
+        return embeddedSectionMatch?.[1] || '';
+      })();
       const townshipLabel = township ? `T${township}${townshipDir || ''}` : '';
       const rangeLabel = range ? `R${range}${rangeDir || ''}` : '';
       const sectionLabel = section ? `Sec ${section}` : '';
