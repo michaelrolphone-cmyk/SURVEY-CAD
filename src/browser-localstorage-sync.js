@@ -7,6 +7,13 @@ const PENDING_DIFFS_KEY = 'surveyfoundryLocalStoragePendingDiffs';
 const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
 const INITIAL_RECONNECT_DELAY_MS = 1500;
 const MAX_RECONNECT_DELAY_MS = 60000;
+const OPERATION_BATCH_DELAY_MS = 120;
+
+function shouldSyncLocalStorageKey(key) {
+  const keyString = String(key || '');
+  if (!keyString) return false;
+  return !INTERNAL_KEYS.has(keyString);
+}
 
 function sortedSnapshot(snapshot = {}) {
   return Object.fromEntries(Object.entries(snapshot).sort(([a], [b]) => a.localeCompare(b)));
@@ -21,7 +28,7 @@ function buildSnapshot() {
   const snapshot = {};
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
-    if (!key || INTERNAL_KEYS.has(key)) continue;
+    if (!shouldSyncLocalStorageKey(key)) continue;
     const value = window.localStorage.getItem(key);
     if (value !== null) snapshot[key] = value;
   }
@@ -56,6 +63,31 @@ function buildDifferentialOperations(previousSnapshot = {}, nextSnapshot = {}) {
   }
 
   return operations;
+}
+
+
+function coalesceQueuedOperations(previousOperations = [], nextOperations = []) {
+  const combined = [...previousOperations, ...nextOperations];
+  let includesClear = false;
+  const operationsByKey = new Map();
+
+  combined.forEach((operation) => {
+    if (operation?.type === 'clear') {
+      includesClear = true;
+      operationsByKey.clear();
+      return;
+    }
+
+    if ((operation?.type === 'set' || operation?.type === 'remove') && operation?.key) {
+      operationsByKey.set(String(operation.key), operation.type === 'set'
+        ? { type: 'set', key: String(operation.key), value: String(operation.value ?? '') }
+        : { type: 'remove', key: String(operation.key) });
+    }
+  });
+
+  const coalesced = includesClear ? [{ type: 'clear' }] : [];
+  coalesced.push(...operationsByKey.values());
+  return coalesced;
 }
 
 function nextReconnectDelay(previousDelayMs = INITIAL_RECONNECT_DELAY_MS, maxDelayMs = MAX_RECONNECT_DELAY_MS) {
@@ -114,6 +146,8 @@ class LocalStorageSocketSync {
     this.flushTimer = null;
     this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
     this.reconnectTimer = null;
+    this.pendingBatch = null;
+    this.batchTimer = null;
 
     this.#patchStorage();
     this.#connect();
@@ -161,7 +195,7 @@ class LocalStorageSocketSync {
       const previous = this.getItem(keyString);
       const baseChecksum = checksumSnapshot(buildSnapshot());
       originalSetItem.call(this, keyString, valueString);
-      if (!sync.suppress && !INTERNAL_KEYS.has(keyString) && previous !== valueString) {
+      if (!sync.suppress && shouldSyncLocalStorageKey(keyString) && previous !== valueString) {
         sync.enqueue([{ type: 'set', key: keyString, value: valueString }], { baseChecksum });
       }
     };
@@ -171,7 +205,7 @@ class LocalStorageSocketSync {
       const had = this.getItem(keyString) !== null;
       const baseChecksum = checksumSnapshot(buildSnapshot());
       originalRemoveItem.call(this, keyString);
-      if (!sync.suppress && !INTERNAL_KEYS.has(keyString) && had) {
+      if (!sync.suppress && shouldSyncLocalStorageKey(keyString) && had) {
         sync.enqueue([{ type: 'remove', key: keyString }], { baseChecksum });
       }
     };
@@ -180,7 +214,7 @@ class LocalStorageSocketSync {
       const keys = [];
       for (let i = 0; i < this.length; i += 1) {
         const key = this.key(i);
-        if (key && !INTERNAL_KEYS.has(key)) keys.push(key);
+        if (shouldSyncLocalStorageKey(key)) keys.push(key);
       }
       const baseChecksum = checksumSnapshot(buildSnapshot());
       originalClear.call(this);
@@ -193,16 +227,47 @@ class LocalStorageSocketSync {
   }
 
   enqueue(operations, { baseChecksum = '' } = {}) {
-    this.queue.push(normalizeQueuedDifferential({
-      operations,
-      baseChecksum,
-      requestId: `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    }));
+    const normalized = normalizeQueuedDifferential({ operations, baseChecksum });
+    if (!normalized.operations.length) return;
+
+    if (!this.pendingBatch) {
+      this.pendingBatch = {
+        requestId: `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        baseChecksum: normalized.baseChecksum || '',
+        operations: [],
+      };
+    }
+
+    if (!this.pendingBatch.baseChecksum && normalized.baseChecksum) {
+      this.pendingBatch.baseChecksum = normalized.baseChecksum;
+    }
+
+    this.pendingBatch.operations = coalesceQueuedOperations(this.pendingBatch.operations, normalized.operations);
+    this.#scheduleBatchCommit();
+  }
+
+  #scheduleBatchCommit() {
+    if (this.batchTimer !== null) return;
+    this.batchTimer = window.setTimeout(() => {
+      this.batchTimer = null;
+      this.#commitPendingBatch();
+    }, OPERATION_BATCH_DELAY_MS);
+  }
+
+  #commitPendingBatch() {
+    if (!this.pendingBatch?.operations?.length) return;
+    this.queue.push(normalizeQueuedDifferential(this.pendingBatch));
+    this.pendingBatch = null;
     this.#persistQueue();
     this.flush();
   }
 
   flush() {
+    if (this.batchTimer !== null) {
+      window.clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+      this.#commitPendingBatch();
+    }
     if (!navigator.onLine) return;
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     if (this.inFlight || this.queue.length === 0) return;
@@ -274,7 +339,7 @@ class LocalStorageSocketSync {
           const keys = [];
           for (let i = 0; i < window.localStorage.length; i += 1) {
             const key = window.localStorage.key(i);
-            if (key && !INTERNAL_KEYS.has(key)) keys.push(key);
+            if (shouldSyncLocalStorageKey(key)) keys.push(key);
           }
           keys.forEach((key) => window.localStorage.removeItem(key));
           return;
@@ -322,7 +387,7 @@ class LocalStorageSocketSync {
       const keys = [];
       for (let i = 0; i < window.localStorage.length; i += 1) {
         const key = window.localStorage.key(i);
-        if (key && !INTERNAL_KEYS.has(key)) keys.push(key);
+        if (shouldSyncLocalStorageKey(key)) keys.push(key);
       }
       keys.forEach((key) => {
         if (!(key in snapshot)) {
@@ -330,7 +395,7 @@ class LocalStorageSocketSync {
         }
       });
       Object.entries(snapshot).forEach(([key, value]) => {
-        if (!INTERNAL_KEYS.has(key)) {
+        if (shouldSyncLocalStorageKey(key)) {
           window.localStorage.setItem(key, String(value));
         }
       });
@@ -401,4 +466,12 @@ if (typeof window !== 'undefined' && !window.document.documentElement.hasAttribu
   }
 }
 
-export { LocalStorageSocketSync, checksumSnapshot, buildSnapshot, buildDifferentialOperations, nextReconnectDelay };
+export {
+  LocalStorageSocketSync,
+  checksumSnapshot,
+  buildSnapshot,
+  buildDifferentialOperations,
+  coalesceQueuedOperations,
+  nextReconnectDelay,
+  shouldSyncLocalStorageKey,
+};
