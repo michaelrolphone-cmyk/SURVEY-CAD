@@ -21,3 +21,10 @@ test('BoundaryLab preserves active call input focus during rerender', async () =
   assert.match(html, /renderRows\(captureActiveInputState\(\)\)/);
   assert.match(html, /nextInput\.focus\(\{ preventScroll: true \}\)/);
 });
+
+test('BoundaryLab stacks preview below call table on mobile and resizes canvas to viewport pixels', async () => {
+  const html = await readFile(path.join(rootDir, 'BoundaryLab.html'), 'utf8');
+  assert.match(html, /@media \(max-width: 960px\) \{[\s\S]*\.layout \{ grid-template-columns: 1fr; \}[\s\S]*canvas \{ height: min\(56vh, 420px\); \}/);
+  assert.match(html, /function resizeCanvasToDisplaySize\(\) \{[\s\S]*window\.devicePixelRatio[\s\S]*canvas\.width = displayWidth;[\s\S]*canvas\.height = displayHeight;/);
+  assert.match(html, /window\.addEventListener\('resize', render\);/);
+});

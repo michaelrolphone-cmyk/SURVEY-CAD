@@ -7,7 +7,7 @@
   <style>
     :root { color-scheme: dark; }
     body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0b1220; color: #e2e8f0; }
-    .layout { display: grid; grid-template-columns: 430px 1fr; min-height: 100vh; }
+    .layout { display: grid; grid-template-columns: 430px minmax(0, 1fr); min-height: 100vh; }
     .panel { border-right: 1px solid #22314f; padding: 18px; }
     h1 { margin: 0 0 6px; font-size: 1.25rem; }
     p { margin: 0 0 14px; color: #9fb0cc; }
@@ -23,8 +23,15 @@
     .summaryRow { display: flex; justify-content: space-between; margin: 5px 0; gap: 10px; }
     .bad { color: #fca5a5; }
     .good { color: #86efac; }
-    .canvasWrap { padding: 16px; }
-    canvas { width: 100%; height: calc(100vh - 32px); border-radius: 10px; background: #07101d; border: 1px solid #22314f; }
+    .canvasWrap { padding: 16px; min-width: 0; }
+    canvas { width: 100%; height: calc(100vh - 32px); border-radius: 10px; background: #07101d; border: 1px solid #22314f; display: block; }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { border-right: 0; border-bottom: 1px solid #22314f; }
+      .canvasWrap { padding-top: 10px; }
+      canvas { height: min(56vh, 420px); }
+    }
   </style>
 </head>
 <body>
@@ -124,7 +131,21 @@
       restoreActiveInputState(activeState);
     }
 
+    function resizeCanvasToDisplaySize() {
+      const rect = canvas.getBoundingClientRect();
+      const pixelRatio = Math.max(window.devicePixelRatio || 1, 1);
+      const displayWidth = Math.max(1, Math.round(rect.width * pixelRatio));
+      const displayHeight = Math.max(1, Math.round(rect.height * pixelRatio));
+
+      if (canvas.width === displayWidth && canvas.height === displayHeight) return false;
+
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+      return true;
+    }
+
     function draw(points) {
+      resizeCanvasToDisplaySize();
       const w = canvas.width;
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
@@ -211,6 +232,8 @@
       state.calls = [];
       render();
     });
+
+    window.addEventListener('resize', render);
 
     render();
   </script>
