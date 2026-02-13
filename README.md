@@ -32,6 +32,7 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 
 ## API and CLI Notes for this change
 
+SurveyFoundry Launcher now shows an on-home active project metadata overview (Project, Client, Contact info, Address, PLSS, and Index) directly inside the `project-manager-launch` section and adds tap-friendly deep links for phone (`tel:`), email (`mailto:`), and address (`geo:` native maps deep link) from the project manager section. This is a launcher UI behavior update only and does not add or change API endpoints or CLI commands.
 The browser localStorage real-time sync bootstrap now hydrates a newly opened browser session from the server snapshot when checksums differ and there are no unsent local edits. This fixes stale local browser state when multiple browser windows/devices are open on the same project.
 
 API and CLI surface area remains unchanged for this fix. Sync continues to use:
