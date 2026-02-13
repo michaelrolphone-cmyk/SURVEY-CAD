@@ -233,6 +233,11 @@ test('launcher enriches saved projects with township/range aliquots and survey i
   assert.match(launcherHtml, /project\.surveyIndex\s*=\s*plssMetadata\?\.surveyIndex\s*\|\|\s*project\.surveyIndex\s*\|\|\s*'';/, 'editing a project should persist survey index metadata');
   assert.match(launcherHtml, /surveyIndex:\s*plssMetadata\?\.surveyIndex\s*\|\|\s*''/, 'creating a project should persist survey index metadata');
   assert.match(launcherHtml, /<small>PLSS: \$\{plssText\}<\/small><br\/><small>Index: \$\{surveyIndexText\}<\/small>/, 'project overview rows should display PLSS summary and survey index');
+  assert.match(launcherHtml, /function\s+projectNeedsPlssMetadata\(project\)/, 'launcher should detect when the active project is missing PLSS or index metadata');
+  assert.match(launcherHtml, /return\s*!plssDescription\s*\|\|\s*!surveyIndex;/, 'metadata detection should trigger when either PLSS description or survey index is missing');
+  assert.match(launcherHtml, /async\s+function\s+syncProjectPlssMetadata\(projectId\)/, 'launcher should define a background metadata sync helper for active projects');
+  assert.match(launcherHtml, /syncProjectPlssMetadata\(activeProjectId\);/, 'launcher should backfill missing metadata for the active project on initial load');
+  assert.match(launcherHtml, /function\s+setActiveProject\(projectId\)[\s\S]*syncProjectPlssMetadata\(activeProjectId\);/, 'switching active projects should trigger PLSS/index backfill when metadata is missing');
 });
 
 test('launcher project manager enforces sequential project status progression', async () => {
