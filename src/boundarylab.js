@@ -3,6 +3,8 @@ export function normalizeAzimuth(azimuth = 0) {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+export const LINEAR_CLOSURE_TOLERANCE = 0.01;
+
 export function normalizeAngleDiff(angle = 0) {
   const normalized = ((Number(angle) + 180) % 360 + 360) % 360;
   return normalized - 180;
@@ -77,6 +79,24 @@ export function bearingToAzimuth(parsedBearing) {
   return NaN;
 }
 
+export function azimuthToBearing(azimuth) {
+  if (!Number.isFinite(azimuth)) return '—';
+  const normalized = normalizeAzimuth(azimuth);
+  const northSouth = normalized <= 180 ? 'N' : 'S';
+  const eastWest = normalized <= 90 || normalized >= 270 ? 'E' : 'W';
+  const angleToAxis = normalized <= 90
+    ? normalized
+    : normalized <= 180
+      ? 180 - normalized
+      : normalized <= 270
+        ? normalized - 180
+        : 360 - normalized;
+
+  if (Math.abs(angleToAxis) <= 1e-9) return `${northSouth} 0°00'00.00" ${eastWest}`;
+  if (Math.abs(angleToAxis - 90) <= 1e-9) return `${northSouth} 90°00'00.00" ${eastWest}`;
+  return `${northSouth} ${formatDms(angleToAxis)} ${eastWest}`;
+}
+
 export function calculateTraverseFromOrderedCalls({
   orderedCalls = [],
   startPoint = { x: 0, y: 0, pointNumber: 1 },
@@ -113,7 +133,10 @@ export function calculateTraverseFromOrderedCalls({
   const closureDx = current.x - base.x;
   const closureDy = current.y - base.y;
   const linearMisclosure = points.length > 1 ? Math.hypot(closureDx, closureDy) : null;
-  const closureIsLinear = Number.isFinite(linearMisclosure) && linearMisclosure <= 1e-6;
+  const closureIsLinear = Number.isFinite(linearMisclosure) && linearMisclosure <= LINEAR_CLOSURE_TOLERANCE;
+  const closureAzimuth = Number.isFinite(linearMisclosure) && linearMisclosure > LINEAR_CLOSURE_TOLERANCE
+    ? normalizeAzimuth((Math.atan2(-closureDx, -closureDy) * 180) / Math.PI)
+    : null;
   const angularMisclosure = Number.isFinite(startAzimuth) && Number.isFinite(endAzimuth)
     ? (closureIsLinear ? 0 : Math.abs(normalizeAngleDiff(endAzimuth - startAzimuth)))
     : null;
@@ -123,6 +146,9 @@ export function calculateTraverseFromOrderedCalls({
     totalLength,
     linearMisclosure,
     angularMisclosure,
+    closureAzimuth,
+    closureBearing: closureIsLinear ? 'Closed' : azimuthToBearing(closureAzimuth),
+    closureIsLinear,
     startAzimuth,
     endAzimuth,
     endPoint: points.at(-1) || null,

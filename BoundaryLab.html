@@ -52,7 +52,7 @@
       <div class="summary">
         <div class="summaryRow"><span>Total Distance</span><strong id="totalDistance">0.00</strong></div>
         <div class="summaryRow"><span>Linear Error</span><strong id="linearError">—</strong></div>
-        <div class="summaryRow"><span>Angular Error</span><strong id="angularError">—</strong></div>
+        <div class="summaryRow"><span>Closure Bearing</span><strong id="angularError">—</strong></div>
         <div class="summaryRow"><span>Closure Ratio</span><strong id="closureRatio">—</strong></div>
         <div class="summaryRow"><span>Status</span><strong id="closureStatus">Add calls</strong></div>
       </div>
@@ -66,7 +66,6 @@
     import {
       calculateTraverseFromOrderedCalls,
       closureRatio,
-      formatDms,
     } from './src/boundarylab.js';
 
     const state = {
@@ -193,10 +192,10 @@
 
       totalDistanceEl.textContent = traversal.totalLength.toFixed(2);
       linearErrorEl.textContent = Number.isFinite(traversal.linearMisclosure) ? traversal.linearMisclosure.toFixed(4) : '—';
-      angularErrorEl.textContent = formatDms(traversal.angularMisclosure);
+      angularErrorEl.textContent = traversal.closureBearing;
       closureRatioEl.textContent = ratio === Infinity ? 'Perfect closure' : (Number.isFinite(ratio) ? `1:${Math.round(ratio).toLocaleString()}` : '—');
 
-      const closed = Number.isFinite(traversal.linearMisclosure) && traversal.linearMisclosure <= 1e-6;
+      const closed = traversal.closureIsLinear;
       closureStatusEl.textContent = closed ? 'Closed' : 'Open';
       closureStatusEl.className = closed ? 'good' : 'bad';
 

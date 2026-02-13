@@ -8,10 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-test('BoundaryLab UI shows angular error in DMS format', async () => {
+test('BoundaryLab UI shows closure bearing text from traverse results', async () => {
   const html = await readFile(path.join(rootDir, 'BoundaryLab.html'), 'utf8');
-  assert.match(html, /formatDms\(traversal\.angularMisclosure\)/);
-  assert.doesNotMatch(html, /formatDegrees\(traversal\.angularMisclosure\)/);
+  assert.match(html, /Closure Bearing/);
+  assert.match(html, /angularErrorEl\.textContent = traversal\.closureBearing;/);
 });
 
 test('BoundaryLab preserves active call input focus during rerender', async () => {
