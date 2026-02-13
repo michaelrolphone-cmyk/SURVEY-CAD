@@ -649,13 +649,13 @@ test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected
   assert.match(html, /ADA_CPF_PDF_BASE\s*=\s*"https:\/\/gisprod\.adacounty\.id\.gov\/apps\/acdscpf\/CpfPdfs\/"/, 'point inspector should use the Ada CP&F PDF base path');
   assert.match(html, /cpfLabel\.textContent\s*=\s*`CP&F \(≤\$\{CPNF_NEARBY_DISTANCE_FEET\}ft\)`/, 'point inspector should label CP&F row with nearby radius context');
   assert.match(html, /a\.textContent\s*=\s*`Open\s+\$\{instrument\}`/, 'point inspector should render quick-open CP&F links per instrument');
-  assert.match(html, /function\s+applySelectedPointEdits\(fields,\s*sourceLabel\s*=\s*"inspector"\)/, 'point inspector and point editor should share a single apply helper for point property updates');
+  assert.match(html, /function\s+applySelectedPointEdits\(fields,\s*sourceLabel\s*=\s*"inspector",\s*options\s*=\s*\{\}\)/, 'point inspector and point editor should share a single apply helper for point property updates');
   assert.match(html, /const\s+fieldSpecs\s*=\s*\[[\s\S]*\["Point",\s*"num",\s*p\.num\][\s\S]*\["Notes",\s*"notes",\s*p\.notes \|\| ""\]/, 'point inspector should render editable fields for number, coordinates, code, and notes');
   assert.match(html, /applyBtn\.id\s*=\s*"pointInspectorApply";/, 'point inspector should render an apply button for saving point property edits directly from inspector');
   assert.match(html, /function\s+getSelectedPoints\(\)/, 'point inspector should expose a selected-point helper for multi-edit workflows');
   assert.match(html, /function\s+summarizeSelectedPointValues\(selectedPoints,\s*keys\)/, 'point inspector should summarize shared values across selected points');
   assert.match(html, /function\s+applySharedFieldToSelectedPoints\(key,\s*rawValue,\s*sourceLabel\s*=\s*"point inspector"\)/, 'point inspector should support bulk edits from varied pills');
-  assert.match(html, /function\s+applyEditsToMultiplePoints\(fields,\s*sourceLabel\s*=\s*"inspector"\)\s*\{[\s\S]*if \(pointCodeChanged\) \{[\s\S]*ensureLegacyAutoFieldToFinishLineMetadata\(\);[\s\S]*syncFieldToFinishLinework\(\);[\s\S]*\}/, 'point inspector apply should re-sync field-to-finish linework when point code edits change draw commands');
+  assert.match(html, /function\s+applyEditsToMultiplePoints\(fields,\s*sourceLabel\s*=\s*"inspector",\s*options\s*=\s*\{\}\)\s*\{[\s\S]*if \(pointCodeChanged\) \{[\s\S]*ensureLegacyAutoFieldToFinishLineMetadata\(\);[\s\S]*syncFieldToFinishLinework\(\);[\s\S]*\}/, 'point inspector apply should re-sync field-to-finish linework when point code edits change draw commands');
   assert.match(html, /function\s+applySharedFieldToSelectedPoints\(key,\s*rawValue,\s*sourceLabel\s*=\s*"point inspector"\)\s*\{[\s\S]*if \(pointCodeChanged\) \{[\s\S]*ensureLegacyAutoFieldToFinishLineMetadata\(\);[\s\S]*syncFieldToFinishLinework\(\);[\s\S]*\}/, 'multi-point Varied code edits from inspector should re-sync field-to-finish linework immediately');
   assert.match(html, /if \(selectedPoints\.length > 1\) \{[\s\S]*buildSharedPointInspector\(selectedPoints\);/, 'point inspector should render shared multi-point values before the per-point editor');
   assert.match(html, /variedButton\.textContent\s*=\s*"Varied";/, 'point inspector should render a red Varied pill for non-shared values');
@@ -806,9 +806,19 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
 test('VIEWPORT.HTML save applies pending single-point editor edits before snapshotting project history', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
-  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*if \(selectedPointIds\.length === 1\) \{[\s\S]*const\s+hasPendingEditorEdits\s*=\s*!!point\s*&&\s*\([\s\S]*normalizePointCode\(String\(\$\("#ptCode"\)\?\.value[\s\S]*if \(hasPendingEditorEdits\) \{[\s\S]*applySelectedPointEdits\(\{[\s\S]*code:\s*\$\("#ptCode"\),[\s\S]*\},\s*"point editor"\);[\s\S]*if \(!appliedPendingEdits\) return false;/, 'saving should commit pending point-editor field values (including code edits) so saved state and collaboration sync include the latest point data');
+  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*if \(selectedPointIds\.length === 1\) \{[\s\S]*const\s+hasPendingEditorEdits\s*=\s*!!point[\s\S]*normalizePointCode\(String\(\$\("#ptCode"\)\?\.value/, 'save workflow should detect pending single-point editor values including normalized point code changes before snapshotting');
+  assert.match(html, /applySelectedPointEdits\(\{[\s\S]*num:\s*\$\("#ptNum"\),[\s\S]*code:\s*\$\("#ptCode"\),[\s\S]*\},\s*"point editor",\s*\{\s*lockDuringSinglePointCollabEdit:\s*false\s*\}\);[\s\S]*if \(!appliedPendingEdits\) return false;/, 'saving should commit pending point-editor field values (including code edits) so saved state and collaboration sync include the latest point data');
 });
 
+
+
+
+test('VIEWPORT.HTML allows save-triggered point editor apply to bypass async single-point collab lock handshake', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+applyEditsToMultiplePoints\(fields,\s*sourceLabel\s*=\s*"inspector",\s*options\s*=\s*\{\}\)\s*\{[\s\S]*const\s+\{\s*lockDuringSinglePointCollabEdit\s*=\s*true\s*\}\s*=\s*options;/, 'apply helper should support disabling async single-point lock handshake when callers need immediate local commit');
+  assert.match(html, /if \(lockDuringSinglePointCollabEdit && editsByPoint\.length === 1 && collab\.enabled && collab\.socket\?\.readyState === WebSocket\.OPEN\) \{/, 'single-point collaboration lock request path should be conditional so save workflow can force immediate local commit');
+});
 
 test('VIEWPORT.HTML normalizes point code token ordering and deduplicates linework directives', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');

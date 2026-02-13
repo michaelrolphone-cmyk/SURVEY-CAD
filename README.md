@@ -105,7 +105,7 @@ This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify A
 
 ## API and CLI Notes for this change
 
-LineSmith now applies pending single-point editor field edits (including point code updates) before `Save Drawing to Project` snapshots state, ensuring saves include the latest in-panel edits and collaboration state sync emits those updates to connected users.
+LineSmith now applies pending single-point editor field edits (including point code updates) before `Save Drawing to Project` snapshots state, ensuring saves include the latest in-panel edits and collaboration state sync emits those updates to connected users. Save-triggered point editor apply now commits immediately (without waiting for async single-point lock handshake), so the saved snapshot and outgoing shared state stay aligned.
 
 API and CLI surface area remains unchanged for this bug fix. Continue using:
 
