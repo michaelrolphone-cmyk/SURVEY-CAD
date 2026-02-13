@@ -45,6 +45,7 @@ Relevant implementation files:
 
 - On initial WebSocket connect, server sends `sync-welcome` with current state/checksum.
 - If a browser has **no pending local edits** and checksum differs, it hydrates from server.
+- **New browser with empty localStorage**: if the server snapshot is non-empty, checksums differ on `sync-welcome`, so the browser immediately fetches `GET /api/localstorage-sync` and hydrates from server. If the server snapshot is also empty (matching checksum), no hydrate call is needed.
 - If a browser **has pending local edits** and checksum differs, it hydrates then rebases pending queue from server->local delta.
 - If server rejects a diff with checksum mismatch, browser fetches snapshot and rebases queue.
 
@@ -69,6 +70,7 @@ open page
   | WebSocket connect --------------------------------------> |
   | <-------------------------- sync-welcome(state/checksum) |
   | compare local checksum vs server checksum
+  | (new/empty localStorage tab usually mismatches when server has data)
   | if queue empty + checksum mismatch:
   |   GET /api/localstorage-sync ---------------------------> |
   | <---------------------------------------- snapshot/state |

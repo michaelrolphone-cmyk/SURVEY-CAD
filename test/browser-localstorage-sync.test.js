@@ -80,6 +80,23 @@ test('shouldHydrateFromServerOnWelcome requests server snapshot only when safe a
 });
 
 
+
+
+test('new browser with empty localStorage hydrates from server when welcome checksum differs', () => {
+  const emptyLocalChecksum = checksumSnapshot({});
+  const serverChecksum = computeSnapshotChecksum({
+    surveyfoundryProjectFile: '{"id":"p-1"}',
+  });
+
+  assert.notEqual(emptyLocalChecksum, serverChecksum);
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: emptyLocalChecksum,
+    serverChecksum,
+    queueLength: 0,
+    hasPendingBatch: false,
+  }), true);
+});
+
 test('shouldRebaseQueueFromServerOnWelcome enables server-hydrate+rebase when queued local changes exist and checksums diverge', () => {
   assert.equal(shouldRebaseQueueFromServerOnWelcome({
     localChecksum: 'fnv1a-local',

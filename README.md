@@ -41,6 +41,7 @@ For a focused, implementation-level explanation of browser-to-browser sync over 
 
 - WebSocket endpoint: `GET /ws/localstorage-sync`
 - REST endpoints: `GET /api/localstorage-sync`, `POST /api/localstorage-sync`
+- New browser with empty localStorage: if server state exists, bootstrap hydration runs via `GET /api/localstorage-sync` after websocket welcome checksum comparison.
 - Run server: `npm start`
 - Run tests: `npm test`
 
