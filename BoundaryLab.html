@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BoundaryLab — Traverse Closure Checker</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0b1220; color: #e2e8f0; }
+    .layout { display: grid; grid-template-columns: 430px 1fr; min-height: 100vh; }
+    .panel { border-right: 1px solid #22314f; padding: 18px; }
+    h1 { margin: 0 0 6px; font-size: 1.25rem; }
+    p { margin: 0 0 14px; color: #9fb0cc; }
+    .toolbar { display: flex; gap: 8px; margin: 10px 0 14px; }
+    button, input { border: 1px solid #2a3f62; border-radius: 8px; background: #12203a; color: #e2e8f0; padding: 8px 10px; }
+    button { cursor: pointer; }
+    .primary { background: #2563eb; border-color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #22314f; padding: 6px; text-align: left; }
+    th { color: #9fb0cc; }
+    input { width: 100%; box-sizing: border-box; }
+    .summary { margin-top: 14px; background: #0f1a2e; border: 1px solid #22314f; border-radius: 10px; padding: 12px; }
+    .summaryRow { display: flex; justify-content: space-between; margin: 5px 0; gap: 10px; }
+    .bad { color: #fca5a5; }
+    .good { color: #86efac; }
+    .canvasWrap { padding: 16px; }
+    canvas { width: 100%; height: calc(100vh - 32px); border-radius: 10px; background: #07101d; border: 1px solid #22314f; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="panel">
+      <h1>BoundaryLab</h1>
+      <p>Enter bearings and distances in order. The boundary preview and closure error update as you edit.</p>
+      <div class="toolbar">
+        <button id="addCall" class="primary" type="button">Add Call</button>
+        <button id="clearCalls" type="button">Clear</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Bearing</th><th>Distance</th><th></th></tr>
+        </thead>
+        <tbody id="callsBody"></tbody>
+      </table>
+      <div class="summary">
+        <div class="summaryRow"><span>Total Distance</span><strong id="totalDistance">0.00</strong></div>
+        <div class="summaryRow"><span>Linear Error</span><strong id="linearError">—</strong></div>
+        <div class="summaryRow"><span>Angular Error</span><strong id="angularError">—</strong></div>
+        <div class="summaryRow"><span>Closure Ratio</span><strong id="closureRatio">—</strong></div>
+        <div class="summaryRow"><span>Status</span><strong id="closureStatus">Add calls</strong></div>
+      </div>
+    </aside>
+    <main class="canvasWrap">
+      <canvas id="previewCanvas" width="1000" height="700" aria-label="Boundary preview canvas"></canvas>
+    </main>
+  </div>
+
+  <script type="module">
+    import {
+      calculateTraverseFromOrderedCalls,
+      closureRatio,
+      formatDegrees,
+    } from './src/boundarylab.js';
+
+    const state = {
+      calls: [
+        { id: crypto.randomUUID(), bearing: 'N 45 E', distance: '100' },
+        { id: crypto.randomUUID(), bearing: 'S 45 E', distance: '100' },
+      ],
+    };
+
+    const body = document.getElementById('callsBody');
+    const addCallButton = document.getElementById('addCall');
+    const clearCallsButton = document.getElementById('clearCalls');
+    const totalDistanceEl = document.getElementById('totalDistance');
+    const linearErrorEl = document.getElementById('linearError');
+    const angularErrorEl = document.getElementById('angularError');
+    const closureRatioEl = document.getElementById('closureRatio');
+    const closureStatusEl = document.getElementById('closureStatus');
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function esc(v = '') {
+      return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function renderRows() {
+      body.innerHTML = state.calls.map((call, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td><input data-id="${call.id}" data-key="bearing" value="${esc(call.bearing)}" placeholder="N 45 E" /></td>
+          <td><input data-id="${call.id}" data-key="distance" value="${esc(call.distance)}" placeholder="100" /></td>
+          <td><button data-remove="${call.id}" type="button">✕</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function draw(points) {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#0f1b30';
+      ctx.fillRect(0, 0, w, h);
+
+      if (!points || points.length === 0) return;
+      const xs = points.map((p) => p.x);
+      const ys = points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+
+      const spanX = Math.max(maxX - minX, 1);
+      const spanY = Math.max(maxY - minY, 1);
+      const pad = 40;
+      const scale = Math.min((w - (pad * 2)) / spanX, (h - (pad * 2)) / spanY);
+      const tx = (x) => pad + ((x - minX) * scale);
+      const ty = (y) => h - (pad + ((y - minY) * scale));
+
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      points.forEach((pt, i) => {
+        const x = tx(pt.x);
+        const y = ty(pt.y);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      ctx.fillStyle = '#fbbf24';
+      points.forEach((pt) => {
+        ctx.beginPath();
+        ctx.arc(tx(pt.x), ty(pt.y), 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function render() {
+      renderRows();
+      const traversal = calculateTraverseFromOrderedCalls({ orderedCalls: state.calls });
+      const ratio = closureRatio(traversal.totalLength, traversal.linearMisclosure);
+
+      totalDistanceEl.textContent = traversal.totalLength.toFixed(2);
+      linearErrorEl.textContent = Number.isFinite(traversal.linearMisclosure) ? traversal.linearMisclosure.toFixed(4) : '—';
+      angularErrorEl.textContent = formatDegrees(traversal.angularMisclosure);
+      closureRatioEl.textContent = ratio === Infinity ? 'Perfect closure' : (Number.isFinite(ratio) ? `1:${Math.round(ratio).toLocaleString()}` : '—');
+
+      const closed = Number.isFinite(traversal.linearMisclosure) && traversal.linearMisclosure <= 1e-6;
+      closureStatusEl.textContent = closed ? 'Closed' : 'Open';
+      closureStatusEl.className = closed ? 'good' : 'bad';
+
+      draw(traversal.points);
+    }
+
+    body.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const id = target.dataset.id;
+      const key = target.dataset.key;
+      const call = state.calls.find((row) => row.id === id);
+      if (!call || !key) return;
+      call[key] = target.value;
+      render();
+    });
+
+    body.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const removeId = target.getAttribute('data-remove');
+      if (!removeId) return;
+      state.calls = state.calls.filter((row) => row.id !== removeId);
+      render();
+    });
+
+    addCallButton.addEventListener('click', () => {
+      state.calls.push({ id: crypto.randomUUID(), bearing: '', distance: '' });
+      render();
+    });
+
+    clearCallsButton.addEventListener('click', () => {
+      state.calls = [];
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
