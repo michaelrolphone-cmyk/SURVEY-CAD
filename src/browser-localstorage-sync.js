@@ -176,6 +176,37 @@ function shouldApplyStartupServerState({
 
 
 
+
+function hasServerSnapshot(serverSnapshot = null) {
+  return Boolean(serverSnapshot && typeof serverSnapshot === 'object' && !Array.isArray(serverSnapshot));
+}
+
+export function shouldApplyWelcomeSnapshotImmediately({
+  localChecksum = '',
+  serverChecksum = '',
+  queueLength = 0,
+  hasPendingBatch = false,
+  serverSnapshot = null,
+} = {}) {
+  if (!hasServerSnapshot(serverSnapshot)) return false;
+  if (!serverChecksum) return false;
+  if (queueLength > 0 || hasPendingBatch) return false;
+  return String(localChecksum) !== String(serverChecksum);
+}
+
+export function shouldRebaseQueueFromWelcomeSnapshotImmediately({
+  localChecksum = '',
+  serverChecksum = '',
+  queueLength = 0,
+  hasPendingBatch = false,
+  serverSnapshot = null,
+} = {}) {
+  if (!hasServerSnapshot(serverSnapshot)) return false;
+  if (!serverChecksum) return false;
+  if (!queueLength && !hasPendingBatch) return false;
+  return String(localChecksum) !== String(serverChecksum);
+}
+
 function shouldRunHttpFallbackSync({
   socketReadyState = 3,
   online = true,
@@ -699,6 +730,10 @@ class LocalStorageSocketSync {
         const queueLength = this.queue.length;
         const hasPendingBatch = Boolean(this.pendingBatch?.operations?.length);
 
+        const welcomeSnapshot = hasServerSnapshot(message?.state?.snapshot)
+          ? normalizeSnapshot(message.state.snapshot)
+          : null;
+
         if (shouldRebaseQueueFromServerOnWelcome({
           localChecksum,
           serverChecksum: this.serverChecksum,
@@ -711,7 +746,18 @@ class LocalStorageSocketSync {
             this.#commitPendingBatch();
           }
           const localSnapshotBeforeHydrate = buildSnapshot();
-          const serverSnapshot = await this.#fetchAndApplyServerSnapshot();
+          const serverSnapshot = shouldRebaseQueueFromWelcomeSnapshotImmediately({
+            localChecksum,
+            serverChecksum: this.serverChecksum,
+            queueLength,
+            hasPendingBatch,
+            serverSnapshot: welcomeSnapshot,
+          })
+            ? this.#applyServerSnapshot(welcomeSnapshot, {
+              checksum: message?.state?.checksum,
+              version: message?.state?.version,
+            })
+            : await this.#fetchAndApplyServerSnapshot();
           this.#rebasePendingQueue(serverSnapshot, localSnapshotBeforeHydrate);
         } else if (shouldHydrateFromServerOnWelcome({
           localChecksum,
@@ -719,7 +765,20 @@ class LocalStorageSocketSync {
           queueLength,
           hasPendingBatch,
         })) {
-          await this.#fetchAndApplyServerSnapshot();
+          if (shouldApplyWelcomeSnapshotImmediately({
+            localChecksum,
+            serverChecksum: this.serverChecksum,
+            queueLength,
+            hasPendingBatch,
+            serverSnapshot: welcomeSnapshot,
+          })) {
+            this.#applyServerSnapshot(welcomeSnapshot, {
+              checksum: message?.state?.checksum,
+              version: message?.state?.version,
+            });
+          } else {
+            await this.#fetchAndApplyServerSnapshot();
+          }
         }
         if (Number.isFinite(message?.state?.version)) {
           this.serverVersion = Number(message.state.version);
@@ -825,10 +884,8 @@ class LocalStorageSocketSync {
     this.#persistQueue();
   }
 
-  async #fetchAndApplyServerSnapshot() {
-    const payload = await this.#fetchServerState();
-    if (!payload) return {};
-    const snapshot = normalizeSnapshot(payload.snapshot || {});
+  #applyServerSnapshot(snapshot = {}, { checksum = '', version = 0 } = {}) {
+    const normalizedSnapshot = normalizeSnapshot(snapshot || {});
 
     this.suppress = true;
     try {
@@ -838,11 +895,11 @@ class LocalStorageSocketSync {
         if (shouldSyncLocalStorageKey(key)) keys.push(key);
       }
       keys.forEach((key) => {
-        if (!(key in snapshot)) {
+        if (!(key in normalizedSnapshot)) {
           window.localStorage.removeItem(key);
         }
       });
-      Object.entries(snapshot).forEach(([key, value]) => {
+      Object.entries(normalizedSnapshot).forEach(([key, value]) => {
         if (shouldSyncLocalStorageKey(key)) {
           window.localStorage.setItem(key, String(value));
         }
@@ -851,11 +908,20 @@ class LocalStorageSocketSync {
       this.suppress = false;
     }
 
-    this.serverChecksum = String(payload.checksum || checksumSnapshot(buildSnapshot()));
-    this.serverVersion = Number(payload.version || 0);
+    this.serverChecksum = String(checksum || checksumSnapshot(buildSnapshot()));
+    this.serverVersion = Number(version || 0);
     this.#persistMeta();
     this.#notifyLocalStorageChanged();
-    return snapshot;
+    return normalizedSnapshot;
+  }
+
+  async #fetchAndApplyServerSnapshot() {
+    const payload = await this.#fetchServerState();
+    if (!payload) return {};
+    return this.#applyServerSnapshot(payload.snapshot, {
+      checksum: payload.checksum,
+      version: payload.version,
+    });
   }
 
   async #fetchServerState() {

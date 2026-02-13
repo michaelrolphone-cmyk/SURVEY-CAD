@@ -7,6 +7,8 @@ import {
   mergeQueuedDifferentials,
   nextReconnectDelay,
   shouldHydrateFromServerOnWelcome,
+  shouldApplyWelcomeSnapshotImmediately,
+  shouldRebaseQueueFromWelcomeSnapshotImmediately,
   shouldApplyStartupServerState,
   shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
@@ -361,4 +363,73 @@ test('browser and server localStorage sync checksum algorithms stay aligned', ()
   };
 
   assert.equal(checksumSnapshot(snapshot), computeSnapshotChecksum(snapshot));
+});
+
+
+test('shouldApplyWelcomeSnapshotImmediately applies welcome snapshot only when safe and out-of-sync', () => {
+  assert.equal(shouldApplyWelcomeSnapshotImmediately({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+    serverSnapshot: { project: 'A' },
+  }), true);
+
+  assert.equal(shouldApplyWelcomeSnapshotImmediately({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 1,
+    hasPendingBatch: false,
+    serverSnapshot: { project: 'A' },
+  }), false);
+
+  assert.equal(shouldApplyWelcomeSnapshotImmediately({
+    localChecksum: 'same',
+    serverChecksum: 'same',
+    queueLength: 0,
+    hasPendingBatch: false,
+    serverSnapshot: { project: 'A' },
+  }), false);
+
+  assert.equal(shouldApplyWelcomeSnapshotImmediately({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+    serverSnapshot: null,
+  }), false);
+});
+
+test('shouldRebaseQueueFromWelcomeSnapshotImmediately uses welcome snapshot when queued changes exist', () => {
+  assert.equal(shouldRebaseQueueFromWelcomeSnapshotImmediately({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 1,
+    hasPendingBatch: false,
+    serverSnapshot: { project: 'A' },
+  }), true);
+
+  assert.equal(shouldRebaseQueueFromWelcomeSnapshotImmediately({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+    serverSnapshot: { project: 'A' },
+  }), false);
+
+  assert.equal(shouldRebaseQueueFromWelcomeSnapshotImmediately({
+    localChecksum: 'same',
+    serverChecksum: 'same',
+    queueLength: 1,
+    hasPendingBatch: false,
+    serverSnapshot: { project: 'A' },
+  }), false);
+
+  assert.equal(shouldRebaseQueueFromWelcomeSnapshotImmediately({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 1,
+    hasPendingBatch: false,
+    serverSnapshot: null,
+  }), false);
 });
