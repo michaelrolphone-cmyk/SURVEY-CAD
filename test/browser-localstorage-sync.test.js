@@ -6,6 +6,7 @@ import {
   coalesceQueuedOperations,
   mergeQueuedDifferentials,
   nextReconnectDelay,
+  shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
@@ -40,6 +41,36 @@ test('nextReconnectDelay normalizes invalid delay inputs to safe defaults', () =
   assert.equal(nextReconnectDelay(0, 60000), 3000);
   assert.equal(nextReconnectDelay(Number.NaN, 60000), 3000);
   assert.equal(nextReconnectDelay(1500, 1000), 1500);
+});
+
+test('shouldHydrateFromServerOnWelcome requests server snapshot only when safe and out-of-sync', () => {
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: false,
+  }), true);
+
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 1,
+    hasPendingBatch: false,
+  }), false);
+
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-local',
+    serverChecksum: 'fnv1a-server',
+    queueLength: 0,
+    hasPendingBatch: true,
+  }), false);
+
+  assert.equal(shouldHydrateFromServerOnWelcome({
+    localChecksum: 'fnv1a-same',
+    serverChecksum: 'fnv1a-same',
+    queueLength: 0,
+    hasPendingBatch: false,
+  }), false);
 });
 
 

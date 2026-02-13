@@ -100,6 +100,17 @@ function nextReconnectDelay(previousDelayMs = INITIAL_RECONNECT_DELAY_MS, maxDel
   return Math.min(normalizedPrevious * 2, normalizedMax);
 }
 
+function shouldHydrateFromServerOnWelcome({
+  localChecksum = '',
+  serverChecksum = '',
+  queueLength = 0,
+  hasPendingBatch = false,
+} = {}) {
+  if (!serverChecksum) return false;
+  if (queueLength > 0 || hasPendingBatch) return false;
+  return String(localChecksum) !== String(serverChecksum);
+}
+
 function normalizeQueuedDifferential(diff = {}) {
   const operationsRaw = Array.isArray(diff?.operations) ? diff.operations : [];
   const operations = operationsRaw
@@ -352,6 +363,16 @@ class LocalStorageSocketSync {
       if (message?.state?.checksum) {
         this.serverChecksum = String(message.state.checksum);
         this.#persistMeta();
+
+        const localChecksum = checksumSnapshot(buildSnapshot());
+        if (shouldHydrateFromServerOnWelcome({
+          localChecksum,
+          serverChecksum: this.serverChecksum,
+          queueLength: this.queue.length,
+          hasPendingBatch: Boolean(this.pendingBatch?.operations?.length),
+        })) {
+          await this.#fetchAndApplyServerSnapshot();
+        }
       }
       this.flush();
       return;
@@ -541,5 +562,6 @@ export {
   coalesceQueuedOperations,
   mergeQueuedDifferentials,
   nextReconnectDelay,
+  shouldHydrateFromServerOnWelcome,
   shouldSyncLocalStorageKey,
 };

@@ -32,6 +32,15 @@ See **API Endpoints** and **CLI Commands** below for the complete endpoint and c
 
 ## API and CLI Notes for this change
 
+The browser localStorage real-time sync bootstrap now hydrates a newly opened browser session from the server snapshot when checksums differ and there are no unsent local edits. This fixes stale local browser state when multiple browser windows/devices are open on the same project.
+
+API and CLI surface area remains unchanged for this fix. Sync continues to use:
+- REST snapshot endpoint: `GET /api/localstorage-sync`
+- WebSocket endpoint: `GET /ws/localstorage-sync` (upgrade)
+- Existing CLI commands listed below (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+
+## API and CLI Notes for this change
+
 SurveyFoundry Launcher now automatically backfills project PLSS and SurveyFoundry Index metadata when an active project is loaded (including launcher startup and active-project switches) and either field is missing. The launcher uses the existing address-based lookup endpoints (`/api/lookup` and `/api/aliquots`) and does not introduce any new API or CLI surface area.
 
 The SurveyFoundry launcher has been visually redesigned around a rustic survey workshop motif (hand-painted texture layering, warm lamplight earth tones, and subtle futuristic cyan/amber glow accents). This is a UI-only refresh and does not add, remove, or modify server API endpoints or CLI commands; the endpoint and command references below remain current for this release.
