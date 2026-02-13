@@ -813,6 +813,14 @@ test('VIEWPORT.HTML point editor code updates auto-connect new JPN targets', asy
   assert.match(html, /Auto-updated linework for point \$\{p\.num\}: \+\$\{addedJpn\} JPN, \+\$\{addedSequential\} sequential, \+\$\{addedCurve\} curve, -\$\{removed\} removed\./, 'LineSmith should report add/remove totals when code edits re-sync field-to-finish linework');
 });
 
+test('VIEWPORT.HTML point inspector apply paths explicitly schedule collaboration sync after committing edits', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+applyEditsToMultiplePoints\(fields,\s*sourceLabel\s*=\s*"inspector",\s*options\s*=\s*\{\}\)\s*\{[\s\S]*function\s+commitEdits\(\)\s*\{[\s\S]*setPointCode\(point, String\(values\.code \?\? point\.code\)\)[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'point inspector apply edits should schedule collab sync immediately after committing point updates');
+  assert.match(html, /function\s+applyPendingPrimaryPointEditorEdits\(sourceLabel\s*=\s*"point editor"\)\s*\{[\s\S]*setPointCode\(point, String\(\$\("#ptCode"\)\?\.value \?\? point\.code\)\)[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'primary inspector/save pending edits should schedule collab sync after committing the edited point');
+  assert.match(html, /function\s+applySharedFieldToSelectedPoints\(key, rawValue, sourceLabel\s*=\s*"point inspector"\)\s*\{[\s\S]*history\.push\(selectedPoints\.length === 1 \? "edit point" : "edit points"\);[\s\S]*scheduleCollabStateSync\(\);[\s\S]*schedulePointsTableRender\(\);/, 'shared inspector field apply should schedule collab sync so bulk inspector updates propagate to connected clients');
+});
+
 test('VIEWPORT.HTML save applies pending primary point editor edits before snapshotting project history', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 

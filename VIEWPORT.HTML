@@ -7885,6 +7885,7 @@
         syncFieldToFinishLinework();
       }
 
+      scheduleCollabStateSync();
       schedulePointsTableRender();
       setStatus(`Updated ${editsByPoint.length} selected point${editsByPoint.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
       updateCounts();
@@ -7947,6 +7948,7 @@
       syncFieldToFinishLinework();
     }
 
+    scheduleCollabStateSync();
     schedulePointsTableRender();
     setStatus(`Updated point ${point.num} from ${sourceLabel}.`, "ok");
     updateCounts();
@@ -7979,6 +7981,7 @@
       ensureLegacyAutoFieldToFinishLineMetadata();
       syncFieldToFinishLinework();
     }
+    scheduleCollabStateSync();
     schedulePointsTableRender();
     setStatus(`Updated ${key.toUpperCase()} for ${selectedPoints.length} selected point${selectedPoints.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
     updateCounts();
