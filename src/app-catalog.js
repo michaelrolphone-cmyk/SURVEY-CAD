@@ -60,6 +60,16 @@ export const APP_CATALOG = [
     glyph: 'UP',
   },
   {
+    id: 'equipment-manager',
+    name: 'EquipmentManager',
+    description: 'Track surveying equipment inventory: make, model, type, and serial numbers for the field crew.',
+    entryHtml: 'EquipmentManager.html',
+    iconPath: '/assets/icons/EquipmentManager.svg',
+    color: '#0F766E',
+    accent: '#CCFBF1',
+    glyph: 'EM',
+  },
+  {
     id: 'equipment-log',
     name: 'EquipmentLog',
     description: 'Record equipment setup logs: rodman, height, reference point, setup time, and job file.',
