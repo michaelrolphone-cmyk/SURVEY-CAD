@@ -46,6 +46,22 @@ function buildSocketEndpointCandidates({
   return [...new Set(candidates)];
 }
 
+function buildApiEndpointCandidates({
+  origin = '',
+  pathname = '/',
+} = {}) {
+  const normalizedPathname = typeof pathname === 'string' && pathname ? pathname : '/';
+  const baseDir = normalizedPathname.endsWith('/')
+    ? normalizedPathname.slice(0, -1)
+    : normalizedPathname.replace(/\/[^/]*$/, '');
+
+  const candidates = [`${origin}/api/localstorage-sync`];
+  if (baseDir && baseDir !== '/') {
+    candidates.push(`${origin}${baseDir}/api/localstorage-sync`);
+  }
+  return [...new Set(candidates)];
+}
+
 function buildSnapshot() {
   const snapshot = {};
   for (let i = 0; i < window.localStorage.length; i += 1) {
@@ -285,6 +301,8 @@ class LocalStorageSocketSync {
     this.httpFallbackInProgress = false;
     this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
     this.socketEndpointIndex = 0;
+    this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+    this.apiEndpointIndex = 0;
 
     this.#patchStorage();
     this.#connect();
@@ -294,6 +312,8 @@ class LocalStorageSocketSync {
       this.httpFallbackInProgress = false;
       this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
       this.socketEndpointIndex = 0;
+      this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+      this.apiEndpointIndex = 0;
       if (!this.socket || this.socket.readyState >= WebSocket.CLOSING) {
         this.#connect();
       }
@@ -336,6 +356,8 @@ class LocalStorageSocketSync {
       this.httpFallbackInProgress = false;
       this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
       this.socketEndpointIndex = 0;
+      this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+      this.apiEndpointIndex = 0;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
       this.#cancelHttpFallbackSync();
       this.flush();
@@ -428,7 +450,7 @@ class LocalStorageSocketSync {
       const localChecksum = checksumSnapshot(localSnapshot);
 
       if (this.queue.length > 0 || this.pendingBatch?.operations?.length) {
-        const response = await fetch('/api/localstorage-sync', {
+        const response = await this.#requestLocalStorageSyncApi({
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -728,7 +750,7 @@ class LocalStorageSocketSync {
   }
 
   async #fetchServerState() {
-    const response = await fetch('/api/localstorage-sync');
+    const response = await this.#requestLocalStorageSyncApi();
     if (!response.ok) return null;
     const payload = await response.json();
     return {
@@ -736,6 +758,34 @@ class LocalStorageSocketSync {
       checksum: String(payload?.checksum || ''),
       snapshot: normalizeSnapshot(payload?.snapshot || {}),
     };
+  }
+
+  async #requestLocalStorageSyncApi(fetchInit = undefined) {
+    const candidates = Array.isArray(this.apiEndpointCandidates) && this.apiEndpointCandidates.length
+      ? this.apiEndpointCandidates
+      : buildApiEndpointCandidates(window.location);
+    let lastResponse = null;
+
+    for (let i = 0; i < candidates.length; i += 1) {
+      const candidateIndex = (this.apiEndpointIndex + i) % candidates.length;
+      const endpoint = candidates[candidateIndex];
+      try {
+        const response = await fetch(endpoint, fetchInit);
+        if (response.ok) {
+          this.apiEndpointIndex = candidateIndex;
+          return response;
+        }
+
+        lastResponse = response;
+        if (response.status !== 404) {
+          return response;
+        }
+      } catch {
+        // Try the next routed endpoint candidate.
+      }
+    }
+
+    return lastResponse || new Response(null, { status: 503 });
   }
 
   #persistQueue() {
@@ -821,4 +871,5 @@ export {
   shouldEnterDormantReconnect,
   shouldRunHttpFallbackSync,
   buildSocketEndpointCandidates,
+  buildApiEndpointCandidates,
 };

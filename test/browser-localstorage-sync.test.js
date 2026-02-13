@@ -13,6 +13,7 @@ import {
   shouldEnterDormantReconnect,
   shouldRunHttpFallbackSync,
   buildSocketEndpointCandidates,
+  buildApiEndpointCandidates,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -144,6 +145,23 @@ test('buildSocketEndpointCandidates includes root and base-path websocket URLs',
     pathname: '/index.html',
   }), [
     'ws://localhost:3000/ws/localstorage-sync',
+  ]);
+});
+
+test('buildApiEndpointCandidates includes root and base-path API URLs', () => {
+  assert.deepEqual(buildApiEndpointCandidates({
+    origin: 'https://example.com',
+    pathname: '/record-of-survey/index.html',
+  }), [
+    'https://example.com/api/localstorage-sync',
+    'https://example.com/record-of-survey/api/localstorage-sync',
+  ]);
+
+  assert.deepEqual(buildApiEndpointCandidates({
+    origin: 'http://localhost:3000',
+    pathname: '/index.html',
+  }), [
+    'http://localhost:3000/api/localstorage-sync',
   ]);
 });
 
