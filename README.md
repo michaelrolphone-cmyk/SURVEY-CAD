@@ -269,6 +269,7 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
   - Supported circle examples: `CIR 2FT END 102G`, `CIR2 BEG WL JPN123`, `CIR2.5`.
 - `PC` / `PT`: curve start/end markers for field-to-finish curve chains.
   - `PC` marks the **Point of Curve** and `PT` marks the **Point of Tangent**.
+  - Markers can be entered as standalone tokens (`CPAD PC`, `CPAD PT`) or concatenated with known linework/companion codes (`CPADPC`, `CPADPT`).
   - Every point between `PC` and `PT` is connected as an approximated curve segment, supporting both classic 3-point curves and denser multi-point approximations.
 - Manual LineSmith line connections now persist to point codes:
   - When a user manually connects two points, LineSmith appends `JPN<targetPointNumber>` to the source point unless that pair is already connected by sequential linework rules.

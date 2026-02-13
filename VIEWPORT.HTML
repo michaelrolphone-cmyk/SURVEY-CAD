@@ -5099,14 +5099,33 @@
     return circles;
   }
 
-  function pointHasCurveStartToken(pointCode = "") {
+  function pointHasCurveMarker(pointCode = "", marker = "PC") {
+    const markerUpper = String(marker ?? "").trim().toUpperCase();
+    if (!markerUpper) return false;
+
     const { tokensUpper } = parseFieldToFinishCommands(pointCode);
-    return tokensUpper.includes("PC");
+    if (tokensUpper.includes(markerUpper)) return true;
+
+    const isKnownLineworkToken = (token = "") => (
+      fieldToFinishRuleState.lineworkCodes.has(token)
+      || fieldToFinishRuleState.companionToLineworkCodes.has(token)
+    );
+
+    for (const token of tokensUpper) {
+      if (!token || token === markerUpper) continue;
+      if (token.startsWith(markerUpper) && isKnownLineworkToken(token.slice(markerUpper.length))) return true;
+      if (token.endsWith(markerUpper) && isKnownLineworkToken(token.slice(0, -markerUpper.length))) return true;
+    }
+
+    return false;
+  }
+
+  function pointHasCurveStartToken(pointCode = "") {
+    return pointHasCurveMarker(pointCode, "PC");
   }
 
   function pointHasCurveEndToken(pointCode = "") {
-    const { tokensUpper } = parseFieldToFinishCommands(pointCode);
-    return tokensUpper.includes("PT");
+    return pointHasCurveMarker(pointCode, "PT");
   }
 
   function buildFieldToFinishCurveLineCommands() {
