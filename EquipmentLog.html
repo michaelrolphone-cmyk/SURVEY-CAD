@@ -174,7 +174,6 @@
       } catch {
         logs = [];
       }
-      renderCrewList();
     }
     function loadCrew() {
       try {
@@ -230,6 +229,8 @@
       fields.rodman.focus();
     }
     function renderLogs() {
+      
+      renderCrewList();
       if (logs.length === 0) {
         logListEl.innerHTML = '';
         emptyStateEl.classList.remove('hidden');
