@@ -75,6 +75,19 @@ export const APP_CATALOG = [
     glyph: 'BL',
     section: 'Drafting',
   },
+  
+  {
+    id: 'surface-loom',
+    name: 'SurfaceLoom',
+    description: 'Model the surface and refine it for rendering a topo map.',
+    entryHtml: 'SURFACE.html',
+    iconPath: '/assets/icons/SurfaceLoom.png',
+    color: '#0F766E',
+    accent: '#BFDBFE',
+    glyph: 'BL',
+    section: 'TOPO',
+  },
+  
   {
     id: 'equipment-manager',
     name: 'EquipmentManager',
