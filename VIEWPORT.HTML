@@ -4112,6 +4112,26 @@
     });
   }
 
+function paintBackground(ctx, w, h){
+  // 1) radial glow
+  const rg = ctx.createRadialGradient(
+    w*0.20, h*0.30, 0,
+    w*0.20, h*0.30, Math.max(w,h)*0.75
+  );
+  rg.addColorStop(0.0, "rgba(124,247,255,0.08)");
+  rg.addColorStop(0.60, "rgba(124,247,255,0.00)");
+  ctx.fillStyle = rg;
+  ctx.fillRect(0,0,w,h);
+
+  // 2) vertical vignette
+  const lg = ctx.createLinearGradient(0,0,0,h);
+  lg.addColorStop(0.0, "rgba(6,8,12,0.55)");
+  lg.addColorStop(1.0, "rgba(6,8,12,0.85)");
+  ctx.fillStyle = lg;
+  ctx.fillRect(0,0,w,h);
+}
+
+
   function drawRemoteCursors() {
     const expiryMs = 8000;
     const now = Date.now();
@@ -6591,7 +6611,8 @@
       ctx.fillStyle = "#000";
       ctx.fillRect(0,0,W,H);
     }
-
+    
+    paintBackground(ctx, W,H);
     drawGrid(W,H);
     if (mapLayerState.enabled) syncMapToView();
 
