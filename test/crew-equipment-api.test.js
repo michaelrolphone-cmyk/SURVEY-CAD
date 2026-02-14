@@ -9,6 +9,9 @@ import {
   findCrewMemberById,
   findEquipmentById,
   findEquipmentLogById,
+  saveCrewMember,
+  saveEquipmentItem,
+  saveEquipmentLog,
   CREW_KEY,
   EQUIPMENT_KEY,
   EQUIPMENT_LOGS_KEY,
@@ -92,6 +95,43 @@ test('handles non-array JSON gracefully', () => {
   assert.deepEqual(getCrewProfiles(snapshot), []);
 });
 
+// --- Unit tests for save functions ---
+
+test('saveCrewMember adds a new member to empty store', () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: {} });
+  const result = saveCrewMember(store, { id: 'new-1', firstName: 'Test', lastName: 'User' });
+  assert.equal(result.status, 'applied');
+  const profiles = getCrewProfiles(store.getState().snapshot);
+  assert.equal(profiles.length, 1);
+  assert.equal(profiles[0].firstName, 'Test');
+});
+
+test('saveCrewMember updates existing member by id', () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: buildSnapshot() });
+  const result = saveCrewMember(store, { id: 'crew-1', firstName: 'Updated', lastName: 'Smith' });
+  assert.equal(result.status, 'applied');
+  const member = findCrewMemberById(store.getState().snapshot, 'crew-1');
+  assert.equal(member.firstName, 'Updated');
+});
+
+test('saveEquipmentItem adds a new item to empty store', () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: {} });
+  const result = saveEquipmentItem(store, { id: 'eq-1', make: 'Topcon', model: 'GT-1' });
+  assert.equal(result.status, 'applied');
+  const items = getEquipmentInventory(store.getState().snapshot);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].make, 'Topcon');
+});
+
+test('saveEquipmentLog adds a new log to empty store', () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: {} });
+  const result = saveEquipmentLog(store, { id: 'log-new', rodman: 'crew-1', jobFileName: 'Test.job' });
+  assert.equal(result.status, 'applied');
+  const logs = getEquipmentLogs(store.getState().snapshot);
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].jobFileName, 'Test.job');
+});
+
 // --- Integration tests for API endpoints ---
 
 async function startApiServer(storeSnapshot = {}) {
@@ -151,11 +191,132 @@ test('GET /api/crew returns empty array when no data', async () => {
   }
 });
 
-test('POST /api/crew returns 405', async () => {
+test('POST /api/crew with empty body returns 400', async () => {
   const app = await startApiServer(buildSnapshot());
   try {
-    const res = await fetch(`http://127.0.0.1:${app.port}/api/crew`, { method: 'POST' });
-    assert.equal(res.status, 405);
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/crew`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 400);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('POST /api/crew creates a new crew member and persists it', async () => {
+  const app = await startApiServer({});
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/crew`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName: 'Alice', lastName: 'Walker', jobTitle: 'Surveyor' }),
+    });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.member.firstName, 'Alice');
+    assert.equal(body.member.lastName, 'Walker');
+    assert.ok(body.member.id);
+
+    // Verify persisted via GET
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/crew`);
+    const getData = await getRes.json();
+    assert.equal(getData.crew.length, 1);
+    assert.equal(getData.crew[0].firstName, 'Alice');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('POST /api/equipment creates a new equipment item and persists it', async () => {
+  const app = await startApiServer({});
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ make: 'Topcon', model: 'GT-600', equipmentType: 'Total Station', serialNumber: 'SN-999' }),
+    });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.equipment.make, 'Topcon');
+    assert.ok(body.equipment.id);
+
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/equipment`);
+    const getData = await getRes.json();
+    assert.equal(getData.equipment.length, 1);
+    assert.equal(getData.equipment[0].make, 'Topcon');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('POST /api/equipment with empty body returns 400', async () => {
+  const app = await startApiServer({});
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 400);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('POST /api/equipment-logs creates a new log and persists it', async () => {
+  const app = await startApiServer({});
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rodman: 'crew-1', jobFileName: 'TestJob.job', equipmentType: 'GPS Rover' }),
+    });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.log.rodman, 'crew-1');
+    assert.equal(body.log.jobFileName, 'TestJob.job');
+    assert.ok(body.log.id);
+
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/equipment-logs`);
+    const getData = await getRes.json();
+    assert.equal(getData.logs.length, 1);
+    assert.equal(getData.logs[0].jobFileName, 'TestJob.job');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('POST /api/equipment-logs with empty body returns 400', async () => {
+  const app = await startApiServer({});
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 400);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('POST /api/crew updates existing member when id matches', async () => {
+  const app = await startApiServer(buildSnapshot());
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/crew`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 'crew-1', firstName: 'Jonathan', lastName: 'Smith' }),
+    });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.member.firstName, 'Jonathan');
+
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/crew?id=crew-1`);
+    const getData = await getRes.json();
+    assert.equal(getData.member.firstName, 'Jonathan');
   } finally {
     app.server.close();
   }
