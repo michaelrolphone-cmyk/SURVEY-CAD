@@ -80,6 +80,19 @@
       padding: 0.3rem 0.78rem;
     }
 
+    .header-meta-index {
+      margin-left: auto;
+      color: #f9d18f;
+      font-size: 0.84rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: min(48vw, 430px);
+      text-align: right;
+      font-weight: 700;
+      padding: 0.3rem 0.78rem;
+    }
+
     .fullscreen-button {
       background: none;
       border: 1px solid rgba(230, 190, 132, 0.35);
@@ -598,6 +611,8 @@
       <svg id="fullscreenExitIcon" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
     </button>
     <span id="activeProjectHeader" class="header-meta" aria-live="polite"></span>
+    <span id="activeProjectHeaderIndex" class="header-meta-index" aria-live="polite"></span>
+    
   </header>
 
   <main>
@@ -735,6 +750,7 @@
     const leaveLineSmithCancelButton = document.getElementById('leaveLineSmithCancelButton');
     const activeProjectSummary = document.getElementById('activeProjectSummary');
     const activeProjectHeader = document.getElementById('activeProjectHeader');
+    const activeProjectHeaderIndex = document.getElementById('activeProjectHeaderIndex');
     const activeProjectNameOverview = document.getElementById('activeProjectNameOverview');
     const activeProjectClientOverview = document.getElementById('activeProjectClientOverview');
     const activeProjectContactOverview = document.getElementById('activeProjectContactOverview');
@@ -1410,6 +1426,7 @@
       activeProjectHeader.textContent = activeProject
         ? `${activeProject.name}${activeProjectIndex ? ` • Index ${activeProjectIndex}` : ''}`
         : '';
+      activeProjectHeaderIndex.textContent = activeProject ? `${activeProjectIndex}` : '';
       renderActiveProjectOverview(activeProject);
       syncActiveProjectBackground();
 
