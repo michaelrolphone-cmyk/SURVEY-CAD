@@ -70,6 +70,7 @@ export class RedisLocalStorageSyncStore {
 
   async ready() {
     await this.#ready;
+    console.log("Redis is Ready");
   }
 
   async getState() {
