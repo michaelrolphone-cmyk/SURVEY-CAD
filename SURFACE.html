@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CSV Terrain Surface + Contours + Refinement (P,N,E,Z,D) — Three.js</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#0f1620;
+      --panel2:#121c28;
+      --text:#e8eef7;
+      --muted:#a5b1c2;
+      --accent:#ffd54a;
+      --danger:#ff5b5b;
+      --ok:#37d67a;
+      --line:rgba(255,255,255,.12);
+    }
+    html,body{height:100%; margin:0; background:var(--bg); color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;}
+    #app{display:grid; grid-template-columns: 430px 1fr; height:100%;}
+    #left{
+      border-right:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 35%), var(--panel);
+      padding:14px; overflow:auto;
+    }
+    #right{position:relative;}
+    #c{width:100%; height:100%; display:block;}
+    h1{font-size:15px; margin:0 0 10px; letter-spacing:.2px;}
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 80%), var(--panel2);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      margin:10px 0;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    .row > *{flex: 1 1 auto;}
+    label{display:block; font-size:12px; color:var(--muted); margin:10px 0 6px;}
+    textarea{
+      width:100%; min-height:170px; resize:vertical;
+      background:#091018; color:var(--text);
+      border:1px solid var(--line); border-radius:12px;
+      padding:10px; outline:none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px; line-height:1.35;
+    }
+    input[type="file"]{width:100%;}
+    input[type="number"]{
+      width:100%; background:#091018; color:var(--text);
+      border:1px solid var(--line); border-radius:12px;
+      padding:10px; outline:none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    button{
+      background:#0b0f14; color:var(--text);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      transition: transform .06s ease, border-color .15s ease, background .15s ease;
+      user-select:none;
+    }
+    button:hover{border-color: rgba(255,213,74,.55); background: rgba(255,213,74,.06);}
+    button:active{transform: translateY(1px);}
+    button.primary{border-color: rgba(255,213,74,.65); background: rgba(255,213,74,.10);}
+    button.danger{border-color: rgba(255,91,91,.65); background: rgba(255,91,91,.08);}
+    .tiny{font-size:12px; color:var(--muted);}
+    .kv{display:grid; grid-template-columns: 190px 1fr; gap:6px 10px; font-size:12px; color:var(--muted);}
+    .kv b{color:var(--text); font-weight:600;}
+    .sep{height:1px; background:var(--line); margin:10px 0;}
+    .badge{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 8px;
+      border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.03);}
+    .dot{width:8px; height:8px; border-radius:50%;}
+    .dot.ok{background:var(--ok);}
+    .dot.bad{background:var(--danger);}
+    .hint{
+      position:absolute; left:14px; bottom:14px;
+      background: rgba(10,14,20,.78);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      padding:10px 12px;
+      max-width: 560px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-size:12px; color:var(--muted);
+    }
+    .hint b{color:var(--text); font-weight:600;}
+    .grid2{display:grid; grid-template-columns: 1fr 1fr; gap:10px;}
+    .grid2 > div{min-width:0;}
+    input[type="range"]{width:100%;}
+    select{
+      width:100%;
+      background:#091018;
+      color:var(--text);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+      outline:none;
+    }
+    .checkbox{display:flex; gap:10px; align-items:center; color:var(--muted); font-size:12px; margin-top:8px;}
+    .checkbox input{transform: scale(1.15);}
+    .status{margin-top:8px;}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <h1>CSV → 3D Surface (P,N,E,Z,D)</h1>
+
+    <div class="card">
+      <div class="row">
+        <button class="primary" id="btnRender">Render Surface</button>
+        <button id="btnFit">Fit View</button>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="btnSample">Load Sample</button>
+        <button class="danger" id="btnClear">Clear</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <label>Load CSV file</label>
+      <input id="file" type="file" accept=".csv,text/csv" />
+
+      <label>…or paste CSV text (P,N,E,Z,D; header optional)</label>
+      <textarea id="csv" spellcheck="false" placeholder="Example:
+1,666102.348,2406162.791,2597.647,Corner
+2,666140.112,2406160.118,2599.220,Spot
+..."></textarea>
+
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="card">
+      <div class="grid2">
+        <div>
+          <label>Navigation mode</label>
+          <select id="navMode">
+            <option value="orbit">Orbit</option>
+            <option value="fps">First-person</option>
+          </select>
+          <div class="tiny" style="margin-top:6px;">FPS: click canvas to lock · WASD · Space/Ctrl · Esc unlock</div>
+        </div>
+
+        <div>
+          <label>Vertical exaggeration (×)</label>
+          <input id="zScale" type="range" min="0.1" max="200" step="0.1" value="60" />
+          <div class="row" style="margin-top:6px;">
+            <div class="tiny"><span id="zScaleLabel" class="mono">60.0×</span></div>
+            <input id="zScaleNum" type="number" min="0.1" max="200" step="0.1" value="60" />
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>Point size</label>
+          <input id="ptSize" type="range" min="0.2" max="6" step="0.1" value="1.0" />
+          <div class="tiny"><span id="ptSizeLabel" class="mono">1.0</span></div>
+        </div>
+        <div>
+          <label>Surface opacity</label>
+          <input id="surfOpacity" type="range" min="0.05" max="1" step="0.05" value="0.95" />
+          <div class="tiny"><span id="surfOpacityLabel" class="mono">0.95</span></div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid2">
+        <div>
+          <label>Sun azimuth (deg)</label>
+          <input id="sunAz" type="range" min="0" max="360" step="1" value="315" />
+          <div class="tiny"><span id="sunAzLabel" class="mono">315°</span></div>
+        </div>
+        <div>
+          <label>Sun elevation (deg)</label>
+          <input id="sunEl" type="range" min="2" max="80" step="1" value="14" />
+          <div class="tiny"><span id="sunElLabel" class="mono">14°</span></div>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>Shadows</label>
+          <select id="shadowMode">
+            <option value="on" selected>On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div>
+          <label>Shadow quality</label>
+          <select id="shadowQuality">
+            <option value="1024">1024</option>
+            <option value="2048" selected>2048</option>
+            <option value="4096">4096</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="checkbox">
+        <input id="wireframe" type="checkbox" />
+        <label for="wireframe" style="margin:0;">Wireframe</label>
+      </div>
+      <div class="checkbox">
+        <input id="showSurface" type="checkbox" checked />
+        <label for="showSurface" style="margin:0;">Show surface</label>
+      </div>
+      <div class="checkbox">
+        <input id="showPoints" type="checkbox" checked />
+        <label for="showPoints" style="margin:0;">Show points</label>
+      </div>
+      <div class="checkbox">
+        <input id="showGrid" type="checkbox" checked />
+        <label for="showGrid" style="margin:0;">Show grid</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sep" style="margin-top:0;"></div>
+
+      <label>Mesh refinement (subdivision levels)</label>
+      <input id="subdivLevels" type="range" min="0" max="4" step="1" value="2" />
+      <div class="tiny">Level <span id="subdivLabel" class="mono">2</span> — adds vertices by splitting triangles. No height averaging / denoise.</div>
+      <div class="tiny" style="margin-top:6px;">
+        Cost grows fast: triangles ×4 per level. If your input is large, keep ≤2.
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="row">
+        <button id="btnRebuildContours">Rebuild Contours</button>
+      </div>
+
+      <div class="checkbox">
+        <input id="contoursOn" type="checkbox" checked />
+        <label for="contoursOn" style="margin:0;">Draw contour lines</label>
+      </div>
+
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>Contour interval (Z units)</label>
+          <input id="contourInterval" type="number" min="0.001" step="0.1" value="1.0" />
+          <div class="tiny">In your CSV Z units (feet/meters), not exaggerated units.</div>
+        </div>
+        <div>
+          <label>Major every N intervals</label>
+          <input id="contourMajorEvery" type="number" min="1" step="1" value="5" />
+          <div class="tiny">Major = brighter line (WebGL line width is limited).</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="kv">
+        <div>Parsed points</div><b id="kvCount">0</b>
+        <div>Excluded (Z=0)</div><b id="kvExcluded">0</b>
+        <div>Deduped (same N/E)</div><b id="kvDeduped">0</b>
+        <div>Triangles (base)</div><b id="kvTrisBase">0</b>
+        <div>Triangles (refined)</div><b id="kvTrisRef">0</b>
+        <div>Contour segments</div><b id="kvSegs">0</b>
+        <div>Offset (E,N,Z)</div><b id="kvOffset" class="mono">—</b>
+      </div>
+    </div>
+  </div>
+
+  <div id="right">
+    <canvas id="c"></canvas>
+    <div class="hint">
+      <b>Orbit:</b> LMB rotate · RMB pan · Wheel zoom<br/>
+      <b>FPS:</b> click canvas to lock mouse · WASD move · Space up · Ctrl down · Esc unlock
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import * as THREE from "three";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+  import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
+  import { Delaunay } from "https://cdn.jsdelivr.net/npm/d3-delaunay@6/+esm";
+  import Papa from "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm";
+
+  const el = (id)=>document.getElementById(id);
+
+  const csvTA = el("csv");
+  const fileIn = el("file");
+  const btnRender = el("btnRender");
+  const btnFit = el("btnFit");
+  const btnSample = el("btnSample");
+  const btnClear = el("btnClear");
+  const statusEl = el("status");
+
+  const navModeSel = el("navMode");
+  const zScale = el("zScale");
+  const zScaleNum = el("zScaleNum");
+  const zScaleLabel = el("zScaleLabel");
+  const ptSize = el("ptSize");
+  const ptSizeLabel = el("ptSizeLabel");
+  const surfOpacity = el("surfOpacity");
+  const surfOpacityLabel = el("surfOpacityLabel");
+  const wireframe = el("wireframe");
+  const showSurface = el("showSurface");
+  const showPoints = el("showPoints");
+  const showGrid = el("showGrid");
+
+  const sunAz = el("sunAz");
+  const sunEl = el("sunEl");
+  const sunAzLabel = el("sunAzLabel");
+  const sunElLabel = el("sunElLabel");
+  const shadowMode = el("shadowMode");
+  const shadowQuality = el("shadowQuality");
+
+  const subdivLevels = el("subdivLevels");
+  const subdivLabel = el("subdivLabel");
+
+  const btnRebuildContours = el("btnRebuildContours");
+  const contoursOn = el("contoursOn");
+  const contourInterval = el("contourInterval");
+  const contourMajorEvery = el("contourMajorEvery");
+
+  const kvCount = el("kvCount");
+  const kvExcluded = el("kvExcluded");
+  const kvDeduped = el("kvDeduped");
+  const kvTrisBase = el("kvTrisBase");
+  const kvTrisRef = el("kvTrisRef");
+  const kvSegs = el("kvSegs");
+  const kvOffset = el("kvOffset");
+
+  // Three.js setup
+  const canvas = el("c");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setClearColor(0x0b0f14, 1);
+
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0b0f14, 250, 7000);
+
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 80000);
+  camera.position.set(200, 160, 200);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.16);
+  scene.add(ambient);
+
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.30);
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(0xffffff, 1.25);
+  sun.castShadow = true;
+  scene.add(sun);
+
+  const sunTarget = new THREE.Object3D();
+  scene.add(sunTarget);
+  sun.target = sunTarget;
+
+  function applyShadowQuality() {
+    const q = Number(shadowQuality.value) || 2048;
+    sun.shadow.mapSize.set(q, q);
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.02;
+    sun.shadow.radius = 2;
+  }
+  applyShadowQuality();
+
+  const grid = new THREE.GridHelper(2600, 104, 0xffffff, 0xffffff);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.07;
+  grid.receiveShadow = true;
+  scene.add(grid);
+
+  const orbit = new OrbitControls(camera, renderer.domElement);
+  orbit.enableDamping = true;
+  orbit.dampingFactor = 0.08;
+  orbit.screenSpacePanning = true;
+
+  const fps = new PointerLockControls(camera, renderer.domElement);
+  let fpsEnabled = false;
+
+  const keys = new Set();
+  const vel = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+
+  window.addEventListener("keydown", (e)=>keys.add(e.code));
+  window.addEventListener("keyup", (e)=>keys.delete(e.code));
+
+  renderer.domElement.addEventListener("click", () => {
+    if (navModeSel.value === "fps") fps.lock();
+  });
+
+  function resize() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // Scene objects
+  let surfaceMesh = null;
+  let pointsMesh = null;
+  let boundsBox = null;
+  let contourMinor = null;
+  let contourMajor = null;
+
+  // Needed for contour mapping in real units
+  let lastBounds = null;  // Box3 in centered coords
+  let lastOffZ = 0;       // real Z offset
+  let lastZEx = 1;        // exaggeration
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[m]));
+  }
+
+  function setStatus(ok, msg){
+    statusEl.innerHTML = `
+      <span class="badge">
+        <span class="dot ${ok ? "ok" : "bad"}"></span>
+        <span>${escapeHtml(msg)}</span>
+      </span>`;
+  }
+
+  function clearContours(){
+    if (contourMinor){ scene.remove(contourMinor); contourMinor.geometry.dispose(); contourMinor.material.dispose(); contourMinor = null; }
+    if (contourMajor){ scene.remove(contourMajor); contourMajor.geometry.dispose(); contourMajor.material.dispose(); contourMajor = null; }
+    kvSegs.textContent = "0";
+  }
+
+  function clearSceneData() {
+    clearContours();
+
+    if (surfaceMesh) { scene.remove(surfaceMesh); surfaceMesh.geometry.dispose(); surfaceMesh.material.dispose(); surfaceMesh = null; }
+    if (pointsMesh) { scene.remove(pointsMesh); pointsMesh.geometry.dispose(); pointsMesh.material.dispose(); pointsMesh = null; }
+    if (boundsBox) { scene.remove(boundsBox); boundsBox.geometry.dispose(); boundsBox.material.dispose(); boundsBox = null; }
+
+    lastBounds = null;
+    lastOffZ = 0;
+    lastZEx = 1;
+
+    kvCount.textContent = "0";
+    kvExcluded.textContent = "0";
+    kvDeduped.textContent = "0";
+    kvTrisBase.textContent = "0";
+    kvTrisRef.textContent = "0";
+    kvOffset.textContent = "—";
+    setStatus(true, "Cleared.");
+  }
+
+  function buildBoundsBox(box3){
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box3.getSize(size);
+    box3.getCenter(center);
+
+    const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.10 });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(center);
+    return m;
+  }
+
+  function fitViewToBox(box3){
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box3.getSize(size);
+    box3.getCenter(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = maxDim * 1.55 + 80;
+
+    camera.position.set(center.x + dist, center.y + dist * 0.55, center.z + dist);
+    camera.lookAt(center);
+
+    orbit.target.copy(center);
+    orbit.update();
+  }
+
+  function degToRad(d){ return d * Math.PI / 180; }
+
+  function updateSunForBounds(box3){
+    if (!box3) return;
+
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    box3.getCenter(center);
+    box3.getSize(size);
+
+    const az = degToRad(Number(sunAz.value));
+    const elv = degToRad(Number(sunEl.value));
+    const cosEl = Math.cos(elv);
+
+    const sunVec = new THREE.Vector3(
+      cosEl * Math.cos(az),
+      Math.sin(elv),
+      cosEl * Math.sin(az)
+    ).normalize();
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = maxDim * 2.2 + 250;
+
+    sun.position.copy(center).addScaledVector(sunVec, dist);
+    sunTarget.position.copy(center);
+
+    const cam = sun.shadow.camera; // OrthographicCamera
+    const halfW = Math.max(size.x, size.z) * 0.72 + 60;
+    cam.left   = -halfW;
+    cam.right  =  halfW;
+    cam.top    =  halfW;
+    cam.bottom = -halfW;
+    cam.near = 0.1;
+    cam.far  = dist * 3.0;
+    cam.updateProjectionMatrix();
+
+    sun.intensity = 1.15 + (0.35 * (1 - (Number(sunEl.value) / 80)));
+  }
+
+  function applyShadowMode(){
+    const on = (shadowMode.value === "on");
+    renderer.shadowMap.enabled = on;
+    sun.castShadow = on;
+    if (surfaceMesh){ surfaceMesh.castShadow = on; surfaceMesh.receiveShadow = on; }
+    grid.receiveShadow = on;
+  }
+
+  // CSV parsing (P,N,E,Z,D)
+  function parseCsvText(text) {
+    const parsed = Papa.parse(text.trim(), { dynamicTyping: false, skipEmptyLines: true });
+    if (parsed.errors?.length) throw new Error(parsed.errors[0].message || "CSV parse error");
+
+    const rows = parsed.data;
+
+    // Optional header skip
+    let startIndex = 0;
+    if (rows.length && rows[0].length >= 4) {
+      const r0 = rows[0].map(v => String(v).trim().toLowerCase());
+      const looksLikeHeader =
+        r0.includes("p") || r0.includes("point") || r0.includes("point number") ||
+        r0.includes("n") || r0.includes("northing") ||
+        r0.includes("e") || r0.includes("easting") ||
+        r0.includes("z") || r0.includes("elev") || r0.includes("elevation") || r0.includes("alt") || r0.includes("altitude");
+      if (looksLikeHeader) startIndex = 1;
+    }
+
+    let excludedZeroZ = 0;
+
+    // Dedupe by (E,N), keep highest Z
+    const map = new Map();
+
+    function toNum(x){
+      const s = String(x ?? "").trim();
+      if (!s) return NaN;
+      const n = Number(s.replace(/,/g,""));
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    let rawUsed = 0;
+    for (let i = startIndex; i < rows.length; i++){
+      const row = rows[i];
+      if (!row || row.length < 4) continue;
+      rawUsed++;
+
+      const P = String(row[0] ?? "").trim();
+      const N = toNum(row[1]);
+      const E = toNum(row[2]);
+      const Z = toNum(row[3]);
+      const D = row.length >= 5 ? String(row.slice(4).join(",")).trim() : "";
+
+      if (!Number.isFinite(N) || !Number.isFinite(E) || !Number.isFinite(Z)) continue;
+      if (Z === 0) { excludedZeroZ++; continue; }
+
+      const key = `${E.toFixed(4)}|${N.toFixed(4)}`;
+      const prev = map.get(key);
+      if (!prev || Z > prev.Z) map.set(key, { P, N, E, Z, D });
+    }
+
+    const points = Array.from(map.values());
+    const deduped = Math.max(0, rawUsed - (points.length + excludedZeroZ));
+    return { points, excludedZeroZ, deduped };
+  }
+
+  // ✅ Indexed triangle subdivision (adds vertices, preserves the surface — no neighbor height averaging)
+  function subdivideIndexedGeometry(geom, levels){
+    levels = Math.max(0, Math.floor(levels));
+    if (levels === 0) return geom;
+
+    if (!geom.getIndex()) {
+      // ensure indexed for our subdivision path
+      geom = geom.toNonIndexed(); // fallback
+      geom = geom.toNonIndexed(); // keep as non-indexed, then re-index not trivial here
+      // For simplicity, if non-indexed, just return it (should not happen in this app)
+      return geom;
+    }
+
+    for (let L = 0; L < levels; L++){
+      const posAttr = geom.getAttribute("position");
+      const oldPos = posAttr.array;
+      const oldCount = posAttr.count;
+      const oldIdx = geom.getIndex().array;
+
+      // Build mutable positions list
+      const positions = new Array(oldCount);
+      for (let i=0;i<oldCount;i++){
+        positions[i] = [ oldPos[i*3], oldPos[i*3+1], oldPos[i*3+2] ];
+      }
+
+      const midpointCache = new Map(); // "a|b" -> newIndex
+
+      const getMid = (a,b) => {
+        const i0 = a < b ? a : b;
+        const i1 = a < b ? b : a;
+        const key = i0 + "|" + i1;
+        const hit = midpointCache.get(key);
+        if (hit !== undefined) return hit;
+
+        const pa = positions[a];
+        const pb = positions[b];
+        const m = [
+          (pa[0] + pb[0]) * 0.5,
+          (pa[1] + pb[1]) * 0.5,
+          (pa[2] + pb[2]) * 0.5
+        ];
+        const idx = positions.length;
+        positions.push(m);
+        midpointCache.set(key, idx);
+        return idx;
+      };
+
+      const newIdx = [];
+      newIdx.length = (oldIdx.length / 3) * 12; // 4 tris * 3 indices
+      let w = 0;
+
+      for (let i=0; i<oldIdx.length; i+=3){
+        const a = oldIdx[i], b = oldIdx[i+1], c = oldIdx[i+2];
+
+        const ab = getMid(a,b);
+        const bc = getMid(b,c);
+        const ca = getMid(c,a);
+
+        // 4 sub-triangles (preserve orientation)
+        newIdx[w++] = a;  newIdx[w++] = ab; newIdx[w++] = ca;
+        newIdx[w++] = ab; newIdx[w++] = b;  newIdx[w++] = bc;
+        newIdx[w++] = ca; newIdx[w++] = bc; newIdx[w++] = c;
+        newIdx[w++] = ab; newIdx[w++] = bc; newIdx[w++] = ca;
+      }
+      newIdx.length = w;
+
+      // Flatten positions
+      const flat = new Float32Array(positions.length * 3);
+      for (let i=0;i<positions.length;i++){
+        const p = positions[i];
+        flat[i*3] = p[0];
+        flat[i*3+1] = p[1];
+        flat[i*3+2] = p[2];
+      }
+
+      const idxArr = (positions.length > 65535) ? new Uint32Array(newIdx) : new Uint16Array(newIdx);
+
+      const next = new THREE.BufferGeometry();
+      next.setAttribute("position", new THREE.BufferAttribute(flat, 3));
+      next.setIndex(new THREE.BufferAttribute(idxArr, 1));
+      next.computeVertexNormals();
+
+      // dispose previous geom and continue
+      geom.dispose();
+      geom = next;
+    }
+
+    return geom;
+  }
+
+  // Surface build (Delaunay on E,N)
+  function buildSurface(points, opts){
+    if (points.length < 3) throw new Error("Need at least 3 non-zero Z points to build a surface.");
+
+    // Offsets to keep coordinates stable
+    let sumE=0, sumN=0, sumZ=0;
+    for (const p of points){ sumE += p.E; sumN += p.N; sumZ += p.Z; }
+    const offE = sumE / points.length;
+    const offN = sumN / points.length;
+    const offZ = sumZ / points.length;
+
+    kvOffset.textContent = `${offE.toFixed(3)}, ${offN.toFixed(3)}, ${offZ.toFixed(3)}`;
+
+    const zEx = opts.zExaggeration;
+
+    const positions = new Float32Array(points.length * 3);
+    const pts2d = new Array(points.length);
+
+    for (let i=0; i<points.length; i++){
+      const p = points[i];
+      const x = (p.E - offE);
+      const y = (p.Z - offZ) * zEx;
+      const z = (p.N - offN);
+
+      positions[i*3+0] = x;
+      positions[i*3+1] = y;
+      positions[i*3+2] = z;
+
+      pts2d[i] = [x, z];
+    }
+
+    const delaunay = Delaunay.from(pts2d);
+    const tri = delaunay.triangles;
+    if (!tri || tri.length < 3) {
+      throw new Error("Triangulation produced 0 triangles. Points may be collinear or too few after filtering.");
+    }
+
+    // Base geom
+    let geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geom.setIndex(new THREE.BufferAttribute(tri, 1));
+    geom.computeVertexNormals();
+
+    const baseTriCount = Math.floor(tri.length / 3);
+
+    // ✅ Refinement by subdivision
+    const levels = Math.floor(Number(subdivLevels.value) || 0);
+    if (levels > 0){
+      geom = subdivideIndexedGeometry(geom, levels);
+    }
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xa8d7ff,
+      metalness: 0.05,
+      roughness: 0.92,
+      transparent: true,
+      opacity: opts.opacity,
+      side: THREE.DoubleSide,
+      wireframe: opts.wireframe,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+    });
+
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.frustumCulled = false;
+
+    const onShadow = (shadowMode.value === "on");
+    mesh.castShadow = onShadow;
+    mesh.receiveShadow = onShadow;
+
+    // Original points as dots (not refined)
+    const ptsGeom = new THREE.BufferGeometry();
+    ptsGeom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const ptsMat = new THREE.PointsMaterial({
+      color: 0xffd54a,
+      size: opts.pointSize,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.85
+    });
+    const pts = new THREE.Points(ptsGeom, ptsMat);
+
+    const box3 = new THREE.Box3().setFromBufferAttribute(mesh.geometry.getAttribute("position"));
+    const pad = 0.05;
+    const size = new THREE.Vector3(); box3.getSize(size);
+    box3.expandByVector(size.multiplyScalar(pad));
+
+    const refinedTriCount = mesh.geometry.getIndex()
+      ? Math.floor(mesh.geometry.getIndex().array.length / 3)
+      : Math.floor(mesh.geometry.getAttribute("position").count / 3);
+
+    return { mesh, pts, box3, offZ, zEx, baseTriCount, refinedTriCount };
+  }
+
+  // Contour extraction (triangle-plane intersections)
+  function buildContoursFromSurface(mesh, offZ, zEx, intervalReal, majorEvery){
+    clearContours();
+    if (!mesh || !intervalReal || intervalReal <= 0) return;
+
+    const geom = mesh.geometry;
+    const pos = geom.getAttribute("position");
+    const arr = pos.array;
+    const indexAttr = geom.getIndex();
+    if (!indexAttr) return;
+    const idx = indexAttr.array;
+
+    // Real Z range from vertex Y
+    let zMin = Infinity, zMax = -Infinity;
+    for (let i=0; i<pos.count; i++){
+      const y = arr[i*3+1];
+      const zr = (y / zEx) + offZ;
+      if (zr < zMin) zMin = zr;
+      if (zr > zMax) zMax = zr;
+    }
+    if (!Number.isFinite(zMin) || !Number.isFinite(zMax) || zMax <= zMin) return;
+
+    const eps = 1e-9;
+    const start = Math.ceil((zMin - eps) / intervalReal) * intervalReal;
+    const end   = Math.floor((zMax + eps) / intervalReal) * intervalReal;
+
+    const minorVerts = [];
+    const majorVerts = [];
+
+    const pushSeg = (list, ax, ay, az, bx, by, bz) => {
+      list.push(ax, ay, az, bx, by, bz);
+    };
+
+    for (let t=0; t<idx.length; t+=3){
+      const ia = idx[t], ib = idx[t+1], ic = idx[t+2];
+
+      const ax = arr[ia*3], ay = arr[ia*3+1], az = arr[ia*3+2];
+      const bx = arr[ib*3], by = arr[ib*3+1], bz = arr[ib*3+2];
+      const cx = arr[ic*3], cy = arr[ic*3+1], cz = arr[ic*3+2];
+
+      const aZ = (ay / zEx) + offZ;
+      const bZ = (by / zEx) + offZ;
+      const cZ = (cy / zEx) + offZ;
+
+      const triMin = Math.min(aZ,bZ,cZ);
+      const triMax = Math.max(aZ,bZ,cZ);
+      if (triMax < start || triMin > end) continue;
+
+      const l0 = Math.ceil((triMin - eps) / intervalReal) * intervalReal;
+      const l1 = Math.floor((triMax + eps) / intervalReal) * intervalReal;
+
+      for (let L = l0; L <= l1 + eps; L += intervalReal){
+        const pts = [];
+        const levelY = (L - offZ) * zEx;
+        const lift = 0.03; // reduce z-fighting
+
+        const segPoint = (x0,y0,z0, Z0, x1,y1,z1, Z1) => {
+          if ((Z0 < L && Z1 < L) || (Z0 > L && Z1 > L)) return;
+          const d = (Z1 - Z0);
+          if (Math.abs(d) < 1e-12) return;
+          const tt = (L - Z0) / d;
+          if (tt < -1e-9 || tt > 1+1e-9) return;
+          const x = x0 + (x1 - x0) * tt;
+          const z = z0 + (z1 - z0) * tt;
+          pts.push([x, levelY + lift, z]);
+        };
+
+        segPoint(ax,ay,az, aZ, bx,by,bz, bZ);
+        segPoint(bx,by,bz, bZ, cx,cy,cz, cZ);
+        segPoint(cx,cy,cz, cZ, ax,ay,az, aZ);
+
+        if (pts.length >= 2){
+          const p0 = pts[0], p1 = pts[1];
+          const k = Math.round(L / intervalReal);
+          const isMajor = (majorEvery > 1) ? (k % majorEvery === 0) : true;
+          const list = isMajor ? majorVerts : minorVerts;
+          pushSeg(list, p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+        }
+      }
+    }
+
+    const segCount = Math.floor((minorVerts.length + majorVerts.length) / 6);
+    kvSegs.textContent = String(segCount);
+
+    if (minorVerts.length){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(minorVerts, 3));
+      const m = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, depthWrite: false });
+      contourMinor = new THREE.LineSegments(g, m);
+      contourMinor.renderOrder = 10;
+      scene.add(contourMinor);
+    }
+
+    if (majorVerts.length){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(majorVerts, 3));
+      const m = new THREE.LineBasicMaterial({ color: 0xffd54a, transparent: true, opacity: 0.70, depthWrite: false });
+      contourMajor = new THREE.LineSegments(g, m);
+      contourMajor.renderOrder = 11;
+      scene.add(contourMajor);
+    }
+  }
+
+  function renderFromText(text){
+    clearSceneData();
+
+    const { points, excludedZeroZ, deduped } = parseCsvText(text);
+
+    kvCount.textContent = String(points.length);
+    kvExcluded.textContent = String(excludedZeroZ);
+    kvDeduped.textContent = String(deduped);
+
+    const opts = {
+      zExaggeration: Number(zScale.value),
+      pointSize: Number(ptSize.value),
+      opacity: Number(surfOpacity.value),
+      wireframe: !!wireframe.checked
+    };
+
+    const { mesh, pts, box3, offZ, zEx, baseTriCount, refinedTriCount } = buildSurface(points, opts);
+
+    surfaceMesh = mesh;
+    pointsMesh = pts;
+    lastBounds = box3;
+    lastOffZ = offZ;
+    lastZEx = zEx;
+
+    kvTrisBase.textContent = String(baseTriCount);
+    kvTrisRef.textContent = String(refinedTriCount);
+
+    if (showSurface.checked) scene.add(surfaceMesh);
+    if (showPoints.checked) scene.add(pointsMesh);
+
+    boundsBox = buildBoundsBox(box3);
+    scene.add(boundsBox);
+
+    applyShadowQuality();
+    applyShadowMode();
+    updateSunForBounds(box3);
+
+    if (contoursOn.checked){
+      buildContoursFromSurface(
+        surfaceMesh,
+        lastOffZ,
+        lastZEx,
+        Number(contourInterval.value),
+        Math.max(1, Math.floor(Number(contourMajorEvery.value) || 1))
+      );
+    }
+
+    setStatus(true, `Rendered. Refinement level: ${Math.floor(Number(subdivLevels.value)||0)}. Contours: ${contoursOn.checked ? "on" : "off"}.`);
+    fitViewToBox(box3);
+  }
+
+  function refreshLabels(){
+    const zs = Number(zScale.value);
+    zScaleLabel.textContent = `${zs.toFixed(1)}×`;
+    ptSizeLabel.textContent = `${Number(ptSize.value).toFixed(1)}`;
+    surfOpacityLabel.textContent = `${Number(surfOpacity.value).toFixed(2)}`;
+    sunAzLabel.textContent = `${Number(sunAz.value)}°`;
+    sunElLabel.textContent = `${Number(sunEl.value)}°`;
+    subdivLabel.textContent = `${Math.floor(Number(subdivLevels.value)||0)}`;
+  }
+  refreshLabels();
+
+  // Exaggeration slider + input sync
+  function setZScale(v){
+    const x = Math.min(200, Math.max(0.1, Number(v) || 1));
+    zScale.value = String(x);
+    zScaleNum.value = String(x);
+    refreshLabels();
+  }
+  zScale.addEventListener("input", () => { setZScale(zScale.value); if (surfaceMesh) btnRender.click(); });
+  zScaleNum.addEventListener("change", () => { setZScale(zScaleNum.value); if (surfaceMesh) btnRender.click(); });
+
+  ptSize.addEventListener("input", () => { refreshLabels(); if (pointsMesh) pointsMesh.material.size = Number(ptSize.value); });
+  surfOpacity.addEventListener("input", () => { refreshLabels(); if (surfaceMesh) surfaceMesh.material.opacity = Number(surfOpacity.value); });
+  wireframe.addEventListener("change", () => { if (surfaceMesh) surfaceMesh.material.wireframe = !!wireframe.checked; });
+
+  showSurface.addEventListener("change", () => { if (!surfaceMesh) return; showSurface.checked ? scene.add(surfaceMesh) : scene.remove(surfaceMesh); });
+  showPoints.addEventListener("change", () => { if (!pointsMesh) return; showPoints.checked ? scene.add(pointsMesh) : scene.remove(pointsMesh); });
+  showGrid.addEventListener("change", () => { grid.visible = !!showGrid.checked; });
+
+  sunAz.addEventListener("input", () => { refreshLabels(); updateSunForBounds(lastBounds); });
+  sunEl.addEventListener("input", () => { refreshLabels(); updateSunForBounds(lastBounds); });
+  shadowQuality.addEventListener("change", () => { applyShadowQuality(); updateSunForBounds(lastBounds); });
+  shadowMode.addEventListener("change", () => { applyShadowMode(); updateSunForBounds(lastBounds); });
+
+  // Refinement (requires re-render because geometry changes)
+  subdivLevels.addEventListener("input", () => { refreshLabels(); });
+  subdivLevels.addEventListener("change", () => { refreshLabels(); if (surfaceMesh) btnRender.click(); });
+
+  // Contours
+  btnRebuildContours.addEventListener("click", () => {
+    try{
+      if (!surfaceMesh) throw new Error("No surface yet.");
+      if (!contoursOn.checked) { clearContours(); setStatus(true, "Contours are off."); return; }
+      buildContoursFromSurface(
+        surfaceMesh,
+        lastOffZ,
+        lastZEx,
+        Number(contourInterval.value),
+        Math.max(1, Math.floor(Number(contourMajorEvery.value) || 1))
+      );
+      setStatus(true, "Contours rebuilt.");
+    }catch(err){
+      setStatus(false, err?.message || String(err));
+    }
+  });
+
+  contoursOn.addEventListener("change", () => {
+    if (!surfaceMesh) return;
+    if (!contoursOn.checked) { clearContours(); return; }
+    btnRebuildContours.click();
+  });
+
+  contourInterval.addEventListener("change", () => { if (surfaceMesh && contoursOn.checked) btnRebuildContours.click(); });
+  contourMajorEvery.addEventListener("change", () => { if (surfaceMesh && contoursOn.checked) btnRebuildContours.click(); });
+
+  navModeSel.addEventListener("change", () => {
+    const mode = navModeSel.value;
+    if (mode === "orbit") {
+      fpsEnabled = false;
+      orbit.enabled = true;
+      fps.unlock();
+      setStatus(true, "Orbit mode enabled.");
+    } else {
+      fpsEnabled = true;
+      orbit.enabled = false;
+      setStatus(true, "First-person mode enabled. Click the canvas to lock pointer.");
+    }
+  });
+
+  btnRender.addEventListener("click", () => {
+    try {
+      const text = csvTA.value.trim();
+      if (!text) throw new Error("Paste CSV text or load a CSV file first.");
+      renderFromText(text);
+    } catch (err) {
+      setStatus(false, err?.message || String(err));
+      console.error(err);
+    }
+  });
+
+  btnFit.addEventListener("click", () => {
+    try {
+      if (!surfaceMesh) throw new Error("Nothing to fit yet.");
+      const posAttr = surfaceMesh.geometry.getAttribute("position");
+      const box3 = new THREE.Box3().setFromBufferAttribute(posAttr);
+      fitViewToBox(box3);
+      updateSunForBounds(box3);
+      setStatus(true, "Fit view.");
+    } catch (err) {
+      setStatus(false, err?.message || String(err));
+    }
+  });
+
+  btnSample.addEventListener("click", () => {
+    // Sample with subtle relief + gentle slope; good for contours + refinement
+    const baseE = 2406000;
+    const baseN = 666000;
+    const rows = [];
+    let p = 1;
+
+    for (let j=0; j<45; j++){
+      for (let i=0; i<45; i++){
+        const E = baseE + i*40;
+        const N = baseN + j*40;
+        const dx = (i-22)/22;
+        const dy = (j-22)/22;
+
+        let Z = 2500
+          + 0.6*(i/44)
+          + 3.2*Math.exp(-(dx*dx + dy*dy)*1.8)
+          + 0.9*Math.sin(i*0.22)*Math.cos(j*0.18);
+
+        if ((i===0 && j===0) || (i===44 && j===44)) Z = 0;
+        rows.push(`${p++},${N.toFixed(3)},${E.toFixed(3)},${Z.toFixed(3)},SAMPLE`);
+      }
+    }
+
+    csvTA.value = rows.join("\n");
+    setZScale(60);
+    contourInterval.value = "0.5";
+    contourMajorEvery.value = "5";
+    sunEl.value = "14";
+    sunAz.value = "315";
+    subdivLevels.value = "2";
+    refreshLabels();
+    setStatus(true, "Sample loaded. Click Render Surface.");
+  });
+
+  btnClear.addEventListener("click", () => {
+    csvTA.value = "";
+    clearSceneData();
+  });
+
+  fileIn.addEventListener("change", async () => {
+    const f = fileIn.files?.[0];
+    if (!f) return;
+    try{
+      const text = await f.text();
+      csvTA.value = text;
+      setStatus(true, `Loaded: ${f.name}`);
+    } catch (err){
+      setStatus(false, `Failed to read file: ${err?.message || err}`);
+    }
+  });
+
+  // Animation loop
+  let lastT = performance.now();
+
+  function fpsUpdate(dt){
+    if (!fpsEnabled || !fps.isLocked) return;
+
+    const speed = (keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 220 : 110;
+
+    vel.set(0,0,0);
+    if (keys.has("KeyW")) vel.z -= 1;
+    if (keys.has("KeyS")) vel.z += 1;
+    if (keys.has("KeyA")) vel.x -= 1;
+    if (keys.has("KeyD")) vel.x += 1;
+    if (keys.has("Space")) vel.y += 1;
+    if (keys.has("ControlLeft") || keys.has("ControlRight")) vel.y -= 1;
+
+    if (vel.lengthSq() > 0) vel.normalize().multiplyScalar(speed * dt);
+
+    fps.moveRight(vel.x);
+    fps.moveForward(vel.z);
+    camera.position.addScaledVector(up, vel.y);
+  }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+
+    resize();
+    if (orbit.enabled) orbit.update();
+    fpsUpdate(dt);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  setStatus(true, "Render a surface. Use subdivision to smooth visually (more triangles, same elevations).");
+</script>
+</body>
+</html>
