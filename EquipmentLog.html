@@ -67,6 +67,12 @@
     </header>
 
     <main>
+      <!-- Log List -->
+      <div id="logList" class="log-list"></div>
+      <div id="emptyState" class="empty-state hidden">
+        <p><strong>No equipment logs yet.</strong></p>
+        <p>Fill in the form above to record your first setup.</p>
+      </div>
       <!-- Entry Form -->
       <div id="formSection" class="form-section">
         <h2 id="formHeading">New Setup Log</h2>
@@ -118,6 +124,7 @@
         </div>
       </div>
 
+      
       <!-- Toolbar -->
       <div class="toolbar">
         <button id="newLogBtn" class="primary" type="button">New Log</button>
@@ -126,12 +133,6 @@
         <button id="clearAllBtn" class="danger" type="button">Clear All</button>
       </div>
 
-      <!-- Log List -->
-      <div id="logList" class="log-list"></div>
-      <div id="emptyState" class="empty-state hidden">
-        <p><strong>No equipment logs yet.</strong></p>
-        <p>Fill in the form above to record your first setup.</p>
-      </div>
     </main>
   </div>
 
