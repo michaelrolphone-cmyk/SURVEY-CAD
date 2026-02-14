@@ -86,6 +86,7 @@ export const APP_CATALOG = [
     accent: '#BFDBFE',
     glyph: 'BL',
     section: 'TOPO',
+    experimental: true,
   },
   
   {
