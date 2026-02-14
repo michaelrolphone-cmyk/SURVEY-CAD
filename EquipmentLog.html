@@ -383,6 +383,12 @@
       a.click();
       URL.revokeObjectURL(url);
     });
+    window.addEventListener('surveyfoundry-localstorage-sync', () => {
+      loadCrew();
+      loadLogs();
+      renderLogs();
+    });
+
     loadCrew();
     loadLogs();
     renderLogs();

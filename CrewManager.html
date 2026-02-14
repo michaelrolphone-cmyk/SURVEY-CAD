@@ -489,6 +489,11 @@
       URL.revokeObjectURL(url);
     });
 
+    window.addEventListener('surveyfoundry-localstorage-sync', () => {
+      loadProfiles();
+      renderProfiles();
+    });
+
     loadProfiles();
     renderProfiles();
   </script>

@@ -11,6 +11,14 @@ import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-stor
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { loadFldConfig } from './fld-config.js';
+import {
+  getCrewProfiles,
+  getEquipmentInventory,
+  getEquipmentLogs,
+  findCrewMemberById,
+  findEquipmentById,
+  findEquipmentLogById,
+} from './crew-equipment-api.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -288,6 +296,57 @@ export function createSurveyServer({
         }
 
         sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/crew' || urlObj.pathname === '/api/crew/') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const state = await resolveStoreState();
+        const profiles = getCrewProfiles(state.snapshot);
+        const id = urlObj.searchParams.get('id');
+        if (id) {
+          const member = findCrewMemberById(state.snapshot, id);
+          sendJson(res, member ? 200 : 404, member ? { member } : { error: 'Crew member not found.' });
+          return;
+        }
+        sendJson(res, 200, { crew: profiles });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/equipment' || urlObj.pathname === '/api/equipment/') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const state = await resolveStoreState();
+        const inventory = getEquipmentInventory(state.snapshot);
+        const id = urlObj.searchParams.get('id');
+        if (id) {
+          const item = findEquipmentById(state.snapshot, id);
+          sendJson(res, item ? 200 : 404, item ? { equipment: item } : { error: 'Equipment not found.' });
+          return;
+        }
+        sendJson(res, 200, { equipment: inventory });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/equipment-logs' || urlObj.pathname === '/api/equipment-logs/') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const state = await resolveStoreState();
+        const logs = getEquipmentLogs(state.snapshot);
+        const id = urlObj.searchParams.get('id');
+        if (id) {
+          const log = findEquipmentLogById(state.snapshot, id);
+          sendJson(res, log ? 200 : 404, log ? { log } : { error: 'Equipment log not found.' });
+          return;
+        }
+        sendJson(res, 200, { logs });
         return;
       }
 
