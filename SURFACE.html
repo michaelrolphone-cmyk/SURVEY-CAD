@@ -3,82 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CSV → 3D Surface (Idaho West) — Three.js</title>
+  <title>CSV Terrain Surface + Contours + Refinement + Map Tiles (P,N,E,Z,D) — Three.js</title>
   <style>
     :root{
-      --bg:#0b0f14; --panel:#111824cc; --panel2:#0f1520cc;
-      --text:#e8eef7; --muted:#9aa8bb; --accent:#ffd54a;
-      --line:#2a3a52; --danger:#ff5a7a;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --bg:#0b0f14;
+      --panel:#0f1620;
+      --panel2:#121c28;
+      --text:#e8eef7;
+      --muted:#a5b1c2;
+      --accent:#ffd54a;
+      --danger:#ff5b5b;
+      --ok:#37d67a;
+      --line:rgba(255,255,255,.12);
     }
-    html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); overflow:hidden;}
-    #wrap{position:fixed; inset:0; display:grid; grid-template-columns: 420px 1fr;}
-    #ui{
-      background:linear-gradient(180deg,var(--panel),var(--panel2));
+    html,body{height:100%; margin:0; background:var(--bg); color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;}
+    #app{display:grid; grid-template-columns: 430px 1fr; height:100%;}
+    #left{
       border-right:1px solid var(--line);
-      padding:14px 14px 10px;
-      display:flex; flex-direction:column; gap:10px;
-      min-width:320px;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 35%), var(--panel);
+      padding:14px; overflow:auto;
     }
-    #viewport{position:relative;}
-    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
-    .row > * {flex: 0 0 auto;}
-    .btn{
-      appearance:none; border:1px solid var(--line); background:#0c1320;
-      color:var(--text); padding:8px 10px; border-radius:10px; cursor:pointer;
-      font-weight:600;
+    #right{position:relative;}
+    #c{width:100%; height:100%; display:block;}
+    h1{font-size:15px; margin:0 0 10px; letter-spacing:.2px;}
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 80%), var(--panel2);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      margin:10px 0;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
     }
-    .btn:hover{border-color:#3a557a;}
-    .btn.accent{border-color:#6b5a1a; background:linear-gradient(180deg,#2a230e,#171206); color:#ffe6a3;}
-    .btn.danger{border-color:#632131; background:linear-gradient(180deg,#2a0f16,#1a0a0f); color:#ffb3c1;}
-    .file{max-width:100%;}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    .row > *{flex: 1 1 auto;}
+    label{display:block; font-size:12px; color:var(--muted); margin:10px 0 6px;}
     textarea{
-      width:100%; height:220px; resize:vertical;
-      border-radius:12px; border:1px solid var(--line);
-      background:#070b10; color:var(--text); padding:10px;
-      font-family:var(--mono); font-size:12px; line-height:1.25;
+      width:100%; min-height:170px; resize:vertical;
+      background:#091018; color:var(--text);
+      border:1px solid var(--line); border-radius:12px;
+      padding:10px; outline:none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px; line-height:1.35;
+    }
+    input[type="file"]{width:100%;}
+    input[type="number"]{
+      width:100%; background:#091018; color:var(--text);
+      border:1px solid var(--line); border-radius:12px;
+      padding:10px; outline:none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    button{
+      background:#0b0f14; color:var(--text);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      transition: transform .06s ease, border-color .15s ease, background .15s ease;
+      user-select:none;
+    }
+    button:hover{border-color: rgba(255,213,74,.55); background: rgba(255,213,74,.06);}
+    button:active{transform: translateY(1px);}
+    button.primary{border-color: rgba(255,213,74,.65); background: rgba(255,213,74,.10);}
+    button.danger{border-color: rgba(255,91,91,.65); background: rgba(255,91,91,.08);}
+    .tiny{font-size:12px; color:var(--muted);}
+    .kv{display:grid; grid-template-columns: 190px 1fr; gap:6px 10px; font-size:12px; color:var(--muted);}
+    .kv b{color:var(--text); font-weight:600;}
+    .sep{height:1px; background:var(--line); margin:10px 0;}
+    .badge{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 8px;
+      border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.03);}
+    .dot{width:8px; height:8px; border-radius:50%;}
+    .dot.ok{background:var(--ok);}
+    .dot.bad{background:var(--danger);}
+    .hint{
+      position:absolute; left:14px; bottom:14px;
+      background: rgba(10,14,20,.78);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      padding:10px 12px;
+      max-width: 560px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-size:12px; color:var(--muted);
+    }
+    .hint b{color:var(--text); font-weight:600;}
+    .grid2{display:grid; grid-template-columns: 1fr 1fr; gap:10px;}
+    .grid2 > div{min-width:0;}
+    input[type="range"]{width:100%;}
+    select{
+      width:100%;
+      background:#091018;
+      color:var(--text);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
       outline:none;
     }
-    .controls{
-      border:1px solid var(--line); border-radius:12px; padding:10px;
-      background:#070b10aa;
-      display:grid; grid-template-columns: 1fr 1fr; gap:10px;
-    }
-    label{display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--muted);}
-    input[type="range"]{width:100%;}
-    input[type="number"], select{
-      width:100%; border-radius:10px; border:1px solid var(--line);
-      background:#0b1220; color:var(--text); padding:7px 8px; outline:none;
-    }
-    .kv{
-      border:1px solid var(--line); border-radius:12px; padding:10px;
-      background:#070b10aa;
-      font-family:var(--mono); font-size:12px; color:var(--muted);
-      white-space:pre-wrap;
-    }
-    .hint{ font-size:12px; color:var(--muted); line-height:1.35; }
-    #fpOverlay{
-      position:absolute; inset:0; display:none;
-      align-items:flex-end; justify-content:center;
-      padding:18px;
-      pointer-events:none;
-      font-family:var(--mono);
-      color:#cfe0ff;
-      text-shadow: 0 1px 0 #000;
-    }
-    #fpOverlay .box{
-      background:#06101dcc; border:1px solid #2a3a52; border-radius:12px;
-      padding:10px 12px;
-    }
-    #canvas{
-      position:absolute; inset:0;
-      display:block;
-      width:100%;
-      height:100%;
-    }
+    .checkbox{display:flex; gap:10px; align-items:center; color:var(--muted); font-size:12px; margin-top:8px;}
+    .checkbox input{transform: scale(1.15);}
+    .status{margin-top:8px;}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
-  
+
   <script type="importmap">
   {
     "imports": {
@@ -89,824 +115,1421 @@
   </script>
 </head>
 <body>
-<div id="wrap">
-  <div id="ui">
-    <div class="row">
-      <input id="file" class="file" type="file" accept=".csv,text/csv" />
-      <button id="btnRender" class="btn accent">Render</button>
-      <button id="btnDemo" class="btn">Demo</button>
-      <button id="btnClear" class="btn danger">Clear</button>
+<div id="app">
+  <div id="left">
+    <h1>CSV → 3D Surface (P,N,E,Z,D)</h1>
+
+    <div class="card">
+      <div class="row">
+        <button class="primary" id="btnRender">Render Surface</button>
+        <button id="btnFit">Fit View</button>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="btnSample">Load Sample</button>
+        <button class="danger" id="btnClear">Clear</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <label>Load CSV file</label>
+      <input id="file" type="file" accept=".csv,text/csv" />
+
+      <label>…or paste CSV text (P,N,E,Z,D; header optional)</label>
+      <textarea id="csv" spellcheck="false" placeholder="Example:
+1,666102.348,2406162.791,2597.647,Corner
+2,666140.112,2406160.118,2599.220,Spot
+..."></textarea>
+
+      <div class="status" id="status"></div>
     </div>
 
-    <textarea id="csv" spellcheck="false" placeholder="Paste CSV here: P,N,E,Z,D"></textarea>
+    <div class="card">
+      <div class="grid2">
+        <div>
+          <label>Navigation mode</label>
+          <select id="navMode">
+            <option value="orbit">Orbit</option>
+            <option value="fps">First-person</option>
+          </select>
+          <div class="tiny" style="margin-top:6px;">FPS: click canvas to lock · WASD · Space/Ctrl · Esc unlock</div>
+        </div>
 
-    <div class="controls">
-      <label>
-        Navigation
-        <select id="navMode">
-          <option value="orbit" selected>Orbit</option>
-          <option value="fp">First-person (pointer lock)</option>
-        </select>
-      </label>
+        <div>
+          <label>Vertical exaggeration (×)</label>
+          <input id="zScale" type="range" min="0.1" max="200" step="0.1" value="60" />
+          <div class="row" style="margin-top:6px;">
+            <div class="tiny"><span id="zScaleLabel" class="mono">60.0×</span></div>
+            <input id="zScaleNum" type="number" min="0.1" max="200" step="0.1" value="60" />
+          </div>
+        </div>
+      </div>
 
-      <label>
-        Texture source
-        <select id="texSource">
-          <option value="esri" selected>Esri World Imagery (tiles)</option>
-          <option value="usgs">USGS ImageryOnly (tiles, max z≈16)</option>
-          <option value="none">None</option>
-        </select>
-      </label>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>Point size</label>
+          <input id="ptSize" type="range" min="0.2" max="6" step="0.1" value="1.0" />
+          <div class="tiny"><span id="ptSizeLabel" class="mono">1.0</span></div>
+        </div>
+        <div>
+          <label>Surface opacity</label>
+          <input id="surfOpacity" type="range" min="0.05" max="1" step="0.05" value="0.95" />
+          <div class="tiny"><span id="surfOpacityLabel" class="mono">0.95</span></div>
+        </div>
+      </div>
 
-      <label>
-        Grid resolution (adds vertices)
-        <input id="gridRes" type="range" min="32" max="256" step="1" value="128" />
-      </label>
+      <div class="sep"></div>
 
-      <label>
-        Z exaggeration
-        <input id="zExag" type="range" min="0.2" max="50" step="0.1" value="10" />
-      </label>
+      <div class="grid2">
+        <div>
+          <label>Sun azimuth (deg)</label>
+          <input id="sunAz" type="range" min="0" max="360" step="1" value="315" />
+          <div class="tiny"><span id="sunAzLabel" class="mono">315°</span></div>
+        </div>
+        <div>
+          <label>Sun elevation (deg)</label>
+          <input id="sunEl" type="range" min="2" max="80" step="1" value="14" />
+          <div class="tiny"><span id="sunElLabel" class="mono">14°</span></div>
+        </div>
+      </div>
 
-      <label>
-        IDW power
-        <input id="idwPow" type="range" min="1" max="4" step="0.1" value="2" />
-      </label>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>Shadows</label>
+          <select id="shadowMode">
+            <option value="on" selected>On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div>
+          <label>Shadow quality</label>
+          <select id="shadowQuality">
+            <option value="1024">1024</option>
+            <option value="2048" selected>2048</option>
+            <option value="4096">4096</option>
+          </select>
+        </div>
+      </div>
 
-      <label>
-        Neighbors (K)
-        <input id="knn" type="range" min="4" max="32" step="1" value="12" />
-      </label>
+      <!-- ✅ Map tiles added (keeps all existing features) -->
+      <div class="sep"></div>
 
-      <label>
-        Contour interval (feet)
-        <input id="contInt" type="number" min="0.1" step="0.1" value="1" />
-      </label>
+      <div class="grid2">
+        <div>
+          <label>Map tiles</label>
+          <select id="tileProvider">
+            <option value="none" selected>None</option>
+            <option value="esri">Esri World Imagery</option>
+            <option value="usgs">USGS ImageryOnly (max z≈16)</option>
+          </select>
+          <div class="tiny" style="margin-top:6px;">Tiles are draped as a separate overlay mesh (does not affect shadows).</div>
+        </div>
+        <div>
+          <label>Tile texture size</label>
+          <select id="tileTexSize">
+            <option value="512">512</option>
+            <option value="1024" selected>1024</option>
+            <option value="2048">2048</option>
+          </select>
+          <div class="tiny" style="margin-top:6px;">Higher = sharper, more VRAM.</div>
+        </div>
+      </div>
 
-      <label style="flex-direction:row; align-items:center; gap:10px; color:var(--text);">
-        <input id="showContours" type="checkbox" checked />
-        Show contours
-      </label>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>Tile opacity</label>
+          <input id="tileOpacity" type="range" min="0" max="1" step="0.05" value="0.30" />
+          <div class="tiny"><span id="tileOpacityLabel" class="mono">0.30</span></div>
+        </div>
+        <div>
+          <label>Rebuild tiles</label>
+          <button id="btnRebuildTiles">Rebuild Map</button>
+          <div class="tiny" style="margin-top:6px;">Use after changing provider/size.</div>
+        </div>
+      </div>
 
-      <label style="flex-direction:row; align-items:center; gap:10px; color:var(--text);">
-        <input id="shadows" type="checkbox" checked />
-        Shadows
-      </label>
+      <div class="checkbox">
+        <input id="wireframe" type="checkbox" />
+        <label for="wireframe" style="margin:0;">Wireframe</label>
+      </div>
+      <div class="checkbox">
+        <input id="showSurface" type="checkbox" checked />
+        <label for="showSurface" style="margin:0;">Show surface</label>
+      </div>
+      <div class="checkbox">
+        <input id="showPoints" type="checkbox" checked />
+        <label for="showPoints" style="margin:0;">Show points</label>
+      </div>
+      <div class="checkbox">
+        <input id="showGrid" type="checkbox" checked />
+        <label for="showGrid" style="margin:0;">Show grid</label>
+      </div>
     </div>
 
-    <div id="status" class="kv">Drop CSV, or click Demo → Render.</div>
-    <div class="hint">
-      CSV format: <b>P,N,E,Z,D</b> (Northing/Easting in Idaho West State Plane, US-ft; Z in feet). Rows with <b>Z=0</b> are ignored.
-      Contours are drawn over the mesh. Smoothing is achieved by increasing grid resolution (more vertices), not by averaging heights.
+    <div class="card">
+      <div class="sep" style="margin-top:0;"></div>
+
+      <label>Mesh refinement (subdivision levels)</label>
+      <input id="subdivLevels" type="range" min="0" max="4" step="1" value="2" />
+      <div class="tiny">Level <span id="subdivLabel" class="mono">2</span> — adds vertices by splitting triangles. No height averaging / denoise.</div>
+      <div class="tiny" style="margin-top:6px;">
+        Cost grows fast: triangles ×4 per level. If your input is large, keep ≤2.
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="row">
+        <button id="btnRebuildContours">Rebuild Contours</button>
+      </div>
+
+      <div class="checkbox">
+        <input id="contoursOn" type="checkbox" checked />
+        <label for="contoursOn" style="margin:0;">Draw contour lines</label>
+      </div>
+
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <label>Contour interval (Z units)</label>
+          <input id="contourInterval" type="number" min="0.001" step="0.1" value="1.0" />
+          <div class="tiny">In your CSV Z units (feet/meters), not exaggerated units.</div>
+        </div>
+        <div>
+          <label>Major every N intervals</label>
+          <input id="contourMajorEvery" type="number" min="1" step="1" value="5" />
+          <div class="tiny">Major = brighter line (WebGL line width is limited).</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="kv">
+        <div>Parsed points</div><b id="kvCount">0</b>
+        <div>Excluded (Z=0)</div><b id="kvExcluded">0</b>
+        <div>Deduped (same N/E)</div><b id="kvDeduped">0</b>
+        <div>Triangles (base)</div><b id="kvTrisBase">0</b>
+        <div>Triangles (refined)</div><b id="kvTrisRef">0</b>
+        <div>Contour segments</div><b id="kvSegs">0</b>
+        <div>Offset (E,N,Z)</div><b id="kvOffset" class="mono">—</b>
+      </div>
     </div>
   </div>
 
-  <div id="viewport">
-    <canvas id="canvas"></canvas>
-    <div id="fpOverlay">
-      <div class="box">Click scene to lock pointer • WASD move • Shift faster • Esc unlock</div>
+  <div id="right">
+    <canvas id="c"></canvas>
+    <div class="hint">
+      <b>Orbit:</b> LMB rotate · RMB pan · Wheel zoom<br/>
+      <b>FPS:</b> click canvas to lock mouse · WASD move · Space up · Ctrl down · Esc unlock
     </div>
   </div>
 </div>
 
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+  import * as THREE from "three";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+  import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
+  import { Delaunay } from "https://cdn.jsdelivr.net/npm/d3-delaunay@6/+esm";
+  import Papa from "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm";
 
-const $ = (id) => document.getElementById(id);
+  const el = (id)=>document.getElementById(id);
 
-const canvas = $('canvas');
-const viewport = $('viewport');
-const statusEl = $('status');
-const fpOverlay = $('fpOverlay');
+  const csvTA = el("csv");
+  const fileIn = el("file");
+  const btnRender = el("btnRender");
+  const btnFit = el("btnFit");
+  const btnSample = el("btnSample");
+  const btnClear = el("btnClear");
+  const statusEl = el("status");
 
-function setStatus(msg){ statusEl.textContent = msg; }
+  const navModeSel = el("navMode");
+  const zScale = el("zScale");
+  const zScaleNum = el("zScaleNum");
+  const zScaleLabel = el("zScaleLabel");
+  const ptSize = el("ptSize");
+  const ptSizeLabel = el("ptSizeLabel");
+  const surfOpacity = el("surfOpacity");
+  const surfOpacityLabel = el("surfOpacityLabel");
+  const wireframe = el("wireframe");
+  const showSurface = el("showSurface");
+  const showPoints = el("showPoints");
+  const showGrid = el("showGrid");
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const sunAz = el("sunAz");
+  const sunEl = el("sunEl");
+  const sunAzLabel = el("sunAzLabel");
+  const sunElLabel = el("sunElLabel");
+  const shadowMode = el("shadowMode");
+  const shadowQuality = el("shadowQuality");
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x070b10);
+  const tileProvider = el("tileProvider");
+  const tileTexSize = el("tileTexSize");
+  const tileOpacity = el("tileOpacity");
+  const tileOpacityLabel = el("tileOpacityLabel");
+  const btnRebuildTiles = el("btnRebuildTiles");
 
-const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2e7);
-camera.position.set(0, 900, 900);
+  const subdivLevels = el("subdivLevels");
+  const subdivLabel = el("subdivLabel");
 
-const orbit = new OrbitControls(camera, renderer.domElement);
-orbit.enableDamping = true;
-orbit.dampingFactor = 0.06;
-orbit.target.set(0, 0, 0);
+  const btnRebuildContours = el("btnRebuildContours");
+  const contoursOn = el("contoursOn");
+  const contourInterval = el("contourInterval");
+  const contourMajorEvery = el("contourMajorEvery");
 
-const fp = new PointerLockControls(camera, renderer.domElement);
-let navMode = 'orbit';
+  const kvCount = el("kvCount");
+  const kvExcluded = el("kvExcluded");
+  const kvDeduped = el("kvDeduped");
+  const kvTrisBase = el("kvTrisBase");
+  const kvTrisRef = el("kvTrisRef");
+  const kvSegs = el("kvSegs");
+  const kvOffset = el("kvOffset");
 
-// Lights
-const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.75);
-scene.add(hemi);
+  // Three.js setup
+  const canvas = el("c");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setClearColor(0x0b0f14, 1);
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.20);
-scene.add(ambient);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0b0f14, 250, 7000);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-sun.position.set(1200, 2200, 900);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.near = 10;
-sun.shadow.camera.far = 10000;
-sun.shadow.camera.left = -4000;
-sun.shadow.camera.right = 4000;
-sun.shadow.camera.top = 4000;
-sun.shadow.camera.bottom = -4000;
-scene.add(sun);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 80000);
+  camera.position.set(200, 160, 200);
 
-// Terrain group
-const terrainGroup = new THREE.Group();
-scene.add(terrainGroup);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.16);
+  scene.add(ambient);
 
-let terrainMesh = null;
-let contourLines = null;
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x223344, 0.30);
+  scene.add(hemi);
 
-function clearTerrain(){
-  while (terrainGroup.children.length){
-    const o = terrainGroup.children.pop();
-    if (o.geometry?.dispose) o.geometry.dispose();
-    if (o.material){
-      const mats = Array.isArray(o.material) ? o.material : [o.material];
-      for (const m of mats){
-        if (m.map?.dispose) m.map.dispose();
-        if (m.dispose) m.dispose();
-      }
-    }
+  const sun = new THREE.DirectionalLight(0xffffff, 1.25);
+  sun.castShadow = true;
+  scene.add(sun);
+
+  const sunTarget = new THREE.Object3D();
+  scene.add(sunTarget);
+  sun.target = sunTarget;
+
+  function applyShadowQuality() {
+    const q = Number(shadowQuality.value) || 2048;
+    sun.shadow.mapSize.set(q, q);
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.02;
+    sun.shadow.radius = 2;
   }
-  terrainMesh = null;
-  contourLines = null;
-}
+  applyShadowQuality();
 
-function resize(){
-  const rect = viewport.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(rect.width));
-  const h = Math.max(1, Math.floor(rect.height));
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-window.addEventListener('resize', resize);
-resize();
+  const grid = new THREE.GridHelper(2600, 104, 0xffffff, 0xffffff);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.07;
+  grid.receiveShadow = true;
+  scene.add(grid);
 
-// -------------------- CSV parsing --------------------
-function parseCSV(text){
-  const lines = text.split(/\r?\n/);
-  const pts = [];
-  for (let raw of lines){
-    const line = raw.trim();
-    if (!line) continue;
-    if (/^[a-z]/i.test(line) && line.toLowerCase().includes('north')) continue; // header-ish
+  const orbit = new OrbitControls(camera, renderer.domElement);
+  orbit.enableDamping = true;
+  orbit.dampingFactor = 0.08;
+  orbit.screenSpacePanning = true;
 
-    const parts = line.split(',');
-    if (parts.length < 4) continue;
+  const fps = new PointerLockControls(camera, renderer.domElement);
+  let fpsEnabled = false;
 
-    const P = parts[0]?.trim();
-    const N = Number(parts[1]);
-    const E = Number(parts[2]);
-    const Z = Number(parts[3]);
-    const D = parts.slice(4).join(',').trim();
+  const keys = new Set();
+  const vel = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
 
-    if (!Number.isFinite(N) || !Number.isFinite(E) || !Number.isFinite(Z)) continue;
-    if (Z === 0) continue; // exclude zero elevations
-    pts.push({ P, N, E, Z, D });
-  }
-  return pts;
-}
+  window.addEventListener("keydown", (e)=>keys.add(e.code));
+  window.addEventListener("keyup", (e)=>keys.delete(e.code));
 
-// -------------------- Idaho West (NAD83 / Idaho West, US-ft) inverse TM --------------------
-const USFT_TO_M = 1200 / 3937; // exact
-const GRS80_A = 6378137.0;
-const GRS80_F = 1 / 298.257222101;
-const GRS80_E2 = 2 * GRS80_F - GRS80_F * GRS80_F;
-const EP2 = GRS80_E2 / (1 - GRS80_E2);
-
-const IDW_LAT0 = 41.6666666666667 * Math.PI / 180;
-const IDW_LON0 = -115.75 * Math.PI / 180;
-const IDW_K0 = 0.999933333;
-const IDW_FE_FT = 2624666.667; // ftUS
-const IDW_FN_FT = 0.0;
-
-const e1 = (1 - Math.sqrt(1 - GRS80_E2)) / (1 + Math.sqrt(1 - GRS80_E2));
-
-function meridionalArc(phi){
-  const e2 = GRS80_E2, e4 = e2*e2, e6 = e4*e2;
-  return GRS80_A * (
-    (1 - e2/4 - 3*e4/64 - 5*e6/256) * phi
-    - (3*e2/8 + 3*e4/32 + 45*e6/1024) * Math.sin(2*phi)
-    + (15*e4/256 + 45*e6/1024) * Math.sin(4*phi)
-    - (35*e6/3072) * Math.sin(6*phi)
-  );
-}
-const M0 = meridionalArc(IDW_LAT0);
-
-function idahoWestToLonLat(E_ft, N_ft){
-  const x = (E_ft - IDW_FE_FT) * USFT_TO_M;
-  const y = (N_ft - IDW_FN_FT) * USFT_TO_M;
-
-  const M = M0 + y / IDW_K0;
-  const e2 = GRS80_E2, e4 = e2*e2, e6 = e4*e2;
-
-  const mu = M / (GRS80_A * (1 - e2/4 - 3*e4/64 - 5*e6/256));
-
-  const J1 = (3*e1/2 - 27*Math.pow(e1,3)/32);
-  const J2 = (21*Math.pow(e1,2)/16 - 55*Math.pow(e1,4)/32);
-  const J3 = (151*Math.pow(e1,3)/96);
-  const J4 = (1097*Math.pow(e1,4)/512);
-
-  const phi1 = mu + J1*Math.sin(2*mu) + J2*Math.sin(4*mu) + J3*Math.sin(6*mu) + J4*Math.sin(8*mu);
-
-  const sin1 = Math.sin(phi1), cos1 = Math.cos(phi1), tan1 = Math.tan(phi1);
-  const N1 = GRS80_A / Math.sqrt(1 - e2*sin1*sin1);
-  const R1 = (GRS80_A * (1 - e2)) / Math.pow(1 - e2*sin1*sin1, 1.5);
-  const T1 = tan1*tan1;
-  const C1 = EP2*cos1*cos1;
-  const D = x / (N1 * IDW_K0);
-
-  const D2 = D*D, D3=D2*D, D4=D2*D2, D5=D4*D, D6=D3*D3;
-
-  const lat = phi1 - (N1*tan1/R1) * (
-    D2/2
-    - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*EP2) * D4/24
-    + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*EP2 - 3*C1*C1) * D6/720
-  );
-
-  const lon = IDW_LON0 + (1/cos1) * (
-    D
-    - (1 + 2*T1 + C1) * D3/6
-    + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*EP2 + 24*T1*T1) * D5/120
-  );
-
-  return { lon: lon * 180/Math.PI, lat: lat * 180/Math.PI };
-}
-
-function lonLatToWebMerc(lon, lat){
-  const R = 6378137;
-  const x = R * (lon * Math.PI/180);
-  const clampedLat = Math.max(Math.min(lat, 85.05112878), -85.05112878);
-  const y = R * Math.log(Math.tan(Math.PI/4 + (clampedLat*Math.PI/180)/2));
-  return { x, y };
-}
-
-function lonLatToTileXY(lon, lat, z){
-  const n = 2 ** z;
-  const x = Math.floor((lon + 180) / 360 * n);
-  const latRad = lat * Math.PI/180;
-  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2 * n);
-  return { x, y };
-}
-
-function chooseZoomForBbox(mercWidth, desiredPx, maxZ){
-  const worldM = 2 * Math.PI * 6378137;
-  const z = Math.log2((desiredPx * worldM) / (256 * mercWidth));
-  return Math.max(0, Math.min(maxZ, Math.round(z)));
-}
-
-const PROVIDERS = {
-  esri: {
-    name: 'Esri World Imagery',
-    maxZ: 19,
-    url: (z,x,y) => `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`
-  },
-  usgs: {
-    name: 'USGS ImageryOnly',
-    maxZ: 16,
-    url: (z,x,y) => `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/${z}/${y}/${x}`
-  }
-};
-
-async function fetchImageBitmap(url){
-  const res = await fetch(url, { mode:'cors', credentials:'omit' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const blob = await res.blob();
-  return await createImageBitmap(blob);
-}
-
-async function buildTileTexture(bboxLonLat, providerKey, desiredSize){
-  const prov = PROVIDERS[providerKey];
-  const { west, south, east, north, mercWidth, mercHeight } = bboxLonLat;
-
-  const z = chooseZoomForBbox(Math.max(mercWidth, mercHeight), desiredSize, prov.maxZ);
-
-  const t0 = lonLatToTileXY(west, north, z);
-  const t1 = lonLatToTileXY(east, south, z);
-
-  const minX = Math.min(t0.x, t1.x), maxX = Math.max(t0.x, t1.x);
-  const minY = Math.min(t0.y, t1.y), maxY = Math.max(t0.y, t1.y);
-
-  const tilesW = (maxX - minX + 1);
-  const tilesH = (maxY - minY + 1);
-  const total = tilesW * tilesH;
-
-  if (total > 120) throw new Error(`Too many tiles at z=${z} (${total}). Reduce area or texture size.`);
-
-  const canvasTex = document.createElement('canvas');
-  canvasTex.width = tilesW * 256;
-  canvasTex.height = tilesH * 256;
-  const ctx = canvasTex.getContext('2d');
-
-  const jobs = [];
-  for (let ty=minY; ty<=maxY; ty++) for (let tx=minX; tx<=maxX; tx++) jobs.push({ tx, ty });
-
-  let done = 0;
-  const concurrency = 8;
-  const workers = Array.from({length: concurrency}, async () => {
-    while (jobs.length){
-      const job = jobs.pop();
-      const url = prov.url(z, job.tx, job.ty);
-      try{
-        const bmp = await fetchImageBitmap(url);
-        ctx.drawImage(bmp, (job.tx - minX) * 256, (job.ty - minY) * 256);
-      }catch{
-        // leave blank
-      }finally{
-        done++;
-        if ((done % 10) === 0) setStatus(`Texture: ${prov.name} z=${z} … ${done}/${total} tiles`);
-      }
-    }
+  renderer.domElement.addEventListener("click", () => {
+    if (navModeSel.value === "fps") fps.lock();
   });
-  await Promise.all(workers);
 
-  const out = document.createElement('canvas');
-  out.width = out.height = desiredSize;
-  out.getContext('2d').drawImage(canvasTex, 0, 0, out.width, out.height);
-
-  const tex = new THREE.CanvasTexture(out);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.needsUpdate = true;
-  return { texture: tex, zoom: z, tiles: total };
-}
-
-// -------------------- Interpolation (IDW on grid) --------------------
-function buildBuckets(points, minE, minN, maxE, maxN){
-  const w = maxE - minE;
-  const h = maxN - minN;
-  const bx = Math.max(16, Math.min(96, Math.floor(Math.sqrt(points.length))));
-  const by = bx;
-  const cellE = w / bx;
-  const cellN = h / by;
-  const buckets = Array.from({ length: bx * by }, () => []);
-  for (let i=0;i<points.length;i++){
-    const p = points[i];
-    const ix = Math.max(0, Math.min(bx-1, Math.floor((p.E - minE) / cellE)));
-    const iy = Math.max(0, Math.min(by-1, Math.floor((p.N - minN) / cellN)));
-    buckets[iy*bx + ix].push(i);
+  function resize() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
   }
-  return { buckets, bx, by, cellE, cellN };
-}
+  window.addEventListener("resize", resize);
+  resize();
 
-function knnFromBuckets(points, bucketInfo, minE, minN, e, n, K){
-  const { buckets, bx, by, cellE, cellN } = bucketInfo;
-  const cx = Math.max(0, Math.min(bx-1, Math.floor((e - minE) / cellE)));
-  const cy = Math.max(0, Math.min(by-1, Math.floor((n - minN) / cellN)));
+  // Scene objects
+  let surfaceMesh = null;
+  let imageryMesh = null;     // ✅ overlay mesh for tiles
+  let pointsMesh = null;
+  let boundsBox = null;
+  let contourMinor = null;
+  let contourMajor = null;
 
-  const best = []; // [{i, d2}] sorted asc
-  const pushBest = (i, d2) => {
-    let j = best.length;
-    while (j>0 && best[j-1].d2 > d2) j--;
-    best.splice(j, 0, { i, d2 });
-    if (best.length > K) best.pop();
+  // Needed for contour mapping in real units
+  let lastBounds = null;  // Box3 in centered coords
+  let lastOffZ = 0;       // real Z offset
+  let lastZEx = 1;        // exaggeration
+
+  // Needed for tile fetch bbox (lon/lat + merc)
+  let lastTileBbox = null; // {west,south,east,north, mercWidth, mercHeight}
+  let lastTileState = { provider:null, size:null, west:null, south:null, east:null, north:null };
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[m]));
+  }
+
+  function setStatus(ok, msg){
+    statusEl.innerHTML = `
+      <span class="badge">
+        <span class="dot ${ok ? "ok" : "bad"}"></span>
+        <span>${escapeHtml(msg)}</span>
+      </span>`;
+  }
+
+  function clearContours(){
+    if (contourMinor){ scene.remove(contourMinor); contourMinor.geometry.dispose(); contourMinor.material.dispose(); contourMinor = null; }
+    if (contourMajor){ scene.remove(contourMajor); contourMajor.geometry.dispose(); contourMajor.material.dispose(); contourMajor = null; }
+    kvSegs.textContent = "0";
+  }
+
+  function clearImagery(){
+    if (!imageryMesh) return;
+    scene.remove(imageryMesh);
+    // IMPORTANT: geometry is shared with surfaceMesh; do NOT dispose geometry here.
+    if (imageryMesh.material){
+      if (imageryMesh.material.map) imageryMesh.material.map.dispose();
+      imageryMesh.material.dispose();
+    }
+    imageryMesh = null;
+  }
+
+  function clearSceneData() {
+    clearContours();
+    clearImagery();
+
+    if (surfaceMesh) { scene.remove(surfaceMesh); surfaceMesh.geometry.dispose(); surfaceMesh.material.dispose(); surfaceMesh = null; }
+    if (pointsMesh) { scene.remove(pointsMesh); pointsMesh.geometry.dispose(); pointsMesh.material.dispose(); pointsMesh = null; }
+    if (boundsBox) { scene.remove(boundsBox); boundsBox.geometry.dispose(); boundsBox.material.dispose(); boundsBox = null; }
+
+    lastBounds = null;
+    lastOffZ = 0;
+    lastZEx = 1;
+    lastTileBbox = null;
+    lastTileState = { provider:null, size:null, west:null, south:null, east:null, north:null };
+
+    kvCount.textContent = "0";
+    kvExcluded.textContent = "0";
+    kvDeduped.textContent = "0";
+    kvTrisBase.textContent = "0";
+    kvTrisRef.textContent = "0";
+    kvOffset.textContent = "—";
+    setStatus(true, "Cleared.");
+  }
+
+  function buildBoundsBox(box3){
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box3.getSize(size);
+    box3.getCenter(center);
+
+    const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.10 });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(center);
+    return m;
+  }
+
+  function fitViewToBox(box3){
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box3.getSize(size);
+    box3.getCenter(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = maxDim * 1.55 + 80;
+
+    camera.position.set(center.x + dist, center.y + dist * 0.55, center.z + dist);
+    camera.lookAt(center);
+
+    orbit.target.copy(center);
+    orbit.update();
+  }
+
+  function degToRad(d){ return d * Math.PI / 180; }
+
+  function updateSunForBounds(box3){
+    if (!box3) return;
+
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    box3.getCenter(center);
+    box3.getSize(size);
+
+    const az = degToRad(Number(sunAz.value));
+    const elv = degToRad(Number(sunEl.value));
+    const cosEl = Math.cos(elv);
+
+    const sunVec = new THREE.Vector3(
+      cosEl * Math.cos(az),
+      Math.sin(elv),
+      cosEl * Math.sin(az)
+    ).normalize();
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = maxDim * 2.2 + 250;
+
+    sun.position.copy(center).addScaledVector(sunVec, dist);
+    sunTarget.position.copy(center);
+
+    const cam = sun.shadow.camera; // OrthographicCamera
+    const halfW = Math.max(size.x, size.z) * 0.72 + 60;
+    cam.left   = -halfW;
+    cam.right  =  halfW;
+    cam.top    =  halfW;
+    cam.bottom = -halfW;
+    cam.near = 0.1;
+    cam.far  = dist * 3.0;
+    cam.updateProjectionMatrix();
+
+    sun.intensity = 1.15 + (0.35 * (1 - (Number(sunEl.value) / 80)));
+  }
+
+  function applyShadowMode(){
+    const on = (shadowMode.value === "on");
+    renderer.shadowMap.enabled = on;
+    sun.castShadow = on;
+    if (surfaceMesh){ surfaceMesh.castShadow = on; surfaceMesh.receiveShadow = on; }
+    grid.receiveShadow = on;
+  }
+
+  // CSV parsing (P,N,E,Z,D)
+  function parseCsvText(text) {
+    const parsed = Papa.parse(text.trim(), { dynamicTyping: false, skipEmptyLines: true });
+    if (parsed.errors?.length) throw new Error(parsed.errors[0].message || "CSV parse error");
+
+    const rows = parsed.data;
+
+    // Optional header skip
+    let startIndex = 0;
+    if (rows.length && rows[0].length >= 4) {
+      const r0 = rows[0].map(v => String(v).trim().toLowerCase());
+      const looksLikeHeader =
+        r0.includes("p") || r0.includes("point") || r0.includes("point number") ||
+        r0.includes("n") || r0.includes("northing") ||
+        r0.includes("e") || r0.includes("easting") ||
+        r0.includes("z") || r0.includes("elev") || r0.includes("elevation") || r0.includes("alt") || r0.includes("altitude");
+      if (looksLikeHeader) startIndex = 1;
+    }
+
+    let excludedZeroZ = 0;
+
+    // Dedupe by (E,N), keep highest Z
+    const map = new Map();
+
+    function toNum(x){
+      const s = String(x ?? "").trim();
+      if (!s) return NaN;
+      const n = Number(s.replace(/,/g,""));
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    let rawUsed = 0;
+    for (let i = startIndex; i < rows.length; i++){
+      const row = rows[i];
+      if (!row || row.length < 4) continue;
+      rawUsed++;
+
+      const P = String(row[0] ?? "").trim();
+      const N = toNum(row[1]);
+      const E = toNum(row[2]);
+      const Z = toNum(row[3]);
+      const D = row.length >= 5 ? String(row.slice(4).join(",")).trim() : "";
+
+      if (!Number.isFinite(N) || !Number.isFinite(E) || !Number.isFinite(Z)) continue;
+      if (Z === 0) { excludedZeroZ++; continue; }
+
+      const key = `${E.toFixed(4)}|${N.toFixed(4)}`;
+      const prev = map.get(key);
+      if (!prev || Z > prev.Z) map.set(key, { P, N, E, Z, D });
+    }
+
+    const points = Array.from(map.values());
+    const deduped = Math.max(0, rawUsed - (points.length + excludedZeroZ));
+    return { points, excludedZeroZ, deduped };
+  }
+
+  // -------------------- Idaho West (NAD83 / Idaho West, US-ft) inverse TM --------------------
+  // This matches NAD83 Idaho West StatePlane Transverse Mercator parameters commonly used for IDW:
+  // lat0=41°40' (41.6666666667), lon0=-115.75, k0=0.999933333, FE=2624666.667 US-ft, FN=0
+  const USFT_TO_M = 1200 / 3937; // exact US survey ft -> m
+  const GRS80_A = 6378137.0;
+  const GRS80_F = 1 / 298.257222101;
+  const GRS80_E2 = 2 * GRS80_F - GRS80_F * GRS80_F;
+  const EP2 = GRS80_E2 / (1 - GRS80_E2);
+
+  const IDW_LAT0 = 41.6666666666667 * Math.PI / 180;
+  const IDW_LON0 = -115.75 * Math.PI / 180;
+  const IDW_K0 = 0.999933333;
+  const IDW_FE_FT = 2624666.667; // ftUS
+  const IDW_FN_FT = 0.0;
+
+  const e1 = (1 - Math.sqrt(1 - GRS80_E2)) / (1 + Math.sqrt(1 - GRS80_E2));
+
+  function meridionalArc(phi){
+    const e2 = GRS80_E2;
+    const e4 = e2*e2;
+    const e6 = e4*e2;
+    return GRS80_A * (
+      (1 - e2/4 - 3*e4/64 - 5*e6/256) * phi
+      - (3*e2/8 + 3*e4/32 + 45*e6/1024) * Math.sin(2*phi)
+      + (15*e4/256 + 45*e6/1024) * Math.sin(4*phi)
+      - (35*e6/3072) * Math.sin(6*phi)
+    );
+  }
+  const M0 = meridionalArc(IDW_LAT0);
+
+  function idahoWestToLonLat(E_ft, N_ft){
+    const x = (E_ft - IDW_FE_FT) * USFT_TO_M;
+    const y = (N_ft - IDW_FN_FT) * USFT_TO_M;
+
+    const M = M0 + y / IDW_K0;
+    const e2 = GRS80_E2;
+    const e4 = e2*e2;
+    const e6 = e4*e2;
+
+    const mu = M / (GRS80_A * (1 - e2/4 - 3*e4/64 - 5*e6/256));
+
+    const J1 = (3*e1/2 - 27*Math.pow(e1,3)/32);
+    const J2 = (21*Math.pow(e1,2)/16 - 55*Math.pow(e1,4)/32);
+    const J3 = (151*Math.pow(e1,3)/96);
+    const J4 = (1097*Math.pow(e1,4)/512);
+
+    const phi1 = mu + J1*Math.sin(2*mu) + J2*Math.sin(4*mu) + J3*Math.sin(6*mu) + J4*Math.sin(8*mu);
+
+    const sin1 = Math.sin(phi1), cos1 = Math.cos(phi1), tan1 = Math.tan(phi1);
+    const N1 = GRS80_A / Math.sqrt(1 - e2*sin1*sin1);
+    const R1 = (GRS80_A * (1 - e2)) / Math.pow(1 - e2*sin1*sin1, 1.5);
+    const T1 = tan1*tan1;
+    const C1 = EP2*cos1*cos1;
+    const D = x / (N1 * IDW_K0);
+
+    const D2 = D*D, D3=D2*D, D4=D2*D2, D5=D4*D, D6=D3*D3;
+
+    const lat = phi1 - (N1*tan1/R1) * (
+      D2/2
+      - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*EP2) * D4/24
+      + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*EP2 - 3*C1*C1) * D6/720
+    );
+
+    const lon = IDW_LON0 + (1/cos1) * (
+      D
+      - (1 + 2*T1 + C1) * D3/6
+      + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*EP2 + 24*T1*T1) * D5/120
+    );
+
+    return { lon: lon * 180/Math.PI, lat: lat * 180/Math.PI };
+  }
+
+  function lonLatToWebMerc(lon, lat){
+    const R = 6378137;
+    const x = R * (lon * Math.PI/180);
+    const clampedLat = Math.max(Math.min(lat, 85.05112878), -85.05112878);
+    const y = R * Math.log(Math.tan(Math.PI/4 + (clampedLat*Math.PI/180)/2));
+    return { x, y };
+  }
+
+  function lonLatToTileXY(lon, lat, z){
+    const n = 2 ** z;
+    const x = Math.floor((lon + 180) / 360 * n);
+    const latRad = lat * Math.PI/180;
+    const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2 * n);
+    return { x, y };
+  }
+
+  function chooseZoomForBbox(mercSpanM, desiredPx, maxZ){
+    const worldM = 2 * Math.PI * 6378137;
+    const z = Math.log2((desiredPx * worldM) / (256 * Math.max(1, mercSpanM)));
+    return Math.max(0, Math.min(maxZ, Math.round(z)));
+  }
+
+  const PROVIDERS = {
+    esri: {
+      name: "Esri World Imagery",
+      maxZ: 19,
+      url: (z,x,y) => `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`
+    },
+    usgs: {
+      name: "USGS ImageryOnly",
+      maxZ: 16,
+      url: (z,x,y) => `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/${z}/${y}/${x}`
+    }
   };
 
-  const maxR = Math.max(bx, by);
-  for (let r=0; r<maxR; r++){
-    let foundAny = false;
-    const y0 = Math.max(0, cy-r), y1 = Math.min(by-1, cy+r);
-    const x0 = Math.max(0, cx-r), x1 = Math.min(bx-1, cx+r);
+  async function fetchImageBitmap(url){
+    const res = await fetch(url, { mode:"cors", credentials:"omit" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    return await createImageBitmap(blob);
+  }
 
-    for (let y=y0; y<=y1; y++){
-      for (let x=x0; x<=x1; x++){
-        if (r>0 && x!==x0 && x!==x1 && y!==y0 && y!==y1) continue;
-        const b = buckets[y*bx + x];
-        if (!b.length) continue;
-        foundAny = true;
-        for (const idx of b){
-          const p = points[idx];
-          const de = p.E - e, dn = p.N - n;
-          const d2 = de*de + dn*dn;
-          if (d2 === 0) return [{ i: idx, d2: 0 }];
-          if (best.length < K || d2 < best[best.length-1].d2) pushBest(idx, d2);
-        }
+  async function buildTileTexture(bbox, providerKey, desiredSize){
+    const prov = PROVIDERS[providerKey];
+    const { west, south, east, north, mercWidth, mercHeight } = bbox;
+
+    const z = chooseZoomForBbox(Math.max(mercWidth, mercHeight), desiredSize, prov.maxZ);
+
+    const t0 = lonLatToTileXY(west, north, z);
+    const t1 = lonLatToTileXY(east, south, z);
+
+    const minX = Math.min(t0.x, t1.x), maxX = Math.max(t0.x, t1.x);
+    const minY = Math.min(t0.y, t1.y), maxY = Math.max(t0.y, t1.y);
+
+    const tilesW = (maxX - minX + 1);
+    const tilesH = (maxY - minY + 1);
+    const total = tilesW * tilesH;
+
+    // guardrail
+    if (total > 140){
+      throw new Error(`Too many tiles at z=${z} (${total}). Increase area padding less / reduce texture size / use USGS.`);
+    }
+
+    const canvasTex = document.createElement("canvas");
+    canvasTex.width = tilesW * 256;
+    canvasTex.height = tilesH * 256;
+    const ctx = canvasTex.getContext("2d", { alpha:false });
+
+    const jobs = [];
+    for (let ty=minY; ty<=maxY; ty++){
+      for (let tx=minX; tx<=maxX; tx++){
+        jobs.push({ tx, ty });
       }
     }
-    if (best.length >= K && foundAny) break;
-  }
-  return best;
-}
 
-function idwZ(points, bucketInfo, minE, minN, e, n, K, power){
-  const nn = knnFromBuckets(points, bucketInfo, minE, minN, e, n, K);
-  if (!nn.length) return 0;
-  if (nn.length === 1 && nn[0].d2 === 0) return points[nn[0].i].Z;
+    let done = 0;
+    const concurrency = 8;
 
-  let num = 0, den = 0;
-  for (const {i, d2} of nn){
-    const w = 1 / Math.pow(d2, power/2);
-    num += w * points[i].Z;
-    den += w;
-  }
-  return den > 0 ? (num/den) : 0;
-}
-
-// -------------------- Contours (marching squares) --------------------
-function buildContours(grid, Nx, Ny, minZ, maxZ, interval, dx, dy, minE, minN, centerE, centerN){
-  if (!interval || interval <= 0) return null;
-
-  const levels = [];
-  const start = Math.ceil(minZ / interval) * interval;
-  const end = Math.floor(maxZ / interval) * interval;
-  for (let z = start; z <= end; z += interval) levels.push(z);
-
-  if (levels.length > 220){
-    const newInt = (end - start) / 200;
-    interval = Math.max(interval, newInt);
-    return buildContours(grid, Nx, Ny, minZ, maxZ, interval, dx, dy, minE, minN, centerE, centerN);
-  }
-
-  const table = {
-    1:[[3,0]], 2:[[0,1]], 3:[[3,1]], 4:[[1,2]], 5:[[3,2],[0,1]],
-    6:[[0,2]], 7:[[3,2]], 8:[[2,3]], 9:[[0,2]], 10:[[0,1],[2,3]],
-    11:[[1,2]], 12:[[1,3]], 13:[[0,1]], 14:[[3,0]]
-  };
-
-  const edgePoint = (edge, t) => {
-    switch(edge){
-      case 0: return { x: t,   y: 0 };
-      case 1: return { x: 1,   y: t };
-      case 2: return { x: 1-t, y: 1 };
-      case 3: return { x: 0,   y: 1-t };
-    }
-  };
-
-  const pos = [];
-  const EPS = 0.03;
-  const at = (ix, iy) => grid[iy*Nx + ix];
-
-  for (const level of levels){
-    for (let iy=0; iy<Ny-1; iy++){
-      for (let ix=0; ix<Nx-1; ix++){
-        const a = at(ix, iy), b = at(ix+1, iy), c = at(ix+1, iy+1), d = at(ix, iy+1);
-
-        let idx = 0;
-        if (a > level) idx |= 1;
-        if (b > level) idx |= 2;
-        if (c > level) idx |= 4;
-        if (d > level) idx |= 8;
-        if (idx === 0 || idx === 15) continue;
-
-        const segs = table[idx];
-        if (!segs) continue;
-
-        const interpT = (z1, z2) => {
-          const denom = (z2 - z1);
-          if (Math.abs(denom) < 1e-12) return 0.5;
-          return (level - z1) / denom;
-        };
-
-        const edgeT = (edge) => {
-          switch(edge){
-            case 0: return interpT(a, b);
-            case 1: return interpT(b, c);
-            case 2: return interpT(c, d);
-            case 3: return interpT(d, a);
-          }
-        };
-
-        for (const [e0, e1] of segs){
-          const p0 = edgePoint(e0, edgeT(e0));
-          const p1 = edgePoint(e1, edgeT(e1));
-
-          const E0 = minE + (ix + p0.x) * dx;
-          const N0 = minN + (iy + p0.y) * dy;
-          const E1 = minE + (ix + p1.x) * dx;
-          const N1 = minN + (iy + p1.y) * dy;
-
-          const x0 = E0 - centerE, z0 = N0 - centerN;
-          const x1 = E1 - centerE, z1 = N1 - centerN;
-
-          const y = (level - minZ) + EPS;
-          pos.push(x0, y, z0, x1, y, z1);
+    const workers = Array.from({length: concurrency}, async () => {
+      while (jobs.length){
+        const job = jobs.pop();
+        const url = prov.url(z, job.tx, job.ty);
+        try{
+          const bmp = await fetchImageBitmap(url);
+          const dx = (job.tx - minX) * 256;
+          const dy = (job.ty - minY) * 256;
+          ctx.drawImage(bmp, dx, dy);
+        }catch(e){
+          // missing tile ok; leave blank
+        }finally{
+          done++;
+          if ((done % 10) === 0) setStatus(true, `Tiles: ${prov.name} z=${z} … ${done}/${total}`);
         }
       }
+    });
+
+    await Promise.all(workers);
+
+    const out = document.createElement("canvas");
+    out.width = out.height = desiredSize;
+    out.getContext("2d").drawImage(canvasTex, 0, 0, out.width, out.height);
+
+    const tex = new THREE.CanvasTexture(out);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+
+    return { texture: tex, zoom: z, tiles: total };
+  }
+
+  // ✅ Indexed triangle subdivision (adds vertices; now also subdivides UVs so tiles stay correct after refinement)
+  function subdivideIndexedGeometry(geom, levels){
+    levels = Math.max(0, Math.floor(levels));
+    if (levels === 0) return geom;
+
+    if (!geom.getIndex()) return geom;
+
+    for (let L = 0; L < levels; L++){
+      const posAttr = geom.getAttribute("position");
+      const uvAttr = geom.getAttribute("uv");
+      const oldPos = posAttr.array;
+      const oldCount = posAttr.count;
+      const oldIdx = geom.getIndex().array;
+
+      const positions = new Array(oldCount);
+      for (let i=0;i<oldCount;i++){
+        positions[i] = [ oldPos[i*3], oldPos[i*3+1], oldPos[i*3+2] ];
+      }
+
+      const hasUV = !!uvAttr;
+      const uvs = hasUV ? new Array(oldCount) : null;
+      if (hasUV){
+        const oldUv = uvAttr.array;
+        for (let i=0;i<oldCount;i++){
+          uvs[i] = [ oldUv[i*2], oldUv[i*2+1] ];
+        }
+      }
+
+      const midpointCache = new Map(); // "a|b" -> newIndex
+
+      const getMid = (a,b) => {
+        const i0 = a < b ? a : b;
+        const i1 = a < b ? b : a;
+        const key = i0 + "|" + i1;
+        const hit = midpointCache.get(key);
+        if (hit !== undefined) return hit;
+
+        const pa = positions[a];
+        const pb = positions[b];
+        const m = [
+          (pa[0] + pb[0]) * 0.5,
+          (pa[1] + pb[1]) * 0.5,
+          (pa[2] + pb[2]) * 0.5
+        ];
+        const idx = positions.length;
+        positions.push(m);
+
+        if (hasUV){
+          const ua = uvs[a], ub = uvs[b];
+          uvs.push([ (ua[0] + ub[0]) * 0.5, (ua[1] + ub[1]) * 0.5 ]);
+        }
+
+        midpointCache.set(key, idx);
+        return idx;
+      };
+
+      const newIdx = [];
+      newIdx.length = (oldIdx.length / 3) * 12;
+      let w = 0;
+
+      for (let i=0; i<oldIdx.length; i+=3){
+        const a = oldIdx[i], b = oldIdx[i+1], c = oldIdx[i+2];
+
+        const ab = getMid(a,b);
+        const bc = getMid(b,c);
+        const ca = getMid(c,a);
+
+        newIdx[w++] = a;  newIdx[w++] = ab; newIdx[w++] = ca;
+        newIdx[w++] = ab; newIdx[w++] = b;  newIdx[w++] = bc;
+        newIdx[w++] = ca; newIdx[w++] = bc; newIdx[w++] = c;
+        newIdx[w++] = ab; newIdx[w++] = bc; newIdx[w++] = ca;
+      }
+      newIdx.length = w;
+
+      const flat = new Float32Array(positions.length * 3);
+      for (let i=0;i<positions.length;i++){
+        const p = positions[i];
+        flat[i*3] = p[0];
+        flat[i*3+1] = p[1];
+        flat[i*3+2] = p[2];
+      }
+
+      const idxArr = (positions.length > 65535) ? new Uint32Array(newIdx) : new Uint16Array(newIdx);
+
+      const next = new THREE.BufferGeometry();
+      next.setAttribute("position", new THREE.BufferAttribute(flat, 3));
+      next.setIndex(new THREE.BufferAttribute(idxArr, 1));
+
+      if (hasUV){
+        const flatUv = new Float32Array(uvs.length * 2);
+        for (let i=0;i<uvs.length;i++){
+          flatUv[i*2] = uvs[i][0];
+          flatUv[i*2+1] = uvs[i][1];
+        }
+        next.setAttribute("uv", new THREE.BufferAttribute(flatUv, 2));
+      }
+
+      next.computeVertexNormals();
+
+      geom.dispose();
+      geom = next;
     }
+
+    return geom;
   }
 
-  if (!pos.length) return null;
+  // Surface build (Delaunay on E,N) + UVs for map tiles
+  function buildSurface(points, opts){
+    if (points.length < 3) throw new Error("Need at least 3 non-zero Z points to build a surface.");
 
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  const m = new THREE.LineBasicMaterial({ color: 0x0099ff, transparent:true, opacity:0.85 });
-  m.linewidth = 5;
-  const lines = new THREE.LineSegments(g, m);
-  lines.frustumCulled = false;
-  return lines;
-}
-
-// -------------------- Build terrain --------------------
-async function buildTerrain(points){
-  if (points.length < 3){
-    setStatus(`Need ≥3 points with nonzero Z. Got ${points.length}.`);
-    return;
-  }
-
-  clearTerrain();
-
-  let minE=Infinity, maxE=-Infinity, minN=Infinity, maxN=-Infinity, minZ=Infinity, maxZ=-Infinity;
-  for (const p of points){
-    if (p.E < minE) minE = p.E;
-    if (p.E > maxE) maxE = p.E;
-    if (p.N < minN) minN = p.N;
-    if (p.N > maxN) maxN = p.N;
-    if (p.Z < minZ) minZ = p.Z;
-    if (p.Z > maxZ) maxZ = p.Z;
-  }
-
-  const padE = (maxE-minE)*0.03, padN = (maxN-minN)*0.03;
-  minE -= padE; maxE += padE; minN -= padN; maxN += padN;
-
-  const centerE = (minE + maxE) / 2;
-  const centerN = (minN + maxN) / 2;
-
-  const res = Number($('gridRes').value);
-  const Nx = res, Ny = res;
-  const dx = (maxE - minE) / (Nx - 1);
-  const dy = (maxN - minN) / (Ny - 1);
-
-  const K = Number($('knn').value);
-  const power = Number($('idwPow').value);
-  const interval = Number($('contInt').value);
-
-  setStatus(`Interpolating grid ${Nx}×${Ny} (IDW p=${power}, K=${K}) …`);
-
-  const bucketInfo = buildBuckets(points, minE, minN, maxE, maxN);
-  const grid = new Float32Array(Nx * Ny);
-
-  for (let iy=0; iy<Ny; iy++){
-    for (let ix=0; ix<Nx; ix++){
-      const E = minE + ix * dx;
-      const N = minN + iy * dy;
-      grid[iy*Nx + ix] = idwZ(points, bucketInfo, minE, minN, E, N, K, power);
+    // Offsets to keep coordinates stable
+    let sumE=0, sumN=0, sumZ=0;
+    let minE=Infinity, maxE=-Infinity, minN=Infinity, maxN=-Infinity;
+    for (const p of points){
+      sumE += p.E; sumN += p.N; sumZ += p.Z;
+      if (p.E < minE) minE = p.E;
+      if (p.E > maxE) maxE = p.E;
+      if (p.N < minN) minN = p.N;
+      if (p.N > maxN) maxN = p.N;
     }
-    if ((iy % 16) === 0) setStatus(`Interpolating … ${(iy+1)}/${Ny} rows`);
-  }
+    const offE = sumE / points.length;
+    const offN = sumN / points.length;
+    const offZ = sumZ / points.length;
 
-  const positions = new Float32Array(Nx * Ny * 3);
-  const uvs = new Float32Array(Nx * Ny * 2);
-  const indices = [];
+    kvOffset.textContent = `${offE.toFixed(3)}, ${offN.toFixed(3)}, ${offZ.toFixed(3)}`;
 
-  setStatus(`Projecting Idaho West → lon/lat for UVs …`);
+    // Build lon/lat bbox corners (for tile request + merc bbox for UV normalization)
+    const ll00 = idahoWestToLonLat(minE, minN);
+    const ll10 = idahoWestToLonLat(maxE, minN);
+    const ll01 = idahoWestToLonLat(minE, maxN);
+    const ll11 = idahoWestToLonLat(maxE, maxN);
 
-  const ll00 = idahoWestToLonLat(minE, minN);
-  const ll10 = idahoWestToLonLat(maxE, minN);
-  const ll01 = idahoWestToLonLat(minE, maxN);
-  const ll11 = idahoWestToLonLat(maxE, maxN);
+    const west  = Math.min(ll00.lon, ll10.lon, ll01.lon, ll11.lon);
+    const east  = Math.max(ll00.lon, ll10.lon, ll01.lon, ll11.lon);
+    const south = Math.min(ll00.lat, ll10.lat, ll01.lat, ll11.lat);
+    const north = Math.max(ll00.lat, ll10.lat, ll01.lat, ll11.lat);
 
-  const west  = Math.min(ll00.lon, ll10.lon, ll01.lon, ll11.lon);
-  const east  = Math.max(ll00.lon, ll10.lon, ll01.lon, ll11.lon);
-  const south = Math.min(ll00.lat, ll10.lat, ll01.lat, ll11.lat);
-  const north = Math.max(ll00.lat, ll10.lat, ll01.lat, ll11.lat);
+    const wm = lonLatToWebMerc(west, (south+north)/2);
+    const em = lonLatToWebMerc(east, (south+north)/2);
+    const sm = lonLatToWebMerc((west+east)/2, south);
+    const nm = lonLatToWebMerc((west+east)/2, north);
 
-  const wm = lonLatToWebMerc(west, (south+north)/2);
-  const em = lonLatToWebMerc(east, (south+north)/2);
-  const sm = lonLatToWebMerc((west+east)/2, south);
-  const nm = lonLatToWebMerc((west+east)/2, north);
+    const bboxMerc = {
+      minX: Math.min(wm.x, em.x),
+      maxX: Math.max(wm.x, em.x),
+      minY: Math.min(sm.y, nm.y),
+      maxY: Math.max(sm.y, nm.y)
+    };
+    const mercWidth = bboxMerc.maxX - bboxMerc.minX;
+    const mercHeight = bboxMerc.maxY - bboxMerc.minY;
 
-  const bboxMerc = {
-    minX: Math.min(wm.x, em.x),
-    maxX: Math.max(wm.x, em.x),
-    minY: Math.min(sm.y, nm.y),
-    maxY: Math.max(sm.y, nm.y)
-  };
+    lastTileBbox = { west, south, east, north, mercWidth, mercHeight };
 
-  const mercWidth = bboxMerc.maxX - bboxMerc.minX;
-  const mercHeight = bboxMerc.maxY - bboxMerc.minY;
+    const zEx = opts.zExaggeration;
 
-  for (let iy=0; iy<Ny; iy++){
-    for (let ix=0; ix<Nx; ix++){
-      const E = minE + ix * dx;
-      const N = minN + iy * dy;
-      const z = grid[iy*Nx + ix];
+    const positions = new Float32Array(points.length * 3);
+    const uvs = new Float32Array(points.length * 2);
+    const pts2d = new Array(points.length);
 
-      const x = E - centerE;
-      const y = (z - minZ);
-      const zc = N - centerN;
+    for (let i=0; i<points.length; i++){
+      const p = points[i];
+      const x = (p.E - offE);
+      const y = (p.Z - offZ) * zEx;
+      const z = (p.N - offN);
 
-      const vi = (iy*Nx + ix) * 3;
-      positions[vi+0] = x;
-      positions[vi+1] = y;
-      positions[vi+2] = zc;
+      positions[i*3+0] = x;
+      positions[i*3+1] = y;
+      positions[i*3+2] = z;
 
-      const ll = idahoWestToLonLat(E, N);
+      pts2d[i] = [x, z];
+
+      // UV for tile drape (mercator-normalized)
+      const ll = idahoWestToLonLat(p.E, p.N);
       const m = lonLatToWebMerc(ll.lon, ll.lat);
       const u = (m.x - bboxMerc.minX) / (mercWidth || 1);
       const v = 1 - (m.y - bboxMerc.minY) / (mercHeight || 1);
-
-      const ui = (iy*Nx + ix) * 2;
-      uvs[ui+0] = u;
-      uvs[ui+1] = v;
+      uvs[i*2+0] = u;
+      uvs[i*2+1] = v;
     }
-    if ((iy % 24) === 0) setStatus(`Projecting … ${(iy+1)}/${Ny} rows`);
+
+    const delaunay = Delaunay.from(pts2d);
+    const tri = delaunay.triangles;
+    if (!tri || tri.length < 3) {
+      throw new Error("Triangulation produced 0 triangles. Points may be collinear or too few after filtering.");
+    }
+
+    // Base geom
+    let geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    geom.setIndex(new THREE.BufferAttribute(tri, 1));
+    geom.computeVertexNormals();
+
+    const baseTriCount = Math.floor(tri.length / 3);
+
+    // ✅ Refinement by subdivision (now keeps UVs correct)
+    const levels = Math.floor(Number(subdivLevels.value) || 0);
+    if (levels > 0){
+      geom = subdivideIndexedGeometry(geom, levels);
+    }
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xa8d7ff,
+      metalness: 0.05,
+      roughness: 0.92,
+      transparent: true,
+      opacity: opts.opacity,
+      side: THREE.DoubleSide,
+      wireframe: opts.wireframe,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+    });
+
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.frustumCulled = false;
+
+    const onShadow = (shadowMode.value === "on");
+    mesh.castShadow = onShadow;
+    mesh.receiveShadow = onShadow;
+
+    // Original points as dots (not refined)
+    const ptsGeom = new THREE.BufferGeometry();
+    ptsGeom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const ptsMat = new THREE.PointsMaterial({
+      color: 0xffd54a,
+      size: opts.pointSize,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.85
+    });
+    const pts = new THREE.Points(ptsGeom, ptsMat);
+
+    const box3 = new THREE.Box3().setFromBufferAttribute(mesh.geometry.getAttribute("position"));
+    const pad = 0.05;
+    const size = new THREE.Vector3(); box3.getSize(size);
+    box3.expandByVector(size.multiplyScalar(pad));
+
+    const refinedTriCount = mesh.geometry.getIndex()
+      ? Math.floor(mesh.geometry.getIndex().array.length / 3)
+      : Math.floor(mesh.geometry.getAttribute("position").count / 3);
+
+    return { mesh, pts, box3, offZ, zEx, baseTriCount, refinedTriCount };
   }
 
-  for (let iy=0; iy<Ny-1; iy++){
-    for (let ix=0; ix<Nx-1; ix++){
-      const a = iy*Nx + ix;
-      const b = iy*Nx + (ix+1);
-      const c = (iy+1)*Nx + (ix+1);
-      const d = (iy+1)*Nx + ix;
-      indices.push(a, d, b,  b, d, c);
+  // Contour extraction (triangle-plane intersections)
+  function buildContoursFromSurface(mesh, offZ, zEx, intervalReal, majorEvery){
+    clearContours();
+    if (!mesh || !intervalReal || intervalReal <= 0) return;
 
-//      indices.push(a,b,d, b,c,d);
+    const geom = mesh.geometry;
+    const pos = geom.getAttribute("position");
+    const arr = pos.array;
+    const indexAttr = geom.getIndex();
+    if (!indexAttr) return;
+    const idx = indexAttr.array;
+
+    // Real Z range from vertex Y
+    let zMin = Infinity, zMax = -Infinity;
+    for (let i=0; i<pos.count; i++){
+      const y = arr[i*3+1];
+      const zr = (y / zEx) + offZ;
+      if (zr < zMin) zMin = zr;
+      if (zr > zMax) zMax = zr;
+    }
+    if (!Number.isFinite(zMin) || !Number.isFinite(zMax) || zMax <= zMin) return;
+
+    const eps = 1e-9;
+    const start = Math.ceil((zMin - eps) / intervalReal) * intervalReal;
+    const end   = Math.floor((zMax + eps) / intervalReal) * intervalReal;
+
+    const minorVerts = [];
+    const majorVerts = [];
+
+    const pushSeg = (list, ax, ay, az, bx, by, bz) => {
+      list.push(ax, ay, az, bx, by, bz);
+    };
+
+    for (let t=0; t<idx.length; t+=3){
+      const ia = idx[t], ib = idx[t+1], ic = idx[t+2];
+
+      const ax = arr[ia*3], ay = arr[ia*3+1], az = arr[ia*3+2];
+      const bx = arr[ib*3], by = arr[ib*3+1], bz = arr[ib*3+2];
+      const cx = arr[ic*3], cy = arr[ic*3+1], cz = arr[ic*3+2];
+
+      const aZ = (ay / zEx) + offZ;
+      const bZ = (by / zEx) + offZ;
+      const cZ = (cy / zEx) + offZ;
+
+      const triMin = Math.min(aZ,bZ,cZ);
+      const triMax = Math.max(aZ,bZ,cZ);
+      if (triMax < start || triMin > end) continue;
+
+      const l0 = Math.ceil((triMin - eps) / intervalReal) * intervalReal;
+      const l1 = Math.floor((triMax + eps) / intervalReal) * intervalReal;
+
+      for (let L = l0; L <= l1 + eps; L += intervalReal){
+        const pts = [];
+        const levelY = (L - offZ) * zEx;
+        const lift = 0.03; // reduce z-fighting
+
+        const segPoint = (x0,y0,z0, Z0, x1,y1,z1, Z1) => {
+          if ((Z0 < L && Z1 < L) || (Z0 > L && Z1 > L)) return;
+          const d = (Z1 - Z0);
+          if (Math.abs(d) < 1e-12) return;
+          const tt = (L - Z0) / d;
+          if (tt < -1e-9 || tt > 1+1e-9) return;
+          const x = x0 + (x1 - x0) * tt;
+          const z = z0 + (z1 - z0) * tt;
+          pts.push([x, levelY + lift, z]);
+        };
+
+        segPoint(ax,ay,az, aZ, bx,by,bz, bZ);
+        segPoint(bx,by,bz, bZ, cx,cy,cz, cZ);
+        segPoint(cx,cy,cz, cZ, ax,ay,az, aZ);
+
+        if (pts.length >= 2){
+          const p0 = pts[0], p1 = pts[1];
+          const k = Math.round(L / intervalReal);
+          const isMajor = (majorEvery > 1) ? (k % majorEvery === 0) : true;
+          const list = isMajor ? majorVerts : minorVerts;
+          pushSeg(list, p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+        }
+      }
+    }
+
+    const segCount = Math.floor((minorVerts.length + majorVerts.length) / 6);
+    kvSegs.textContent = String(segCount);
+
+    if (minorVerts.length){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(minorVerts, 3));
+      const m = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, depthWrite: false });
+      contourMinor = new THREE.LineSegments(g, m);
+      contourMinor.renderOrder = 10;
+      scene.add(contourMinor);
+    }
+
+    if (majorVerts.length){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(majorVerts, 3));
+      const m = new THREE.LineBasicMaterial({ color: 0xffd54a, transparent: true, opacity: 0.70, depthWrite: false });
+      contourMajor = new THREE.LineSegments(g, m);
+      contourMajor.renderOrder = 11;
+      scene.add(contourMajor);
     }
   }
 
-  const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geom.setIndex(indices);
-  geom.computeVertexNormals();
-
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.5 });
-
-  terrainMesh = new THREE.Mesh(geom, mat);
-  terrainMesh.receiveShadow = true;
-  terrainGroup.add(terrainMesh);
-
-  const texMode = $('texSource').value;
-  if (texMode !== 'none'){
+  async function rebuildTilesIfNeeded(force=false){
     try{
-      const desiredSize = 1024;
-      setStatus(`Fetching imagery (${PROVIDERS[texMode].name}) …`);
-      const { texture, zoom, tiles } = await buildTileTexture(
-        { west, south, east, north, mercWidth, mercHeight },
-        texMode,
-        desiredSize
+      clearImagery();
+
+      if (!surfaceMesh) return;
+      if (!lastTileBbox) return;
+
+      const provider = tileProvider.value;
+      if (provider === "none") return;
+
+      const size = Number(tileTexSize.value) || 1024;
+
+      // If nothing changed and not forced, no-op
+      const b = lastTileBbox;
+      if (!force &&
+        lastTileState.provider === provider &&
+        lastTileState.size === size &&
+        lastTileState.west === b.west &&
+        lastTileState.south === b.south &&
+        lastTileState.east === b.east &&
+        lastTileState.north === b.north
+      ){
+        return;
+      }
+
+      setStatus(true, `Fetching ${PROVIDERS[provider].name} tiles…`);
+
+      const { texture, zoom, tiles } = await buildTileTexture(lastTileBbox, provider, size);
+
+      // Overlay mesh uses SAME geometry (with UVs). Separate material so opacity is independent.
+      const mat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: Number(tileOpacity.value),
+        depthWrite: false,
+        toneMapped: false,
+        side: THREE.DoubleSide
+      });
+
+      // Ensure it renders "on top" of the surface (prevents looking like it's under)
+      mat.polygonOffset = true;
+      mat.polygonOffsetFactor = -1;
+      mat.polygonOffsetUnits = -1;
+
+      imageryMesh = new THREE.Mesh(surfaceMesh.geometry, mat);
+      imageryMesh.frustumCulled = false;
+      imageryMesh.castShadow = false;
+      imageryMesh.receiveShadow = false;
+      imageryMesh.renderOrder = 5;
+
+      // Only add if surface is visible
+      if (showSurface.checked) scene.add(imageryMesh);
+
+      lastTileState = { provider, size, west:b.west, south:b.south, east:b.east, north:b.north };
+
+      setStatus(true, `Tiles ready: ${PROVIDERS[provider].name} z=${zoom} (${tiles} tiles).`);
+    }catch(err){
+      clearImagery();
+      setStatus(false, `Tiles failed: ${err?.message || err}`);
+      console.error(err);
+    }
+  }
+
+  function renderFromText(text){
+    clearSceneData();
+
+    const { points, excludedZeroZ, deduped } = parseCsvText(text);
+
+    kvCount.textContent = String(points.length);
+    kvExcluded.textContent = String(excludedZeroZ);
+    kvDeduped.textContent = String(deduped);
+
+    const opts = {
+      zExaggeration: Number(zScale.value),
+      pointSize: Number(ptSize.value),
+      opacity: Number(surfOpacity.value),
+      wireframe: !!wireframe.checked
+    };
+
+    const { mesh, pts, box3, offZ, zEx, baseTriCount, refinedTriCount } = buildSurface(points, opts);
+
+    surfaceMesh = mesh;
+    pointsMesh = pts;
+    lastBounds = box3;
+    lastOffZ = offZ;
+    lastZEx = zEx;
+
+    kvTrisBase.textContent = String(baseTriCount);
+    kvTrisRef.textContent = String(refinedTriCount);
+
+    if (showSurface.checked) scene.add(surfaceMesh);
+    if (showPoints.checked) scene.add(pointsMesh);
+
+    boundsBox = buildBoundsBox(box3);
+    scene.add(boundsBox);
+
+    applyShadowQuality();
+    applyShadowMode();
+    updateSunForBounds(box3);
+
+    if (contoursOn.checked){
+      buildContoursFromSurface(
+        surfaceMesh,
+        lastOffZ,
+        lastZEx,
+        Number(contourInterval.value),
+        Math.max(1, Math.floor(Number(contourMajorEvery.value) || 1))
       );
-      mat.map = texture;
-      mat.side=THREE.DoubleSide;
-      mat.needsUpdate = true;
-      setStatus(`Imagery: ${PROVIDERS[texMode].name} z=${zoom} (${tiles} tiles). Building contours…`);
-    }catch(e){
-      setStatus(`Imagery failed: ${e?.message || e}. Rendering without texture.`);
     }
-  }else{
-    setStatus(`No texture. Building contours…`);
+
+    setStatus(true, `Rendered. Refinement level: ${Math.floor(Number(subdivLevels.value)||0)}. Contours: ${contoursOn.checked ? "on" : "off"}.`);
+    fitViewToBox(box3);
+
+    // ✅ Build tiles after surface exists
+    rebuildTilesIfNeeded(true);
   }
 
-  if ($('showContours').checked){
-    contourLines = buildContours(grid, Nx, Ny, minZ, maxZ, interval, dx, dy, minE, minN, centerE, centerN);
-    if (contourLines) terrainGroup.add(contourLines);
+  function refreshLabels(){
+    const zs = Number(zScale.value);
+    zScaleLabel.textContent = `${zs.toFixed(1)}×`;
+    ptSizeLabel.textContent = `${Number(ptSize.value).toFixed(1)}`;
+    surfOpacityLabel.textContent = `${Number(surfOpacity.value).toFixed(2)}`;
+    sunAzLabel.textContent = `${Number(sunAz.value)}°`;
+    sunElLabel.textContent = `${Number(sunEl.value)}°`;
+    subdivLabel.textContent = `${Math.floor(Number(subdivLevels.value)||0)}`;
+    tileOpacityLabel.textContent = `${Number(tileOpacity.value).toFixed(2)}`;
   }
+  refreshLabels();
 
-  const ex = Number($('zExag').value);
-  terrainGroup.scale.set(1, ex, 1);
-
-  const sh = $('shadows').checked;
-  renderer.shadowMap.enabled = sh;
-  sun.castShadow = sh;
-
-  const span = Math.max((maxE - minE), (maxN - minN));
-  orbit.target.set(0, (maxZ - minZ) * 0.15, 0);
-  camera.position.set(span*0.35, span*0.55, span*0.45);
-  camera.near = 0.1;
-  camera.far = Math.max(20000, span * 8);
-  camera.updateProjectionMatrix();
-  orbit.update();
-
-  const s = Math.max(1200, span*0.8);
-  sun.shadow.camera.left = -s;
-  sun.shadow.camera.right = s;
-  sun.shadow.camera.top = s;
-  sun.shadow.camera.bottom = -s;
-  sun.shadow.camera.far = Math.max(10000, span*4);
-  sun.shadow.camera.updateProjectionMatrix();
-
-  setStatus(
-`Done.
-
-Points: ${points.length}
-Easting:  ${minE.toFixed(3)} .. ${maxE.toFixed(3)} (ft)
-Northing: ${minN.toFixed(3)} .. ${maxN.toFixed(3)} (ft)
-Z:        ${minZ.toFixed(3)} .. ${maxZ.toFixed(3)} (ft)
-
-Lon/Lat bbox (approx):
-W ${west.toFixed(6)}  E ${east.toFixed(6)}
-S ${south.toFixed(6)} N ${north.toFixed(6)}
-`
-  );
-}
-
-// -------------------- Navigation modes --------------------
-const keys = new Set();
-window.addEventListener('keydown', (e)=> keys.add(e.code));
-window.addEventListener('keyup', (e)=> keys.delete(e.code));
-
-function setNavMode(mode){
-  navMode = mode;
-  if (navMode === 'fp'){
-    fpOverlay.style.display = 'flex';
-    orbit.enabled = false;
-    scene.add(fp.getObject());
-  }else{
-    fpOverlay.style.display = 'none';
-    orbit.enabled = true;
-    try{ document.exitPointerLock?.(); }catch{}
+  // Exaggeration slider + input sync
+  function setZScale(v){
+    const x = Math.min(200, Math.max(0.1, Number(v) || 1));
+    zScale.value = String(x);
+    zScaleNum.value = String(x);
+    refreshLabels();
   }
-}
-$('navMode').addEventListener('change', (e)=> setNavMode(e.target.value));
-renderer.domElement.addEventListener('click', ()=>{
-  if (navMode === 'fp') fp.lock();
-});
+  zScale.addEventListener("input", () => { setZScale(zScale.value); if (surfaceMesh) btnRender.click(); });
+  zScaleNum.addEventListener("change", () => { setZScale(zScaleNum.value); if (surfaceMesh) btnRender.click(); });
 
-let lastT = performance.now();
-function tick(t){
-  const dt = Math.min(0.05, (t - lastT) / 1000);
-  lastT = t;
+  ptSize.addEventListener("input", () => { refreshLabels(); if (pointsMesh) pointsMesh.material.size = Number(ptSize.value); });
+  surfOpacity.addEventListener("input", () => { refreshLabels(); if (surfaceMesh) surfaceMesh.material.opacity = Number(surfOpacity.value); });
+  wireframe.addEventListener("change", () => { if (surfaceMesh) surfaceMesh.material.wireframe = !!wireframe.checked; });
 
-  if (navMode === 'orbit'){
-    orbit.update();
-  }else if (fp.isLocked){
-    const speedBase = 260; // ft/s
-    const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight')) ? speedBase * 2.5 : speedBase;
-
-    const dir = new THREE.Vector3();
-    const fwd = new THREE.Vector3();
-    camera.getWorldDirection(fwd);
-    fwd.y = 0; fwd.normalize();
-    const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
-
-    if (keys.has('KeyW')) dir.add(fwd);
-    if (keys.has('KeyS')) dir.sub(fwd);
-    if (keys.has('KeyA')) dir.sub(right);
-    if (keys.has('KeyD')) dir.add(right);
-
-    if (dir.lengthSq() > 0){
-      dir.normalize().multiplyScalar(speed * dt);
-      fp.getObject().position.add(dir);
+  showSurface.addEventListener("change", () => {
+    if (!surfaceMesh) return;
+    if (showSurface.checked){
+      scene.add(surfaceMesh);
+      if (imageryMesh) scene.add(imageryMesh);
+    }else{
+      scene.remove(surfaceMesh);
+      if (imageryMesh) scene.remove(imageryMesh);
     }
-  }
-
-  renderer.render(scene, camera);
-  requestAnimationFrame(tick);
-}
-requestAnimationFrame(tick);
-
-// -------------------- UI wiring --------------------
-$('file').addEventListener('change', async (e)=>{
-  const f = e.target.files?.[0];
-  if (!f) return;
-  const txt = await f.text();
-  $('csv').value = txt;
-  setStatus(`Loaded ${f.name} (${txt.length.toLocaleString()} chars). Click Render.`);
-});
-
-$('btnRender').addEventListener('click', async ()=>{
-  const txt = $('csv').value || '';
-  const pts = parseCSV(txt);
-  await buildTerrain(pts);
-});
-
-$('btnDemo').addEventListener('click', ()=>{
-  $('csv').value =
-`1, 666102.348, 2406162.791, 2597.647, DEMO
-2, 666102.399, 2406136.995, 2597.169, DEMO
-3, 666085.547, 2406098.992, 2596.664, DEMO
-4, 666059.268, 2406098.879, 2596.532, DEMO
-5, 666048.323, 2406131.632, 2596.739, DEMO
-6, 666058.793, 2406175.813, 2597.597, DEMO
-7, 666085.389, 2406175.801, 2597.810, DEMO
-8, 666090.000, 2406140.000, 2597.200, DEMO
-`;
-  setStatus('Demo loaded. Click Render.');
-});
-
-$('btnClear').addEventListener('click', ()=>{
-  $('csv').value = '';
-  clearTerrain();
-  setStatus('Cleared.');
-});
-
-['gridRes','idwPow','knn','contInt','showContours','texSource','shadows' ].forEach(id=>{
-  $(id).addEventListener('change', ()=>{
-    if (($('csv').value||'').trim().length) $('btnRender').click();
   });
-});
-$('zExag').addEventListener('input', ()=>{
-  terrainGroup.scale.y = Number($('zExag').value);
-});
+  showPoints.addEventListener("change", () => { if (!pointsMesh) return; showPoints.checked ? scene.add(pointsMesh) : scene.remove(pointsMesh); });
+  showGrid.addEventListener("change", () => { grid.visible = !!showGrid.checked; });
 
-setNavMode('orbit');
-setStatus(`Ready.`);
+  sunAz.addEventListener("input", () => { refreshLabels(); updateSunForBounds(lastBounds); });
+  sunEl.addEventListener("input", () => { refreshLabels(); updateSunForBounds(lastBounds); });
+  shadowQuality.addEventListener("change", () => { applyShadowQuality(); updateSunForBounds(lastBounds); });
+  shadowMode.addEventListener("change", () => { applyShadowMode(); updateSunForBounds(lastBounds); });
+
+  // Tiles controls
+  tileOpacity.addEventListener("input", () => {
+    refreshLabels();
+    if (imageryMesh) imageryMesh.material.opacity = Number(tileOpacity.value);
+  });
+  tileProvider.addEventListener("change", () => {
+    refreshLabels();
+    if (!surfaceMesh) return;
+    rebuildTilesIfNeeded(true);
+  });
+  tileTexSize.addEventListener("change", () => {
+    if (!surfaceMesh) return;
+    rebuildTilesIfNeeded(true);
+  });
+  btnRebuildTiles.addEventListener("click", () => {
+    if (!surfaceMesh) { setStatus(false, "No surface yet."); return; }
+    rebuildTilesIfNeeded(true);
+  });
+
+  // Refinement (requires re-render because geometry changes)
+  subdivLevels.addEventListener("input", () => { refreshLabels(); });
+  subdivLevels.addEventListener("change", () => { refreshLabels(); if (surfaceMesh) btnRender.click(); });
+
+  // Contours
+  btnRebuildContours.addEventListener("click", () => {
+    try{
+      if (!surfaceMesh) throw new Error("No surface yet.");
+      if (!contoursOn.checked) { clearContours(); setStatus(true, "Contours are off."); return; }
+      buildContoursFromSurface(
+        surfaceMesh,
+        lastOffZ,
+        lastZEx,
+        Number(contourInterval.value),
+        Math.max(1, Math.floor(Number(contourMajorEvery.value) || 1))
+      );
+      setStatus(true, "Contours rebuilt.");
+    }catch(err){
+      setStatus(false, err?.message || String(err));
+    }
+  });
+
+  contoursOn.addEventListener("change", () => {
+    if (!surfaceMesh) return;
+    if (!contoursOn.checked) { clearContours(); return; }
+    btnRebuildContours.click();
+  });
+
+  contourInterval.addEventListener("change", () => { if (surfaceMesh && contoursOn.checked) btnRebuildContours.click(); });
+  contourMajorEvery.addEventListener("change", () => { if (surfaceMesh && contoursOn.checked) btnRebuildContours.click(); });
+
+  navModeSel.addEventListener("change", () => {
+    const mode = navModeSel.value;
+    if (mode === "orbit") {
+      fpsEnabled = false;
+      orbit.enabled = true;
+      fps.unlock();
+      setStatus(true, "Orbit mode enabled.");
+    } else {
+      fpsEnabled = true;
+      orbit.enabled = false;
+      setStatus(true, "First-person mode enabled. Click the canvas to lock pointer.");
+    }
+  });
+
+  btnRender.addEventListener("click", () => {
+    try {
+      const text = csvTA.value.trim();
+      if (!text) throw new Error("Paste CSV text or load a CSV file first.");
+      renderFromText(text);
+    } catch (err) {
+      setStatus(false, err?.message || String(err));
+      console.error(err);
+    }
+  });
+
+  btnFit.addEventListener("click", () => {
+    try {
+      if (!surfaceMesh) throw new Error("Nothing to fit yet.");
+      const posAttr = surfaceMesh.geometry.getAttribute("position");
+      const box3 = new THREE.Box3().setFromBufferAttribute(posAttr);
+      fitViewToBox(box3);
+      updateSunForBounds(box3);
+      setStatus(true, "Fit view.");
+    } catch (err) {
+      setStatus(false, err?.message || String(err));
+    }
+  });
+
+  btnSample.addEventListener("click", () => {
+    // Sample with subtle relief + gentle slope; good for contours + refinement
+    const baseE = 2406000;
+    const baseN = 666000;
+    const rows = [];
+    let p = 1;
+
+    for (let j=0; j<45; j++){
+      for (let i=0; i<45; i++){
+        const E = baseE + i*40;
+        const N = baseN + j*40;
+        const dx = (i-22)/22;
+        const dy = (j-22)/22;
+
+        let Z = 2500
+          + 0.6*(i/44)
+          + 3.2*Math.exp(-(dx*dx + dy*dy)*1.8)
+          + 0.9*Math.sin(i*0.22)*Math.cos(j*0.18);
+
+        if ((i===0 && j===0) || (i===44 && j===44)) Z = 0;
+        rows.push(`${p++},${N.toFixed(3)},${E.toFixed(3)},${Z.toFixed(3)},SAMPLE`);
+      }
+    }
+
+    csvTA.value = rows.join("\n");
+    setZScale(60);
+    contourInterval.value = "0.5";
+    contourMajorEvery.value = "5";
+    sunEl.value = "14";
+    sunAz.value = "315";
+    subdivLevels.value = "2";
+    tileProvider.value = "none";
+    tileTexSize.value = "1024";
+    tileOpacity.value = "0.30";
+    refreshLabels();
+    setStatus(true, "Sample loaded. Click Render Surface.");
+  });
+
+  btnClear.addEventListener("click", () => {
+    csvTA.value = "";
+    clearSceneData();
+  });
+
+  fileIn.addEventListener("change", async () => {
+    const f = fileIn.files?.[0];
+    if (!f) return;
+    try{
+      const text = await f.text();
+      csvTA.value = text;
+      setStatus(true, `Loaded: ${f.name}`);
+    } catch (err){
+      setStatus(false, `Failed to read file: ${err?.message || err}`);
+    }
+  });
+
+  // Animation loop
+  let lastT = performance.now();
+
+  function fpsUpdate(dt){
+    if (!fpsEnabled || !fps.isLocked) return;
+
+    const speed = (keys.has("ShiftLeft") || keys.has("ShiftRight")) ? 220 : 110;
+
+    vel.set(0,0,0);
+    if (keys.has("KeyW")) vel.z -= 1;
+    if (keys.has("KeyS")) vel.z += 1;
+    if (keys.has("KeyA")) vel.x -= 1;
+    if (keys.has("KeyD")) vel.x += 1;
+    if (keys.has("Space")) vel.y += 1;
+    if (keys.has("ControlLeft") || keys.has("ControlRight")) vel.y -= 1;
+
+    if (vel.lengthSq() > 0) vel.normalize().multiplyScalar(speed * dt);
+
+    fps.moveRight(vel.x);
+    fps.moveForward(vel.z);
+    camera.position.addScaledVector(up, vel.y);
+  }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+
+    resize();
+    if (orbit.enabled) orbit.update();
+    fpsUpdate(dt);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  setStatus(true, "Render a surface. Map tiles: pick a provider (Esri/USGS) and they’ll drape at 30% opacity.");
 </script>
 </body>
 </html>
