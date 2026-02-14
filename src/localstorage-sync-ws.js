@@ -149,5 +149,5 @@ export function createLocalStorageSyncWsService({ store }) {
     return true;
   }
 
-  return { handleUpgrade, _clients: clients };
+  return { handleUpgrade, broadcast, _clients: clients };
 }

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { access, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +19,9 @@ import {
   findCrewMemberById,
   findEquipmentById,
   findEquipmentLogById,
+  saveCrewMember,
+  saveEquipmentItem,
+  saveEquipmentLog,
 } from './crew-equipment-api.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -308,8 +312,39 @@ export function createSurveyServer({
       }
 
       if (urlObj.pathname === '/api/crew' || urlObj.pathname === '/api/crew/') {
+        if (req.method === 'POST') {
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object' || (!body.firstName && !body.lastName)) {
+            sendJson(res, 400, { error: 'firstName or lastName is required.' });
+            return;
+          }
+          const member = {
+            id: body.id || randomUUID(),
+            firstName: body.firstName || '',
+            lastName: body.lastName || '',
+            jobTitle: body.jobTitle || '',
+            phone: body.phone || '',
+            email: body.email || '',
+            certifications: body.certifications || '',
+            notes: body.notes || '',
+            roles: Array.isArray(body.roles) ? body.roles : [],
+            photo: body.photo || null,
+            createdAt: body.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          const result = saveCrewMember(localStorageSyncStore, member);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 201, { member });
+          return;
+        }
         if (req.method !== 'GET') {
-          sendJson(res, 405, { error: 'Only GET is supported.' });
+          sendJson(res, 405, { error: 'Only GET and POST are supported.' });
           return;
         }
         const state = await resolveStoreState();
@@ -325,8 +360,34 @@ export function createSurveyServer({
       }
 
       if (urlObj.pathname === '/api/equipment' || urlObj.pathname === '/api/equipment/') {
+        if (req.method === 'POST') {
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object' || (!body.make && !body.model)) {
+            sendJson(res, 400, { error: 'make or model is required.' });
+            return;
+          }
+          const item = {
+            id: body.id || randomUUID(),
+            make: body.make || '',
+            model: body.model || '',
+            equipmentType: body.equipmentType || '',
+            serialNumber: body.serialNumber || '',
+            createdAt: body.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          const result = saveEquipmentItem(localStorageSyncStore, item);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 201, { equipment: item });
+          return;
+        }
         if (req.method !== 'GET') {
-          sendJson(res, 405, { error: 'Only GET is supported.' });
+          sendJson(res, 405, { error: 'Only GET and POST are supported.' });
           return;
         }
         const state = await resolveStoreState();
@@ -342,8 +403,38 @@ export function createSurveyServer({
       }
 
       if (urlObj.pathname === '/api/equipment-logs' || urlObj.pathname === '/api/equipment-logs/') {
+        if (req.method === 'POST') {
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object' || (!body.rodman && !body.jobFileName)) {
+            sendJson(res, 400, { error: 'rodman or jobFileName is required.' });
+            return;
+          }
+          const log = {
+            id: body.id || randomUUID(),
+            rodman: body.rodman || '',
+            equipmentHeight: body.equipmentHeight || '',
+            referencePoint: body.referencePoint || '',
+            setupTime: body.setupTime || '',
+            teardownTime: body.teardownTime || '',
+            jobFileName: body.jobFileName || '',
+            equipmentType: body.equipmentType || '',
+            notes: body.notes || '',
+            createdAt: body.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          const result = saveEquipmentLog(localStorageSyncStore, log);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 201, { log });
+          return;
+        }
         if (req.method !== 'GET') {
-          sendJson(res, 405, { error: 'Only GET is supported.' });
+          sendJson(res, 405, { error: 'Only GET and POST are supported.' });
           return;
         }
         const state = await resolveStoreState();
