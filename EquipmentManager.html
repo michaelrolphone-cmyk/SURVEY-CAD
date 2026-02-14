@@ -60,6 +60,7 @@
       .equip-card { flex-direction: column; }
     }
   </style>
+  <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -379,9 +380,25 @@
       render();
     });
 
+    async function fetchLatestFromApi() {
+      try {
+        const res = await fetch('/api/equipment');
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverItems = Array.isArray(data?.equipment) ? data.equipment : [];
+        if (serverItems.length === 0) return;
+        items = serverItems;
+        saveItems();
+        render();
+      } catch {
+        // API unavailable, continue with localStorage data.
+      }
+    }
+
     /* ── init ── */
     loadItems();
     render();
+    fetchLatestFromApi();
   </script>
 </body>
 </html>

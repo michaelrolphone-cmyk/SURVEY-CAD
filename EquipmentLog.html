@@ -57,6 +57,7 @@
       main { padding: 14px; }
     }
   </style>
+  <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -389,9 +390,41 @@
       renderLogs();
     });
 
+    async function fetchLatestFromApi() {
+      try {
+        const [crewRes, logsRes] = await Promise.all([
+          fetch('/api/crew'),
+          fetch('/api/equipment-logs'),
+        ]);
+        let updated = false;
+        if (crewRes.ok) {
+          const crewData = await crewRes.json();
+          const serverCrew = Array.isArray(crewData?.crew) ? crewData.crew : [];
+          if (serverCrew.length > 0) {
+            crew = serverCrew;
+            localStorage.setItem(CREW_PROFILES_STORAGE_KEY, JSON.stringify(crew));
+            updated = true;
+          }
+        }
+        if (logsRes.ok) {
+          const logsData = await logsRes.json();
+          const serverLogs = Array.isArray(logsData?.logs) ? logsData.logs : [];
+          if (serverLogs.length > 0) {
+            logs = serverLogs;
+            saveLogs();
+            updated = true;
+          }
+        }
+        if (updated) renderLogs();
+      } catch {
+        // API unavailable, continue with localStorage data.
+      }
+    }
+
     loadCrew();
     loadLogs();
     renderLogs();
+    fetchLatestFromApi();
   </script>
 </body>
 </html>

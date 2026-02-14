@@ -76,6 +76,7 @@
       .crew-avatar { align-self: center; }
     }
   </style>
+  <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -494,8 +495,24 @@
       renderProfiles();
     });
 
+    async function fetchLatestFromApi() {
+      try {
+        const res = await fetch('/api/crew');
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverProfiles = Array.isArray(data?.crew) ? data.crew : [];
+        if (serverProfiles.length === 0) return;
+        profiles = serverProfiles;
+        saveProfiles();
+        renderProfiles();
+      } catch {
+        // API unavailable, continue with localStorage data.
+      }
+    }
+
     loadProfiles();
     renderProfiles();
+    fetchLatestFromApi();
   </script>
 </body>
 </html>
