@@ -165,7 +165,7 @@
 
     function renderCrewList() {
         let crewItems = crew.map((member)=> `<option value="${member.id}">${member.firstName} ${member.lastName}</option>`);
-        return `<select>${crewItems.join('\n')}</select>`
+        rodman.innerHTML = crewItems.join("\n");
     }
     function loadLogs() {
       try {
