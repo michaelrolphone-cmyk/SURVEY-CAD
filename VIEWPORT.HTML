@@ -6612,10 +6612,14 @@ function paintBackground(ctx, w, h){
       ctx.fillRect(0,0,W,H);
     }
     
-    paintBackground(ctx, W,H);
     drawGrid(W,H);
-    if (mapLayerState.enabled) syncMapToView();
 
+    if (mapLayerState.enabled) {
+      syncMapToView();
+    }
+    else {
+        paintBackground(ctx, W,H);
+    }
     const blockedTextRects = [];
 
     // layer fills
