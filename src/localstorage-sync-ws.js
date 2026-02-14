@@ -76,7 +76,8 @@ export function createLocalStorageSyncWsService({ store }) {
       let message;
       try {
         message = JSON.parse(frame.payload.toString('utf8'));
-      } catch {
+      } catch (e) {
+        console.error(e);
         return;
       }
 
