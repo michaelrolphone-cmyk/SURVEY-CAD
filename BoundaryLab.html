@@ -38,7 +38,10 @@
   <div class="layout">
     <aside class="panel">
       <h1>BoundaryLab</h1>
-      <p>Enter bearings and distances in order. The boundary preview and closure error update as you edit.</p>
+      <p>
+        Enter bearings and distances in order. Bearings accept DMS (e.g. <code>N 45°01'07" E</code> or <code>N 45-01-07 E</code>).
+        The boundary preview and closure error update as you edit.
+      </p>
       <div class="toolbar">
         <button id="addCall" class="primary" type="button">Add Call</button>
         <button id="clearCalls" type="button">Clear</button>
@@ -72,8 +75,8 @@
 
     const state = {
       calls: [
-        { id: crypto.randomUUID(), bearing: 'N 45 E', distance: '100' },
-        { id: crypto.randomUUID(), bearing: 'S 45 E', distance: '100' },
+        { id: crypto.randomUUID(), bearing: 'N 45°00\'00" E', distance: '100' },
+        { id: crypto.randomUUID(), bearing: 'S 45-00-00 E', distance: '100' },
       ],
     };
 
@@ -91,6 +94,80 @@
     function esc(v = '') {
       return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
+
+    // --- DMS / bearing normalization -------------------------------------------------
+    // Accepts:
+    //   N 45°01'07" E
+    //   N45°01'07"E
+    //   N 45-01-07 E
+    //   N 45 01 07 E
+    //   N 45.0186 E  (decimal degrees still works)
+    // Converts to:
+    //   N <decimalDegrees> E
+    // If it can't parse cleanly, returns the original string (so upstream can handle/flag).
+    function parseDmsAngleToDecimal(angleText) {
+      const s = String(angleText ?? '').trim();
+      if (!s) return NaN;
+
+      // Grab 1-3 numeric components (deg, min, sec), seconds may be decimal.
+      const nums = s.match(/\d+(?:\.\d+)?/g);
+      if (!nums || nums.length === 0) return NaN;
+
+      const deg = Number(nums[0]);
+      const min = nums.length >= 2 ? Number(nums[1]) : 0;
+      const sec = nums.length >= 3 ? Number(nums[2]) : 0;
+
+      if (!Number.isFinite(deg) || !Number.isFinite(min) || !Number.isFinite(sec)) return NaN;
+      if (min < 0 || sec < 0) return NaN;
+      // (Keep this permissive; you may have 60+ in dirty input. We won't hard-fail.)
+
+      return deg + (min / 60) + (sec / 3600);
+    }
+
+    function formatDecimalDegrees(deg) {
+      // Keep stable + readable; trim trailing zeros.
+      const rounded = Math.round(deg * 1e8) / 1e8;
+      let out = String(rounded);
+      if (out.includes('.')) out = out.replace(/\.?0+$/g, '');
+      return out;
+    }
+
+    function normalizeBearingToDecimalQuadrant(rawBearing) {
+      const raw = String(rawBearing ?? '').trim();
+      if (!raw) return raw;
+
+      // Normalize some unicode variants (degree/prime/double-prime) to keep matching simple.
+      const cleaned = raw
+        .replace(/[º]/g, '°')
+        .replace(/[′’]/g, "'")
+        .replace(/[″“”]/g, '"')
+        .trim();
+
+      // Quadrant bearing: leading N/S, trailing E/W, angle in the middle.
+      // Allow no spaces: N45-01-07E
+      const m = cleaned.match(/^\s*([NS])\s*(.*?)\s*([EW])\s*$/i);
+      if (!m) return raw; // not quadrant bearing (or malformed)
+
+      const ns = m[1].toUpperCase();
+      const ew = m[3].toUpperCase();
+      const mid = (m[2] ?? '').trim();
+      if (!mid) return raw;
+
+      // The middle can be DMS with symbols or hyphens or spaces.
+      const dec = parseDmsAngleToDecimal(mid);
+      if (!Number.isFinite(dec)) return raw;
+
+      return `${ns} ${formatDecimalDegrees(dec)} ${ew}`;
+    }
+
+    function normalizedCallsForCompute(calls) {
+      // Preserve the user's visible text; only normalize for computation.
+      return calls.map((c) => ({
+        ...c,
+        bearing: normalizeBearingToDecimalQuadrant(c.bearing),
+      }));
+    }
+    // --------------------------------------------------------------------------------
 
     function captureActiveInputState() {
       const active = document.activeElement;
@@ -123,7 +200,15 @@
       body.innerHTML = state.calls.map((call, index) => `
         <tr>
           <td>${index + 1}</td>
-          <td><input data-id="${call.id}" data-key="bearing" value="${esc(call.bearing)}" placeholder="N 45 E" /></td>
+          <td>
+            <input
+              data-id="${call.id}"
+              data-key="bearing"
+              value="${esc(call.bearing)}"
+              placeholder="N 45°01'07&quot; E  (or N 45-01-07 E)"
+              title="Accepted: N 45°01'07&quot; E | N 45-01-07 E | N 45 01 07 E | N 45.0186 E"
+            />
+          </td>
           <td><input data-id="${call.id}" data-key="distance" value="${esc(call.distance)}" placeholder="100" /></td>
           <td><button data-remove="${call.id}" type="button">✕</button></td>
         </tr>
@@ -189,7 +274,11 @@
 
     function render() {
       renderRows(captureActiveInputState());
-      const traversal = calculateTraverseFromOrderedCalls({ orderedCalls: state.calls });
+
+      const traversal = calculateTraverseFromOrderedCalls({
+        orderedCalls: normalizedCallsForCompute(state.calls),
+      });
+
       const ratio = closureRatio(traversal.totalLength, traversal.linearMisclosure);
 
       totalDistanceEl.textContent = traversal.totalLength.toFixed(2);
@@ -239,7 +328,7 @@
 
     exportButton.addEventListener('click', () => {
       const traversal = calculateTraverseFromOrderedCalls({
-        orderedCalls: state.calls,
+        orderedCalls: normalizedCallsForCompute(state.calls),
         startPoint: { x: 10000, y: 10000, pointNumber: 1 },
       });
 
