@@ -73,7 +73,6 @@ export const APP_CATALOG = [
     color: '#0F766E',
     accent: '#BFDBFE',
     glyph: 'BL',
-    experimental: true,
     section: 'Drafting',
   },
   {
