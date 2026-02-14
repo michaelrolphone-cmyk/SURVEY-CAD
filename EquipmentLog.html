@@ -176,7 +176,7 @@
       }
       renderCrewList();
     }
-    loadCrew() {
+    function loadCrew() {
       try {
         const raw = localStorage.getItem(CREW_PROFILES_STORAGE_KEY);
         crew = raw ? JSON.parse(raw) : [];
