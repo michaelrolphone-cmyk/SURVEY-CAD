@@ -212,7 +212,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource, removeResourceById, findCpfPointLinks } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource, appendResourceToFolder, removeResourceById, findCpfPointLinks } from './src/project-browser-state.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
@@ -474,6 +474,136 @@
       renderTree(context.projectFile, context);
     }
 
+    async function uploadFilesToServer(files, folderKey, context) {
+      const fileList = Array.from(files || []);
+      if (!fileList.length) {
+        context.setUploadStatus('No files selected.');
+        return;
+      }
+      if (!context.activeProjectId || !context.projectFile) {
+        context.setUploadStatus('Select an active project before uploading files.');
+        return;
+      }
+      if (!folderKey) {
+        context.setUploadStatus('Please select a folder to upload into.');
+        return;
+      }
+
+      let uploadedCount = 0;
+      for (const file of fileList) {
+        const formData = new FormData();
+        formData.append('projectId', context.activeProjectId);
+        formData.append('folderKey', folderKey);
+        formData.append('file', file, file.name);
+
+        try {
+          const response = await fetch('/api/project-files/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({ error: 'Upload failed.' }));
+            context.setUploadStatus(`Failed to upload ${file.name}: ${err.error}`);
+            continue;
+          }
+          const { resource } = await response.json();
+          const appended = appendResourceToFolder(context.projectFile, folderKey, resource);
+          if (appended) uploadedCount += 1;
+        } catch (err) {
+          context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
+        }
+      }
+
+      if (!uploadedCount) {
+        context.setUploadStatus('No files were uploaded successfully.');
+        return;
+      }
+
+      saveStoredProjectFile(window.localStorage, context.activeProjectId, context.projectFile);
+      context.setUploadStatus(`Uploaded ${uploadedCount} file${uploadedCount === 1 ? '' : 's'} to project.`);
+      renderTree(context.projectFile, context);
+    }
+
+    function createFileUploadPanel(context) {
+      const panel = document.createElement('div');
+      panel.className = 'upload-panel';
+
+      const title = document.createElement('div');
+      title.className = 'muted';
+      title.textContent = 'Upload files to the project: drag files here, or choose files below.';
+      panel.appendChild(title);
+
+      const actions = document.createElement('div');
+      actions.className = 'upload-actions';
+
+      const folderSelect = document.createElement('select');
+      folderSelect.className = 'launch-btn';
+      folderSelect.style.padding = '0.3rem 0.45rem';
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'Select folder…';
+      folderSelect.appendChild(defaultOption);
+      for (const folder of context.projectFile?.folders || []) {
+        const option = document.createElement('option');
+        option.value = folder.key;
+        option.textContent = folder.label;
+        folderSelect.appendChild(option);
+      }
+      actions.appendChild(folderSelect);
+
+      const picker = document.createElement('input');
+      picker.type = 'file';
+      picker.multiple = true;
+      picker.style.display = 'none';
+      picker.addEventListener('change', () => {
+        if (picker.files.length) {
+          uploadFilesToServer(picker.files, folderSelect.value, context);
+        }
+      });
+
+      const pickerButton = document.createElement('button');
+      pickerButton.type = 'button';
+      pickerButton.className = 'launch-btn';
+      pickerButton.textContent = 'Choose Files';
+      pickerButton.addEventListener('click', () => {
+        if (!folderSelect.value) {
+          context.setUploadStatus('Please select a folder first.');
+          const statusEl = panel.querySelector('.upload-status');
+          if (statusEl) statusEl.textContent = context.uploadStatus;
+          return;
+        }
+        picker.click();
+      });
+
+      actions.appendChild(pickerButton);
+      actions.appendChild(picker);
+      panel.appendChild(actions);
+
+      const status = document.createElement('div');
+      status.className = 'upload-status';
+      status.textContent = context.uploadStatus || '';
+      panel.appendChild(status);
+
+      panel.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        panel.classList.add('drag-active');
+      });
+      panel.addEventListener('dragleave', () => panel.classList.remove('drag-active'));
+      panel.addEventListener('drop', (event) => {
+        event.preventDefault();
+        panel.classList.remove('drag-active');
+        if (!folderSelect.value) {
+          context.setUploadStatus('Please select a folder before dropping files.');
+          const statusEl = panel.querySelector('.upload-status');
+          if (statusEl) statusEl.textContent = context.uploadStatus;
+          return;
+        }
+        uploadFilesToServer(event.dataTransfer?.files, folderSelect.value, context);
+      });
+
+      return panel;
+    }
+
     function createPointFileUploadPanel(context) {
       const panel = document.createElement('div');
       panel.className = 'upload-panel';
@@ -528,6 +658,8 @@
       root.className = 'tree-root';
       root.innerHTML = `<span class="icon">🗂️</span><strong>${projectFile.archive.rootFolderName}</strong><span class="muted">(symbolic root folder)</span>`;
       treeContainer.appendChild(root);
+
+      treeContainer.appendChild(createFileUploadPanel(projectContext));
 
       for (const folder of projectFile.folders || []) {
         const folderRow = document.createElement('div');
@@ -647,6 +779,51 @@
             deleteButton.addEventListener('click', (event) => {
               event.stopPropagation();
               deleteCpfResource(folder, entry, projectContext);
+            });
+            resource.appendChild(deleteButton);
+          }
+
+          const isServerUpload = entry?.reference?.type === 'server-upload';
+          if (isServerUpload) {
+            const downloadUrl = entry.reference.value;
+            resource.classList.add('pointforge-openable');
+            resource.setAttribute('role', 'button');
+            resource.setAttribute('tabindex', '0');
+            resource.title = 'Click to open this file';
+            resource.addEventListener('click', () => window.open(downloadUrl, '_blank', 'noopener,noreferrer'));
+            resource.addEventListener('keydown', (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+            });
+
+            const openButton = document.createElement('button');
+            openButton.type = 'button';
+            openButton.className = 'launch-btn';
+            openButton.textContent = 'Open';
+            openButton.title = 'Opens this file in a new tab';
+            openButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+            });
+            resource.appendChild(openButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'launch-btn';
+            deleteButton.textContent = 'Delete';
+            deleteButton.title = 'Remove this file from the project';
+            deleteButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              if (!window.confirm(`Remove "${entry.title}" from the project?`)) return;
+              const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
+              if (!removed) {
+                renderError(`Could not remove ${entry?.title || entry?.id || 'file'}.`);
+                return;
+              }
+              saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+              projectContext.setUploadStatus(`Removed ${entry.title}.`);
+              renderTree(projectContext.projectFile, projectContext);
             });
             resource.appendChild(deleteButton);
           }

@@ -1,8 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createSurveyServer, startServer } from '../src/server.js';
 import SurveyCadClient from '../src/survey-api.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
 
 function createMockServer(options = {}) {
   const { utilities404 = false, estimateCalculate404 = false } = options;
@@ -648,5 +655,116 @@ test('server localstorage sync endpoint supports async-backed stores', async () 
     assert.equal(updatePayload.state.snapshot.shared, 'updated');
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+test('server file upload, download, and list endpoints', async () => {
+  const app = await startApiServer(new SurveyCadClient());
+  const testProjectId = `test-upload-${Date.now()}`;
+  const testProjectDir = path.join(UPLOADS_DIR, testProjectId);
+
+  try {
+    // Upload a file to the drawings folder
+    const boundary = '----TestBoundary123';
+    const fileContent = 'sample drawing content for test';
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="projectId"',
+      '',
+      testProjectId,
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="folderKey"',
+      '',
+      'drawings',
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="test-drawing.dxf"',
+      'Content-Type: application/octet-stream',
+      '',
+      fileContent,
+      `--${boundary}--`,
+    ].join('\r\n');
+
+    const uploadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    assert.equal(uploadRes.status, 201);
+    const uploadPayload = await uploadRes.json();
+    assert.ok(uploadPayload.resource);
+    assert.equal(uploadPayload.resource.folder, 'drawings');
+    assert.equal(uploadPayload.resource.title, 'test-drawing.dxf');
+    assert.equal(uploadPayload.resource.exportFormat, 'dxf');
+    assert.equal(uploadPayload.resource.reference.type, 'server-upload');
+    assert.ok(uploadPayload.resource.reference.value.includes('/api/project-files/download'));
+
+    // Download the file
+    const downloadUrl = `http://127.0.0.1:${app.port}${uploadPayload.resource.reference.value}`;
+    const downloadRes = await fetch(downloadUrl);
+    assert.equal(downloadRes.status, 200);
+    const downloadedContent = await downloadRes.text();
+    assert.equal(downloadedContent, fileContent);
+
+    // List files for the project
+    const listRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/list?projectId=${encodeURIComponent(testProjectId)}`);
+    assert.equal(listRes.status, 200);
+    const listPayload = await listRes.json();
+    assert.ok(Array.isArray(listPayload.files));
+    assert.equal(listPayload.files.length, 1);
+    assert.equal(listPayload.files[0].folderKey, 'drawings');
+
+    // Validate error cases
+    const noFileRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body: [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="projectId"',
+        '',
+        testProjectId,
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="folderKey"',
+        '',
+        'drawings',
+        `--${boundary}--`,
+      ].join('\r\n'),
+    });
+    assert.equal(noFileRes.status, 400);
+
+    const badFolderRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body: [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="projectId"',
+        '',
+        testProjectId,
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="folderKey"',
+        '',
+        'invalid-folder',
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="test.txt"',
+        'Content-Type: text/plain',
+        '',
+        'test content',
+        `--${boundary}--`,
+      ].join('\r\n'),
+    });
+    assert.equal(badFolderRes.status, 400);
+
+    // Download non-existent file
+    const missingRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=${testProjectId}&folderKey=drawings&fileName=nonexistent.txt`);
+    assert.equal(missingRes.status, 404);
+
+    // List for non-existent project returns empty
+    const emptyListRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/list?projectId=no-such-project`);
+    assert.equal(emptyListRes.status, 200);
+    const emptyListPayload = await emptyListRes.json();
+    assert.deepEqual(emptyListPayload.files, []);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+    // Clean up test uploads
+    await fs.rm(testProjectDir, { recursive: true, force: true }).catch(() => {});
   }
 });

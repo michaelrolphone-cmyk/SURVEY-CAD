@@ -1,12 +1,12 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { access, readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile, mkdir, writeFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import SurveyCadClient from './survey-api.js';
 import { createRosOcrApp } from './ros-ocr-api.js';
 import { listApps } from './app-catalog.js';
-import { buildProjectArchivePlan, createProjectFile } from './project-file.js';
+import { buildProjectArchivePlan, createProjectFile, PROJECT_FILE_FOLDERS } from './project-file.js';
 import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
@@ -133,6 +133,73 @@ function lonLatToTile(lat, lon, zoom = 17) {
 }
 
 const MAX_JSON_BODY_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
+const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
+const VALID_FOLDER_KEYS = new Set(PROJECT_FILE_FOLDERS.map((f) => f.key));
+
+function sanitizeFileName(name) {
+  return String(name || 'file')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/^\.+/, '_')
+    .slice(0, 200);
+}
+
+async function parseMultipartUpload(req) {
+  const contentType = req.headers['content-type'] || '';
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^\s;]+))/);
+  if (!boundaryMatch) throw new Error('Missing multipart boundary.');
+  const boundary = boundaryMatch[1] || boundaryMatch[2];
+  const delimiter = Buffer.from(`--${boundary}`);
+
+  const chunks = [];
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_UPLOAD_FILE_BYTES + 1024 * 1024) {
+      req.destroy();
+      throw new Error(`Upload exceeds maximum allowed size of ${MAX_UPLOAD_FILE_BYTES} bytes.`);
+    }
+    chunks.push(chunk);
+  }
+  const body = Buffer.concat(chunks);
+
+  const fields = {};
+  let fileBuffer = null;
+  let fileName = '';
+
+  let start = body.indexOf(delimiter);
+  while (start !== -1) {
+    start += delimiter.length;
+    if (body[start] === 0x2d && body[start + 1] === 0x2d) break; // --boundary-- end marker
+    // Skip CRLF after delimiter
+    if (body[start] === 0x0d && body[start + 1] === 0x0a) start += 2;
+
+    const headerEnd = body.indexOf('\r\n\r\n', start);
+    if (headerEnd === -1) break;
+    const headerBlock = body.slice(start, headerEnd).toString('utf8');
+    const bodyStart = headerEnd + 4;
+
+    const nextDelimiter = body.indexOf(delimiter, bodyStart);
+    const bodyEnd = nextDelimiter !== -1 ? nextDelimiter - 2 : body.length; // -2 for preceding CRLF
+    const partBody = body.slice(bodyStart, bodyEnd);
+
+    const nameMatch = headerBlock.match(/name="([^"]+)"/);
+    const filenameMatch = headerBlock.match(/filename="([^"]+)"/);
+
+    if (nameMatch) {
+      if (filenameMatch) {
+        fileBuffer = partBody;
+        fileName = filenameMatch[1];
+      } else {
+        fields[nameMatch[1]] = partBody.toString('utf8');
+      }
+    }
+
+    start = nextDelimiter !== -1 ? nextDelimiter : -1;
+  }
+
+  return { fields, fileBuffer, fileName };
+}
 
 async function readJsonBody(req) {
   const chunks = [];
@@ -446,6 +513,131 @@ export function createSurveyServer({
           return;
         }
         sendJson(res, 200, { logs });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-files/upload') {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
+        const { fields, fileBuffer, fileName } = await parseMultipartUpload(req);
+        const projectId = fields.projectId;
+        const folderKey = fields.folderKey;
+        if (!projectId || !folderKey) {
+          sendJson(res, 400, { error: 'projectId and folderKey are required fields.' });
+          return;
+        }
+        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+          sendJson(res, 400, { error: `Invalid folderKey. Must be one of: ${[...VALID_FOLDER_KEYS].join(', ')}` });
+          return;
+        }
+        if (!fileBuffer || !fileName) {
+          sendJson(res, 400, { error: 'A file must be included in the upload.' });
+          return;
+        }
+        if (fileBuffer.length > MAX_UPLOAD_FILE_BYTES) {
+          sendJson(res, 400, { error: `File exceeds maximum size of ${MAX_UPLOAD_FILE_BYTES} bytes.` });
+          return;
+        }
+
+        const sanitized = sanitizeFileName(fileName);
+        const timestamp = Date.now();
+        const storedName = `${timestamp}-${sanitized}`;
+        const folderPath = path.join(UPLOADS_DIR, projectId, folderKey);
+        await mkdir(folderPath, { recursive: true });
+        const filePath = path.join(folderPath, storedName);
+        await writeFile(filePath, fileBuffer);
+
+        const ext = path.extname(sanitized).replace(/^\./, '').toLowerCase() || 'bin';
+        const folderDef = PROJECT_FILE_FOLDERS.find((f) => f.key === folderKey);
+        const resourceId = `upload-${sanitized.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '-')}-${timestamp}`;
+
+        const resource = {
+          id: resourceId,
+          folder: folderKey,
+          title: fileName,
+          exportFormat: ext,
+          reference: {
+            type: 'server-upload',
+            value: `/api/project-files/download?projectId=${encodeURIComponent(projectId)}&folderKey=${encodeURIComponent(folderKey)}&fileName=${encodeURIComponent(storedName)}`,
+            resolverHint: 'evidence-desk-upload',
+            metadata: {
+              fileName,
+              storedName,
+              uploadedAt: new Date(timestamp).toISOString(),
+              sizeBytes: fileBuffer.length,
+            },
+          },
+        };
+
+        sendJson(res, 201, { resource });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-files/download') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const projectId = urlObj.searchParams.get('projectId');
+        const folderKey = urlObj.searchParams.get('folderKey');
+        const requestedFileName = urlObj.searchParams.get('fileName');
+        if (!projectId || !folderKey || !requestedFileName) {
+          sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
+          return;
+        }
+        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+          sendJson(res, 400, { error: 'Invalid folderKey.' });
+          return;
+        }
+        const safeName = path.basename(requestedFileName);
+        const filePath = path.join(UPLOADS_DIR, projectId, folderKey, safeName);
+        if (!filePath.startsWith(path.join(UPLOADS_DIR, projectId, folderKey))) {
+          sendJson(res, 403, { error: 'Forbidden path.' });
+          return;
+        }
+        try {
+          await access(filePath);
+        } catch {
+          sendJson(res, 404, { error: 'File not found.' });
+          return;
+        }
+        const body = await readFile(filePath);
+        const ext = path.extname(safeName).toLowerCase();
+        res.statusCode = 200;
+        res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.end(body);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-files/list') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const projectId = urlObj.searchParams.get('projectId');
+        if (!projectId) {
+          sendJson(res, 400, { error: 'projectId is required.' });
+          return;
+        }
+        const projectDir = path.join(UPLOADS_DIR, projectId);
+        const files = [];
+        try {
+          const folders = await readdir(projectDir, { withFileTypes: true });
+          for (const folder of folders) {
+            if (!folder.isDirectory() || !VALID_FOLDER_KEYS.has(folder.name)) continue;
+            const folderFiles = await readdir(path.join(projectDir, folder.name));
+            for (const f of folderFiles) {
+              files.push({ folderKey: folder.name, fileName: f });
+            }
+          }
+        } catch {
+          // Directory doesn't exist yet, return empty list
+        }
+        sendJson(res, 200, { files });
         return;
       }
 
