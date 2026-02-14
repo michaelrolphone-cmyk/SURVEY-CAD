@@ -72,7 +72,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label for="rodman">Rodman</label>
-            <input id="rodman" type="text" placeholder="e.g. J. Smith" />
+            <select id="rodman"></select>
           </div>
           <div class="form-group">
             <label for="equipmentHeight">Equipment Height</label>
@@ -136,6 +136,7 @@
 
   <script type="module">
     const STORAGE_KEY = 'surveyfoundryEquipmentLogs';
+    const CREW_PROFILES_STORAGE_KEY = 'surveyfoundryCrewProfiles';
 
     const fields = {
       rodman: document.getElementById('rodman'),
@@ -159,8 +160,13 @@
     const emptyStateEl = document.getElementById('emptyState');
 
     let logs = [];
+    let crew = [];
     let editingId = null;
 
+    function renderCrewList() {
+        let crewItems = crew.map((member)=> `<option value="${member.id}">${member.firstName} ${member.lastName}</option>`);
+        return `<select>${crewItems.join('\n')}</select>`
+    }
     function loadLogs() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -168,7 +174,16 @@
       } catch {
         logs = [];
       }
+      renderCrewList();
     }
+    loadCrew() {
+      try {
+        const raw = localStorage.getItem(CREW_PROFILES_STORAGE_KEY);
+        crew = raw ? JSON.parse(raw) : [];
+      } catch {
+        crew = [];
+      }
+    }      
 
     function saveLogs() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
@@ -214,7 +229,6 @@
       cancelBtn.classList.remove('hidden');
       fields.rodman.focus();
     }
-
     function renderLogs() {
       if (logs.length === 0) {
         logListEl.innerHTML = '';
@@ -229,6 +243,7 @@
         const tb = b.createdAt || '';
         return tb.localeCompare(ta);
       });
+    
 
       logListEl.innerHTML = sorted.map((log) => `
         <div class="log-card" data-id="${log.id}">
@@ -367,7 +382,7 @@
       a.click();
       URL.revokeObjectURL(url);
     });
-
+    loadCrew();
     loadLogs();
     renderLogs();
   </script>
