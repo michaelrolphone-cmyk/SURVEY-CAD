@@ -615,7 +615,6 @@
 
   <main>
     <section class="home" id="homeView" aria-label="App launcher home">
-      <p class="subtitle">Choose an app to open in the embedded viewer.</p>
       <div class="project-manager-launch" aria-label="RecordQuarry project manager">
         <div class="project-manager-meta">
           <strong>Project manager</strong>
@@ -1418,7 +1417,7 @@
     function renderProjects() {
       const activeProject = getActiveProject();
       activeProjectSummary.textContent = activeProject
-        ? `Active project: ${activeProject.name}`
+        ? ``
         : 'No active project selected.';
       const activeProjectIndex = activeProject?.surveyIndex || '';
       activeProjectHeader.textContent = activeProject
