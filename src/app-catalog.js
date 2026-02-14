@@ -119,6 +119,17 @@ export const APP_CATALOG = [
     glyph: 'AR',
     experimental: true,
   },
+  {
+    id: 'workbench',
+    name: 'Workbench',
+    description: 'A standalone, offline “boundary casefile” web app that ingests survey records, extracts calls with traceability, forces evidence-weighted corner decisions with required justification, runs traverse computations, and prints a defensible audit-ready package..',
+    entryHtml: 'WORKBENCH.html',
+    iconPath: '/assets/icons/Workbench.png',
+    color: '#0F766E',
+    accent: '#CCFBF1',
+    glyph: 'WB',
+    experimental: true,
+  },
 
 
   // {
