@@ -7,6 +7,7 @@ import {
   PROJECT_POINT_FILE_STORAGE_PREFIX,
   buildPointFileUploadRecord,
   appendPointFileResource,
+  appendResourceToFolder,
   saveStoredProjectFile,
   removeResourceById,
   extractCpfInstrumentsFromPointNote,
@@ -202,6 +203,29 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /onclick="window\.print\(\)"/, 'Print preview should include a direct print button');
 });
 
+
+test('appendResourceToFolder appends resource to any valid folder', () => {
+  const projectFile = {
+    folders: [
+      { key: 'drawings', index: [] },
+      { key: 'deeds', index: [] },
+      { key: 'other', index: [] },
+    ],
+  };
+  const resource = { id: 'upload-test-1', folder: 'deeds', title: 'Test Deed.pdf', exportFormat: 'pdf', reference: { type: 'server-upload', value: '/api/project-files/download?test=1' } };
+  const result = appendResourceToFolder(projectFile, 'deeds', resource);
+  assert.equal(result, true);
+  assert.equal(projectFile.folders[1].index.length, 1);
+  assert.equal(projectFile.folders[1].index[0].id, 'upload-test-1');
+});
+
+test('appendResourceToFolder returns false for invalid folder key', () => {
+  const projectFile = { folders: [{ key: 'drawings', index: [] }] };
+  const resource = { id: 'r1', title: 'test' };
+  assert.equal(appendResourceToFolder(projectFile, 'nonexistent', resource), false);
+  assert.equal(appendResourceToFolder(null, 'drawings', resource), false);
+  assert.equal(appendResourceToFolder(projectFile, 'drawings', null), false);
+});
 
 test('Project Browser can open drawing resources directly in LineSmith', async () => {
   const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');

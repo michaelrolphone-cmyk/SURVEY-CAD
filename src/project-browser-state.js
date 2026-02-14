@@ -84,6 +84,15 @@ export function appendPointFileResource(projectFile, resource) {
   return true;
 }
 
+export function appendResourceToFolder(projectFile, folderKey, resource) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey || !resource) return false;
+  const folder = projectFile.folders.find((f) => f.key === folderKey);
+  if (!folder) return false;
+  if (!Array.isArray(folder.index)) folder.index = [];
+  folder.index.push(resource);
+  return true;
+}
+
 export function removeResourceById(projectFile, folderKey, resourceId) {
   if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey || !resourceId) return false;
   const folder = projectFile.folders.find((entry) => entry.key === folderKey);
