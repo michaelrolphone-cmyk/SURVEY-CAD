@@ -91,7 +91,7 @@ export const APP_CATALOG = [
     name: 'EquipmentLog',
     description: 'Record equipment setup logs: rodman, height, reference point, setup time, and job file.',
     entryHtml: 'EquipmentLog.html',
-    iconPath: '/assets/icons/EquipmentLog.svg',
+    iconPath: '/assets/icons/EquipmentLog.png',
     color: '#7C3AED',
     accent: '#EDE9FE',
     glyph: 'EL',
