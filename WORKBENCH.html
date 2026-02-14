@@ -1,0 +1,2290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Boundary Evidence Workbench — Concept Prototype (Standalone)</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#0f1621;
+      --panel2:#121c2a;
+      --line:#223046;
+      --text:#e9eef6;
+      --muted:#9aa7ba;
+      --accent:#ffd54a;
+      --good:#43d17a;
+      --warn:#ffb020;
+      --bad:#ff4d4f;
+      --link:#7cc7ff;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --radius:14px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; background:linear-gradient(180deg, #070a10 0%, var(--bg) 60%);
+      color:var(--text); font-family:var(--sans);
+    }
+    a{ color:var(--link); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+    .app{
+      display:grid;
+      grid-template-rows: 62px 1fr;
+      min-height:100vh;
+    }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 14px;
+      border-bottom:1px solid var(--line);
+      background:rgba(10,14,20,.75);
+      backdrop-filter: blur(10px);
+      position:sticky; top:0; z-index:50;
+    }
+    .brand{
+      display:flex; gap:12px; align-items:center;
+      font-weight:700; letter-spacing:.2px;
+    }
+    .badge{
+      font: 12px var(--mono);
+      padding:4px 8px; border:1px solid var(--line);
+      border-radius:999px; color:var(--muted);
+      background:rgba(255,255,255,.03);
+    }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    select, input, textarea, button{
+      font-family:inherit;
+      color:var(--text);
+    }
+    select, input[type="text"], input[type="number"], textarea{
+      background:rgba(255,255,255,.03);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 10px;
+      outline:none;
+    }
+    textarea{ width:100%; min-height:140px; resize:vertical; }
+    input[type="number"]{ width:110px; }
+    .btn{
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      transition:.15s transform, .15s background;
+      user-select:none;
+    }
+    .btn:hover{ background:rgba(255,255,255,.07); transform: translateY(-1px); }
+    .btn:active{ transform: translateY(0px); }
+    .btn.primary{
+      border-color: rgba(255,213,74,.45);
+      box-shadow: 0 0 0 1px rgba(255,213,74,.12) inset;
+      background: rgba(255,213,74,.08);
+    }
+    .btn.danger{
+      border-color: rgba(255,77,79,.45);
+      background: rgba(255,77,79,.07);
+    }
+    .btn.good{
+      border-color: rgba(67,209,122,.45);
+      background: rgba(67,209,122,.07);
+    }
+    .layout{
+      display:grid;
+      grid-template-columns: 280px 1fr;
+      min-height: calc(100vh - 62px);
+    }
+    .nav{
+      border-right:1px solid var(--line);
+      background: rgba(10,14,20,.55);
+      padding:14px;
+    }
+    .nav .section-title{
+      font-size:12px; color:var(--muted); letter-spacing:.18em;
+      text-transform:uppercase; margin:10px 8px 8px;
+    }
+    .nav .tab{
+      display:flex; align-items:center; gap:10px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid transparent;
+      cursor:pointer;
+      color:var(--text);
+    }
+    .nav .tab:hover{ background:rgba(255,255,255,.03); }
+    .nav .tab.active{
+      background: rgba(255,213,74,.09);
+      border-color: rgba(255,213,74,.22);
+    }
+    .nav .tab .dot{
+      width:10px; height:10px; border-radius:50%;
+      background:rgba(255,255,255,.15);
+    }
+    .nav .tab.active .dot{ background: var(--accent); }
+    .main{
+      padding:16px;
+      overflow:auto;
+    }
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    .grid3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:14px; }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card .hd{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      background: rgba(0,0,0,.10);
+    }
+    .card .hd h3{ margin:0; font-size:14px; letter-spacing:.2px; }
+    .card .bd{ padding:14px; }
+    .muted{ color:var(--muted); }
+    .mono{ font-family:var(--mono); }
+    .small{ font-size:12px; }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      font-size:12px;
+      color:var(--muted);
+      user-select:none;
+    }
+    .pill.good{ border-color: rgba(67,209,122,.25); color: rgba(67,209,122,.95); background: rgba(67,209,122,.06); }
+    .pill.warn{ border-color: rgba(255,176,32,.25); color: rgba(255,176,32,.95); background: rgba(255,176,32,.06); }
+    .pill.bad{ border-color: rgba(255,77,79,.25); color: rgba(255,77,79,.95); background: rgba(255,77,79,.06); }
+    .table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    .table th, .table td{
+      border-bottom:1px solid rgba(34,48,70,.55);
+      padding:8px 6px;
+      vertical-align:top;
+    }
+    .table th{
+      text-align:left;
+      color:var(--muted);
+      font-weight:600;
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .kpi{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .kpi .box{
+      flex:1;
+      min-width:160px;
+      background:rgba(0,0,0,.14);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px 12px;
+    }
+    .kpi .box .v{ font-size:20px; font-weight:800; }
+    .kpi .box .l{ color:var(--muted); font-size:12px; margin-top:2px; }
+    .dropzone{
+      border:1px dashed rgba(255,255,255,.25);
+      border-radius:14px;
+      padding:14px;
+      background: rgba(255,255,255,.02);
+    }
+    .dropzone.drag{
+      border-color: rgba(255,213,74,.65);
+      background: rgba(255,213,74,.06);
+    }
+    .split{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap:14px;
+    }
+    .hr{ height:1px; background:var(--line); margin:12px 0; }
+    .right{ text-align:right; }
+    .nowrap{ white-space:nowrap; }
+    .w100{ width:100%; }
+    .toast{
+      position:fixed; bottom:16px; right:16px;
+      background:rgba(0,0,0,.55);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px 12px;
+      color:var(--text);
+      box-shadow: var(--shadow);
+      max-width: 420px;
+      display:none;
+      z-index:9999;
+    }
+    .toast.show{ display:block; }
+    .toast .t{ font-weight:700; }
+    .toast .m{ color:var(--muted); font-size:12px; margin-top:2px; }
+    .rowline{
+      display:flex; gap:10px; align-items:center;
+    }
+    .rowline > *{ flex:1; }
+    .rowline .fit{ flex:0 0 auto; }
+
+    /* Print output styling */
+    @media print{
+      body{ background:#fff; color:#000; }
+      .topbar, .nav, .no-print, .toast{ display:none !important; }
+      .layout{ grid-template-columns: 1fr; }
+      .main{ padding:0; }
+      .card{ box-shadow:none; border:1px solid #ccc; }
+      a{ color:#000; text-decoration:underline; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar no-print">
+    <div class="brand">
+      <div style="width:36px;height:36px;border-radius:12px;background:rgba(255,213,74,.12);border:1px solid rgba(255,213,74,.25);display:flex;align-items:center;justify-content:center;">
+        <span class="mono" style="font-weight:900;color:var(--accent);">BEW</span>
+      </div>
+      <div>
+        <div style="display:flex;gap:10px;align-items:baseline;">
+          <div>Boundary Evidence Workbench</div>
+          <span class="badge">concept prototype — standalone</span>
+        </div>
+        <div class="muted small">Evidence-first casefile → extraction → matrix → decision log → computations → printable outputs</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="pill" id="autosavePill">Autosave: <b class="mono" id="autosaveState">OK</b></span>
+      <select id="projectSelect" title="Project"></select>
+      <button class="btn" id="newProjectBtn">New</button>
+      <button class="btn" id="duplicateProjectBtn">Duplicate</button>
+      <button class="btn danger" id="deleteProjectBtn">Delete</button>
+      <button class="btn" id="importBtn">Import</button>
+      <button class="btn primary" id="exportBtn">Export</button>
+      <button class="btn good" id="printBtn">Print Outputs</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="nav no-print">
+      <div class="section-title">Workspace</div>
+      <div class="tab active" data-tab="dashboard"><div class="dot"></div> Dashboard</div>
+      <div class="tab" data-tab="evidence"><div class="dot"></div> Evidence Library</div>
+      <div class="tab" data-tab="extract"><div class="dot"></div> Extract Calls</div>
+      <div class="tab" data-tab="matrix"><div class="dot"></div> Evidence Matrix</div>
+      <div class="tab" data-tab="traverse"><div class="dot"></div> Traverse</div>
+      <div class="tab" data-tab="outputs"><div class="dot"></div> Outputs</div>
+
+      <div class="hr"></div>
+
+      <div class="section-title">Principles (hard-coded)</div>
+      <div class="card" style="box-shadow:none;">
+        <div class="bd small muted">
+          <div><b>Coordinates don’t define boundaries.</b> This demo forces you to link decisions to evidence.</div>
+          <div style="margin-top:8px;"><b>No silent overrides.</b> If you choose a weaker candidate, justification is required.</div>
+          <div style="margin-top:8px;"><b>This prototype does not “decide” a boundary.</b> It captures your defensible workflow.</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <button class="btn w100" id="loadSampleBtn">Load Sample Casefile</button>
+      <div class="small muted" style="margin-top:8px;">Tip: start in <b>Evidence Library</b> → add items → run <b>Extract Calls</b> → build <b>Matrix</b> → compute <b>Traverse</b> → print <b>Outputs</b>.</div>
+    </div>
+
+    <div class="main" id="main"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="t" id="toastTitle">Saved</div>
+  <div class="m" id="toastMsg">Casefile updated.</div>
+</div>
+
+<input type="file" id="hiddenImport" accept="application/json" style="display:none"/>
+
+<script>
+(() => {
+  "use strict";
+
+  /**********************
+   * Storage + Casefile
+   **********************/
+  const STORAGE_KEY = "bew_casefiles_v1";
+  const ACTIVE_KEY = "bew_active_project_id_v1";
+  const MAX_ATTACHMENT_BYTES = 900_000; // demo constraint to avoid localStorage blowups
+
+  const nowISO = () => new Date().toISOString();
+  const uid = () => crypto.randomUUID ? crypto.randomUUID() : ("id_" + Math.random().toString(16).slice(2) + Date.now());
+
+  const deepClone = (o) => JSON.parse(JSON.stringify(o));
+
+  function defaultProject(name="New Boundary Casefile"){
+    return {
+      id: uid(),
+      meta: {
+        name,
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
+        jurisdiction: "Idaho (demo label only)",
+        notes: ""
+      },
+      evidence: [],       // evidence items
+      extractions: [],    // extracted calls (bearing/dist)
+      corners: [],        // corner objects + candidates + decisions
+      traverse: {
+        start: { N: 10000, E: 10000 },
+        basis: { label: "Assumed/Grid North (demo)", rotationDeg: 0 },
+        calls: [], // references to extraction ids (or inline)
+        lastRun: null,
+        results: null
+      },
+      decisions: []       // global decision log entries
+    };
+  }
+
+  function loadAll(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    }catch{ return []; }
+  }
+  function saveAll(projects){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  }
+  function getActiveId(){
+    return localStorage.getItem(ACTIVE_KEY) || "";
+  }
+  function setActiveId(id){
+    localStorage.setItem(ACTIVE_KEY, id);
+  }
+
+  let projects = loadAll();
+  if(projects.length === 0){
+    const p = defaultProject("BEW Demo Casefile");
+    projects = [p];
+    saveAll(projects);
+    setActiveId(p.id);
+  }
+  let activeProject = null;
+
+  function getProjectById(id){
+    return projects.find(p => p.id === id) || null;
+  }
+  function setActiveProject(id){
+    const p = getProjectById(id) || projects[0];
+    activeProject = p;
+    setActiveId(p.id);
+    refreshProjectSelect();
+    render();
+  }
+
+  /**********************
+   * UI Elements
+   **********************/
+  const $ = (sel, el=document) => el.querySelector(sel);
+  const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+  const main = $("#main");
+  const projectSelect = $("#projectSelect");
+  const autosaveState = $("#autosaveState");
+  const autosavePill = $("#autosavePill");
+
+  const toast = $("#toast");
+  const toastTitle = $("#toastTitle");
+  const toastMsg = $("#toastMsg");
+  let toastTimer = null;
+  function showToast(title, msg){
+    toastTitle.textContent = title;
+    toastMsg.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>toast.classList.remove("show"), 2200);
+  }
+
+  function refreshProjectSelect(){
+    projectSelect.innerHTML = "";
+    projects.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.meta?.name || "(unnamed)";
+      projectSelect.appendChild(opt);
+    });
+    if(activeProject) projectSelect.value = activeProject.id;
+  }
+
+  function commit(reason="Autosaved"){
+    try{
+      if(!activeProject) return;
+      activeProject.meta.updatedAt = nowISO();
+      saveAll(projects);
+      autosaveState.textContent = "OK";
+      autosavePill.style.opacity = "1";
+      showToast("Saved", reason);
+    }catch(err){
+      autosaveState.textContent = "ERR";
+      autosavePill.style.opacity = "0.9";
+      showToast("Save failed", String(err));
+    }
+  }
+
+  /**********************
+   * Tabs
+   **********************/
+  let activeTab = "dashboard";
+  function setTab(tab){
+    activeTab = tab;
+    $$(".nav .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
+    render();
+  }
+
+  $$(".nav .tab").forEach(t => t.addEventListener("click", () => setTab(t.dataset.tab)));
+
+  /**********************
+   * Actions: Project CRUD
+   **********************/
+  projectSelect.addEventListener("change", () => setActiveProject(projectSelect.value));
+
+  $("#newProjectBtn").addEventListener("click", () => {
+    const name = prompt("Project name:", "New Boundary Casefile");
+    if(name === null) return;
+    const p = defaultProject(name.trim() || "New Boundary Casefile");
+    projects.unshift(p);
+    saveAll(projects);
+    setActiveProject(p.id);
+    commit("Created new casefile");
+  });
+
+  $("#duplicateProjectBtn").addEventListener("click", () => {
+    if(!activeProject) return;
+    const copy = deepClone(activeProject);
+    copy.id = uid();
+    copy.meta.name = (activeProject.meta.name || "Casefile") + " (Copy)";
+    copy.meta.createdAt = nowISO();
+    copy.meta.updatedAt = nowISO();
+    projects.unshift(copy);
+    saveAll(projects);
+    setActiveProject(copy.id);
+    commit("Duplicated casefile");
+  });
+
+  $("#deleteProjectBtn").addEventListener("click", () => {
+    if(!activeProject) return;
+    const ok = confirm(`Delete "${activeProject.meta.name}"?\nThis removes it from localStorage.`);
+    if(!ok) return;
+    projects = projects.filter(p => p.id !== activeProject.id);
+    if(projects.length === 0){
+      projects = [defaultProject("BEW Demo Casefile")];
+    }
+    saveAll(projects);
+    setActiveProject(projects[0].id);
+    commit("Deleted casefile");
+  });
+
+  /**********************
+   * Import / Export / Print
+   **********************/
+  function downloadText(filename, text, mime="application/json"){
+    const blob = new Blob([text], {type:mime});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  $("#exportBtn").addEventListener("click", () => {
+    if(!activeProject) return;
+    const payload = deepClone(activeProject);
+    payload.__exportedAt = nowISO();
+    payload.__tool = "Boundary Evidence Workbench (concept prototype)";
+    downloadText(
+      (activeProject.meta.name || "casefile").replace(/[^\w\-]+/g,"_") + ".bew.json",
+      JSON.stringify(payload, null, 2)
+    );
+  });
+
+  $("#importBtn").addEventListener("click", () => $("#hiddenImport").click());
+  $("#hiddenImport").addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const obj = JSON.parse(text);
+      if(!obj || typeof obj !== "object") throw new Error("Invalid JSON");
+      const p = obj.id && getProjectById(obj.id) ? {...obj, id: uid()} : obj;
+      if(!p.meta) p.meta = {name:"Imported casefile", createdAt: nowISO(), updatedAt: nowISO()};
+      p.meta.name = p.meta.name || ("Imported " + (file.name || "Casefile"));
+      p.meta.updatedAt = nowISO();
+      p.id = p.id || uid();
+      projects.unshift(p);
+      saveAll(projects);
+      setActiveProject(p.id);
+      commit("Imported casefile");
+    }catch(err){
+      alert("Import failed: " + err);
+    }
+  });
+
+  $("#printBtn").addEventListener("click", () => {
+    setTab("outputs");
+    setTimeout(()=>window.print(), 50);
+  });
+
+  /**********************
+   * Sample Loader
+   **********************/
+  $("#loadSampleBtn").addEventListener("click", () => {
+    if(!activeProject) return;
+    const ok = confirm("Load sample data into the current casefile? This will overwrite current contents.");
+    if(!ok) return;
+
+    const p = activeProject;
+    p.evidence = [
+      { id: uid(), type:"Deed", title:"Warranty Deed (Demo)", date:"2022-05-14", source:"Ada County Recorder (demo)", tags:["legal","calls"], notes:"Demo text; replace with your own.", attachment:null },
+      { id: uid(), type:"ROS", title:"Record of Survey 95051440 (Demo)", date:"1995-05-14", source:"Ada County ROS (demo)", tags:["ros","basis"], notes:"Demo: includes basis-of-bearing statement.", attachment:null },
+      { id: uid(), type:"Photo", title:"Found 5/8\" RB w/ cap (Demo)", date:"2026-02-13", source:"Field photo (demo)", tags:["monument"], notes:"Demo placeholder photo slot.", attachment:null }
+    ];
+    const deedId = p.evidence[0].id;
+    const rosId  = p.evidence[1].id;
+
+    p.extractions = [];
+    const calls = [
+      {bearing:"S 89°58'00\" W", distance:315.27, unit:"ft"},
+      {bearing:"N 00°00'27\" W", distance:267.69, unit:"ft"},
+      {bearing:"N 89°57'43\" E", distance:315.13, unit:"ft"},
+      {bearing:"S 00°02'17\" E", distance:267.72, unit:"ft"},
+    ];
+    calls.forEach((c, i) => {
+      p.extractions.push({
+        id: uid(),
+        createdAt: nowISO(),
+        evidenceId: deedId,
+        page: 1,
+        snippet: "…(demo) boundary call…",
+        label: `Call ${i+1}`,
+        bearingText: c.bearing,
+        distance: c.distance,
+        distanceUnit: c.unit,
+        include: true,
+        confidence: 0.85
+      });
+    });
+
+    p.corners = [
+      {
+        id: uid(),
+        name: "NW COR (Parcel)",
+        plss: "Within Sec/T/R (demo)",
+        status: "Existent",
+        candidates: [
+          { id: uid(), kind:"Monument", refEvidenceId: p.evidence[2].id, summary:"Found 5/8\" rebar w/cap", weight:5, chosen:true, justification:"" },
+          { id: uid(), kind:"Record Call", refEvidenceId: rosId, summary:"ROS shows set 1/2\" RB", weight:3, chosen:false, justification:"" }
+        ],
+        decisions: []
+      },
+      {
+        id: uid(),
+        name: "NE COR (Parcel)",
+        plss: "Within Sec/T/R (demo)",
+        status: "Obliterated",
+        candidates: [
+          { id: uid(), kind:"Occupation", refEvidenceId: deedId, summary:"Fence corner long-standing", weight:3, chosen:true, justification:"Occupation consistent w/ record dimensions; no monument recovered." },
+          { id: uid(), kind:"Record Call", refEvidenceId: deedId, summary:"Deed call corner", weight:2, chosen:false, justification:"" }
+        ],
+        decisions: []
+      }
+    ];
+
+    p.traverse.start = {N:10000, E:10000};
+    p.traverse.basis = {label:"Assumed/Grid North (demo)", rotationDeg:0};
+    p.traverse.calls = p.extractions.map(x => x.id);
+    p.traverse.results = null;
+    p.traverse.lastRun = null;
+
+    p.decisions = [];
+    commit("Loaded sample data");
+    render();
+  });
+
+  /**********************
+   * Bearing / Distance Parsing
+   **********************/
+  function dmsToDeg(d,m,s){
+    return (d||0) + (m||0)/60 + (s||0)/3600;
+  }
+
+  function parseBearingText(text){
+    // Supports forms like:
+    // N 45°01'07" E
+    // N45 01 07E
+    // S 12-34-56 W
+    // N 0°00'27" W
+    if(!text) return null;
+    const t = text.toUpperCase().replace(/[\u00B0º]/g,"°").replace(/[′’]/g,"'").replace(/[″“”]/g,'"').trim();
+
+    // Attempt to capture quadrant-bearing
+    // groups: 1=NS, 2=deg, 3=min, 4=sec, 5=EW
+    const re = /([NS])\s*([0-9]{1,3})\s*(?:°|\s)\s*([0-9]{1,2})?\s*(?:'|\s|-)?\s*([0-9]{1,2}(?:\.[0-9]+)?)?\s*(?:"|\s|-)?\s*([EW])/i;
+    const m = t.match(re);
+    if(!m) return null;
+
+    const NS = m[1];
+    const deg = Number(m[2] || 0);
+    const min = Number(m[3] || 0);
+    const sec = Number(m[4] || 0);
+    const EW = m[5];
+
+    const theta = dmsToDeg(deg, min, sec);
+    if(theta < 0 || theta > 90.0000001) return null;
+
+    // Convert quadrant bearing to azimuth degrees (0=N,90=E,180=S,270=W)
+    let az;
+    if(NS === "N" && EW === "E") az = theta;
+    else if(NS === "N" && EW === "W") az = 360 - theta;
+    else if(NS === "S" && EW === "E") az = 180 - theta;
+    else if(NS === "S" && EW === "W") az = 180 + theta;
+
+    return { NS, EW, deg, min, sec, theta, azimuthDeg: az };
+  }
+
+  function parseCallsFromText(raw){
+    // Extracts pairs of (bearing, distance) from pasted text.
+    // Looks for quadrant bearing and a nearby distance number.
+    // Example matches:
+    // N 45°01'07" E, 123.45
+    // S 89 58 00 W 315.27
+    const text = (raw || "").replace(/\t/g," ").replace(/\u00A0/g," ");
+    const lines = text.split(/\r?\n/);
+
+    const results = [];
+    const bearingRe = /([NS])\s*([0-9]{1,3})\s*(?:°|\s)\s*([0-9]{1,2})?\s*(?:'|\s|-)?\s*([0-9]{1,2}(?:\.[0-9]+)?)?\s*(?:"|\s|-)?\s*([EW])/ig;
+
+    for(const line of lines){
+      let match;
+      while((match = bearingRe.exec(line)) !== null){
+        const bText = match[0].trim();
+        // Find a distance after the bearing in the same line
+        const after = line.slice(match.index + match[0].length);
+        const distMatch = after.match(/([0-9]+(?:\.[0-9]+)?)\s*(FT|FEET|FOOT|')?/i);
+        if(!distMatch) continue;
+        const dist = Number(distMatch[1]);
+        if(!isFinite(dist)) continue;
+
+        results.push({
+          bearingText: normalizeBearingDisplay(bText),
+          distance: dist,
+          distanceUnit: "ft",
+          snippet: line.trim().slice(0, 220),
+          confidence: 0.75
+        });
+      }
+    }
+    return results;
+  }
+
+  function normalizeBearingDisplay(bearing){
+    // Best-effort normalize into: N 45°01'07" E
+    const pb = parseBearingText(bearing);
+    if(!pb) return bearing.trim();
+    const pad2 = (n)=> String(Math.floor(Math.abs(n))).padStart(2,"0");
+    const d = String(pb.deg);
+    const m = pad2(pb.min || 0);
+    const s = pad2(pb.sec || 0);
+    return `${pb.NS} ${d}°${m}'${s}" ${pb.EW}`;
+  }
+
+  function computeTraverseFromExtractions(project){
+    const startN = Number(project.traverse.start?.N ?? 0);
+    const startE = Number(project.traverse.start?.E ?? 0);
+    const rotationDeg = Number(project.traverse.basis?.rotationDeg ?? 0);
+
+    const calls = [];
+    for(const id of (project.traverse.calls || [])){
+      const ex = project.extractions.find(x => x.id === id);
+      if(ex && ex.include){
+        calls.push(ex);
+      }
+    }
+
+    let N = startN, E = startE;
+    const points = [{pt:1, N, E}];
+
+    const segments = [];
+    let pt = 1;
+
+    for(const c of calls){
+      const pb = parseBearingText(c.bearingText);
+      if(!pb) {
+        segments.push({ ok:false, label:c.label, bearing:c.bearingText, distance:c.distance, err:"Bearing parse failed" });
+        continue;
+      }
+      const az = (pb.azimuthDeg + rotationDeg) % 360;
+      const rad = az * Math.PI / 180;
+
+      const d = Number(c.distance);
+      const dN = Math.cos(rad) * d;
+      const dE = Math.sin(rad) * d;
+
+      const N2 = N + dN;
+      const E2 = E + dE;
+
+      segments.push({
+        ok:true,
+        label: c.label || "",
+        bearing: c.bearingText,
+        azimuthDeg: az,
+        distance: d,
+        dN, dE,
+        from: {N, E},
+        to: {N:N2, E:E2}
+      });
+
+      N = N2; E = E2;
+      pt += 1;
+      points.push({pt, N, E});
+    }
+
+    const closeDN = startN - N;
+    const closeDE = startE - E;
+    const misclose = Math.hypot(closeDN, closeDE);
+
+    const totalDist = segments.filter(s=>s.ok).reduce((a,s)=>a + s.distance, 0);
+    const precision = misclose > 0 ? (totalDist / misclose) : Infinity;
+
+    return {
+      start: {N:startN, E:startE},
+      rotationDeg,
+      points,
+      segments,
+      closure: {dN: closeDN, dE: closeDE, misclose},
+      totalDist,
+      precision
+    };
+  }
+
+  /**********************
+   * Evidence helpers
+   **********************/
+  function evidenceTitle(e){
+    return `${e.type || "Evidence"} — ${e.title || "(untitled)"}`;
+  }
+  function findEvidenceById(id){
+    return activeProject?.evidence?.find(e => e.id === id) || null;
+  }
+
+  function addDecisionLog(entry){
+    if(!activeProject) return;
+    activeProject.decisions.unshift(entry);
+    // keep bounded
+    if(activeProject.decisions.length > 500) activeProject.decisions.length = 500;
+  }
+
+  function cornerChosenCandidate(corner){
+    return (corner.candidates || []).find(c => c.chosen) || null;
+  }
+
+  function maxCandidateWeight(corner){
+    const ws = (corner.candidates || []).map(c => Number(c.weight||0));
+    return ws.length ? Math.max(...ws) : 0;
+  }
+
+  function requiresJustification(corner, chosen){
+    if(!corner || !chosen) return false;
+    const maxW = maxCandidateWeight(corner);
+    const chosenW = Number(chosen.weight || 0);
+    if(chosenW < maxW) return true; // selected weaker candidate than strongest available
+    if(chosen.kind === "Computed"){
+      const hasMon = (corner.candidates || []).some(c => c.kind === "Monument");
+      if(hasMon) return true; // computed chosen while monument exists
+    }
+    return false;
+  }
+
+  /**********************
+   * Render: Dashboard
+   **********************/
+  function viewDashboard(){
+    const p = activeProject;
+    const ev = p.evidence.length;
+    const ex = p.extractions.length;
+    const corners = p.corners.length;
+    const chosen = p.corners.filter(c => !!cornerChosenCandidate(c)).length;
+
+    const lastRun = p.traverse?.lastRun ? new Date(p.traverse.lastRun).toLocaleString() : "—";
+    const travRes = p.traverse?.results;
+
+    const closurePill = travRes
+      ? (travRes.closure.misclose <= 0.05 ? `<span class="pill good">Closure: ${travRes.closure.misclose.toFixed(3)} ft</span>`
+         : travRes.closure.misclose <= 0.50 ? `<span class="pill warn">Closure: ${travRes.closure.misclose.toFixed(3)} ft</span>`
+         : `<span class="pill bad">Closure: ${travRes.closure.misclose.toFixed(3)} ft</span>`)
+      : `<span class="pill">Closure: —</span>`;
+
+    return `
+      <div class="grid2">
+        <div class="card">
+          <div class="hd">
+            <h3>Casefile</h3>
+            <span class="pill mono">ID: ${p.id.slice(0,8)}</span>
+          </div>
+          <div class="bd">
+            <div class="rowline">
+              <div>
+                <div class="muted small">Project Name</div>
+                <input class="w100" type="text" id="projName" value="${escapeHtml(p.meta.name || "")}"/>
+              </div>
+              <div class="fit">
+                <div class="muted small">Jurisdiction</div>
+                <input class="w100" type="text" id="projJur" value="${escapeHtml(p.meta.jurisdiction || "")}"/>
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <div class="muted small">Notes</div>
+              <textarea id="projNotes" style="min-height:90px;">${escapeHtml(p.meta.notes || "")}</textarea>
+            </div>
+            <div class="hr"></div>
+            <div class="kpi">
+              <div class="box"><div class="v mono">${ev}</div><div class="l">Evidence Items</div></div>
+              <div class="box"><div class="v mono">${ex}</div><div class="l">Extracted Calls</div></div>
+              <div class="box"><div class="v mono">${corners}</div><div class="l">Corners Tracked</div></div>
+              <div class="box"><div class="v mono">${chosen}/${corners}</div><div class="l">Corners with a Chosen Candidate</div></div>
+            </div>
+            <div class="hr"></div>
+            <div class="small muted">
+              <b>Concept demo focus:</b> capture evidence → extract calls → assign weights → record choices with justification → compute traverse → print defensible package.
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">
+            <h3>Traverse Snapshot</h3>
+            <div class="row">
+              ${closurePill}
+              <span class="pill">Last run: <b class="mono">${escapeHtml(lastRun)}</b></span>
+            </div>
+          </div>
+          <div class="bd">
+            <div class="grid2">
+              <div>
+                <div class="muted small">Start (N,E)</div>
+                <div class="row" style="margin-top:6px;">
+                  <input type="number" id="startN" step="0.001" value="${Number(p.traverse.start?.N ?? 10000)}"/>
+                  <input type="number" id="startE" step="0.001" value="${Number(p.traverse.start?.E ?? 10000)}"/>
+                </div>
+              </div>
+              <div>
+                <div class="muted small">Basis rotation (deg)</div>
+                <div class="row" style="margin-top:6px;">
+                  <input type="number" id="rotDeg" step="0.0001" value="${Number(p.traverse.basis?.rotationDeg ?? 0)}"/>
+                  <button class="btn good" id="runTraverseBtn">Run Traverse</button>
+                </div>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div class="small muted">
+              This uses quadrant bearings → azimuth conversion and computes points from extracted calls you include.
+              Rotation is applied as a simple azimuth offset (demo basis-of-bearing behavior).
+            </div>
+            <div style="margin-top:10px;">
+              <button class="btn" id="gotoTraverse">Open Traverse Workspace</button>
+              <button class="btn" id="gotoExtract">Open Extract Calls</button>
+              <button class="btn" id="gotoMatrix">Open Evidence Matrix</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**********************
+   * Render: Evidence Library
+   **********************/
+  function viewEvidence(){
+    const p = activeProject;
+
+    const evidenceRows = p.evidence.map(e => {
+      const hasAtt = e.attachment && e.attachment.dataUrl ? "• attachment" : "";
+      return `
+        <tr>
+          <td class="nowrap">${escapeHtml(e.type || "")}</td>
+          <td><b>${escapeHtml(e.title || "")}</b><div class="small muted">${escapeHtml(e.source || "")} ${hasAtt ? `<span class="pill">${hasAtt}</span>`:""}</div></td>
+          <td class="nowrap">${escapeHtml(e.date || "")}</td>
+          <td>${escapeHtml((e.tags||[]).join(", "))}</td>
+          <td class="right nowrap">
+            <button class="btn" data-act="editEvidence" data-id="${e.id}">Edit</button>
+            <button class="btn danger" data-act="delEvidence" data-id="${e.id}">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    return `
+      <div class="split">
+        <div class="card">
+          <div class="hd">
+            <h3>Evidence Library</h3>
+            <span class="pill">Stored in localStorage (demo)</span>
+          </div>
+          <div class="bd">
+            <div class="dropzone" id="dropzone">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+                <div>
+                  <div><b>Drag & drop</b> a small file (PDF/image/text) or use the picker.</div>
+                  <div class="small muted">Demo stores attachments only if &lt; ${Math.round(MAX_ATTACHMENT_BYTES/1000)} KB to avoid localStorage overflow.</div>
+                </div>
+                <div class="row">
+                  <input type="file" id="filePick" />
+                  <button class="btn primary" id="addEvidenceBtn">Add Metadata Only</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Title / Source</th>
+                  <th>Date</th>
+                  <th>Tags</th>
+                  <th class="right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${evidenceRows || `<tr><td colspan="5" class="muted">No evidence yet. Add a deed/plat/ROS/photo and move to “Extract Calls”.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">
+            <h3>Quick Add</h3>
+            <span class="pill">Evidence object</span>
+          </div>
+          <div class="bd">
+            <div class="grid2">
+              <div>
+                <div class="muted small">Type</div>
+                <select id="evType" class="w100">
+                  <option>Deed</option>
+                  <option>Plat</option>
+                  <option>ROS</option>
+                  <option>Corner Record</option>
+                  <option>Field Notes</option>
+                  <option>Photo</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div>
+                <div class="muted small">Date</div>
+                <input id="evDate" class="w100" type="text" placeholder="YYYY-MM-DD" />
+              </div>
+            </div>
+
+            <div style="margin-top:10px;">
+              <div class="muted small">Title</div>
+              <input id="evTitle" class="w100" type="text" placeholder="e.g., Warranty Deed 2022-05-14" />
+            </div>
+
+            <div style="margin-top:10px;">
+              <div class="muted small">Source</div>
+              <input id="evSource" class="w100" type="text" placeholder="e.g., Ada County Recorder / ROS #..." />
+            </div>
+
+            <div style="margin-top:10px;">
+              <div class="muted small">Tags (comma separated)</div>
+              <input id="evTags" class="w100" type="text" placeholder="legal, calls, basis, monument" />
+            </div>
+
+            <div style="margin-top:10px;">
+              <div class="muted small">Notes</div>
+              <textarea id="evNotes" style="min-height:110px;" placeholder="Monument descriptions, basis-of-bearing text, research notes…"></textarea>
+            </div>
+
+            <div class="row" style="margin-top:10px;">
+              <button class="btn primary" id="saveEvBtn">Save Evidence</button>
+              <button class="btn" id="goExtractBtn">Go to Extract Calls</button>
+            </div>
+
+            <div class="hr"></div>
+            <div class="small muted">
+              The app doesn’t “read PDFs” in this prototype. The core concept is: every extracted call keeps a trace back to evidence + page/snippet.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**********************
+   * Render: Extract Calls
+   **********************/
+  function viewExtract(){
+    const p = activeProject;
+
+    const evOpts = p.evidence.map(e => `<option value="${e.id}">${escapeHtml(evidenceTitle(e))}</option>`).join("");
+
+    const extractedRows = p.extractions.map((x, i) => {
+      const ev = findEvidenceById(x.evidenceId);
+      const pb = parseBearingText(x.bearingText);
+      const ok = !!pb;
+      const pill = ok ? `<span class="pill good">OK</span>` : `<span class="pill bad">BAD</span>`;
+      return `
+        <tr>
+          <td class="nowrap">${pill}</td>
+          <td class="nowrap"><input type="checkbox" data-act="toggleInclude" data-id="${x.id}" ${x.include ? "checked":""}/></td>
+          <td class="mono">${escapeHtml(x.label || ("Call "+(i+1)))}</td>
+          <td class="mono">${escapeHtml(x.bearingText || "")}</td>
+          <td class="mono">${Number(x.distance||0).toFixed(2)} ${escapeHtml(x.distanceUnit||"")}</td>
+          <td>
+            <div class="small"><b>${escapeHtml(ev ? ev.title : "—")}</b></div>
+            <div class="small muted">p.${escapeHtml(String(x.page ?? "—"))} • conf ${(Number(x.confidence||0)*100).toFixed(0)}%</div>
+          </td>
+          <td class="right nowrap">
+            <button class="btn" data-act="editExtraction" data-id="${x.id}">Edit</button>
+            <button class="btn danger" data-act="delExtraction" data-id="${x.id}">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    return `
+      <div class="grid2">
+        <div class="card">
+          <div class="hd">
+            <h3>Extract Bearings & Distances</h3>
+            <span class="pill">Paste text → regex extraction (demo)</span>
+          </div>
+          <div class="bd">
+            <div class="grid2">
+              <div>
+                <div class="muted small">Evidence item</div>
+                <select id="exEvidence" class="w100">${evOpts || `<option value="">(add evidence first)</option>`}</select>
+              </div>
+              <div>
+                <div class="muted small">Page (for traceability)</div>
+                <input id="exPage" class="w100" type="number" min="1" step="1" value="1"/>
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <div class="muted small">Paste deed/plat/ROS call text</div>
+              <textarea id="exText" placeholder='Example:
+S 89°58&apos;00&quot; W 315.27
+N 00°00&apos;27&quot; W 267.69
+N 89°57&apos;43&quot; E 315.13
+S 00°02&apos;17&quot; E 267.72'></textarea>
+            </div>
+
+            <div class="row" style="margin-top:10px;">
+              <button class="btn primary" id="runExtractBtn">Extract Calls</button>
+              <button class="btn" id="addManualBtn">Add Manual Call</button>
+              <button class="btn good" id="pushToTraverseBtn">Use Included Calls in Traverse</button>
+            </div>
+
+            <div class="hr"></div>
+            <div class="small muted">
+              Extraction keeps: evidence link + page + snippet. In production, OCR/PDF anchoring would replace this textarea.
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">
+            <h3>Extracted Calls</h3>
+            <span class="pill">Include → Traverse</span>
+          </div>
+          <div class="bd">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Use</th>
+                  <th>Label</th>
+                  <th>Bearing</th>
+                  <th>Distance</th>
+                  <th>Trace</th>
+                  <th class="right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${extractedRows || `<tr><td colspan="7" class="muted">No calls extracted yet.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**********************
+   * Render: Evidence Matrix
+   **********************/
+  function viewMatrix(){
+    const p = activeProject;
+
+    const cornerList = p.corners.map(c => {
+      const chosen = cornerChosenCandidate(c);
+      const needsJ = chosen && requiresJustification(c, chosen);
+      const statusPill = chosen
+        ? (needsJ ? `<span class="pill warn">Chosen • justification required</span>` : `<span class="pill good">Chosen</span>`)
+        : `<span class="pill bad">No selection</span>`;
+
+      return `
+        <tr>
+          <td><b>${escapeHtml(c.name || "(unnamed corner)")}</b><div class="small muted">${escapeHtml(c.plss || "")}</div></td>
+          <td class="nowrap">${escapeHtml(c.status || "")}</td>
+          <td>${statusPill}</td>
+          <td class="right nowrap">
+            <button class="btn" data-act="openCorner" data-id="${c.id}">Open</button>
+            <button class="btn danger" data-act="delCorner" data-id="${c.id}">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    const globalLog = (p.decisions || []).slice(0, 20).map(d => {
+      return `
+        <tr>
+          <td class="nowrap mono">${escapeHtml(new Date(d.at).toLocaleString())}</td>
+          <td><b>${escapeHtml(d.cornerName || "")}</b><div class="small muted">${escapeHtml(d.action || "")}</div></td>
+          <td>${escapeHtml(d.detail || "")}</td>
+        </tr>
+      `;
+    }).join("");
+
+    return `
+      <div class="grid2">
+        <div class="card">
+          <div class="hd">
+            <h3>Corners</h3>
+            <span class="pill">Evidence Matrix (weights + selection)</span>
+          </div>
+          <div class="bd">
+            <div class="row">
+              <button class="btn primary" id="addCornerBtn">Add Corner</button>
+              <button class="btn" id="bulkFromTraverseBtn">Add 4 Corners (demo)</button>
+            </div>
+            <div class="hr"></div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Corner</th>
+                  <th>Status</th>
+                  <th>Selection</th>
+                  <th class="right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${cornerList || `<tr><td colspan="4" class="muted">No corners yet. Add a corner, then add candidates and select one with defensible justification.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">
+            <h3>Decision Log (latest)</h3>
+            <span class="pill">Audit trail</span>
+          </div>
+          <div class="bd">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Corner</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${globalLog || `<tr><td colspan="3" class="muted">No decisions logged yet.</td></tr>`}
+              </tbody>
+            </table>
+            <div class="hr"></div>
+            <div class="small muted">
+              Rule enforced here: selecting a weaker candidate (lower weight) requires a justification note. (Demo of “no silent overrides”.)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="cornerModalHost"></div>
+    `;
+  }
+
+  function renderCornerModal(cornerId){
+    const p = activeProject;
+    const c = p.corners.find(x => x.id === cornerId);
+    if(!c) return "";
+
+    const evOpts = p.evidence.map(e => `<option value="${e.id}">${escapeHtml(evidenceTitle(e))}</option>`).join("");
+
+    const rows = (c.candidates || []).map((cand, idx) => {
+      const ev = findEvidenceById(cand.refEvidenceId);
+      const chosen = !!cand.chosen;
+      const w = Number(cand.weight || 0);
+      const maxW = maxCandidateWeight(c);
+      const needsJ = chosen && requiresJustification(c, cand);
+      const pill = chosen ? (needsJ ? `<span class="pill warn">Chosen • justify</span>` : `<span class="pill good">Chosen</span>`) : `<span class="pill">—</span>`;
+      const weaker = chosen && w < maxW;
+
+      return `
+        <tr>
+          <td class="nowrap">${pill}</td>
+          <td class="nowrap">${escapeHtml(cand.kind || "")}</td>
+          <td>
+            <div><b>${escapeHtml(ev ? ev.title : "—")}</b></div>
+            <div class="small muted">${escapeHtml(cand.summary || "")}</div>
+          </td>
+          <td class="nowrap mono">${w}</td>
+          <td class="right nowrap">
+            <button class="btn ${chosen ? "danger":""}" data-act="chooseCandidate" data-corner="${c.id}" data-cand="${cand.id}">
+              ${chosen ? "Unchoose" : "Choose"}
+            </button>
+            <button class="btn" data-act="editCandidate" data-corner="${c.id}" data-cand="${cand.id}">Edit</button>
+            <button class="btn danger" data-act="delCandidate" data-corner="${c.id}" data-cand="${cand.id}">Delete</button>
+          </td>
+        </tr>
+        ${weaker ? `
+          <tr>
+            <td></td>
+            <td colspan="4">
+              <div class="small ${needsJ ? "":"muted"}">
+                ${needsJ ? `<b style="color:var(--warn);">Justification required:</b> chosen weight ${w} &lt; max ${maxW}.` : ""}
+              </div>
+            </td>
+          </tr>` : ``}
+      `;
+    }).join("");
+
+    const chosen = cornerChosenCandidate(c);
+    const needJ = chosen && requiresJustification(c, chosen);
+
+    return `
+      <div class="card" style="margin-top:14px;">
+        <div class="hd">
+          <h3>Corner Detail</h3>
+          <div class="row">
+            <span class="pill mono">Corner ID: ${c.id.slice(0,8)}</span>
+            <button class="btn" data-act="closeCorner">Close</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="grid2">
+            <div>
+              <div class="muted small">Name</div>
+              <input class="w100" type="text" id="cornerName" value="${escapeHtml(c.name || "")}" />
+            </div>
+            <div>
+              <div class="muted small">Status</div>
+              <select id="cornerStatus" class="w100">
+                ${["Existent","Obliterated","Lost","Unknown"].map(s => `<option ${c.status===s?"selected":""}>${s}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:10px;">
+            <div class="muted small">PLSS / Reference</div>
+            <input class="w100" type="text" id="cornerPlss" value="${escapeHtml(c.plss || "")}" placeholder="e.g., NE 1/4 COR Sec 12 T3N R2E BM (demo)"/>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="card" style="box-shadow:none;">
+            <div class="hd"><h3 style="font-size:13px;">Candidates</h3>
+              <div class="row">
+                <button class="btn primary" data-act="addCandidate" data-corner="${c.id}">Add Candidate</button>
+              </div>
+            </div>
+            <div class="bd">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Chosen</th>
+                    <th>Kind</th>
+                    <th>Evidence / Summary</th>
+                    <th>Weight</th>
+                    <th class="right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows || `<tr><td colspan="5" class="muted">No candidates. Add monument/record/occupation/computed as candidate evidence and weight it.</td></tr>`}
+                </tbody>
+              </table>
+
+              <div class="hr"></div>
+
+              <div>
+                <div class="muted small">Corner decision note (required if justification is flagged)</div>
+                <textarea id="cornerDecisionNote" style="min-height:90px;" placeholder="Explain why the chosen candidate controls (or why a weaker candidate was selected).">${escapeHtml(chosen?.justification || "")}</textarea>
+                <div class="row" style="margin-top:10px;">
+                  <button class="btn good" data-act="saveCornerDecision" data-corner="${c.id}">
+                    Save Decision
+                  </button>
+                  <span class="small ${needJ ? "" : "muted"}">
+                    ${needJ ? `<b style="color:var(--warn)">Justification required</b> because selection overrides stronger evidence.` : `Justification optional unless an override rule triggers.`}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="hr"></div>
+          <div class="small muted">
+            This is the core “defensibility engine” concept: candidates + weights + explicit selection + required justification on override.
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**********************
+   * Render: Traverse
+   **********************/
+  function viewTraverse(){
+    const p = activeProject;
+    const calls = p.extractions.map(x => {
+      const pb = parseBearingText(x.bearingText);
+      const ok = !!pb;
+      const pill = ok ? `<span class="pill good">OK</span>` : `<span class="pill bad">BAD</span>`;
+      return `
+        <tr>
+          <td>${pill}</td>
+          <td class="nowrap"><input type="checkbox" data-act="toggleInclude" data-id="${x.id}" ${x.include ? "checked":""}/></td>
+          <td class="mono">${escapeHtml(x.label || "")}</td>
+          <td class="mono">${escapeHtml(x.bearingText || "")}</td>
+          <td class="mono">${Number(x.distance||0).toFixed(2)} ft</td>
+          <td class="right">
+            <button class="btn" data-act="moveCallUp" data-id="${x.id}">↑</button>
+            <button class="btn" data-act="moveCallDown" data-id="${x.id}">↓</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    const res = p.traverse.results;
+    const summary = res ? `
+      <div class="kpi" style="margin-top:10px;">
+        <div class="box"><div class="v mono">${res.totalDist.toFixed(2)}</div><div class="l">Total distance (ft)</div></div>
+        <div class="box"><div class="v mono">${res.closure.misclose.toFixed(3)}</div><div class="l">Misclosure (ft)</div></div>
+        <div class="box"><div class="v mono">${(isFinite(res.precision) ? ("1:" + Math.round(res.precision).toLocaleString()) : "∞")}</div><div class="l">Relative precision</div></div>
+        <div class="box"><div class="v mono">${res.points.length}</div><div class="l">Points computed</div></div>
+      </div>
+    ` : `<div class="muted small">Not run yet.</div>`;
+
+    const segTable = res ? res.segments.map((s, i) => {
+      if(!s.ok){
+        return `<tr><td colspan="8" class="pill bad">Segment ${i+1} error: ${escapeHtml(s.err || "Unknown")}</td></tr>`;
+      }
+      return `
+        <tr>
+          <td class="mono">${escapeHtml(s.label || ("Seg "+(i+1)))}</td>
+          <td class="mono">${escapeHtml(s.bearing)}</td>
+          <td class="mono">${s.distance.toFixed(2)}</td>
+          <td class="mono">${s.dN.toFixed(3)}</td>
+          <td class="mono">${s.dE.toFixed(3)}</td>
+          <td class="mono">${s.to.N.toFixed(3)}</td>
+          <td class="mono">${s.to.E.toFixed(3)}</td>
+          <td class="mono">${s.azimuthDeg.toFixed(6)}</td>
+        </tr>
+      `;
+    }).join("") : "";
+
+    return `
+      <div class="grid2">
+        <div class="card">
+          <div class="hd">
+            <h3>Traverse Setup</h3>
+            <span class="pill">Uses included extracted calls</span>
+          </div>
+          <div class="bd">
+            <div class="grid2">
+              <div>
+                <div class="muted small">Start Northing</div>
+                <input type="number" id="travStartN" step="0.001" value="${Number(p.traverse.start?.N ?? 10000)}"/>
+              </div>
+              <div>
+                <div class="muted small">Start Easting</div>
+                <input type="number" id="travStartE" step="0.001" value="${Number(p.traverse.start?.E ?? 10000)}"/>
+              </div>
+            </div>
+
+            <div class="grid2" style="margin-top:10px;">
+              <div>
+                <div class="muted small">Basis label</div>
+                <input class="w100" type="text" id="basisLabel" value="${escapeHtml(p.traverse.basis?.label ?? "")}"/>
+              </div>
+              <div>
+                <div class="muted small">Rotation (deg)</div>
+                <input type="number" id="basisRot" step="0.0001" value="${Number(p.traverse.basis?.rotationDeg ?? 0)}"/>
+              </div>
+            </div>
+
+            <div class="row" style="margin-top:10px;">
+              <button class="btn good" id="runTraverseBtn2">Run Traverse</button>
+              <button class="btn" id="syncTraverseCallsBtn">Sync Included Calls</button>
+              <button class="btn primary" id="pushTraverseToOutputsBtn">Refresh Outputs</button>
+            </div>
+
+            <div class="hr"></div>
+            <div class="small muted">
+              Demo computation: quadrant bearing → azimuth (+ rotation) → ΔN/ΔE → coordinate chain.
+              This does not replace least-squares adjustment or a full boundary resolution.
+            </div>
+
+            ${summary}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">
+            <h3>Call Order & Inclusion</h3>
+            <span class="pill">Reorder & include</span>
+          </div>
+          <div class="bd">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Use</th>
+                  <th>Label</th>
+                  <th>Bearing</th>
+                  <th>Dist (ft)</th>
+                  <th class="right">Order</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${calls || `<tr><td colspan="6" class="muted">No extracted calls. Go to Extract Calls.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="hd">
+          <h3>Traverse Results</h3>
+          <span class="pill">Segments + computed coordinates</span>
+        </div>
+        <div class="bd">
+          ${res ? `
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Segment</th>
+                  <th>Bearing</th>
+                  <th>Dist</th>
+                  <th>ΔN</th>
+                  <th>ΔE</th>
+                  <th>N (to)</th>
+                  <th>E (to)</th>
+                  <th>Az (deg)</th>
+                </tr>
+              </thead>
+              <tbody>${segTable}</tbody>
+            </table>
+            <div class="hr"></div>
+            <div class="small muted mono">
+              Closure vector: dN=${res.closure.dN.toFixed(3)} ft, dE=${res.closure.dE.toFixed(3)} ft (misclose=${res.closure.misclose.toFixed(3)} ft)
+            </div>
+          ` : `<div class="muted">Run traverse to compute coordinates.</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  /**********************
+   * Render: Outputs
+   **********************/
+  function viewOutputs(){
+    const p = activeProject;
+    const ev = p.evidence || [];
+    const ex = p.extractions || [];
+    const corners = p.corners || [];
+    const res = p.traverse?.results;
+
+    const evList = ev.map(e => `
+      <tr>
+        <td class="nowrap">${escapeHtml(e.type || "")}</td>
+        <td><b>${escapeHtml(e.title || "")}</b><div class="small muted">${escapeHtml(e.source || "")}</div></td>
+        <td class="nowrap">${escapeHtml(e.date || "")}</td>
+        <td>${escapeHtml((e.tags||[]).join(", "))}</td>
+      </tr>
+    `).join("");
+
+    const callList = ex.filter(x=>x.include).map((x, i) => {
+      const ev = findEvidenceById(x.evidenceId);
+      return `
+        <tr>
+          <td class="mono nowrap">${i+1}</td>
+          <td class="mono">${escapeHtml(x.bearingText || "")}</td>
+          <td class="mono nowrap">${Number(x.distance||0).toFixed(2)} ft</td>
+          <td class="small">
+            <b>${escapeHtml(ev?.title || "—")}</b>
+            <div class="muted small">p.${escapeHtml(String(x.page ?? "—"))}</div>
+          </td>
+          <td class="small muted">${escapeHtml(x.snippet || "")}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const cornerList = corners.map(c => {
+      const chosen = cornerChosenCandidate(c);
+      const needsJ = chosen && requiresJustification(c, chosen);
+      const maxW = maxCandidateWeight(c);
+
+      return `
+        <tr>
+          <td><b>${escapeHtml(c.name || "")}</b><div class="small muted">${escapeHtml(c.plss || "")}</div></td>
+          <td class="nowrap">${escapeHtml(c.status || "")}</td>
+          <td>
+            ${chosen ? `
+              <div><b>${escapeHtml(chosen.kind || "")}</b> <span class="pill ${needsJ ? "warn" : "good"}">${needsJ ? "Justified override" : "Selected"}</span></div>
+              <div class="small muted">Weight ${Number(chosen.weight||0)} / max ${maxW}</div>
+              <div class="small">${escapeHtml(chosen.summary || "")}</div>
+            ` : `<span class="pill bad">No selection</span>`}
+          </td>
+          <td class="small">${escapeHtml(chosen?.justification || "")}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const travSummary = res ? `
+      <div class="kpi">
+        <div class="box"><div class="v mono">${res.totalDist.toFixed(2)}</div><div class="l">Total distance (ft)</div></div>
+        <div class="box"><div class="v mono">${res.closure.misclose.toFixed(3)}</div><div class="l">Misclosure (ft)</div></div>
+        <div class="box"><div class="v mono">${(isFinite(res.precision) ? ("1:" + Math.round(res.precision).toLocaleString()) : "∞")}</div><div class="l">Relative precision</div></div>
+      </div>
+      <div class="small muted" style="margin-top:10px;">
+        Basis: <b>${escapeHtml(p.traverse.basis?.label || "")}</b> • rotation ${Number(p.traverse.basis?.rotationDeg||0).toFixed(6)}°
+        • start N=${Number(p.traverse.start?.N||0).toFixed(3)} E=${Number(p.traverse.start?.E||0).toFixed(3)}
+      </div>
+    ` : `<div class="muted">Traverse not run yet.</div>`;
+
+    return `
+      <div class="card">
+        <div class="hd">
+          <h3>Printable Casefile Package (Concept)</h3>
+          <span class="pill">Use Print → Save as PDF</span>
+        </div>
+        <div class="bd">
+          <div class="grid2">
+            <div>
+              <div class="muted small">Project</div>
+              <div style="font-size:18px;font-weight:800;">${escapeHtml(p.meta.name || "")}</div>
+              <div class="small muted">Created: ${escapeHtml(new Date(p.meta.createdAt).toLocaleString())} • Updated: ${escapeHtml(new Date(p.meta.updatedAt).toLocaleString())}</div>
+              <div class="small muted">Jurisdiction: ${escapeHtml(p.meta.jurisdiction || "")}</div>
+            </div>
+            <div>
+              <div class="muted small">Notes</div>
+              <div class="small">${escapeHtml(p.meta.notes || "—")}</div>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <h3 style="margin:0 0 8px;">1) Evidence Register</h3>
+          <table class="table">
+            <thead><tr><th>Type</th><th>Title / Source</th><th>Date</th><th>Tags</th></tr></thead>
+            <tbody>${evList || `<tr><td colspan="4" class="muted">No evidence.</td></tr>`}</tbody>
+          </table>
+
+          <div class="hr"></div>
+
+          <h3 style="margin:0 0 8px;">2) Extracted Calls (with Traceability)</h3>
+          <table class="table">
+            <thead><tr><th>#</th><th>Bearing</th><th>Distance</th><th>Source</th><th>Snippet</th></tr></thead>
+            <tbody>${callList || `<tr><td colspan="5" class="muted">No included calls.</td></tr>`}</tbody>
+          </table>
+
+          <div class="hr"></div>
+
+          <h3 style="margin:0 0 8px;">3) Evidence Matrix — Corner Selections & Justifications</h3>
+          <table class="table">
+            <thead><tr><th>Corner</th><th>Status</th><th>Chosen Candidate</th><th>Justification</th></tr></thead>
+            <tbody>${cornerList || `<tr><td colspan="4" class="muted">No corners.</td></tr>`}</tbody>
+          </table>
+
+          <div class="hr"></div>
+
+          <h3 style="margin:0 0 8px;">4) Computations Summary (Traverse)</h3>
+          ${travSummary}
+
+          <div class="hr"></div>
+
+          <div class="small muted">
+            <b>Important:</b> This is a concept prototype. It is not a substitute for professional judgment, standards, record research,
+            monument recovery/restoration rules, or state filing compliance. It demonstrates the workflow structure that prevents rework
+            and preserves defensibility.
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**********************
+   * Rendering router
+   **********************/
+  function render(){
+    if(!activeProject){
+      const id = getActiveId();
+      setActiveProject(id || (projects[0]?.id));
+      return;
+    }
+
+    let html = "";
+    if(activeTab === "dashboard") html = viewDashboard();
+    if(activeTab === "evidence") html = viewEvidence();
+    if(activeTab === "extract") html = viewExtract();
+    if(activeTab === "matrix") html = viewMatrix();
+    if(activeTab === "traverse") html = viewTraverse();
+    if(activeTab === "outputs") html = viewOutputs();
+
+    main.innerHTML = html;
+
+    wireTabEvents();
+  }
+
+  /**********************
+   * Wire events per tab
+   **********************/
+  function wireTabEvents(){
+    const p = activeProject;
+
+    // Dashboard events
+    if(activeTab === "dashboard"){
+      $("#projName")?.addEventListener("input", (e)=>{ p.meta.name = e.target.value; refreshProjectSelect(); commit("Updated project name"); });
+      $("#projJur")?.addEventListener("input", (e)=>{ p.meta.jurisdiction = e.target.value; commit("Updated jurisdiction"); });
+      $("#projNotes")?.addEventListener("input", (e)=>{ p.meta.notes = e.target.value; commit("Updated notes"); });
+
+      $("#startN")?.addEventListener("change", (e)=>{ p.traverse.start.N = Number(e.target.value); commit("Updated traverse start"); });
+      $("#startE")?.addEventListener("change", (e)=>{ p.traverse.start.E = Number(e.target.value); commit("Updated traverse start"); });
+      $("#rotDeg")?.addEventListener("change", (e)=>{ p.traverse.basis.rotationDeg = Number(e.target.value); commit("Updated rotation"); });
+
+      $("#runTraverseBtn")?.addEventListener("click", ()=>{
+        // Sync calls
+        p.traverse.calls = p.extractions.filter(x=>x.include).map(x=>x.id);
+        p.traverse.results = computeTraverseFromExtractions(p);
+        p.traverse.lastRun = nowISO();
+        commit("Traverse computed");
+        render();
+      });
+
+      $("#gotoTraverse")?.addEventListener("click", ()=> setTab("traverse"));
+      $("#gotoExtract")?.addEventListener("click", ()=> setTab("extract"));
+      $("#gotoMatrix")?.addEventListener("click", ()=> setTab("matrix"));
+    }
+
+    // Evidence tab
+    if(activeTab === "evidence"){
+      $("#goExtractBtn")?.addEventListener("click", ()=> setTab("extract"));
+
+      $("#saveEvBtn")?.addEventListener("click", ()=>{
+        const e = {
+          id: uid(),
+          type: $("#evType").value,
+          title: ($("#evTitle").value || "").trim(),
+          date: ($("#evDate").value || "").trim(),
+          source: ($("#evSource").value || "").trim(),
+          tags: ($("#evTags").value || "").split(",").map(s=>s.trim()).filter(Boolean),
+          notes: ($("#evNotes").value || "").trim(),
+          attachment: null
+        };
+        if(!e.title) e.title = e.type + " (untitled)";
+        p.evidence.unshift(e);
+        commit("Added evidence");
+        render();
+      });
+
+      $("#addEvidenceBtn")?.addEventListener("click", ()=>{
+        const title = prompt("Evidence title:", "Evidence Item");
+        if(title === null) return;
+        const type = prompt("Type (Deed/Plat/ROS/Photo/etc):", "Other") || "Other";
+        p.evidence.unshift({
+          id: uid(),
+          type: type.trim() || "Other",
+          title: title.trim() || "Evidence Item",
+          date: "",
+          source: "",
+          tags: [],
+          notes: "",
+          attachment: null
+        });
+        commit("Added evidence (metadata only)");
+        render();
+      });
+
+      // drag/drop + file picker
+      const dz = $("#dropzone");
+      const pick = $("#filePick");
+      if(dz){
+        ["dragenter","dragover"].forEach(evt => dz.addEventListener(evt, (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          dz.classList.add("drag");
+        }));
+        ["dragleave","drop"].forEach(evt => dz.addEventListener(evt, (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          dz.classList.remove("drag");
+        }));
+        dz.addEventListener("drop", async (e)=>{
+          const file = e.dataTransfer.files?.[0];
+          if(file) await ingestFileAsEvidence(file);
+        });
+      }
+      pick?.addEventListener("change", async (e)=>{
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if(file) await ingestFileAsEvidence(file);
+      });
+
+      main.addEventListener("click", (e)=>{
+        const btn = e.target.closest("button");
+        if(!btn) return;
+        const act = btn.dataset.act;
+        const id = btn.dataset.id;
+        if(act === "delEvidence"){
+          const ok = confirm("Delete evidence item?");
+          if(!ok) return;
+          p.evidence = p.evidence.filter(x => x.id !== id);
+          // cascade: extractions referencing it remain but show missing evidence
+          commit("Deleted evidence");
+          render();
+        }
+        if(act === "editEvidence"){
+          const ev = p.evidence.find(x=>x.id===id);
+          if(!ev) return;
+          const title = prompt("Title:", ev.title || "") ?? ev.title;
+          if(title === null) return;
+          ev.title = title.trim();
+          ev.type = (prompt("Type:", ev.type || "") ?? ev.type).trim();
+          ev.date = (prompt("Date (YYYY-MM-DD):", ev.date || "") ?? ev.date).trim();
+          ev.source = (prompt("Source:", ev.source || "") ?? ev.source).trim();
+          ev.tags = (prompt("Tags (comma separated):", (ev.tags||[]).join(", ")) ?? (ev.tags||[]).join(", ")).split(",").map(s=>s.trim()).filter(Boolean);
+          ev.notes = (prompt("Notes:", ev.notes || "") ?? ev.notes);
+          commit("Updated evidence");
+          render();
+        }
+      }, {once:true}); // avoid piling multiple listeners per render
+    }
+
+    // Extract tab
+    if(activeTab === "extract"){
+      $("#runExtractBtn")?.addEventListener("click", ()=>{
+        const evidenceId = $("#exEvidence").value;
+        if(!evidenceId){
+          alert("Add evidence first, then select it here.");
+          return;
+        }
+        const page = Number($("#exPage").value || 1);
+        const text = $("#exText").value || "";
+        const found = parseCallsFromText(text);
+        if(found.length === 0){
+          alert("No calls found. Check bearing format: N 45°01'07\" E 123.45");
+          return;
+        }
+        found.forEach((f, idx) => {
+          p.extractions.push({
+            id: uid(),
+            createdAt: nowISO(),
+            evidenceId,
+            page,
+            snippet: f.snippet,
+            label: `Call ${p.extractions.length + 1}`,
+            bearingText: f.bearingText,
+            distance: f.distance,
+            distanceUnit: f.distanceUnit,
+            include: true,
+            confidence: f.confidence
+          });
+        });
+        commit(`Extracted ${found.length} calls`);
+        render();
+      });
+
+      $("#addManualBtn")?.addEventListener("click", ()=>{
+        const evidenceId = $("#exEvidence").value;
+        if(!evidenceId){
+          alert("Select an evidence item first.");
+          return;
+        }
+        const bearing = prompt("Bearing (e.g., N 45°01'07\" E):", "N 00°00'00\" E");
+        if(bearing === null) return;
+        const dist = prompt("Distance (ft):", "100.00");
+        if(dist === null) return;
+        const pb = parseBearingText(bearing);
+        if(!pb){
+          alert("Bearing parse failed. Use quadrant format like: N 45°01'07\" E");
+          return;
+        }
+        p.extractions.push({
+          id: uid(),
+          createdAt: nowISO(),
+          evidenceId,
+          page: Number($("#exPage").value || 1),
+          snippet: "(manual entry)",
+          label: `Call ${p.extractions.length + 1}`,
+          bearingText: normalizeBearingDisplay(bearing),
+          distance: Number(dist),
+          distanceUnit: "ft",
+          include: true,
+          confidence: 0.9
+        });
+        commit("Added manual call");
+        render();
+      });
+
+      $("#pushToTraverseBtn")?.addEventListener("click", ()=>{
+        p.traverse.calls = p.extractions.filter(x=>x.include).map(x=>x.id);
+        commit("Synced included calls to traverse");
+        showToast("Traverse updated", "Included calls are now used by the traverse workspace.");
+      });
+
+      main.addEventListener("change", (e)=>{
+        const cb = e.target.closest("input[type='checkbox'][data-act='toggleInclude']");
+        if(!cb) return;
+        const id = cb.dataset.id;
+        const ex = p.extractions.find(x=>x.id===id);
+        if(!ex) return;
+        ex.include = cb.checked;
+        commit("Updated call inclusion");
+      });
+
+      main.addEventListener("click", (e)=>{
+        const btn = e.target.closest("button");
+        if(!btn) return;
+        const act = btn.dataset.act;
+        const id = btn.dataset.id;
+        if(act === "delExtraction"){
+          const ok = confirm("Delete extracted call?");
+          if(!ok) return;
+          p.extractions = p.extractions.filter(x=>x.id!==id);
+          p.traverse.calls = p.traverse.calls.filter(x=>x!==id);
+          commit("Deleted extracted call");
+          render();
+        }
+        if(act === "editExtraction"){
+          const ex = p.extractions.find(x=>x.id===id);
+          if(!ex) return;
+          const label = prompt("Label:", ex.label || "") ?? ex.label;
+          if(label === null) return;
+          const bearing = prompt("Bearing:", ex.bearingText || "") ?? ex.bearingText;
+          if(bearing === null) return;
+          const dist = prompt("Distance (ft):", String(ex.distance||0)) ?? String(ex.distance||0);
+          if(dist === null) return;
+          const page = prompt("Page:", String(ex.page ?? "")) ?? String(ex.page ?? "");
+          if(page === null) return;
+          const conf = prompt("Confidence (0-1):", String(ex.confidence ?? 0.75)) ?? String(ex.confidence ?? 0.75);
+
+          const pb = parseBearingText(bearing);
+          if(!pb){
+            alert("Bearing parse failed. Keep quadrant format like: N 45°01'07\" E");
+            return;
+          }
+          ex.label = (label||"").trim();
+          ex.bearingText = normalizeBearingDisplay(bearing);
+          ex.distance = Number(dist);
+          ex.page = Number(page);
+          ex.confidence = Math.max(0, Math.min(1, Number(conf)));
+          commit("Edited extracted call");
+          render();
+        }
+      }, {once:true});
+    }
+
+    // Matrix tab
+    if(activeTab === "matrix"){
+      $("#addCornerBtn")?.addEventListener("click", ()=>{
+        const name = prompt("Corner name:", "NW COR (Parcel)");
+        if(name === null) return;
+        p.corners.unshift({
+          id: uid(),
+          name: name.trim() || "Corner",
+          plss: "",
+          status: "Unknown",
+          candidates: [],
+          decisions: []
+        });
+        commit("Added corner");
+        render();
+      });
+
+      $("#bulkFromTraverseBtn")?.addEventListener("click", ()=>{
+        const ok = confirm("Add 4 corners (NW/NE/SE/SW) as placeholders?");
+        if(!ok) return;
+        const names = ["NW COR (Parcel)","NE COR (Parcel)","SE COR (Parcel)","SW COR (Parcel)"];
+        names.forEach(n => p.corners.unshift({ id: uid(), name:n, plss:"", status:"Unknown", candidates:[], decisions:[] }));
+        commit("Added 4 placeholder corners");
+        render();
+      });
+
+      main.addEventListener("click", (e)=>{
+        const btn = e.target.closest("button");
+        if(!btn) return;
+        const act = btn.dataset.act;
+
+        if(act === "openCorner"){
+          const id = btn.dataset.id;
+          $("#cornerModalHost").innerHTML = renderCornerModal(id);
+          // wire modal handlers by reusing wire function
+          wireCornerModalHandlers();
+        }
+        if(act === "closeCorner"){
+          $("#cornerModalHost").innerHTML = "";
+        }
+        if(act === "delCorner"){
+          const id = btn.dataset.id;
+          const ok = confirm("Delete corner?");
+          if(!ok) return;
+          p.corners = p.corners.filter(x=>x.id!==id);
+          commit("Deleted corner");
+          render();
+        }
+      }, {once:true});
+    }
+
+    // Traverse tab
+    if(activeTab === "traverse"){
+      $("#travStartN")?.addEventListener("change",(e)=>{ p.traverse.start.N = Number(e.target.value); commit("Updated traverse start"); });
+      $("#travStartE")?.addEventListener("change",(e)=>{ p.traverse.start.E = Number(e.target.value); commit("Updated traverse start"); });
+      $("#basisLabel")?.addEventListener("input",(e)=>{ p.traverse.basis.label = e.target.value; commit("Updated basis label"); });
+      $("#basisRot")?.addEventListener("change",(e)=>{ p.traverse.basis.rotationDeg = Number(e.target.value); commit("Updated rotation"); });
+
+      $("#syncTraverseCallsBtn")?.addEventListener("click", ()=>{
+        p.traverse.calls = p.extractions.filter(x=>x.include).map(x=>x.id);
+        commit("Synced included calls");
+        render();
+      });
+
+      $("#runTraverseBtn2")?.addEventListener("click", ()=>{
+        // Ensure call list has all extractions in their current order
+        if(!Array.isArray(p.traverse.calls) || p.traverse.calls.length === 0){
+          p.traverse.calls = p.extractions.map(x=>x.id);
+        }
+        p.traverse.results = computeTraverseFromExtractions(p);
+        p.traverse.lastRun = nowISO();
+        commit("Traverse computed");
+        render();
+      });
+
+      $("#pushTraverseToOutputsBtn")?.addEventListener("click", ()=>{
+        commit("Outputs refreshed");
+        showToast("Outputs ready", "Open Outputs tab and Print → Save as PDF.");
+      });
+
+      main.addEventListener("change", (e)=>{
+        const cb = e.target.closest("input[type='checkbox'][data-act='toggleInclude']");
+        if(!cb) return;
+        const id = cb.dataset.id;
+        const ex = p.extractions.find(x=>x.id===id);
+        if(!ex) return;
+        ex.include = cb.checked;
+        commit("Updated call inclusion");
+      });
+
+      main.addEventListener("click", (e)=>{
+        const btn = e.target.closest("button");
+        if(!btn) return;
+        const act = btn.dataset.act;
+        const id = btn.dataset.id;
+
+        if(act === "moveCallUp" || act === "moveCallDown"){
+          const idx = p.extractions.findIndex(x=>x.id===id);
+          if(idx < 0) return;
+          const swapWith = act === "moveCallUp" ? idx-1 : idx+1;
+          if(swapWith < 0 || swapWith >= p.extractions.length) return;
+          const tmp = p.extractions[idx];
+          p.extractions[idx] = p.extractions[swapWith];
+          p.extractions[swapWith] = tmp;
+          // keep traverse.calls aligned with extraction order for demo
+          p.traverse.calls = p.extractions.map(x=>x.id);
+          commit("Reordered calls");
+          render();
+        }
+      }, {once:true});
+    }
+  }
+
+  function wireCornerModalHandlers(){
+    const host = $("#cornerModalHost");
+    if(!host) return;
+
+    const p = activeProject;
+
+    // save simple fields on change
+    $("#cornerName")?.addEventListener("input",(e)=>{
+      const c = currentCorner();
+      if(!c) return;
+      c.name = e.target.value;
+      commit("Updated corner name");
+    });
+    $("#cornerStatus")?.addEventListener("change",(e)=>{
+      const c = currentCorner();
+      if(!c) return;
+      c.status = e.target.value;
+      commit("Updated corner status");
+    });
+    $("#cornerPlss")?.addEventListener("input",(e)=>{
+      const c = currentCorner();
+      if(!c) return;
+      c.plss = e.target.value;
+      commit("Updated corner reference");
+    });
+
+    host.addEventListener("click", (e)=>{
+      const btn = e.target.closest("button");
+      if(!btn) return;
+      const act = btn.dataset.act;
+
+      if(act === "closeCorner"){
+        $("#cornerModalHost").innerHTML = "";
+        return;
+      }
+
+      const cornerId = btn.dataset.corner || $("#cornerModalHost .card .pill.mono")?.textContent; // fallback not needed
+      const c = currentCorner();
+      if(!c) return;
+
+      if(act === "addCandidate"){
+        if(p.evidence.length === 0){
+          alert("Add evidence first so candidates can cite something.");
+          return;
+        }
+        const kind = prompt("Candidate kind (Monument/Record Call/Occupation/Computed/Other):", "Monument");
+        if(kind === null) return;
+        const evTitle = p.evidence.map((ev, idx) => `${idx+1}) ${ev.type} — ${ev.title}`).join("\n");
+        const idxStr = prompt("Select evidence # for this candidate:\n" + evTitle, "1");
+        if(idxStr === null) return;
+        const idx = Number(idxStr) - 1;
+        const ev = p.evidence[idx];
+        if(!ev){ alert("Invalid evidence selection."); return; }
+
+        const summary = prompt("Candidate summary (monument/occupation/record description):", "Found monument ...");
+        if(summary === null) return;
+        const weight = prompt("Weight (1-5):", "3");
+        if(weight === null) return;
+
+        c.candidates.push({
+          id: uid(),
+          kind: (kind||"Other").trim() || "Other",
+          refEvidenceId: ev.id,
+          summary: (summary||"").trim(),
+          weight: Math.max(1, Math.min(5, Number(weight)||3)),
+          chosen: false,
+          justification: ""
+        });
+        commit("Added candidate");
+        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
+        wireCornerModalHandlers();
+        return;
+      }
+
+      if(act === "delCandidate"){
+        const candId = btn.dataset.cand;
+        const ok = confirm("Delete candidate?");
+        if(!ok) return;
+        c.candidates = c.candidates.filter(x=>x.id!==candId);
+        commit("Deleted candidate");
+        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
+        wireCornerModalHandlers();
+        return;
+      }
+
+      if(act === "editCandidate"){
+        const candId = btn.dataset.cand;
+        const cand = (c.candidates||[]).find(x=>x.id===candId);
+        if(!cand) return;
+
+        const kind = prompt("Kind:", cand.kind || "") ?? cand.kind;
+        if(kind === null) return;
+        const summary = prompt("Summary:", cand.summary || "") ?? cand.summary;
+        if(summary === null) return;
+        const weight = prompt("Weight (1-5):", String(cand.weight||3)) ?? String(cand.weight||3);
+        if(weight === null) return;
+
+        cand.kind = (kind||"").trim();
+        cand.summary = (summary||"").trim();
+        cand.weight = Math.max(1, Math.min(5, Number(weight)||3));
+
+        commit("Edited candidate");
+        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
+        wireCornerModalHandlers();
+        return;
+      }
+
+      if(act === "chooseCandidate"){
+        const candId = btn.dataset.cand;
+        const cand = (c.candidates||[]).find(x=>x.id===candId);
+        if(!cand) return;
+
+        // toggle
+        if(cand.chosen){
+          cand.chosen = false;
+          cand.justification = "";
+          addDecisionLog({
+            at: nowISO(),
+            cornerId: c.id,
+            cornerName: c.name,
+            action: "Un-chose candidate",
+            detail: `${cand.kind}: ${cand.summary}`
+          });
+          commit("Updated selection");
+          $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
+          wireCornerModalHandlers();
+          render(); // update global matrix list pills
+          return;
+        }
+
+        // choose this one; unchoose others
+        (c.candidates||[]).forEach(x => x.chosen = (x.id === candId));
+        addDecisionLog({
+          at: nowISO(),
+          cornerId: c.id,
+          cornerName: c.name,
+          action: "Chose candidate",
+          detail: `${cand.kind}: ${cand.summary} (weight ${cand.weight})`
+        });
+        commit("Candidate chosen");
+        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
+        wireCornerModalHandlers();
+        render();
+        return;
+      }
+
+      if(act === "saveCornerDecision"){
+        const chosen = cornerChosenCandidate(c);
+        if(!chosen){
+          alert("Choose a candidate first.");
+          return;
+        }
+        const note = ($("#cornerDecisionNote")?.value || "").trim();
+        chosen.justification = note;
+
+        const needJ = requiresJustification(c, chosen);
+        if(needJ && !note){
+          alert("Justification is required for this selection (override rule triggered).");
+          return;
+        }
+
+        addDecisionLog({
+          at: nowISO(),
+          cornerId: c.id,
+          cornerName: c.name,
+          action: "Saved corner justification",
+          detail: note ? note.slice(0, 160) + (note.length>160 ? "…" : "") : "(none)"
+        });
+
+        commit("Saved corner decision");
+        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
+        wireCornerModalHandlers();
+        render();
+        return;
+      }
+    });
+
+    function currentCorner(){
+      // infer the only open modal corner by reading the rendered content:
+      // we keep it simple: grab the corner name field and match against corners list.
+      const name = $("#cornerName")?.value;
+      // better: store active corner id in dataset
+      // We'll store it on host:
+      let cornerId = host.dataset.cornerId;
+      if(!cornerId){
+        // derive from close button's data?
+        const anyChooseBtn = host.querySelector("button[data-act='chooseCandidate']");
+        cornerId = anyChooseBtn?.dataset.corner;
+      }
+      if(!cornerId) return null;
+      host.dataset.cornerId = cornerId;
+      return p.corners.find(x=>x.id===cornerId) || null;
+    }
+  }
+
+  async function ingestFileAsEvidence(file){
+    const p = activeProject;
+    const typeGuess = guessEvidenceType(file);
+    const title = file.name || (typeGuess + " file");
+
+    let attachment = null;
+    if(file.size <= MAX_ATTACHMENT_BYTES){
+      const dataUrl = await readFileAsDataURL(file);
+      attachment = { name:file.name, mime:file.type || "application/octet-stream", size:file.size, dataUrl };
+    }else{
+      attachment = { name:file.name, mime:file.type || "application/octet-stream", size:file.size, dataUrl:null, tooLarge:true };
+    }
+
+    p.evidence.unshift({
+      id: uid(),
+      type: typeGuess,
+      title,
+      date: "",
+      source: "",
+      tags: [],
+      notes: file.size <= MAX_ATTACHMENT_BYTES
+        ? `Attachment stored in casefile (demo).`
+        : `File too large for demo localStorage attachment; stored metadata only.`,
+      attachment
+    });
+
+    commit(file.size <= MAX_ATTACHMENT_BYTES ? "Added evidence with attachment" : "Added evidence (metadata; attachment too large)");
+    render();
+  }
+
+  function guessEvidenceType(file){
+    const n = (file.name || "").toLowerCase();
+    const t = (file.type || "").toLowerCase();
+    if(t.includes("pdf") || n.endsWith(".pdf")) return "PDF";
+    if(t.startsWith("image/") || /\.(png|jpg|jpeg|webp|gif)$/i.test(n)) return "Photo";
+    if(t.includes("text") || /\.(txt|csv|md)$/i.test(n)) return "Field Notes";
+    return "Other";
+  }
+  function readFileAsDataURL(file){
+    return new Promise((resolve, reject)=>{
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+  }
+
+  /**********************
+   * Utilities
+   **********************/
+  function escapeHtml(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  /**********************
+   * Global delegated behavior (small)
+   **********************/
+  document.addEventListener("keydown",(e)=>{
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s"){
+      e.preventDefault();
+      commit("Saved (manual)");
+    }
+  });
+
+  /**********************
+   * Boot
+   **********************/
+  setActiveProject(getActiveId() || projects[0].id);
+  setTab("dashboard");
+
+})();
+</script>
+</body>
+</html>
