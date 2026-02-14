@@ -749,18 +749,38 @@
     const fullscreenEnterIcon = document.getElementById('fullscreenEnterIcon');
     const fullscreenExitIcon = document.getElementById('fullscreenExitIcon');
 
+    function isLineSmithActive() {
+      const app = getAppByEntryFile(currentApp);
+      return app?.id === 'viewport-sketch';
+    }
+
+    function lockEscapeInFullscreen() {
+      if (navigator.keyboard && typeof navigator.keyboard.lock === 'function') {
+        navigator.keyboard.lock(['Escape']).catch(() => {});
+      }
+    }
+
+    function unlockKeyboard() {
+      if (navigator.keyboard && typeof navigator.keyboard.unlock === 'function') {
+        navigator.keyboard.unlock();
+      }
+    }
+
     function updateFullscreenIcon() {
       const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
       fullscreenEnterIcon.style.display = isFullscreen ? 'none' : '';
       fullscreenExitIcon.style.display = isFullscreen ? '' : 'none';
+      if (!isFullscreen) unlockKeyboard();
     }
 
     fullscreenButton.addEventListener('click', () => {
       if (document.fullscreenElement || document.webkitFullscreenElement) {
+        unlockKeyboard();
         (document.exitFullscreen || document.webkitExitFullscreen).call(document);
       } else {
         const el = document.documentElement;
         (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+        if (isLineSmithActive()) lockEscapeInFullscreen();
       }
     });
 
@@ -1598,6 +1618,7 @@
       launcherHeaderIcon.alt = LAUNCHER_HOME_ICON_ALT;
       launcherHeaderTitle.textContent = LAUNCHER_HOME_TITLE;
       writeHistoryState(buildHomeHistoryState(), historyMode);
+      unlockKeyboard();
     }
 
     function getAppByEntryFile(file) {
@@ -1626,6 +1647,12 @@
       footerLogoWrap?.classList.add('hidden');
       updateHeaderForApp(file);
       writeHistoryState(buildAppHistoryState(file), historyMode);
+      const inFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (inFullscreen && isLineSmithActive()) {
+        lockEscapeInFullscreen();
+      } else if (inFullscreen) {
+        unlockKeyboard();
+      }
     }
 
     function createAppCard(app) {
