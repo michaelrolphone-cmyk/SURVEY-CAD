@@ -81,7 +81,6 @@
     }
 
     .header-meta-index {
-      margin-left: auto;
       color: #f9d18f;
       font-size: 0.84rem;
       white-space: nowrap;
@@ -1424,7 +1423,7 @@
         : 'No active project selected.';
       const activeProjectIndex = activeProject?.surveyIndex || '';
       activeProjectHeader.textContent = activeProject
-        ? `${activeProject.name}${activeProjectIndex ? ` • Index ${activeProjectIndex}` : ''}`
+        ? `${activeProject.name}`
         : '';
       activeProjectHeaderIndex.textContent = activeProject ? `${activeProjectIndex}` : '';
       renderActiveProjectOverview(activeProject);
