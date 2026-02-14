@@ -166,6 +166,10 @@
   <script type="module">
     const STORAGE_KEY = 'surveyfoundryCrewProfiles';
 
+    // API config
+    const CREW_API_URL = '/api/crew';
+    const SEND_PHOTO_TO_API = true; // set false if your API shouldn't receive base64 photos
+
     const fields = {
       firstName: document.getElementById('firstName'),
       lastName: document.getElementById('lastName'),
@@ -319,7 +323,7 @@
     }
 
     function getFormData() {
-      return {
+      const payload = {
         firstName: fields.firstName.value.trim(),
         lastName: fields.lastName.value.trim(),
         jobTitle: fields.jobTitle.value.trim(),
@@ -330,6 +334,70 @@
         photo: currentPhoto,
         roles: [...currentRoles],
       };
+
+      if (!SEND_PHOTO_TO_API) delete payload.photo;
+      return payload;
+    }
+
+    // --------------------------
+    // API helpers (NEW)
+    // --------------------------
+    function normalizeServerCrewList(json) {
+      // Accept common shapes:
+      //  - { crew: [...] }
+      //  - { members: [...] }
+      //  - { data: [...] }
+      //  - [...] (array)
+      if (Array.isArray(json)) return json;
+      if (Array.isArray(json?.crew)) return json.crew;
+      if (Array.isArray(json?.members)) return json.members;
+      if (Array.isArray(json?.data)) return json.data;
+      return null;
+    }
+
+    function normalizeServerMember(json) {
+      // Accept common shapes:
+      //  - { member: {...} }
+      //  - { crewMember: {...} }
+      //  - { data: {...} }
+      //  - {...} (object with id)
+      if (json && typeof json === 'object') {
+        if (json.member && typeof json.member === 'object') return json.member;
+        if (json.crewMember && typeof json.crewMember === 'object') return json.crewMember;
+        if (json.data && typeof json.data === 'object') return json.data;
+        if (json.id) return json;
+      }
+      return null;
+    }
+
+    function mergeById(localList, serverList) {
+      // Union by id with server precedence (prevents wiping local-only records).
+      const out = new Map();
+      for (const p of (localList || [])) {
+        if (p && p.id) out.set(p.id, p);
+      }
+      for (const p of (serverList || [])) {
+        if (p && p.id) out.set(p.id, { ...(out.get(p.id) || {}), ...p });
+      }
+      return Array.from(out.values());
+    }
+
+    async function postNewCrewMember(member) {
+      const res = await fetch(CREW_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(member),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`POST ${CREW_API_URL} failed (${res.status}) ${text}`.trim());
+      }
+
+      // server may return JSON or empty
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) return null;
+      return await res.json();
     }
 
     // Photo handling
@@ -397,8 +465,8 @@
       }
     });
 
-    // Save
-    saveBtn.addEventListener('click', () => {
+    // Save (UPDATED: async + POST on create)
+    saveBtn.addEventListener('click', async () => {
       const data = getFormData();
 
       if (!data.firstName && !data.lastName) {
@@ -406,23 +474,78 @@
         return;
       }
 
-      if (editingId) {
-        const idx = profiles.findIndex((p) => p.id === editingId);
-        if (idx !== -1) {
-          profiles[idx] = { ...profiles[idx], ...data, updatedAt: new Date().toISOString() };
-        }
-      } else {
-        profiles.push({
-          id: crypto.randomUUID(),
-          ...data,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      const nowIso = new Date().toISOString();
+      const wasEditing = !!editingId;
 
-      saveProfiles();
-      clearForm();
-      renderProfiles();
+      // UI lock
+      const prevText = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = wasEditing ? 'Saving…' : 'Saving & Syncing…';
+
+      try {
+        if (wasEditing) {
+          const idx = profiles.findIndex((p) => p.id === editingId);
+          if (idx !== -1) {
+            profiles[idx] = { ...profiles[idx], ...data, updatedAt: nowIso };
+          }
+          saveProfiles();
+          clearForm();
+          renderProfiles();
+          return;
+        }
+
+        // NEW member: create local record first (fast)
+        const localId = crypto.randomUUID();
+        const newLocal = {
+          id: localId,
+          ...data,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        profiles.push(newLocal);
+        saveProfiles();
+        clearForm();
+        renderProfiles();
+
+        // Then POST to API
+        try {
+          const apiJson = await postNewCrewMember(newLocal);
+
+          // If server returns a crew list, merge it in
+          const serverList = normalizeServerCrewList(apiJson);
+          if (serverList) {
+            profiles = mergeById(profiles, serverList);
+            saveProfiles();
+            renderProfiles();
+            return;
+          }
+
+          // If server returns a created member, reconcile it
+          const serverMember = normalizeServerMember(apiJson);
+          if (serverMember && serverMember.id) {
+            // Replace local record if server assigned a different id, otherwise merge fields
+            const localIdx = profiles.findIndex(p => p.id === localId);
+            if (localIdx !== -1) {
+              // If server id differs, remove local and insert server (preserving any local-only fields)
+              if (serverMember.id !== localId) {
+                const merged = { ...profiles[localIdx], ...serverMember };
+                profiles.splice(localIdx, 1);
+                profiles.push(merged);
+              } else {
+                profiles[localIdx] = { ...profiles[localIdx], ...serverMember };
+              }
+              saveProfiles();
+              renderProfiles();
+            }
+          }
+        } catch (err) {
+          // API unavailable or failed — keep localStorage version.
+          console.warn('Crew POST failed; kept local copy:', err);
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = prevText;
+      }
     });
 
     cancelBtn.addEventListener('click', () => {
@@ -497,12 +620,17 @@
 
     async function fetchLatestFromApi() {
       try {
-        const res = await fetch('/api/crew');
+        const res = await fetch(CREW_API_URL);
         if (!res.ok) return;
         const data = await res.json();
-        const serverProfiles = Array.isArray(data?.crew) ? data.crew : [];
+        const serverProfiles = Array.isArray(data?.crew) ? data.crew
+          : Array.isArray(data?.members) ? data.members
+          : Array.isArray(data) ? data
+          : [];
         if (serverProfiles.length === 0) return;
-        profiles = serverProfiles;
+
+        // Merge instead of replacing (prevents wiping local-only items)
+        profiles = mergeById(profiles, serverProfiles);
         saveProfiles();
         renderProfiles();
       } catch {
