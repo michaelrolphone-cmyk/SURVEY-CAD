@@ -374,6 +374,11 @@
       a.click(); URL.revokeObjectURL(url);
     });
 
+    window.addEventListener('surveyfoundry-localstorage-sync', () => {
+      loadItems();
+      render();
+    });
+
     /* ── init ── */
     loadItems();
     render();
