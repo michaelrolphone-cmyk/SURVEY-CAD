@@ -120,9 +120,17 @@ function lonLatToTile(lat, lon, zoom = 17) {
   };
 }
 
+const MAX_JSON_BODY_BYTES = 5 * 1024 * 1024; // 5 MB
+
 async function readJsonBody(req) {
   const chunks = [];
+  let totalBytes = 0;
   for await (const chunk of req) {
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_JSON_BODY_BYTES) {
+      req.destroy();
+      throw new Error(`Request body exceeds maximum allowed size of ${MAX_JSON_BODY_BYTES} bytes.`);
+    }
     chunks.push(chunk);
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
@@ -545,6 +553,15 @@ export async function startServer({
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  process.on('uncaughtException', (err) => {
+    console.error(`Uncaught exception: ${err?.stack || err?.message || err}`);
+    process.exitCode = 1;
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    console.error(`Unhandled rejection: ${reason?.stack || reason?.message || reason}`);
+  });
+
   startServer().then((server) => {
     const addr = server.address();
     const display = typeof addr === 'string' ? addr : `${addr.address}:${addr.port}`;

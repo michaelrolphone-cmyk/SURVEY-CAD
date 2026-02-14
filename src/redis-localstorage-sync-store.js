@@ -149,6 +149,11 @@ export async function createRedisLocalStorageSyncStore({
     const redisClient = clientFactory(redisClientOptions);
 
     try {
+      if (typeof redisClient.on === 'function') {
+        redisClient.on('error', (err) => {
+          console.error(`Redis client error: ${err?.message || err}`);
+        });
+      }
       await redisClient.connect();
       const store = new RedisLocalStorageSyncStore({ redisClient, redisKey });
       await store.ready();
