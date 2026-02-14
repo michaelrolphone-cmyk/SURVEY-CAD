@@ -1,178 +1,363 @@
-export function normalizeAzimuth(azimuth = 0) {
-  const normalized = Number(azimuth) % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BoundaryLab — Traverse Closure Checker</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0b1220; color: #e2e8f0; }
+    .layout { display: grid; grid-template-columns: 430px minmax(0, 1fr); min-height: 100vh; }
+    .panel { border-right: 1px solid #22314f; padding: 18px; }
+    h1 { margin: 0 0 6px; font-size: 1.25rem; }
+    p { margin: 0 0 14px; color: #9fb0cc; }
+    .toolbar { display: flex; gap: 8px; margin: 10px 0 14px; }
+    button, input { border: 1px solid #2a3f62; border-radius: 8px; background: #12203a; color: #e2e8f0; padding: 8px 10px; }
+    button { cursor: pointer; }
+    .primary { background: #2563eb; border-color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #22314f; padding: 6px; text-align: left; }
+    th { color: #9fb0cc; }
+    input { width: 100%; box-sizing: border-box; }
+    .summary { margin-top: 14px; background: #0f1a2e; border: 1px solid #22314f; border-radius: 10px; padding: 12px; }
+    .summaryRow { display: flex; justify-content: space-between; margin: 5px 0; gap: 10px; }
+    .bad { color: #fca5a5; }
+    .good { color: #86efac; }
+    .canvasWrap { padding: 16px; min-width: 0; }
+    canvas { width: 100%; height: calc(100vh - 32px); border-radius: 10px; background: #07101d; border: 1px solid #22314f; display: block; }
 
-export const LINEAR_CLOSURE_TOLERANCE = 0.01;
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { border-right: 0; border-bottom: 1px solid #22314f; }
+      .canvasWrap { padding-top: 10px; }
+      canvas { height: min(56vh, 420px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="panel">
+      <h1>BoundaryLab</h1>
+      <p>
+        Enter bearings and distances in order. Bearings accept DMS (e.g. <code>N 45°01'07" E</code> or <code>N 45-01-07 E</code>).
+        The boundary preview and closure error update as you edit.
+      </p>
+      <div class="toolbar">
+        <button id="addCall" class="primary" type="button">Add Call</button>
+        <button id="clearCalls" type="button">Clear</button>
+        <button id="exportPointForge" type="button">Export to PointForge</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Bearing</th><th>Distance</th><th></th></tr>
+        </thead>
+        <tbody id="callsBody"></tbody>
+      </table>
+      <div class="summary">
+        <div class="summaryRow"><span>Total Distance</span><strong id="totalDistance">0.00</strong></div>
+        <div class="summaryRow"><span>Linear Error</span><strong id="linearError">—</strong></div>
+        <div class="summaryRow"><span>Closure Bearing</span><strong id="angularError">—</strong></div>
+        <div class="summaryRow"><span>Closure Ratio</span><strong id="closureRatio">—</strong></div>
+        <div class="summaryRow"><span>Status</span><strong id="closureStatus">Add calls</strong></div>
+      </div>
+    </aside>
+    <main class="canvasWrap">
+      <canvas id="previewCanvas" width="1000" height="700" aria-label="Boundary preview canvas"></canvas>
+    </main>
+  </div>
 
-export function normalizeAngleDiff(angle = 0) {
-  const normalized = ((Number(angle) + 180) % 360 + 360) % 360;
-  return normalized - 180;
-}
+  <script type="module">
+    import {
+      calculateTraverseFromOrderedCalls,
+      closureRatio,
+      buildTraverseCsvPNEZD,
+    } from './src/boundarylab.js';
 
-export function formatDegrees(value) {
-  return Number.isFinite(value) ? `${value.toFixed(2)}°` : '—';
-}
+    const state = {
+      calls: [
+        { id: crypto.randomUUID(), bearing: 'N 45°00\'00" E', distance: '100' },
+        { id: crypto.randomUUID(), bearing: 'S 45-00-00 E', distance: '100' },
+      ],
+    };
 
+    const body = document.getElementById('callsBody');
+    const addCallButton = document.getElementById('addCall');
+    const clearCallsButton = document.getElementById('clearCalls');
+    const totalDistanceEl = document.getElementById('totalDistance');
+    const linearErrorEl = document.getElementById('linearError');
+    const angularErrorEl = document.getElementById('angularError');
+    const closureRatioEl = document.getElementById('closureRatio');
+    const closureStatusEl = document.getElementById('closureStatus');
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
 
-export function formatDms(value) {
-  if (!Number.isFinite(value)) return '—';
-  const sign = value < 0 ? '-' : '';
-  let abs = Math.abs(value);
-  let degrees = Math.floor(abs);
-  abs = (abs - degrees) * 60;
-  let minutes = Math.floor(abs);
-  let seconds = (abs - minutes) * 60;
+    function esc(v = '') {
+      return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
 
-  if (seconds >= 59.9995) {
-    seconds = 0;
-    minutes += 1;
-  }
-  if (minutes >= 60) {
-    minutes = 0;
-    degrees += 1;
-  }
+    // --- DMS / bearing normalization -------------------------------------------------
+    // Accepts:
+    //   N 45°01'07" E
+    //   N45°01'07"E
+    //   N 45-01-07 E
+    //   N 45 01 07 E
+    //   N 45.0186 E  (decimal degrees still works)
+    // Converts to:
+    //   N <decimalDegrees> E
+    // If it can't parse cleanly, returns the original string (so upstream can handle/flag).
+    function parseDmsAngleToDecimal(angleText) {
+      const s = String(angleText ?? '').trim();
+      if (!s) return NaN;
 
-  const secText = seconds.toFixed(2).padStart(5, '0');
-  return `${sign}${degrees}°${String(minutes).padStart(2, '0')}'${secText}"`;
-}
+      // Grab 1-3 numeric components (deg, min, sec), seconds may be decimal.
+      const nums = s.match(/\d+(?:\.\d+)?/g);
+      if (!nums || nums.length === 0) return NaN;
 
-export function parseBearing(value = '') {
-  const source = String(value || '').trim().toUpperCase();
-  if (!source) return null;
+      const deg = Number(nums[0]);
+      const min = nums.length >= 2 ? Number(nums[1]) : 0;
+      const sec = nums.length >= 3 ? Number(nums[2]) : 0;
 
-  const compact = source
-    .replace(/[º°]/g, 'D')
-    .replace(/[′']/g, 'M')
-    .replace(/[″"]/g, 'S')
-    .replace(/\s+/g, '');
+      if (!Number.isFinite(deg) || !Number.isFinite(min) || !Number.isFinite(sec)) return NaN;
+      if (min < 0 || sec < 0) return NaN;
+      // (Keep this permissive; you may have 60+ in dirty input. We won't hard-fail.)
 
-  let match = compact.match(/^([NS])([0-9]{1,3}(?:\.[0-9]+)?)([EW])$/);
-  if (match) {
-    const [, ns, degRaw, ew] = match;
-    const angle = Number(degRaw);
-    if (!Number.isFinite(angle) || angle < 0 || angle > 90.000001) return null;
-    return { ns, ew, angle };
-  }
+      return deg + (min / 60) + (sec / 3600);
+    }
 
-  match = compact.match(/^([NS])([0-9]{1,3})D([0-9]{1,2}(?:\.[0-9]+)?)(?:M([0-9]{1,2}(?:\.[0-9]+)?))?(?:S)?([EW])$/);
-  if (!match) return null;
+    function formatDecimalDegrees(deg) {
+      // Keep stable + readable; trim trailing zeros.
+      const rounded = Math.round(deg * 1e8) / 1e8;
+      let out = String(rounded);
+      if (out.includes('.')) out = out.replace(/\.?0+$/g, '');
+      return out;
+    }
 
-  const [, ns, degRaw, minRaw, secRaw, ew] = match;
-  const degrees = Number(degRaw);
-  const minutes = Number(minRaw || 0);
-  const seconds = Number(secRaw || 0);
-  if (!Number.isFinite(degrees) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) return null;
+    function normalizeBearingToDecimalQuadrant(rawBearing) {
+      const raw = String(rawBearing ?? '').trim();
+      if (!raw) return raw;
 
-  const angle = degrees + (minutes / 60) + (seconds / 3600);
-  if (angle < 0 || angle > 90.000001) return null;
-  return { ns, ew, angle };
-}
+      // Normalize some unicode variants (degree/prime/double-prime) to keep matching simple.
+      const cleaned = raw
+        .replace(/[º]/g, '°')
+        .replace(/[′’]/g, "'")
+        .replace(/[″“”]/g, '"')
+        .trim();
 
-export function bearingToAzimuth(parsedBearing) {
-  if (!parsedBearing) return NaN;
-  const { ns, ew, angle } = parsedBearing;
-  if (ns === 'N' && ew === 'E') return normalizeAzimuth(angle);
-  if (ns === 'N' && ew === 'W') return normalizeAzimuth(360 - angle);
-  if (ns === 'S' && ew === 'E') return normalizeAzimuth(180 - angle);
-  if (ns === 'S' && ew === 'W') return normalizeAzimuth(180 + angle);
-  return NaN;
-}
+      // Quadrant bearing: leading N/S, trailing E/W, angle in the middle.
+      // Allow no spaces: N45-01-07E
+      const m = cleaned.match(/^\s*([NS])\s*(.*?)\s*([EW])\s*$/i);
+      if (!m) return raw; // not quadrant bearing (or malformed)
 
-export function azimuthToBearing(azimuth) {
-  if (!Number.isFinite(azimuth)) return '—';
-  const normalized = normalizeAzimuth(azimuth);
-  const northSouth = normalized <= 180 ? 'N' : 'S';
-  const eastWest = normalized <= 90 || normalized >= 270 ? 'E' : 'W';
-  const angleToAxis = normalized <= 90
-    ? normalized
-    : normalized <= 180
-      ? 180 - normalized
-      : normalized <= 270
-        ? normalized - 180
-        : 360 - normalized;
+      const ns = m[1].toUpperCase();
+      const ew = m[3].toUpperCase();
+      const mid = (m[2] ?? '').trim();
+      if (!mid) return raw;
 
-  if (Math.abs(angleToAxis) <= 1e-9) return `${northSouth} 0°00'00.00" ${eastWest}`;
-  if (Math.abs(angleToAxis - 90) <= 1e-9) return `${northSouth} 90°00'00.00" ${eastWest}`;
-  return `${northSouth} ${formatDms(angleToAxis)} ${eastWest}`;
-}
+      // The middle can be DMS with symbols or hyphens or spaces.
+      const dec = parseDmsAngleToDecimal(mid);
+      if (!Number.isFinite(dec)) return raw;
 
-export function calculateTraverseFromOrderedCalls({
-  orderedCalls = [],
-  startPoint = { x: 0, y: 0, pointNumber: 1 },
-} = {}) {
-  const base = {
-    x: Number.parseFloat(startPoint?.x) || 0,
-    y: Number.parseFloat(startPoint?.y) || 0,
-    pointNumber: Number.isFinite(startPoint?.pointNumber) ? startPoint.pointNumber : 1,
-  };
+      return `${ns} ${formatDecimalDegrees(dec)} ${ew}`;
+    }
 
-  const points = [{ ...base }];
-  let current = { x: base.x, y: base.y };
-  let totalLength = 0;
-  let startAzimuth = null;
-  let endAzimuth = null;
+    function normalizedCallsForCompute(calls) {
+      // Preserve the user's visible text; only normalize for computation.
+      return calls.map((c) => ({
+        ...c,
+        bearing: normalizeBearingToDecimalQuadrant(c.bearing),
+      }));
+    }
+    // --------------------------------------------------------------------------------
 
-  orderedCalls.forEach((call, index) => {
-    const parsed = parseBearing(call?.bearing || '');
-    const azimuth = bearingToAzimuth(parsed);
-    const distance = Number.parseFloat(call?.distance);
-    if (!Number.isFinite(azimuth) || !Number.isFinite(distance)) return;
+    function captureActiveInputState() {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLInputElement)) return null;
+      const { id, key } = active.dataset;
+      if (!id || !key) return null;
 
-    if (startAzimuth === null) startAzimuth = azimuth;
-    endAzimuth = azimuth;
-    totalLength += Math.abs(distance);
+      return {
+        id,
+        key,
+        selectionStart: active.selectionStart,
+        selectionEnd: active.selectionEnd,
+      };
+    }
 
-    const azRad = (azimuth * Math.PI) / 180;
-    const dE = distance * Math.sin(azRad);
-    const dN = distance * Math.cos(azRad);
-    current = { x: current.x + dE, y: current.y + dN };
-    points.push({ x: current.x, y: current.y, pointNumber: base.pointNumber + index + 1 });
-  });
+    function restoreActiveInputState(activeState) {
+      if (!activeState) return;
+      const nextInput = Array.from(body.querySelectorAll('input')).find((input) => (
+        input.dataset.id === activeState.id && input.dataset.key === activeState.key
+      ));
 
-  const closureDx = current.x - base.x;
-  const closureDy = current.y - base.y;
-  const linearMisclosure = points.length > 1 ? Math.hypot(closureDx, closureDy) : null;
-  const closureIsLinear = Number.isFinite(linearMisclosure) && linearMisclosure <= LINEAR_CLOSURE_TOLERANCE;
-  const closureAzimuth = Number.isFinite(linearMisclosure) && linearMisclosure > LINEAR_CLOSURE_TOLERANCE
-    ? normalizeAzimuth((Math.atan2(-closureDx, -closureDy) * 180) / Math.PI)
-    : null;
-  const angularMisclosure = Number.isFinite(startAzimuth) && Number.isFinite(endAzimuth)
-    ? (closureIsLinear ? 0 : Math.abs(normalizeAngleDiff(endAzimuth - startAzimuth)))
-    : null;
+      if (!nextInput) return;
+      nextInput.focus({ preventScroll: true });
+      if (Number.isInteger(activeState.selectionStart) && Number.isInteger(activeState.selectionEnd)) {
+        nextInput.setSelectionRange(activeState.selectionStart, activeState.selectionEnd);
+      }
+    }
 
-  return {
-    points,
-    totalLength,
-    linearMisclosure,
-    angularMisclosure,
-    closureAzimuth,
-    closureBearing: closureIsLinear ? 'Closed' : azimuthToBearing(closureAzimuth),
-    closureIsLinear,
-    startAzimuth,
-    endAzimuth,
-    endPoint: points.at(-1) || null,
-    closureDx,
-    closureDy,
-  };
-}
+    function renderRows(activeState = null) {
+      body.innerHTML = state.calls.map((call, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>
+            <input
+              data-id="${call.id}"
+              data-key="bearing"
+              value="${esc(call.bearing)}"
+              placeholder="N 45°01'07&quot; E  (or N 45-01-07 E)"
+              title="Accepted: N 45°01'07&quot; E | N 45-01-07 E | N 45 01 07 E | N 45.0186 E"
+            />
+          </td>
+          <td><input data-id="${call.id}" data-key="distance" value="${esc(call.distance)}" placeholder="100" /></td>
+          <td><button data-remove="${call.id}" type="button">✕</button></td>
+        </tr>
+      `).join('');
 
-export function closureRatio(totalLength, linearMisclosure) {
-  if (!Number.isFinite(totalLength) || totalLength <= 0 || !Number.isFinite(linearMisclosure)) return null;
-  if (Math.abs(linearMisclosure) <= 1e-9) return Infinity;
-  return totalLength / linearMisclosure;
-}
+      restoreActiveInputState(activeState);
+    }
 
-export function buildTraverseCsvPNEZD(points, { startPointNumber = 1 } = {}) {
-  if (!points || !points.length) return '';
-  const lines = [];
-  for (let i = 0; i < points.length; i++) {
-    const pt = points[i];
-    if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
-    const num = startPointNumber + i;
-    const northing = pt.y.toFixed(3);
-    const easting = pt.x.toFixed(3);
-    lines.push(`${num},${northing},${easting},0.000,TRAV`);
-  }
-  return lines.join('\n');
-}
+    function resizeCanvasToDisplaySize() {
+      const rect = canvas.getBoundingClientRect();
+      const pixelRatio = Math.max(window.devicePixelRatio || 1, 1);
+      const displayWidth = Math.max(1, Math.round(rect.width * pixelRatio));
+      const displayHeight = Math.max(1, Math.round(rect.height * pixelRatio));
+
+      if (canvas.width === displayWidth && canvas.height === displayHeight) return false;
+
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+      return true;
+    }
+
+    function draw(points) {
+      resizeCanvasToDisplaySize();
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#0f1b30';
+      ctx.fillRect(0, 0, w, h);
+
+      if (!points || points.length === 0) return;
+      const xs = points.map((p) => p.x);
+      const ys = points.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+
+      const spanX = Math.max(maxX - minX, 1);
+      const spanY = Math.max(maxY - minY, 1);
+      const pad = 40;
+      const scale = Math.min((w - (pad * 2)) / spanX, (h - (pad * 2)) / spanY);
+      const tx = (x) => pad + ((x - minX) * scale);
+      const ty = (y) => h - (pad + ((y - minY) * scale));
+
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      points.forEach((pt, i) => {
+        const x = tx(pt.x);
+        const y = ty(pt.y);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      ctx.fillStyle = '#fbbf24';
+      points.forEach((pt) => {
+        ctx.beginPath();
+        ctx.arc(tx(pt.x), ty(pt.y), 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function render() {
+      renderRows(captureActiveInputState());
+
+      const traversal = calculateTraverseFromOrderedCalls({
+        orderedCalls: normalizedCallsForCompute(state.calls),
+      });
+
+      const ratio = closureRatio(traversal.totalLength, traversal.linearMisclosure);
+
+      totalDistanceEl.textContent = traversal.totalLength.toFixed(2);
+      linearErrorEl.textContent = Number.isFinite(traversal.linearMisclosure) ? traversal.linearMisclosure.toFixed(4) : '—';
+      angularErrorEl.textContent = traversal.closureBearing;
+      closureRatioEl.textContent = ratio === Infinity ? 'Perfect closure' : (Number.isFinite(ratio) ? `1:${Math.round(ratio).toLocaleString()}` : '—');
+
+      const closed = traversal.closureIsLinear;
+      closureStatusEl.textContent = closed ? 'Closed' : 'Open';
+      closureStatusEl.className = closed ? 'good' : 'bad';
+
+      draw(traversal.points);
+    }
+
+    body.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const id = target.dataset.id;
+      const key = target.dataset.key;
+      const call = state.calls.find((row) => row.id === id);
+      if (!call || !key) return;
+      call[key] = target.value;
+      render();
+    });
+
+    body.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const removeId = target.getAttribute('data-remove');
+      if (!removeId) return;
+      state.calls = state.calls.filter((row) => row.id !== removeId);
+      render();
+    });
+
+    addCallButton.addEventListener('click', () => {
+      state.calls.push({ id: crypto.randomUUID(), bearing: '', distance: '' });
+      render();
+    });
+
+    clearCallsButton.addEventListener('click', () => {
+      state.calls = [];
+      render();
+    });
+
+    const BOUNDARYLAB_POINTFORGE_IMPORT_KEY = 'pointforgeBoundaryLabImport';
+    const exportButton = document.getElementById('exportPointForge');
+
+    exportButton.addEventListener('click', () => {
+      const traversal = calculateTraverseFromOrderedCalls({
+        orderedCalls: normalizedCallsForCompute(state.calls),
+        startPoint: { x: 10000, y: 10000, pointNumber: 1 },
+      });
+
+      if (!traversal.points || traversal.points.length < 2) return;
+
+      const csv = buildTraverseCsvPNEZD(traversal.points);
+      if (!csv) return;
+
+      localStorage.setItem(BOUNDARYLAB_POINTFORGE_IMPORT_KEY, JSON.stringify({
+        csv,
+        exportedAt: new Date().toISOString(),
+        source: 'boundary-lab',
+      }));
+
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'survey-cad:navigate-app',
+            path: '/POINT_TRANSFORMER.HTML?source=boundary-lab',
+          }, window.location.origin);
+          return;
+        }
+      } catch (_e) { /* fallback below */ }
+      window.location.assign('/POINT_TRANSFORMER.HTML?source=boundary-lab');
+    });
+
+    window.addEventListener('resize', render);
+
+    render();
+  </script>
+</body>
+</html>
