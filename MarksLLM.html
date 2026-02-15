@@ -11,153 +11,48 @@
       --text:#e6eefc;
       --muted:#9ab0d0;
       --line:rgba(255,255,255,.10);
-      --accent:#ffd54a;
       --ok:#37d67a;
       --warn:#ffb020;
       --bad:#ff5b5b;
-      --shadow: 0 12px 40px rgba(0,0,0,.55);
-      --r:16px;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
     }
-    html,body{
-      height:100%; margin:0;
-      background:radial-gradient(1200px 700px at 30% 0%, #101c35 0%, var(--bg) 60%);
-      color:var(--text);
-      font-family:var(--sans);
-    }
+    html,body{height:100%; margin:0; background:radial-gradient(1200px 700px at 30% 0%, #101c35 0%, var(--bg) 60%); color:var(--text); font-family:var(--sans);}
     .app{display:grid; grid-template-rows:auto 1fr auto; height:100%;}
-    .topbar{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:12px 14px;
-      border-bottom:1px solid var(--line);
-      background:linear-gradient(180deg, rgba(0,0,0,.35), transparent);
-      gap:12px;
-    }
+    .topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line); background:linear-gradient(180deg, rgba(0,0,0,.35), transparent); gap:12px;}
     .brand{display:flex; gap:10px; align-items:center; min-width:0;}
-    .brand img{
-      width:34px; height:34px; border-radius:12px; object-fit:cover;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.25);
-      box-shadow: 0 10px 26px rgba(0,0,0,.38);
-      flex:0 0 auto;
-    }
+    .brand img{width:34px; height:34px; border-radius:12px; object-fit:cover; border:1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.25); flex:0 0 auto;}
     .brand .stack{display:flex; flex-direction:column; gap:2px; min-width:0;}
     .brand .stack b{font-size:13px;}
     .brand .stack span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-
-    /* only indicator */
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(0,0,0,.22);
-      font-size:12px;
-      color:var(--muted);
-      user-select:none;
-    }
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:rgba(0,0,0,.22); font-size:12px; color:var(--muted); user-select:none;}
     .dot{width:10px; height:10px; border-radius:50%;}
-    .dot.ok{background:var(--ok);}
-    .dot.warn{background:var(--warn);}
-    .dot.bad{background:var(--bad);}
-
-    .chat{
-      overflow:auto;
-      padding:16px 14px;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-    }
-    .msg{
-      max-width: 980px;
-      width: fit-content;
-      border-radius: 16px;
-      border:1px solid var(--line);
-      background:rgba(0,0,0,.28);
-      padding:10px 12px;
-      box-shadow: 0 8px 26px rgba(0,0,0,.35);
-    }
+    .dot.ok{background:var(--ok);} .dot.warn{background:var(--warn);} .dot.bad{background:var(--bad);}
+    .chat{overflow:auto; padding:16px 14px; display:flex; flex-direction:column; gap:12px;}
+    .msg{max-width:980px; width:fit-content; border-radius:16px; border:1px solid var(--line); background:rgba(0,0,0,.28); padding:10px 12px;}
     .msg.user{align-self:flex-end; background:rgba(255,213,74,.08); border-color:rgba(255,213,74,.24);}
     .msg.assistant{align-self:flex-start;}
     .meta{display:flex; gap:10px; align-items:center; margin-bottom:6px; color:var(--muted); font-size:11px;}
     .meta .role{font-weight:800; letter-spacing:.3px;}
     .meta .small{font-family:var(--mono); opacity:.85;}
-    .msg pre{
-      margin:0;
-      white-space:pre-wrap;
-      word-break:break-word;
-      font-family:var(--sans);
-      font-size:13px;
-      line-height:1.45;
-      color:var(--text);
-    }
-
-    .composer{
-      border-top:1px solid var(--line);
-      padding:12px 14px;
-      background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
-    }
-    .composer .box{
-      display:grid;
-      grid-template-columns: 1fr auto;
-      gap:10px;
-      align-items:end;
-    }
-    textarea{
-      width:100%;
-      min-height:56px;
-      max-height:220px;
-      resize:vertical;
-      background:rgba(0,0,0,.25);
-      border:1px solid var(--line);
-      color:var(--text);
-      border-radius:14px;
-      padding:10px 10px;
-      outline:none;
-      font-family:var(--sans);
-    }
-    textarea:focus{border-color: rgba(255,213,74,.55); box-shadow:0 0 0 3px rgba(255,213,74,.12);}
-    .btn{
-      border:1px solid var(--line);
-      border-radius:14px;
-      padding:10px 14px;
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      cursor:pointer;
-      user-select:none;
-      transition:transform .06s ease, background .15s ease, border-color .15s ease;
-      font-weight:700;
-      font-size:12px;
-      height: 42px;
-    }
-    .btn:hover{background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.18);}
-    .btn:active{transform:translateY(1px);}
-    .btn.primary{background:rgba(255,213,74,.12); border-color:rgba(255,213,74,.30);}
-    .btn.primary:hover{background:rgba(255,213,74,.16); border-color:rgba(255,213,74,.42);}
-
-    .chat::-webkit-scrollbar{width:10px}
-    .chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10); border-radius:999px}
-
-    @media (max-width: 520px){
-      .brand .stack span{display:none;}
-      .pill{padding:6px 9px;}
-    }
+    .msg pre{margin:0; white-space:pre-wrap; word-break:break-word; font-family:var(--sans); font-size:13px; line-height:1.45;}
+    .composer{border-top:1px solid var(--line); padding:12px 14px; background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));}
+    .composer .box{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end;}
+    textarea{width:100%; min-height:56px; max-height:220px; resize:vertical; background:rgba(0,0,0,.25); border:1px solid var(--line); color:var(--text); border-radius:14px; padding:10px 10px; outline:none; font-family:var(--sans);}
+    .btn{border:1px solid var(--line); border-radius:14px; padding:10px 14px; background:rgba(255,255,255,.04); color:var(--text); cursor:pointer; font-weight:700; font-size:12px; height:42px;}
   </style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <img src="/assets/icons/MarksAI.png" alt="Marks"
-             onerror="this.style.opacity=.4; this.title='Missing /assets/icons/MarksAI.png';" />
+        <img src="/assets/icons/MarksAI.png" alt="Marks" onerror="this.style.opacity=.4;" />
         <div class="stack">
           <b>Marks</b>
           <span id="subtitle">LM socket proxy chat</span>
         </div>
       </div>
-
-      <span class="pill" title="WebSocket connection status">
+      <span class="pill">
         <span class="dot bad" id="statusDot"></span>
         <span id="statusText">Disconnected</span>
       </span>
@@ -168,48 +63,30 @@
     <footer class="composer">
       <div class="box">
         <textarea id="input" placeholder="Message Marks… (Shift+Enter for newline)"></textarea>
-        <button class="btn primary" id="btnSend">Send</button>
+        <button class="btn" id="btnSend">Send</button>
       </div>
     </footer>
   </div>
 
   <script>
-    // Your WS endpoint:
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
 
-    // The proxy client expects SERVER->CLIENT commands like:
-    //   { type:"chat", id:"...", body:{ messages:[...], temperature, max_tokens, stream, model? } }
-    //
-    // You are connecting the browser to that same WS endpoint, and your server is responding:
-    //   "must send hello first"
-    //
-    // So we MUST send a hello immediately on connect, before any chat/models/cancel.
-    // This hello is the same shape the proxy ecosystem uses: {type:"hello", client_id:"..."}.
-    //
-    // If your server also sends hello_ack, we’ll mark handshakeComplete. If it doesn’t, we proceed anyway.
-
     let ws = null;
+    let handshakeOk = false;
     let keepalive = null;
 
-    let handshakeSent = false;
-    let handshakeComplete = false;
-
-    let lastReqId = null;
     let streamingAssistantPre = null;
 
-    const SYSTEM_MESSAGE = { role: "system", content: "You are Marks. Be precise and practical. Keep answers compact and accurate." };
-    const history = [ SYSTEM_MESSAGE ];
-    const HISTORY_MAX_MESSAGES = 24; // keep it bounded
+    const SYSTEM = { role: "system", content: "You are Marks. Be precise and practical. Keep answers compact and accurate." };
+    const history = [SYSTEM];
+    const HISTORY_MAX = 24;
 
     const $ = (id) => document.getElementById(id);
 
     function setStatus(kind, text) {
       $("statusDot").className = "dot " + (kind || "bad");
       $("statusText").textContent = text || "";
-      $("subtitle").textContent =
-        (kind === "ok") ? "Connected" :
-        (kind === "warn") ? "Connecting…" :
-        "LM socket proxy chat";
+      $("subtitle").textContent = (kind === "ok") ? "Connected" : (kind === "warn") ? "Connecting…" : "LM socket proxy chat";
     }
 
     function addMsg(role, text, meta = {}) {
@@ -239,7 +116,7 @@
       $("chat").appendChild(wrap);
       $("chat").scrollTop = $("chat").scrollHeight;
 
-      return { wrap, pre };
+      return { pre };
     }
 
     function newId() {
@@ -255,39 +132,24 @@
     function startKeepalive() {
       stopKeepalive();
       keepalive = setInterval(() => {
-        // Proxy client understands ping/pong. Server may also.
         wsSend({ type: "ping", ts: Date.now() });
-      }, 25_000);
+      }, 25000);
     }
-
     function stopKeepalive() {
       if (keepalive) clearInterval(keepalive);
       keepalive = null;
     }
 
+    function trimHistory() {
+      while (history.length > 1 + HISTORY_MAX) history.splice(1, 1);
+    }
+
     function sendHello() {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-      // This is the minimal "hello" your server is requiring before it will accept anything else.
-      // It also matches the proxy ecosystem style.
-      wsSend({
-        type: "hello",
-        client_id: "marks-ui",
-        role: "ui",
-        ts: Date.now()
-      });
-
-      handshakeSent = true;
-      // If server never acks, we still allow chat after a brief tick.
-      setTimeout(() => { if (!handshakeComplete) handshakeComplete = true; }, 200);
+      wsSend({ type: "hello", client_id: "marks-ui", role: "ui", ts: Date.now() });
     }
 
     function connect() {
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-
-      handshakeSent = false;
-      handshakeComplete = false;
-
+      handshakeOk = false;
       setStatus("warn", "Connecting…");
       ws = new WebSocket(WS_URL);
 
@@ -314,93 +176,48 @@
 
         const type = String(msg?.type || "");
 
-        // server/proxy keepalives
         if (type === "ping") { wsSend({ type: "pong", ts: Date.now() }); return; }
-        if (type === "pong") { return; }
+        if (type === "pong") return;
 
-        // handshake acks (some servers do this; your proxy client doesn’t)
-        if (type === "hello_ack" || type === "server_hello") {
-          handshakeComplete = true;
-          if (!handshakeSent) sendHello();
-          return;
-        }
-
-        // If server forwards proxy client's hello, ignore
-        if (type === "hello") return;
+        if (type === "server_hello") { sendHello(); return; }
+        if (type === "hello_ack") { handshakeOk = true; return; }
 
         if (type === "started") {
-          const { pre } = addMsg("assistant", "", { id: msg.id });
-          streamingAssistantPre = pre;
+          streamingAssistantPre = addMsg("assistant", "", { id: msg.id }).pre;
           return;
         }
 
         if (type === "delta") {
-          if (!streamingAssistantPre) {
-            const { pre } = addMsg("assistant", "", { id: msg.id });
-            streamingAssistantPre = pre;
-          }
+          if (!streamingAssistantPre) streamingAssistantPre = addMsg("assistant", "", { id: msg.id }).pre;
           streamingAssistantPre.textContent += (msg.delta || "");
           $("chat").scrollTop = $("chat").scrollHeight;
           return;
         }
 
         if (type === "done") {
-          const finalText = (msg.message || "");
-
-          if (!streamingAssistantPre) {
-            addMsg("assistant", finalText, { id: msg.id });
-          } else if (finalText && streamingAssistantPre.textContent.trim().length === 0) {
-            streamingAssistantPre.textContent = finalText;
-          }
-
+          const finalText = msg.message || "";
+          if (!streamingAssistantPre) addMsg("assistant", finalText, { id: msg.id });
           history.push({ role: "assistant", content: finalText });
+          trimHistory();
           streamingAssistantPre = null;
           return;
         }
 
         if (type === "error") {
-          const errText = msg?.error?.message || msg?.message || "unknown error";
-          addMsg("assistant", "ERROR: " + errText, { id: msg.id });
-
-          // If the server says we must hello first, do it immediately.
-          if (String(errText).toLowerCase().includes("must send hello first")) {
-            handshakeComplete = false;
-            sendHello();
-          }
-
+          const err = msg?.error?.message || msg?.message || "unknown error";
+          addMsg("assistant", "ERROR: " + err, { id: msg.id });
+          if (String(err).toLowerCase().includes("must send hello")) sendHello();
           streamingAssistantPre = null;
           return;
         }
-
-        if (type === "models") {
-          const ok = msg.ok !== false;
-          const models =
-            Array.isArray(msg?.data?.data) ? msg.data.data.map(x => x.id).filter(Boolean) :
-            Array.isArray(msg?.models) ? msg.models :
-            [];
-          addMsg("assistant",
-            ok ? ("Models:\n" + models.join("\n")) : ("Models error: " + (msg?.error?.message || "unknown")),
-            { id: msg.id }
-          );
-          return;
-        }
-
-        if (type === "cancelled") return;
       };
-    }
-
-    function trimHistory() {
-      // Always keep system message at index 0
-      while (history.length > 1 + HISTORY_MAX_MESSAGES) history.splice(1, 1);
     }
 
     function sendChat() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-      // Guarantee hello happened before chat
-      if (!handshakeSent) sendHello();
-      if (!handshakeComplete) {
-        addMsg("assistant", "ERROR: handshake not complete (sending hello… try again in a moment).");
+      if (!handshakeOk) {
+        addMsg("assistant", "ERROR: not ready (hello handshake pending).");
+        sendHello();
         return;
       }
 
@@ -408,24 +225,22 @@
       if (!userText) return;
 
       const id = newId();
-      lastReqId = id;
 
       addMsg("user", userText, { id });
-
       history.push({ role: "user", content: userText });
       trimHistory();
 
-      // EXACT format your lmstudio-proxy-client expects (server->proxy).
-      const body = {
-        // model: omitted => LM Studio default
-        messages: history.slice(),
-        temperature: 0.2,
-        max_tokens: 600,
-        stream: true
-      };
-
-      const ok = wsSend({ type: "chat", id, body });
-      if (!ok) addMsg("assistant", "ERROR: socket not open", { id });
+      // EXACT format the proxy client expects (hub forwards to proxy):
+      wsSend({
+        type: "chat",
+        id,
+        body: {
+          messages: history.slice(),
+          temperature: 0.2,
+          max_tokens: 600,
+          stream: true
+        }
+      });
 
       $("input").value = "";
       $("input").focus();
@@ -436,7 +251,6 @@
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
     });
 
-    // auto-connect
     connect();
   </script>
 </body>
