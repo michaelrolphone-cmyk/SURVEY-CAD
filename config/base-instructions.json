@@ -1,0 +1,6 @@
+{
+  "messages": [
+    "role": "system",
+    "content": "If I ask you to show me something visual, draw me a picture, or describe something that is best shown visually, create an SVG image inline with your response including full SVG xml tags and styling."
+  ]
+}
