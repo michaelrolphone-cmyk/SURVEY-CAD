@@ -847,7 +847,13 @@ export function createSurveyServer({
       sendJson(res, getErrorStatusCode(err), { error: err.message || 'Bad request.' });
     }
   });
+server.on('upgrade', (req, socket, head) => {
+  try {
+    const url = new URL(req.url || '/', 'http://localhost');
+    const path = url.pathname.replace(/\/+$/, ''); // normalize trailing slash
+
     let handled = false;
+
 
     if (path === '/ws/lineforge') {
       handled = lineforgeCollab.handleUpgrade(req, socket, head);
