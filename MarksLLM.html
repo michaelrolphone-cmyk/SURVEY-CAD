@@ -155,6 +155,39 @@
       max-width: 100%;
     }
 
+    /* Download buttons (table/csv) */
+    .dlRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin: 8px 0 0;
+    }
+    .dlBtn{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:12px;
+      padding:8px 10px;
+      background:rgba(255,255,255,.04);
+      color:rgba(230,238,252,.95);
+      font-size:12px;
+      font-weight:700;
+      cursor:pointer;
+      user-select:none;
+    }
+    .dlBtn:hover{ background: rgba(255,255,255,.08); }
+    .dlBtn:active{ transform: translateY(1px); }
+    .dlMeta{
+      color: rgba(154,176,208,.9);
+      font-size:12px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width: 68vw;
+    }
+
     .composer{
       border-top:1px solid var(--line);
       padding:12px 14px;
@@ -333,6 +366,7 @@
       .personaSelect{min-width: 160px;}
       .personaHint{display:none;}
       .attachChip .name{ max-width: 58vw; }
+      .dlMeta{ max-width: 72vw; }
     }
     @media (max-width: 420px){
       .composer .box{flex-direction:column; align-items:stretch;}
@@ -342,6 +376,7 @@
       .personaRow .left{justify-content:space-between;}
       .personaSelect{max-width:100%; width:100%;}
       .attachChip .name{ max-width: 78vw; }
+      .dlMeta{ max-width: 84vw; }
     }
 
     /* Thinking indicator */
@@ -471,7 +506,7 @@
 
     let inflight = null; // { id, raw, contentEl, thinkingEl, scheduled }
 
-    // ✅ NEW: Base/persona are now arrays of messages (not one system blob)
+    // Seed messages (ALL items in messages[])
     let baseSeedMessages = [];    // [{role, content}, ...]
     let personaSeedMessages = []; // [{role, content}, ...]
 
@@ -546,6 +581,7 @@
     function addUserMsg(id, text, attachList = []) {
       const wrap = document.createElement("div");
       wrap.className = "msg user";
+      wrap.dataset.msgId = id;
 
       const metaRow = document.createElement("div");
       metaRow.className = "meta";
@@ -580,6 +616,7 @@
     function addAssistantPlaceholder(id) {
       const wrap = document.createElement("div");
       wrap.className = "msg assistant";
+      wrap.dataset.msgId = id;
 
       const metaRow = document.createElement("div");
       metaRow.className = "meta";
@@ -611,6 +648,7 @@
         inflight.contentEl.innerHTML = renderMarkdownToHtml(`**ERROR:** ${message}`);
         progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
         inlineSvgsFromCodeBlocks(inflight.contentEl);
+        enhanceCsvDownloads(inflight.contentEl);
         scrollBottom();
         inflight = null;
         setUiBusy(false);
@@ -622,6 +660,7 @@
       p.contentEl.innerHTML = renderMarkdownToHtml(`**ERROR:** ${message}`);
       progressiveInlineSvgsFromCodeBlocks(p.contentEl);
       inlineSvgsFromCodeBlocks(p.contentEl);
+      enhanceCsvDownloads(p.contentEl);
       scrollBottom();
     }
 
@@ -660,7 +699,7 @@
     }
 
     // ==========================
-    // ✅ NEW: Use *all* messages[]
+    // Use *all* messages[]
     // ==========================
     const ALLOWED_ROLES = new Set(["system", "user", "assistant"]); // keep proxy-compatible
 
@@ -671,7 +710,6 @@
 
     function coerceContentToString(content) {
       if (typeof content === "string") return content;
-      // Handle "content parts" style: [{type:'text', text:'...'}, ...]
       if (Array.isArray(content)) {
         return content.map(p => {
           if (!p) return "";
@@ -685,21 +723,12 @@
       try { return JSON.stringify(content, null, 2); } catch { return String(content); }
     }
 
-    // Accepts:
-    //  - string => [{role:'system', content:string}]
-    //  - {messages:[...]} => all items in order
-    //  - {role, content} => one message
-    //  - {system/system_prompt/...} => one system message
-    //  - otherwise => system message with JSON stringified
     function normalizeConfigToMessages(json, fallbackRole = "system") {
-      // string
       if (typeof json === "string") {
         const c = json.trim();
         return c ? [{ role: fallbackRole, content: c }] : [];
       }
-      // object
       if (json && typeof json === "object") {
-        // messages array => USE ALL
         if (Array.isArray(json.messages)) {
           const msgs = json.messages
             .filter(m => m && typeof m === "object")
@@ -709,18 +738,15 @@
               return content ? { role, content } : null;
             })
             .filter(Boolean);
-
           if (msgs.length) return msgs;
         }
 
-        // direct role/content
         if (typeof json.role === "string" && "content" in json) {
           const role = normalizeRole(json.role, fallbackRole);
           const content = coerceContentToString(json.content).trim();
           return content ? [{ role, content }] : [];
         }
 
-        // common prompt keys => single system
         const candidates = [
           json.system,
           json.system_prompt,
@@ -732,12 +758,10 @@
 
         if (candidates.length) return [{ role: fallbackRole, content: candidates[0].trim() }];
 
-        // fallback stringified
         const s = JSON.stringify(json, null, 2);
         return s && s.trim() ? [{ role: fallbackRole, content: s }] : [];
       }
 
-      // other => string
       const s = String(json ?? "").trim();
       return s ? [{ role: fallbackRole, content: s }] : [];
     }
@@ -756,8 +780,6 @@
       const keep = seedLen();
       while (history.length > keep + HISTORY_MAX) history.splice(keep, 1);
     }
-
-    // ---- Loading base + persona ----
 
     async function loadBaseInstructions() {
       setUiBusy(true, "Loading base instructions…");
@@ -786,7 +808,6 @@
 
         personaSeedMessages = msgs;
 
-        // Reset conversation history but keep base+persona seed messages (ALL of them)
         reseedHistory();
         inflight = null;
 
@@ -800,6 +821,7 @@
         a.contentEl.innerHTML = renderMarkdownToHtml(`Persona loaded: **${p.label}**\n\nSeed messages: base **${baseSeedMessages.length}**, persona **${personaSeedMessages.length}**.`);
         progressiveInlineSvgsFromCodeBlocks(a.contentEl);
         inlineSvgsFromCodeBlocks(a.contentEl);
+        enhanceCsvDownloads(a.contentEl);
 
         maybeTryDeepLinkSend();
       } catch (e) {
@@ -869,6 +891,9 @@
 
               progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
 
+              // NEW: add CSV download buttons for tables & csv code blocks
+              enhanceCsvDownloads(inflight.contentEl);
+
               scrollBottom();
               inflight.scheduled = false;
             });
@@ -885,6 +910,7 @@
             p.contentEl.innerHTML = renderMarkdownToHtml(finalText);
             progressiveInlineSvgsFromCodeBlocks(p.contentEl);
             inlineSvgsFromCodeBlocks(p.contentEl);
+            enhanceCsvDownloads(p.contentEl);
           } else {
             inflight.raw = finalText || inflight.raw;
             inflight.thinkingEl.style.display = "none";
@@ -893,6 +919,7 @@
 
             progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
             inlineSvgsFromCodeBlocks(inflight.contentEl);
+            enhanceCsvDownloads(inflight.contentEl);
           }
 
           history.push({ role: "assistant", content: finalText || (inflight ? inflight.raw : "") });
@@ -1167,6 +1194,142 @@
       });
     }
 
+    // -------- NEW: CSV download buttons for tables + csv code blocks --------
+
+    function downloadTextFile(filename, text, mime = "text/plain;charset=utf-8") {
+      const blob = new Blob([text || ""], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || "download.txt";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2500);
+    }
+
+    function csvEscapeCell(val) {
+      const s = String(val ?? "");
+      if (/[",\r\n]/.test(s)) return '"' + s.replaceAll('"', '""') + '"';
+      return s;
+    }
+
+    function htmlTableToCsv(tableEl) {
+      const rows = Array.from(tableEl.querySelectorAll("tr"));
+      const out = [];
+
+      for (const tr of rows) {
+        const cells = Array.from(tr.querySelectorAll("th,td"));
+        // Some markdown tables can have blank alignment rows; ignore fully empty
+        const values = cells.map(td => (td.textContent ?? "").trim());
+        if (!values.some(v => v.length)) continue;
+        out.push(values.map(csvEscapeCell).join(","));
+      }
+
+      return out.join("\r\n") + (out.length ? "\r\n" : "");
+    }
+
+    function isCsvLang(codeEl) {
+      const cls = (codeEl.className || "").toLowerCase();
+      return cls.includes("language-csv") || cls.includes("lang-csv");
+    }
+
+    function looksLikeCsvText(text) {
+      const t = String(text || "").trim();
+      if (!t) return false;
+      if (looksLikeSvg(t)) return false; // avoid false positives
+      const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) return false;
+      const first = lines[0];
+      if (!first.includes(",")) return false;
+      const cols0 = first.split(",").length;
+      if (cols0 < 2) return false;
+
+      let ok = 0;
+      const sample = lines.slice(0, Math.min(10, lines.length));
+      for (const line of sample) {
+        const cols = line.split(",").length;
+        if (cols >= Math.max(2, cols0 - 1)) ok++;
+      }
+      return ok >= Math.min(3, sample.length);
+    }
+
+    function ensureDlRowAfter(node, label, metaText, onClick) {
+      const next = node.nextElementSibling;
+      if (next && next.classList && next.classList.contains("dlRow")) return next;
+
+      const row = document.createElement("div");
+      row.className = "dlRow";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dlBtn";
+      btn.textContent = label || "Download CSV";
+      btn.addEventListener("click", onClick);
+
+      row.appendChild(btn);
+
+      if (metaText) {
+        const meta = document.createElement("span");
+        meta.className = "dlMeta";
+        meta.textContent = metaText;
+        row.appendChild(meta);
+      }
+
+      node.insertAdjacentElement("afterend", row);
+      return row;
+    }
+
+    // Called after markdown render (and after svg processing). Adds:
+    //  1) "Download CSV" after each rendered markdown table (.table-wrap)
+    //  2) "Download CSV" after any csv code block (```csv ...``` or CSV-looking text)
+    function enhanceCsvDownloads(containerEl) {
+      if (!containerEl) return;
+
+      const msgWrap = containerEl.closest(".msg");
+      const msgId = msgWrap?.dataset?.msgId || "msg";
+
+      // 1) Tables
+      const tableWraps = Array.from(containerEl.querySelectorAll(".table-wrap"));
+      tableWraps.forEach((wrap, idx) => {
+        const table = wrap.querySelector("table");
+        if (!table) return;
+
+        const filename = `marks-${msgId}-table-${idx + 1}.csv`;
+        const meta = `From table ${idx + 1}`;
+        ensureDlRowAfter(wrap, "Download CSV", meta, () => {
+          const csv = htmlTableToCsv(table);
+          downloadTextFile(filename, csv, "text/csv;charset=utf-8");
+        });
+      });
+
+      // 2) CSV code blocks
+      const codeEls = Array.from(containerEl.querySelectorAll("pre > code"));
+      let csvIndex = 0;
+
+      codeEls.forEach((code) => {
+        const raw = (code.textContent || "").trim();
+        if (!raw) return;
+        if (looksLikeSvg(raw)) return;
+
+        const pre = code.closest("pre");
+        if (!pre) return;
+
+        const treatAsCsv = isCsvLang(code) || looksLikeCsvText(raw);
+        if (!treatAsCsv) return;
+
+        csvIndex++;
+        const filename = `marks-${msgId}-code-${csvIndex}.csv`;
+        const meta = `From code block ${csvIndex}`;
+
+        ensureDlRowAfter(pre, "Download CSV", meta, () => {
+          // Download exactly what the model sent (no rewriting)
+          const csv = raw.endsWith("\n") ? raw : (raw + "\n");
+          downloadTextFile(filename, csv, "text/csv;charset=utf-8");
+        });
+      });
+    }
+
     // -------- Send logic --------
 
     function sendChatText(text, attachList = []) {
@@ -1277,6 +1440,7 @@
       e.target.value = ""; // allow reselect same file
     });
 
+    // Drag/drop support (drop onto composer / textarea)
     const dropTargets = [$("composer"), $("input")];
     dropTargets.forEach((el) => {
       el.addEventListener("dragover", (e) => {
@@ -1311,7 +1475,6 @@
 
       await loadPersona(key);
 
-      // Ensure history is seeded even if loadPersona didn't run due to errors
       if (!history.length && (baseSeedMessages.length || personaSeedMessages.length)) reseedHistory();
 
       connect();
