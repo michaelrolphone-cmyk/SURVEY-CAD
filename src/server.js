@@ -847,14 +847,52 @@ export function createSurveyServer({
       sendJson(res, getErrorStatusCode(err), { error: err.message || 'Bad request.' });
     }
   });
+    let handled = false;
 
-  server.on('upgrade', (req, socket, head) => {
-    const handled = lineforgeCollab.handleUpgrade(req, socket, head)
-      || localStorageSyncWsService.handleUpgrade(req, socket, head) || workerSocket.handleUpgrade(req, socket, head);
+    if (path === '/ws/lineforge') {
+      handled = lineforgeCollab.handleUpgrade(req, socket, head);
+    } else if (path === '/ws/worker') {
+      handled = workerSocket.handleUpgrade(req, socket, head);
+    } else if (path === '/ws/localstorage-sync') {
+      // CHANGE THIS PATH to whatever your localStorageSyncWsService actually uses
+      handled = localStorageSyncWsService.handleUpgrade(req, socket, head);
+    } else {
+      handled = false;
+    }
+
     if (!handled && !socket.destroyed) {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
       socket.destroy();
     }
-  });
+  } catch {
+    if (!socket.destroyed) socket.destroy();
+  }
+});
+
+
+server.on('upgrade', (req, socket, head) => {
+  try {
+    const url = new URL(req.url || '/', 'http://localhost');
+    const path = url.pathname.replace(/\/+$/, ''); // normalize trailing slash
+
+    let handled = false;
+
+    if (path === '/ws/worker') {
+      handled = workerSocket.handleUpgrade(req, socket, head);
+    } else {
+      handled = lineforgeCollab.handleUpgrade(req, socket, head)
+      || localStorageSyncWsService.handleUpgrade(req, socket, head);
+    }
+
+    if (!handled && !socket.destroyed) {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+    }
+  } catch {
+    if (!socket.destroyed) socket.destroy();
+  }
+});
+
 
   return server;
 }
