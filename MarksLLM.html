@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LM Proxy Chat — WebSocket Client</title>
+  <title>Marks — LM Proxy Chat</title>
   <style>
     :root{
       color-scheme: dark;
@@ -26,8 +26,18 @@
     .app{display:grid; grid-template-columns: 380px minmax(0,1fr); height:100%;}
     .left{border-right:1px solid var(--line); padding:16px; background:linear-gradient(180deg, rgba(255,255,255,.03), transparent);}
     .right{display:grid; grid-template-rows: auto 1fr auto; min-width:0;}
-    h1{font-size:16px; margin:0 0 10px;}
-    .sub{color:var(--muted); font-size:12px; margin:0 0 14px; line-height:1.35;}
+
+    .brand{display:flex; gap:12px; align-items:center; margin-bottom:12px;}
+    .brand img{
+      width:44px; height:44px; border-radius:14px; object-fit:cover;
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: 0 10px 30px rgba(0,0,0,.45);
+      background: rgba(0,0,0,.25);
+    }
+    .brand .title{display:flex; flex-direction:column; gap:2px; min-width:0;}
+    .brand .title h1{font-size:16px; margin:0; letter-spacing:.2px;}
+    .brand .title p{font-size:12px; margin:0; color:var(--muted); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
     .card{background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:12px;}
     .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
     label{font-size:12px; color:var(--muted);}
@@ -77,6 +87,9 @@
     .kv .k{font-size:12px; color:var(--muted); margin-bottom:6px;}
     .kv .v{font-family:var(--mono); font-size:12px; color:#cfe1ff; opacity:.95; word-break:break-all;}
     .divider{height:1px; background:var(--line); margin:12px 0;}
+    .tiny{font-size:11px; color:var(--muted); margin-top:10px; line-height:1.3;}
+    .debug{margin-top:10px; font-family:var(--mono); font-size:11px; color:#cfe1ff; opacity:.9; white-space:pre-wrap; max-height:160px; overflow:auto;}
+
     .chatHeader{
       padding:14px 16px;
       border-bottom:1px solid var(--line);
@@ -84,9 +97,16 @@
       display:flex; gap:10px; align-items:center; justify-content:space-between;
       min-width:0;
     }
-    .chatTitle{display:flex; flex-direction:column; gap:2px; min-width:0;}
-    .chatTitle b{font-size:13px;}
-    .chatTitle span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    .chatTitle{display:flex; gap:10px; align-items:center; min-width:0;}
+    .chatTitle img{
+      width:28px; height:28px; border-radius:10px; object-fit:cover;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.25);
+    }
+    .chatTitle .stack{display:flex; flex-direction:column; gap:2px; min-width:0;}
+    .chatTitle .stack b{font-size:13px;}
+    .chatTitle .stack span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
     .chat{overflow:auto; padding:18px 16px; display:flex; flex-direction:column; gap:12px;}
     .msg{
       max-width: 900px;
@@ -112,6 +132,7 @@
       line-height:1.45;
       color:var(--text);
     }
+
     .composer{
       border-top:1px solid var(--line);
       padding:14px 16px;
@@ -124,8 +145,6 @@
       align-items:end;
     }
     .composer textarea{min-height:64px; max-height:210px;}
-    .tiny{font-size:11px; color:var(--muted); margin-top:10px; line-height:1.3;}
-    .debug{margin-top:10px; font-family:var(--mono); font-size:11px; color:#cfe1ff; opacity:.9; white-space:pre-wrap; max-height:160px; overflow:auto;}
     .hint{font-size:11px; color:var(--muted); margin-top:8px;}
     .right .chat::-webkit-scrollbar{width:10px}
     .right .chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10); border-radius:999px}
@@ -134,10 +153,13 @@
 <body>
   <div class="app">
     <aside class="left">
-      <h1>LM Proxy Chat</h1>
-      <p class="sub">
-        Standalone browser client that connects to your WebSocket endpoint and sends chat requests that your server should forward to a connected LM Studio proxy client.
-      </p>
+      <div class="brand">
+        <img src="/assets/icons/MarksAI.png" alt="Marks" onerror="this.style.opacity=.4; this.title='Missing /assets/icons/MarksAI.png';" />
+        <div class="title">
+          <h1>Marks</h1>
+          <p>WebSocket chat via LM proxy</p>
+        </div>
+      </div>
 
       <div class="card">
         <div class="row" style="justify-content:space-between;">
@@ -166,7 +188,7 @@
             <select id="model" style="width:100%; margin-top:6px;">
               <option value="">(server default)</option>
             </select>
-            <div class="hint">If your server forwards `/v1/models`, this will populate.</div>
+            <div class="hint">Populates if your server forwards a models response.</div>
           </div>
 
           <div style="width:140px;">
@@ -189,8 +211,7 @@
         <div class="divider"></div>
 
         <label>System prompt</label>
-        <textarea id="systemPrompt" placeholder="Optional system prompt... (e.g., 'Be precise and return JSON')"
-          style="margin-top:6px;">You are a precise assistant. Keep answers compact and accurate.</textarea>
+        <textarea id="systemPrompt" style="margin-top:6px;">You are Marks. Be precise and practical. Keep answers compact and accurate.</textarea>
 
         <div class="divider"></div>
 
@@ -209,7 +230,7 @@
         </div>
 
         <div class="tiny">
-          Keepalive: browser sends <span style="font-family:var(--mono);">{"type":"ping"}</span> every 20s (and replies with <span style="font-family:var(--mono);">pong</span> when asked).
+          Keepalive: sends <span style="font-family:var(--mono);">{"type":"ping"}</span> every 20s; replies with <span style="font-family:var(--mono);">pong</span> if prompted.
         </div>
 
         <div class="debug" id="debug"></div>
@@ -219,8 +240,11 @@
     <main class="right">
       <div class="chatHeader">
         <div class="chatTitle">
-          <b>Chat</b>
-          <span id="chatSubtitle">Connect to start.</span>
+          <img src="/assets/icons/MarksAI.png" alt="Marks" onerror="this.style.opacity=.4;" />
+          <div class="stack">
+            <b>Marks</b>
+            <span id="chatSubtitle">Connect to start.</span>
+          </div>
         </div>
         <div class="row">
           <button class="btn danger" id="btnCancel" title="Cancel the last request">Cancel</button>
@@ -232,7 +256,7 @@
 
       <div class="composer">
         <div class="box">
-          <textarea id="input" placeholder="Type a message… (Shift+Enter for newline)"></textarea>
+          <textarea id="input" placeholder="Message Marks… (Shift+Enter for newline)"></textarea>
           <button class="btn primary" id="btnSend">Send</button>
         </div>
       </div>
@@ -240,14 +264,12 @@
   </div>
 
   <script>
-    // ---- config ----
     const DEFAULT_WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
 
-    // ---- state ----
     let ws = null;
     let keepalive = null;
     let lastReqId = null;
-    let streamingAssistantEl = null; // <pre> element we append deltas into
+    let streamingAssistantEl = null;
 
     const $ = (id) => document.getElementById(id);
 
@@ -258,15 +280,9 @@
     }
 
     function setStatus(kind, text) {
-      const dot = $("statusDot");
-      dot.className = "dot " + (kind || "bad");
+      $("statusDot").className = "dot " + (kind || "bad");
       $("statusText").textContent = text || "";
       $("chatSubtitle").textContent = text || "";
-    }
-
-    function esc(s) {
-      // not used (we set textContent), kept for reference
-      return String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
     }
 
     function addMsg(role, text, meta = {}) {
@@ -329,9 +345,7 @@
 
     function populateModels(list) {
       const sel = $("model");
-      // preserve current selection
       const current = sel.value;
-      // clear everything except the first "(server default)" option
       while (sel.options.length > 1) sel.remove(1);
       (list || []).forEach(m => {
         const opt = document.createElement("option");
@@ -343,7 +357,6 @@
     }
 
     function newId() {
-      // crypto.randomUUID is widely supported
       return (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("req-" + Math.random().toString(16).slice(2));
     }
 
@@ -366,13 +379,8 @@
         setStatus("ok", "connected");
         startKeepalive();
 
-        // Some servers want a hello. This is safe even if ignored.
-        wsSend({
-          type: "hello",
-          client_id: "browser-ui",
-          role: "ui",
-          ts: Date.now()
-        });
+        // safe hello (ignored if server doesn't care)
+        wsSend({ type: "hello", client_id: "marks-ui", role: "ui", ts: Date.now() });
       };
 
       ws.onclose = () => {
@@ -382,7 +390,7 @@
         ws = null;
       };
 
-      ws.onerror = (e) => {
+      ws.onerror = () => {
         debug("ws error");
         setStatus("bad", "socket error");
       };
@@ -392,49 +400,32 @@
         try { msg = JSON.parse(ev.data); }
         catch { debug("bad json from server"); return; }
 
-        // Handle json ping/pong if your server uses it
-        if (msg.type === "ping") {
-          wsSend({ type: "pong", ts: Date.now() });
-          return;
-        }
-
-        if (msg.type === "server_hello") {
-          // optional handshake from server; respond with hello
-          wsSend({ type: "hello", client_id: "browser-ui", role: "ui", ts: Date.now() });
-          return;
-        }
-
-        if (msg.type === "hello" || msg.type === "hello_ack") {
-          debug("hello/ack received");
-          return;
-        }
+        if (msg.type === "ping") { wsSend({ type: "pong", ts: Date.now() }); return; }
+        if (msg.type === "server_hello") { wsSend({ type: "hello", client_id: "marks-ui", role: "ui", ts: Date.now() }); return; }
+        if (msg.type === "hello" || msg.type === "hello_ack") { debug("hello/ack"); return; }
 
         if (msg.type === "models") {
-          // supports either: {type:"models", models:[...]} or {type:"models", data:{data:[{id}...]}}
           const models =
             Array.isArray(msg.models) ? msg.models :
             Array.isArray(msg?.data?.data) ? msg.data.data.map(x => x.id).filter(Boolean) :
             Array.isArray(msg?.raw?.data) ? msg.raw.data.map(x => x.id).filter(Boolean) :
             [];
-
           populateModels(models);
-          debug("models received: " + (models.length ? models.length : "(none)"));
           addMsg("assistant", models.length ? ("Models:\n" + models.join("\n")) : "No models returned.", { extra: "models" });
+          debug("models received: " + (models.length ? models.length : "(none)"));
           return;
         }
 
         if (msg.type === "started") {
           debug("started id=" + msg.id);
-          // create a streaming assistant bubble
-          const { pre } = addMsg("assistant", "", { id: msg.id, extra: "streaming" });
+          const { pre } = addMsg("assistant", "", { id: msg.id, extra: "Marks" });
           streamingAssistantEl = pre;
           return;
         }
 
         if (msg.type === "delta") {
           if (!streamingAssistantEl) {
-            // if server didn’t send started, create one
-            const { pre } = addMsg("assistant", "", { id: msg.id, extra: "streaming" });
+            const { pre } = addMsg("assistant", "", { id: msg.id, extra: "Marks" });
             streamingAssistantEl = pre;
           }
           streamingAssistantEl.textContent += (msg.delta || "");
@@ -444,9 +435,8 @@
 
         if (msg.type === "done") {
           debug("done id=" + msg.id);
-          // If we were streaming, keep the final; if not streaming, render
           if (!streamingAssistantEl) {
-            addMsg("assistant", msg.message || "", { id: msg.id, extra: "done" });
+            addMsg("assistant", msg.message || "", { id: msg.id, extra: "Marks" });
           } else if ((msg.message || "").length && streamingAssistantEl.textContent.trim().length === 0) {
             streamingAssistantEl.textContent = msg.message;
           }
@@ -464,7 +454,6 @@
           return;
         }
 
-        // Unknown message
         debug("unknown message type: " + msg.type);
       };
     }
@@ -480,8 +469,7 @@
 
     function sendModels() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const id = newId();
-      wsSend({ type: "models", id });
+      wsSend({ type: "models", id: newId() });
     }
 
     function sendChat() {
@@ -493,11 +481,8 @@
       const id = newId();
       setLastReq(id);
 
-      // Render user bubble immediately
       addMsg("user", userText, { id });
 
-      // Build conversation: simplest approach is to send just system + user each turn.
-      // If your server expects full history, extend this to keep an array of past messages.
       const sys = $("systemPrompt").value.trim();
       const model = $("model").value.trim();
       const temperature = parseFloat($("temp").value || "0.2");
@@ -515,12 +500,8 @@
         stream
       };
 
-      // Protocol assumption:
-      // Send {type:"chat", id, body:{...}} and expect started/delta/done.
       const ok = wsSend({ type: "chat", id, body });
-      if (!ok) {
-        addMsg("assistant", "ERROR: socket not open", { id, extra: "client" });
-      }
+      if (!ok) addMsg("assistant", "ERROR: socket not open", { id, extra: "client" });
 
       $("input").value = "";
       $("input").focus();
@@ -538,7 +519,6 @@
       streamingAssistantEl = null;
     }
 
-    // ---- wire up ----
     $("wsUrl").value = DEFAULT_WS_URL;
 
     $("btnConnect").onclick = connect;
@@ -555,7 +535,7 @@
       }
     });
 
-    // auto-connect if you want (comment out to disable)
+    // auto-connect (comment out if you don't want it)
     connect();
   </script>
 </body>
