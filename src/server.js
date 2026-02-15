@@ -12,6 +12,8 @@ import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-stor
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
+import { createLmProxyControlWsService } from "./lmstudio-proxy-control-ws.js";
+
 import { loadFldConfig } from './fld-config.js';
 import {
   getCrewProfiles,
@@ -316,6 +318,11 @@ export function createSurveyServer({
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
   const workerSocket = createWorkerSchedulerService();
+  const lmProxy = createLmProxyControlWsService({
+    path: "/ws/lmproxy",
+    token: process.env.CONTROL_TOKEN || "",   // optional
+    requestTimeoutMs: 120_000
+  });
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
@@ -917,8 +924,10 @@ server.on('upgrade', (req, socket, head) => {
   try {
     const url = new URL(req.url || '/', 'http://localhost');
     const path = url.pathname.replace(/\/+$/, '');
-
-    if (path === '/ws/worker') {
+  
+    if (path === '/ws/lmproxy') {
+      handled = !!lmProxy.handleUpgrade(req, socket, head);
+    } else if (path === '/ws/worker') {
       handled = !!workerSocket.handleUpgrade(req, socket, head);
     } else if (path === '/ws/lineforge') {
       handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
