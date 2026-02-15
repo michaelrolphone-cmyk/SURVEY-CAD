@@ -21,32 +21,16 @@
       --bad:#ff5b5b;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-
-      --accent: rgba(255,213,74,.55);
-      --accentBg: rgba(255,213,74,.10);
     }
-
-    *{box-sizing:border-box}
     html,body{height:100%; margin:0; background:radial-gradient(1200px 700px at 30% 0%, #101c35 0%, var(--bg) 60%); color:var(--text); font-family:var(--sans);}
     .app{display:grid; grid-template-rows:auto 1fr auto; height:100%;}
-
-    .topbar{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:12px 14px; border-bottom:1px solid var(--line);
-      background:linear-gradient(180deg, rgba(0,0,0,.35), transparent);
-      gap:12px;
-    }
+    .topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line); background:linear-gradient(180deg, rgba(0,0,0,.35), transparent); gap:12px;}
     .brand{display:flex; gap:10px; align-items:center; min-width:0;}
     .brand img{width:34px; height:34px; border-radius:12px; object-fit:cover; border:1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.25); flex:0 0 auto;}
     .brand .stack{display:flex; flex-direction:column; gap:2px; min-width:0;}
     .brand .stack b{font-size:13px;}
     .brand .stack span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-
-    .pill{
-      display:inline-flex; align-items:center; gap:8px; padding:7px 10px;
-      border-radius:999px; border:1px solid var(--line); background:rgba(0,0,0,.22);
-      font-size:12px; color:var(--muted); user-select:none;
-    }
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:rgba(0,0,0,.22); font-size:12px; color:var(--muted); user-select:none;}
     .dot{width:10px; height:10px; border-radius:50%;}
     .dot.ok{background:var(--ok);} .dot.warn{background:var(--warn);} .dot.bad{background:var(--bad);}
 
@@ -54,6 +38,7 @@
     .msg{max-width:980px; width:fit-content; border-radius:16px; border:1px solid var(--line); background:rgba(0,0,0,.28); padding:10px 12px;}
     .msg.user{align-self:flex-end; background:rgba(255,213,74,.08); border-color:rgba(255,213,74,.24);}
     .msg.assistant{align-self:flex-start;}
+
     .meta{display:flex; gap:10px; align-items:center; margin-bottom:6px; color:var(--muted); font-size:11px;}
     .meta .role{font-weight:800; letter-spacing:.2px;}
 
@@ -151,21 +136,23 @@
       background: rgba(0,0,0,.12);
     }
 
-    /* Inline SVG frame (when SVG came from a markdown code block) */
+    /* Inline SVG frame (rendered from code blocks) */
     .svgFrame{
-      margin-top: 8px;
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 14px;
-      background: rgba(0,0,0,.22);
+      margin: 0.45em 0;
       padding: 10px 12px;
-      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.24);
+      overflow:auto;
       max-width: 100%;
+      color: var(--muted);
+      font-size: 12px;
     }
-    .svgFrame svg,
-    .md svg{
+    .svgFrame svg{
       display:block;
-      max-width:100%;
-      height:auto;
+      width: 100%;
+      height: auto;
+      max-width: 100%;
     }
 
     .composer{
@@ -233,58 +220,55 @@
       max-width: 45vw;
     }
 
-    /* Attachments bar */
-    .attachBar{
+    /* Attachments row */
+    .attachRow{
       display:flex;
-      gap:8px;
       flex-wrap:wrap;
+      gap:8px;
       margin: 0 0 10px;
+      align-items:center;
       min-height: 0;
     }
-    .chip{
+    .attachChip{
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding:7px 9px;
+      padding:7px 10px;
       border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.22);
       color: rgba(230,238,252,.92);
+      font-size:12px;
       max-width: 100%;
     }
-    .chip .fileIcon{
-      width:18px; height:18px;
-      border-radius: 6px;
-      display:grid; place-items:center;
+    .attachChip .name{
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width: min(62vw, 520px);
+    }
+    .attachChip .x{
+      border:1px solid rgba(255,255,255,.16);
       background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.10);
-      font-size: 11px;
-      font-weight: 900;
+      color: rgba(230,238,252,.9);
+      border-radius: 999px;
+      width: 22px;
+      height: 22px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      padding:0;
+      line-height: 1;
       flex: 0 0 auto;
     }
-    .chip .name{
-      font-size: 12px;
-      color: rgba(230,238,252,.92);
-      overflow:hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: min(55vw, 520px);
-    }
-    .chip .x{
-      border:0;
-      background: transparent;
-      color: rgba(230,238,252,.7);
-      cursor:pointer;
-      font-weight: 900;
-      padding: 0 2px;
-      line-height: 1;
-      font-size: 14px;
-    }
-    .chip .x:hover{ color: rgba(230,238,252,.95); }
-    .chip small{
-      color: rgba(154,176,208,.85);
-      font-size: 11px;
-      white-space: nowrap;
+    .attachChip .x:hover{ background: rgba(255,255,255,.10); }
+    .attachChip .ico{
+      width: 14px;
+      height: 14px;
+      display:inline-block;
+      opacity: .9;
+      flex: 0 0 auto;
     }
 
     .composer .box{
@@ -292,24 +276,23 @@
       gap:10px;
       align-items:flex-end;
     }
-
     .attachBtn{
       flex:0 0 auto;
+      border:1px solid var(--line);
+      border-radius:14px;
       width:42px;
       height:42px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background: rgba(255,255,255,.04);
-      color: rgba(230,238,252,.92);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
       cursor:pointer;
-      display:grid;
-      place-items:center;
-      font-size: 18px;
-      font-weight: 900;
-      user-select:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
       box-sizing:border-box;
+      user-select:none;
     }
-    .attachBtn:hover{ background: rgba(255,255,255,.06); }
+    .attachBtn:hover{ background: rgba(255,255,255,.08); }
+    .attachBtn:active{ transform: translateY(1px); }
     .attachBtn[disabled]{opacity:.55; cursor:not-allowed;}
 
     textarea{
@@ -328,13 +311,7 @@
       box-sizing:border-box;
     }
     textarea:focus{border-color: rgba(255,213,74,.55); box-shadow:0 0 0 3px rgba(255,213,74,.12);}
-
-    /* Drop highlight */
-    .dropActive{
-      border-color: var(--accent) !important;
-      box-shadow: 0 0 0 3px rgba(255,213,74,.16) !important;
-      background: linear-gradient(180deg, rgba(255,213,74,.06), rgba(0,0,0,.25));
-    }
+    textarea.dropActive{ border-color: rgba(109,215,255,.7); box-shadow:0 0 0 3px rgba(109,215,255,.14); }
 
     .btn{
       flex:0 0 auto;
@@ -355,16 +332,16 @@
     @media (max-width: 520px){
       .personaSelect{min-width: 160px;}
       .personaHint{display:none;}
-      .chip .name{max-width: 58vw;}
+      .attachChip .name{ max-width: 58vw; }
     }
     @media (max-width: 420px){
       .composer .box{flex-direction:column; align-items:stretch;}
       .btn{width:100%;}
-      .attachBtn{width:100%;}
+      .attachBtn{ width:100%; }
       .personaRow{flex-direction:column; align-items:stretch;}
       .personaRow .left{justify-content:space-between;}
       .personaSelect{max-width:100%; width:100%;}
-      .chip .name{max-width: 72vw;}
+      .attachChip .name{ max-width: 78vw; }
     }
 
     /* Thinking indicator */
@@ -395,42 +372,6 @@
     @keyframes bounce{
       0%, 80%, 100% { transform: translateY(0); opacity:.45; }
       40% { transform: translateY(-5px); opacity:1; }
-    }
-
-    /* Message attachment chips (inside chat bubble) */
-    .msgAttachRow{
-      display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      margin-top: 8px;
-    }
-    .msgChip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:6px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.18);
-      color: rgba(230,238,252,.92);
-      max-width: 100%;
-    }
-    .msgChip .fileIcon{
-      width:18px; height:18px;
-      border-radius: 6px;
-      display:grid; place-items:center;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.10);
-      font-size: 11px;
-      font-weight: 900;
-      flex: 0 0 auto;
-    }
-    .msgChip .name{
-      font-size: 12px;
-      overflow:hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: min(55vw, 520px);
     }
 
     .chat::-webkit-scrollbar{width:10px}
@@ -469,12 +410,12 @@
         <div class="personaHint" id="personaHint">Loading…</div>
       </div>
 
-      <div class="attachBar" id="attachBar" aria-label="Attachments"></div>
+      <div class="attachRow" id="attachRow" aria-label="Attachments"></div>
 
       <div class="box">
-        <button class="attachBtn" id="btnAttach" type="button" title="Attach text file" aria-label="Attach file">+</button>
-        <input id="fileInput" type="file" multiple hidden
-               accept=".txt,.csv,.tsv,.json,.geojson,.xml,.html,.md,.log,.yaml,.yml,.js,.ts,.css,.py,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.rb,.php,.sql,.ini,.cfg,.toml,.properties,application/json,text/*" />
+        <button class="attachBtn" id="btnAttach" type="button" aria-label="Attach file" title="Attach file">+</button>
+        <input id="filePicker" type="file" multiple hidden
+               accept=".txt,.md,.csv,.tsv,.json,.geojson,.xml,.yml,.yaml,.log,.ini,.cfg,.py,.js,.ts,.html,.css,.sql,.wkt,.wkb,.gml,.dxf,.fld" />
         <textarea id="input" placeholder="Message Marks… (Shift+Enter for newline)"></textarea>
         <button class="btn" id="btnSend">Send</button>
       </div>
@@ -484,45 +425,23 @@
   <script>
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
 
+    // Base instructions injected BEFORE persona
+    const BASE_INSTRUCTIONS_URL = "/config/base-instructions.json";
+
     const PERSONAS = {
       field: { key: "field", label: "Field Assistant", url: "/config/personas/marks-field.json" },
       legal: { key: "legal", label: "Legal Expert", url: "/config/personas/marks-legal.json" }
     };
     const PERSONA_STORAGE_KEY = "marks.persona.key";
 
-    // Base instructions (injected BEFORE persona prompt for all personas)
-    const BASE_INSTRUCTIONS_URL = "/config/base-instructions.json";
-    let BASE_INSTRUCTIONS = "";
-
     // ---- Deep-link Quick Q&A ----
     const DEEPLINK_HASH = "#deeplink";
     const DEEPLINK_Q_KEY = "marks.deeplink.question";
     const DEEPLINK_AUTOSEND = true;
-
-    // ---- Attachments ----
-    const MAX_ATTACH_BYTES = 750_000; // per file
-    const MAX_ATTACH_FILES = 8;
-
-    const ATTACH_ONLY_PROMPT_HELPER = "Analyze the attached file(s) and respond with a clear, practical answer.";
-
-    // Injection wrapper format
-    function wrapAttachmentForInjection(fileMeta, index1) {
-      const name = fileMeta.name || `attachment-${index1}`;
-      const bytes = Number.isFinite(fileMeta.size) ? fileMeta.size : 0;
-      const mime = fileMeta.type || "text/plain";
-      const header = `=== BEGIN ATTACHMENT ${index1}: ${name} (${bytes} bytes, ${mime}) ===`;
-      const footer = `=== END ATTACHMENT ${index1}: ${name} ===`;
-      return `${header}\n${fileMeta.text}\n${footer}`;
-    }
-
-    // Keep in-memory only
-    let attachments = []; // [{aid,name,size,type,text}]
-
     let pendingDeepLinkQuestion = null;
 
     function readDeepLinkQuestionIfAny() {
       if (location.hash !== DEEPLINK_HASH) return null;
-
       const q = localStorage.getItem(DEEPLINK_Q_KEY);
       if (q && String(q).trim()) {
         localStorage.removeItem(DEEPLINK_Q_KEY);
@@ -530,6 +449,18 @@
       }
       return null;
     }
+    // ----------------------------
+
+    // ---- Attachments injection wrapper + helper ----
+    const ATTACHMENT_ONLY_HELPER = "Analyze the attached file(s).";
+    const MAX_ATTACH_FILES = 6;
+    const MAX_ATTACH_BYTES_EACH = 2_000_000;   // 2 MB per file
+    const MAX_ATTACH_CHARS_EACH = 220_000;     // clip huge text
+
+    const ATTACH_WRAP_START = "<<<ATTACHMENTS>>>";
+    const ATTACH_WRAP_END   = "<<<END_ATTACHMENTS>>>";
+
+    let attachments = []; // [{id, name, type, size, text, clipped}]
     // ----------------------------
 
     let ws = null;
@@ -540,8 +471,10 @@
 
     let inflight = null; // { id, raw, contentEl, thinkingEl, scheduled }
 
-    const SYSTEM = { role: "system", content: "" };
-    const history = [SYSTEM];
+    const BASE_SYSTEM = { role: "system", content: "" };
+    const PERSONA_SYSTEM = { role: "system", content: "" };
+
+    const history = [BASE_SYSTEM, PERSONA_SYSTEM];
     const HISTORY_MAX = 24;
 
     const $ = (id) => document.getElementById(id);
@@ -565,78 +498,27 @@
       });
     }
 
-    // --- SVG inline rendering (from markdown code blocks) ---
-    function looksLikeSvg(text) {
-      const t = String(text || "").trim();
-      return t.startsWith("<svg") && t.includes("</svg>");
+    // If streaming code fences are unbalanced, temporarily close them so marked can render <pre><code>
+    function closeOpenCodeFences(md) {
+      const s = String(md || "");
+      const fenceCount = (s.match(/```/g) || []).length;
+      if (fenceCount % 2 === 1) return s + "\n```";
+      return s;
     }
-
-    function sanitizeSvgToFragment(svgText) {
-      if (!window.DOMPurify) return null;
-      try {
-        return DOMPurify.sanitize(String(svgText || ""), {
-          USE_PROFILES: { svg: true, svgFilters: true },
-          RETURN_DOM_FRAGMENT: true,
-          FORBID_TAGS: ["script","foreignObject"]
-        });
-      } catch {
-        return null;
-      }
-    }
-
-    function inlineSvgsFromCodeBlocks(containerEl) {
-      if (!containerEl) return;
-
-      const codeEls = containerEl.querySelectorAll("pre > code");
-      codeEls.forEach((code) => {
-        const svgText = code.textContent || "";
-        if (!looksLikeSvg(svgText)) return;
-
-        const pre = code.closest("pre");
-        if (!pre) return;
-
-        const frag = sanitizeSvgToFragment(svgText);
-        if (!frag) return;
-
-        const frame = document.createElement("div");
-        frame.className = "svgFrame";
-        frame.appendChild(frag);
-
-        pre.replaceWith(frame);
-      });
-    }
-    // -----------------------------------------------
 
     function renderMarkdownToHtml(mdText) {
-      if (!window.marked) return escapeHtml(mdText).replace(/\n/g, "<br/>");
-
-      let html = marked.parse(mdText || "");
+      const md = closeOpenCodeFences(mdText);
+      if (!window.marked) return escapeHtml(md).replace(/\n/g, "<br/>");
+      let html = marked.parse(md || "");
       html = wrapTables(html);
-
       if (window.DOMPurify) {
+        // Intentionally sanitize as HTML only — SVG will be rendered from code blocks via our SVG sanitizer.
         return DOMPurify.sanitize(html, {
-          USE_PROFILES: { html: true, svg: true, svgFilters: true },
-          ADD_TAGS: [
-            "svg","g","path","circle","rect","line","polyline","polygon","ellipse",
-            "text","tspan","defs","linearGradient","radialGradient","stop","clipPath","mask",
-            "pattern","filter","feGaussianBlur","feOffset","feColorMatrix","feBlend",
-            "feComponentTransfer","feFuncR","feFuncG","feFuncB","feFuncA","feMerge","feMergeNode",
-            "symbol","use","marker","title","desc","image"
-          ],
-          ADD_ATTR: [
-            "viewBox","xmlns","preserveAspectRatio","width","height","x","y","cx","cy","r","rx","ry",
-            "d","points","fill","stroke","stroke-width","stroke-linecap","stroke-linejoin","stroke-dasharray",
-            "stroke-dashoffset","opacity","transform","class","id","style",
-            "font-size","font-family","text-anchor","dominant-baseline",
-            "href","xlink:href",
-            "gradientUnits","gradientTransform","offset","stop-color","stop-opacity",
-            "clip-path","mask","filter","patternUnits","patternTransform",
-            "marker-start","marker-mid","marker-end"
-          ],
-          FORBID_TAGS: ["script","foreignObject"]
+          USE_PROFILES: { html: true },
+          ADD_TAGS: ["table","thead","tbody","tr","th","td","div"],
+          ADD_ATTR: ["colspan","rowspan","align","class"]
         });
       }
-
       return html;
     }
 
@@ -650,135 +532,17 @@
       $("chat").scrollTop = $("chat").scrollHeight;
     }
 
-    function fileKindLabel(name = "") {
-      const n = String(name).toLowerCase();
-      if (n.endsWith(".csv") || n.endsWith(".tsv")) return "CSV";
-      if (n.endsWith(".json") || n.endsWith(".geojson")) return "JSON";
-      if (n.endsWith(".xml")) return "XML";
-      if (n.endsWith(".md")) return "MD";
-      if (n.endsWith(".sql")) return "SQL";
-      if (n.endsWith(".txt") || n.endsWith(".log")) return "TXT";
-      if (n.endsWith(".yaml") || n.endsWith(".yml")) return "YML";
-      if (n.endsWith(".js")) return "JS";
-      if (n.endsWith(".ts")) return "TS";
-      if (n.endsWith(".py")) return "PY";
-      if (n.endsWith(".svg")) return "SVG";
-      return "TXT";
-    }
-
-    function formatBytes(n) {
-      const v = Number(n) || 0;
-      if (v < 1024) return `${v}B`;
-      if (v < 1024*1024) return `${(v/1024).toFixed(1)}KB`;
-      return `${(v/(1024*1024)).toFixed(2)}MB`;
-    }
-
-    function renderAttachBar() {
-      const bar = $("attachBar");
-      bar.innerHTML = "";
-      if (!attachments.length) return;
-
-      attachments.forEach((a) => {
-        const chip = document.createElement("div");
-        chip.className = "chip";
-        chip.title = `${a.name} (${formatBytes(a.size)})`;
-
-        const icon = document.createElement("span");
-        icon.className = "fileIcon";
-        icon.textContent = fileKindLabel(a.name);
-
-        const name = document.createElement("span");
-        name.className = "name";
-        name.textContent = a.name;
-
-        const size = document.createElement("small");
-        size.textContent = formatBytes(a.size);
-
-        const x = document.createElement("button");
-        x.className = "x";
-        x.type = "button";
-        x.title = "Remove";
-        x.textContent = "×";
-        x.addEventListener("click", () => {
-          attachments = attachments.filter((it) => it.aid !== a.aid);
-          renderAttachBar();
-        });
-
-        chip.appendChild(icon);
-        chip.appendChild(name);
-        chip.appendChild(size);
-        chip.appendChild(x);
-        bar.appendChild(chip);
-      });
-    }
-
-    function normalizeNewlines(s) {
-      return String(s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    }
-
-    function isTextLikeFile(file) {
-      const type = String(file?.type || "").toLowerCase();
-      const name = String(file?.name || "").toLowerCase();
-
-      if (type.startsWith("text/")) return true;
-      if (["application/json","application/xml","application/x-yaml","application/yaml","application/javascript"].includes(type)) return true;
-
-      const okExt = [
-        ".txt",".csv",".tsv",".json",".geojson",".xml",".html",".md",".log",".yaml",".yml",
-        ".js",".ts",".css",".py",".java",".c",".cpp",".h",".hpp",".cs",".go",".rs",".rb",".php",
-        ".sql",".ini",".cfg",".toml",".properties",".svg"
-      ];
-      return okExt.some(ext => name.endsWith(ext));
-    }
-
-    async function addFiles(fileList) {
-      const files = Array.from(fileList || []);
-      if (!files.length) return;
-
-      if (attachments.length >= MAX_ATTACH_FILES) {
-        showAssistantErrorInline("attach", `Too many attachments (max ${MAX_ATTACH_FILES}). Remove some first.`);
-        return;
-      }
-
-      for (const f of files) {
-        if (attachments.length >= MAX_ATTACH_FILES) break;
-
-        if (!isTextLikeFile(f)) {
-          showAssistantErrorInline("attach", `Skipping non-text file: ${f.name}`);
-          continue;
-        }
-        if ((f.size || 0) > MAX_ATTACH_BYTES) {
-          showAssistantErrorInline("attach", `File too large (max ${formatBytes(MAX_ATTACH_BYTES)}): ${f.name} (${formatBytes(f.size)})`);
-          continue;
-        }
-
-        try {
-          const text = normalizeNewlines(await f.text());
-          const aid = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("a-" + Math.random().toString(16).slice(2));
-          attachments.push({
-            aid,
-            name: f.name || "untitled.txt",
-            size: f.size || 0,
-            type: f.type || "text/plain",
-            text
-          });
-        } catch (e) {
-          showAssistantErrorInline("attach", `Failed to read file: ${f.name} (${e?.message || String(e)})`);
-        }
-      }
-
-      renderAttachBar();
-    }
-
-    function clearAttachments() {
-      attachments = [];
-      renderAttachBar();
-      const fi = $("fileInput");
-      if (fi) fi.value = "";
+    function humanBytes(n) {
+      const v = Number(n);
+      if (!Number.isFinite(v) || v <= 0) return "0 B";
+      const u = ["B","KB","MB","GB"];
+      let i = 0, x = v;
+      while (x >= 1024 && i < u.length - 1) { x /= 1024; i++; }
+      return `${(i === 0 ? x : x.toFixed(1))} ${u[i]}`;
     }
 
     // USER bubble header: "You" only (id in tooltip)
-    function addUserMsg(id, text, attachMetas = []) {
+    function addUserMsg(id, text, attachList = []) {
       const wrap = document.createElement("div");
       wrap.className = "msg user";
 
@@ -794,24 +558,14 @@
       wrap.appendChild(metaRow);
       wrap.appendChild(body);
 
-      if (attachMetas && attachMetas.length) {
+      if (attachList && attachList.length) {
         const row = document.createElement("div");
-        row.className = "msgAttachRow";
-        attachMetas.forEach((a) => {
-          const chip = document.createElement("div");
-          chip.className = "msgChip";
-          chip.title = `${a.name} (${formatBytes(a.size)})`;
-
-          const icon = document.createElement("span");
-          icon.className = "fileIcon";
-          icon.textContent = fileKindLabel(a.name);
-
-          const name = document.createElement("span");
-          name.className = "name";
-          name.textContent = a.name;
-
-          chip.appendChild(icon);
-          chip.appendChild(name);
+        row.className = "attachRow";
+        attachList.forEach((a) => {
+          const chip = document.createElement("span");
+          chip.className = "attachChip";
+          chip.title = `${a.name} • ${humanBytes(a.size)}${a.clipped ? " • clipped" : ""}`;
+          chip.innerHTML = `<span class="ico">📎</span><span class="name">${escapeHtml(a.name)}</span>`;
           row.appendChild(chip);
         });
         wrap.appendChild(row);
@@ -854,6 +608,9 @@
         inflight.thinkingEl.style.display = "none";
         inflight.contentEl.style.display = "";
         inflight.contentEl.innerHTML = renderMarkdownToHtml(`**ERROR:** ${message}`);
+        // finalize SVG replacements if any
+        progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
+        inlineSvgsFromCodeBlocks(inflight.contentEl);
         scrollBottom();
         inflight = null;
         setUiBusy(false);
@@ -863,6 +620,8 @@
       p.thinkingEl.style.display = "none";
       p.contentEl.style.display = "";
       p.contentEl.innerHTML = renderMarkdownToHtml(`**ERROR:** ${message}`);
+      progressiveInlineSvgsFromCodeBlocks(p.contentEl);
+      inlineSvgsFromCodeBlocks(p.contentEl);
       scrollBottom();
     }
 
@@ -870,12 +629,11 @@
       $("btnSend").disabled = !!busy;
       $("personaSelect").disabled = !!busy;
       $("btnAttach").disabled = !!busy;
-      $("fileInput").disabled = !!busy;
       if (typeof hintText === "string") $("personaHint").textContent = hintText;
     }
 
     function trimHistory() {
-      while (history.length > 1 + HISTORY_MAX) history.splice(1, 1);
+      while (history.length > 2 + HISTORY_MAX) history.splice(2, 1); // keep base+persona
     }
 
     function newId() {
@@ -920,59 +678,37 @@
       return JSON.stringify(json, null, 2);
     }
 
-    async function fetchJsonOrText(url) {
-      const resp = await fetch(url, { cache: "no-store" });
-      if (!resp.ok) throw new Error(`fetch failed: ${resp.status} ${resp.statusText}`);
-
-      const raw = await resp.text();
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return raw; // allow plain-text fallback
-      }
-    }
-
     async function loadBaseInstructions() {
-      try {
-        const data = await fetchJsonOrText(BASE_INSTRUCTIONS_URL);
-        BASE_INSTRUCTIONS = extractSystemPrompt(data);
-        return true;
-      } catch (e) {
-        BASE_INSTRUCTIONS = "";
-        showAssistantErrorInline("base", `base-instructions load failed — ${e?.message || String(e)}`);
-        return false;
+      setUiBusy(true, "Loading base instructions…");
+      const resp = await fetch(BASE_INSTRUCTIONS_URL, { cache: "no-store" });
+      if (!resp.ok) throw new Error(`base instructions fetch failed: ${resp.status} ${resp.statusText}`);
+      const json = await resp.json();
+      BASE_SYSTEM.content = extractSystemPrompt(json);
+      if (!String(BASE_SYSTEM.content || "").trim()) {
+        throw new Error("base instructions empty");
       }
-    }
-
-    function combineSystemPrompt(baseText, personaText) {
-      const a = String(baseText || "").trim();
-      const b = String(personaText || "").trim();
-      if (a && b) return `${a}\n\n${b}`;
-      return (a || b || "").trim();
     }
 
     async function loadPersona(key) {
       const p = PERSONAS[key] || PERSONAS.field;
       setUiBusy(true, `Loading: ${p.label}…`);
       try {
-        // Ensure base instructions are loaded (injected before persona)
-        if (!BASE_INSTRUCTIONS || !String(BASE_INSTRUCTIONS).trim()) {
-          await loadBaseInstructions(); // errors are already surfaced inline
+        // Ensure base is loaded first (and keep it fresh if you’re editing it)
+        if (!String(BASE_SYSTEM.content || "").trim()) {
+          await loadBaseInstructions();
         }
 
         const resp = await fetch(p.url, { cache: "no-store" });
         if (!resp.ok) throw new Error(`persona fetch failed: ${resp.status} ${resp.statusText}`);
         const json = await resp.json();
-        const personaPrompt = extractSystemPrompt(json);
+        PERSONA_SYSTEM.content = extractSystemPrompt(json);
 
-        SYSTEM.content = combineSystemPrompt(BASE_INSTRUCTIONS, personaPrompt);
-
+        // Reset conversation history but keep base+persona system messages
         history.length = 0;
-        history.push(SYSTEM);
+        history.push(BASE_SYSTEM, PERSONA_SYSTEM);
         inflight = null;
 
         localStorage.setItem(PERSONA_STORAGE_KEY, p.key);
-
         setUiBusy(false, `Active: ${p.label}`);
 
         const id = "persona-" + Math.random().toString(16).slice(2, 8);
@@ -980,6 +716,8 @@
         a.thinkingEl.style.display = "none";
         a.contentEl.style.display = "";
         a.contentEl.innerHTML = renderMarkdownToHtml(`Persona loaded: **${p.label}**`);
+        progressiveInlineSvgsFromCodeBlocks(a.contentEl);
+        inlineSvgsFromCodeBlocks(a.contentEl);
 
         maybeTryDeepLinkSend();
       } catch (e) {
@@ -1047,9 +785,8 @@
               inflight.contentEl.style.display = "";
               inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
 
-              if (inflight.raw.includes("</svg>")) {
-                inlineSvgsFromCodeBlocks(inflight.contentEl);
-              }
+              // Progressive SVG rendering (hides raw SVG code blocks early, renders when parseable)
+              progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
 
               scrollBottom();
               inflight.scheduled = false;
@@ -1065,12 +802,15 @@
             p.thinkingEl.style.display = "none";
             p.contentEl.style.display = "";
             p.contentEl.innerHTML = renderMarkdownToHtml(finalText);
+            progressiveInlineSvgsFromCodeBlocks(p.contentEl);
             inlineSvgsFromCodeBlocks(p.contentEl);
           } else {
             inflight.raw = finalText || inflight.raw;
             inflight.thinkingEl.style.display = "none";
             inflight.contentEl.style.display = "";
             inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
+
+            progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
             inlineSvgsFromCodeBlocks(inflight.contentEl);
           }
 
@@ -1099,35 +839,286 @@
       };
     }
 
-    function buildInjectedUserMessage(displayText, attachList) {
-      const base = String(displayText || "").trim();
-      if (!attachList || !attachList.length) return base;
+    // -------- Attachments UI --------
 
-      const wrapped = attachList.map((a, i) => wrapAttachmentForInjection(a, i + 1)).join("\n\n");
-      return `${base}\n\n${wrapped}`.trim();
+    function renderAttachRow() {
+      const row = $("attachRow");
+      row.replaceChildren();
+
+      if (!attachments.length) return;
+
+      attachments.forEach((a) => {
+        const chip = document.createElement("span");
+        chip.className = "attachChip";
+        chip.title = `${a.name} • ${humanBytes(a.size)}${a.clipped ? " • clipped" : ""}`;
+        chip.innerHTML = `
+          <span class="ico">📎</span>
+          <span class="name">${escapeHtml(a.name)}</span>
+          <button class="x" type="button" aria-label="Remove attachment">×</button>
+        `;
+        chip.querySelector(".x").addEventListener("click", () => {
+          attachments = attachments.filter(x => x.id !== a.id);
+          renderAttachRow();
+        });
+        row.appendChild(chip);
+      });
     }
 
-    function sendChat() {
-      const typed = $("input").value.trim();
+    function isLikelyTextFile(file) {
+      const type = (file?.type || "").toLowerCase();
+      if (type.startsWith("text/")) return true;
+      if (type === "application/json" || type === "application/xml" || type === "image/svg+xml") return true;
+      if (type === "application/vnd.geo+json") return true;
+      // fall back by extension
+      const name = (file?.name || "").toLowerCase();
+      return /\.(txt|md|csv|tsv|json|geojson|xml|yml|yaml|log|ini|cfg|py|js|ts|html|css|sql|wkt|gml|dxf|fld)$/i.test(name);
+    }
 
-      const attachList = attachments.slice();
-      const hasAttach = attachList.length > 0;
-      const displayText = typed || (hasAttach ? ATTACH_ONLY_PROMPT_HELPER : "");
+    function guessFenceLang(name, type) {
+      const n = (name || "").toLowerCase();
+      const t = (type || "").toLowerCase();
+      if (t.includes("json") || n.endsWith(".json") || n.endsWith(".geojson")) return "json";
+      if (t.includes("xml") || n.endsWith(".xml") || n.endsWith(".gml") || n.endsWith(".svg")) return "xml";
+      if (n.endsWith(".csv")) return "csv";
+      if (n.endsWith(".tsv")) return "tsv";
+      if (n.endsWith(".yml") || n.endsWith(".yaml")) return "yaml";
+      if (n.endsWith(".sql")) return "sql";
+      if (n.endsWith(".html")) return "html";
+      if (n.endsWith(".css")) return "css";
+      if (n.endsWith(".js")) return "javascript";
+      if (n.endsWith(".ts")) return "typescript";
+      if (n.endsWith(".py")) return "python";
+      return "";
+    }
 
-      if (!displayText) return;
+    function buildAttachmentsInjectionBlock(list) {
+      if (!list || !list.length) return "";
 
-      const injectedText = hasAttach ? buildInjectedUserMessage(displayText, attachList) : displayText;
+      let out = `\n\n${ATTACH_WRAP_START}\n`;
+      for (const a of list) {
+        const lang = guessFenceLang(a.name, a.type);
+        const head = `FILE: ${a.name}\nTYPE: ${a.type || "unknown"}\nSIZE: ${a.size}\n${a.clipped ? "NOTE: content was clipped\n" : ""}`;
+        out += `\n${head}CONTENT:\n\`\`\`${lang}\n${a.text || ""}\n\`\`\`\n`;
+      }
+      out += `\n${ATTACH_WRAP_END}\n`;
+      return out;
+    }
 
-      $("input").value = "";
-      $("input").focus();
+    async function addFiles(files) {
+      const list = Array.from(files || []);
+      if (!list.length) return;
 
+      // enforce max count
+      const room = Math.max(0, MAX_ATTACH_FILES - attachments.length);
+      const incoming = list.slice(0, room);
+
+      for (const f of incoming) {
+        if (!isLikelyTextFile(f)) {
+          showAssistantErrorInline("attach", `Only text-based files are supported right now. Skipped: ${f.name}`);
+          continue;
+        }
+        if (f.size > MAX_ATTACH_BYTES_EACH) {
+          showAssistantErrorInline("attach", `File too large (max ${humanBytes(MAX_ATTACH_BYTES_EACH)}). Skipped: ${f.name}`);
+          continue;
+        }
+
+        let text = "";
+        try {
+          text = await f.text();
+        } catch (e) {
+          showAssistantErrorInline("attach", `Could not read file. Skipped: ${f.name}`);
+          continue;
+        }
+
+        let clipped = false;
+        if (text.length > MAX_ATTACH_CHARS_EACH) {
+          text = text.slice(0, MAX_ATTACH_CHARS_EACH) + `\n\n[...clipped at ${MAX_ATTACH_CHARS_EACH} chars...]`;
+          clipped = true;
+        }
+
+        attachments.push({
+          id: newId(),
+          name: f.name || "attachment",
+          type: f.type || "",
+          size: f.size || 0,
+          text,
+          clipped
+        });
+      }
+
+      renderAttachRow();
+
+      if (list.length > incoming.length) {
+        showAssistantErrorInline("attach", `Attachment limit: ${MAX_ATTACH_FILES} files. Extra files were ignored.`);
+      }
+    }
+
+    // -------- SVG rendering from code blocks (progressive + final) --------
+
+    function looksLikeSvg(s) {
+      const t = String(s || "").trim();
+      return t.startsWith("<svg") || (t.startsWith("<?xml") && t.includes("<svg"));
+    }
+
+    function sanitizeSvgToFragment(svgText) {
+      const raw = String(svgText || "").trim();
+      if (!raw) return null;
+
+      // Parse as SVG
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(raw, "image/svg+xml");
+      const svg = doc.documentElement;
+
+      if (!svg || svg.nodeName.toLowerCase() !== "svg") return null;
+      if (svg.querySelector("parsererror")) return null;
+
+      // Remove dangerous nodes
+      svg.querySelectorAll("script, foreignObject, iframe, object, embed").forEach(n => n.remove());
+
+      // Strip event handlers and external links
+      svg.querySelectorAll("*").forEach((el) => {
+        Array.from(el.attributes || []).forEach((attr) => {
+          const name = String(attr.name || "").toLowerCase();
+          const value = String(attr.value || "");
+          if (name.startsWith("on")) el.removeAttribute(attr.name);
+          if (name === "href" || name === "xlink:href") {
+            const v = value.trim();
+            // allow only internal fragment refs
+            if (v && !v.startsWith("#")) el.removeAttribute(attr.name);
+          }
+        });
+      });
+
+      // Import into current document
+      const frag = document.createDocumentFragment();
+      frag.appendChild(document.importNode(svg, true));
+      return frag;
+    }
+
+    // Track progressive SVG frames (avoid duplicates)
+    const svgPreToFrame = new WeakMap();
+
+    function bestEffortSvgMarkup(svgText) {
+      let s = String(svgText || "").trim();
+      if (!s.startsWith("<svg") && !(s.startsWith("<?xml") && s.includes("<svg"))) return null;
+
+      // If there's an xml header, keep from <svg onward (browser parser is happier)
+      const svgStart = s.indexOf("<svg");
+      if (svgStart > 0) s = s.slice(svgStart);
+
+      // Truncate if stream ends mid-tag
+      const lastLt = s.lastIndexOf("<");
+      const lastGt = s.lastIndexOf(">");
+      if (lastLt > lastGt) s = s.slice(0, lastLt);
+
+      // Ensure closing tag so DOMParser can build DOM
+      if (!s.includes("</svg>")) s += "\n</svg>";
+      return s;
+    }
+
+    function renderSvgIntoFrame(frameEl, svgMarkup) {
+      const frag = sanitizeSvgToFragment(svgMarkup);
+      if (!frag) return false;
+      const probe = frag.querySelector ? frag.querySelector("svg") : null;
+      if (!probe) return false;
+
+      frameEl.textContent = "";
+      frameEl.innerHTML = "";
+      frameEl.appendChild(frag);
+      return true;
+    }
+
+    // Progressive rendering: hide SVG code blocks and show a live-rendered frame instead
+    function progressiveInlineSvgsFromCodeBlocks(containerEl) {
+      if (!containerEl) return;
+
+      const codeEls = containerEl.querySelectorAll("pre > code");
+      codeEls.forEach((code) => {
+        const raw = (code.textContent || "").trim();
+        if (!raw) return;
+
+        // Detect SVG even if the code fence language isn't "svg"
+        if (!looksLikeSvg(raw)) return;
+
+        const pre = code.closest("pre");
+        if (!pre) return;
+
+        // Create or reuse a frame
+        let frame = svgPreToFrame.get(pre);
+        if (!frame) {
+          frame = document.createElement("div");
+          frame.className = "svgFrame";
+          frame.textContent = "Rendering SVG…";
+          pre.style.display = "none";
+          pre.parentNode.insertBefore(frame, pre.nextSibling);
+          svgPreToFrame.set(pre, frame);
+        } else {
+          pre.style.display = "none";
+        }
+
+        // Throttle rerender by length
+        const lenKey = String(raw.length);
+        if (frame.dataset.lastLen === lenKey) return;
+        frame.dataset.lastLen = lenKey;
+
+        const markup = bestEffortSvgMarkup(raw);
+        if (!markup) return;
+
+        const ok = renderSvgIntoFrame(frame, markup);
+        if (!ok) frame.textContent = "Rendering SVG…";
+      });
+    }
+
+    // Final pass: replace SVG code blocks fully with rendered SVG
+    function inlineSvgsFromCodeBlocks(containerEl) {
+      if (!containerEl) return;
+
+      const codeEls = containerEl.querySelectorAll("pre > code");
+      codeEls.forEach((code) => {
+        const svgText = (code.textContent || "").trim();
+        if (!looksLikeSvg(svgText)) return;
+
+        const pre = code.closest("pre");
+        if (!pre) return;
+
+        // If we already created a progressive frame, finalize into it and remove the pre
+        const existingFrame = svgPreToFrame.get(pre);
+        if (existingFrame) {
+          const frag = sanitizeSvgToFragment(svgText);
+          if (frag) {
+            existingFrame.textContent = "";
+            existingFrame.innerHTML = "";
+            existingFrame.appendChild(frag);
+          }
+          pre.remove();
+          return;
+        }
+
+        const frag = sanitizeSvgToFragment(svgText);
+        if (!frag) return;
+
+        const frame = document.createElement("div");
+        frame.className = "svgFrame";
+        frame.appendChild(frag);
+
+        pre.replaceWith(frame);
+      });
+    }
+
+    // -------- Send logic --------
+
+    function sendChatText(text, attachList = []) {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (!handshakeOk) {
         showAssistantErrorInline("ui", "not ready (hello handshake pending).");
         sendHello(false);
         return;
       }
-      if (!SYSTEM.content || !String(SYSTEM.content).trim()) {
+      if (!String(BASE_SYSTEM.content || "").trim()) {
+        showAssistantErrorInline("ui", "base instructions not loaded yet.");
+        return;
+      }
+      if (!String(PERSONA_SYSTEM.content || "").trim()) {
         showAssistantErrorInline("ui", "persona not loaded yet.");
         return;
       }
@@ -1136,11 +1127,21 @@
         return;
       }
 
+      // Attachment-only helper
+      let userText = String(text || "").trim();
+      if (!userText && attachList && attachList.length) userText = ATTACHMENT_ONLY_HELPER;
+      if (!userText && (!attachList || !attachList.length)) return;
+
+      // Injection wrapper
+      const injection = buildAttachmentsInjectionBlock(attachList);
+      const messageToModel = userText + (injection || "");
+
       const id = newId();
 
-      addUserMsg(id, displayText, attachList.map(a => ({ name: a.name, size: a.size })));
+      // Show only the user text + attachment icons (NOT the injected content)
+      addUserMsg(id, userText, attachList);
 
-      history.push({ role: "user", content: injectedText });
+      history.push({ role: "user", content: messageToModel });
       trimHistory();
 
       const p = addAssistantPlaceholder(id);
@@ -1154,7 +1155,7 @@
         body: {
           messages: history.slice(),
           temperature: 0.2,
-          max_tokens: 600,
+          max_tokens: 4096,
           stream: true
         }
       };
@@ -1165,16 +1166,31 @@
           showAssistantErrorInline(id, "socket not open");
           inflight = null;
           setUiBusy(false);
-          return;
         }
-        if (hasAttach) clearAttachments();
       });
     }
 
+    function sendChat() {
+      const userText = $("input").value.trim();
+      const attachList = attachments.slice();
+
+      if (!userText && !attachList.length) return;
+
+      $("input").value = "";
+      $("input").focus();
+
+      // clear attachments for next message
+      attachments = [];
+      renderAttachRow();
+
+      sendChatText(userText, attachList);
+    }
+
+    // Attempt to consume+send deep-link question if everything is ready.
     function maybeTryDeepLinkSend() {
       if (!pendingDeepLinkQuestion) return;
 
-      const personaReady = !!(SYSTEM.content && String(SYSTEM.content).trim());
+      const personaReady = !!(String(BASE_SYSTEM.content || "").trim() && String(PERSONA_SYSTEM.content || "").trim());
       const wsReady = !!(ws && ws.readyState === WebSocket.OPEN);
       if (!personaReady || !wsReady || !handshakeOk) return;
 
@@ -1189,45 +1205,8 @@
       }
     }
 
-    // ---- Attach UI wiring ----
-    $("btnAttach").addEventListener("click", () => {
-      if ($("btnAttach").disabled) return;
-      $("fileInput").click();
-    });
+    // -------- Wire UI events --------
 
-    $("fileInput").addEventListener("change", async (e) => {
-      const files = e.target.files;
-      if (files && files.length) await addFiles(files);
-      e.target.value = "";
-    });
-
-    // Drag+drop onto composer / textarea
-    const dropTargets = [$("composer"), $("input")];
-    let dropDepth = 0;
-
-    function prevent(e){ e.preventDefault(); e.stopPropagation(); }
-
-    function setDropActive(on) {
-      const t = $("input");
-      if (!t) return;
-      if (on) t.classList.add("dropActive");
-      else t.classList.remove("dropActive");
-    }
-
-    dropTargets.forEach((el) => {
-      el.addEventListener("dragenter", (e) => { prevent(e); dropDepth++; setDropActive(true); });
-      el.addEventListener("dragover", (e) => { prevent(e); setDropActive(true); });
-      el.addEventListener("dragleave", (e) => { prevent(e); dropDepth = Math.max(0, dropDepth - 1); if (dropDepth === 0) setDropActive(false); });
-      el.addEventListener("drop", async (e) => {
-        prevent(e);
-        dropDepth = 0;
-        setDropActive(false);
-        const dt = e.dataTransfer;
-        if (dt && dt.files && dt.files.length) await addFiles(dt.files);
-      });
-    });
-
-    // ---- Send wiring ----
     $("btnSend").onclick = sendChat;
     $("input").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
@@ -1237,6 +1216,32 @@
       await loadPersona(e.target.value);
     });
 
+    $("btnAttach").addEventListener("click", () => $("filePicker").click());
+    $("filePicker").addEventListener("change", async (e) => {
+      await addFiles(e.target.files);
+      e.target.value = ""; // allow reselect same file
+    });
+
+    // Drag/drop support (drop onto composer / textarea)
+    const dropTargets = [$("composer"), $("input")];
+    dropTargets.forEach((el) => {
+      el.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        $("input").classList.add("dropActive");
+      });
+      el.addEventListener("dragleave", () => {
+        $("input").classList.remove("dropActive");
+      });
+      el.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        $("input").classList.remove("dropActive");
+        const files = e.dataTransfer?.files;
+        if (files && files.length) await addFiles(files);
+      });
+    });
+
+    // -------- Boot --------
+
     (async function boot(){
       pendingDeepLinkQuestion = readDeepLinkQuestionIfAny();
 
@@ -1244,14 +1249,17 @@
       const key = (saved && PERSONAS[saved]) ? saved : "field";
       $("personaSelect").value = key;
 
-      // Load base first (then persona will combine base + persona into SYSTEM)
-      await loadBaseInstructions();
-      await loadPersona(key);
+      // Load base first, then persona, then connect
+      try {
+        await loadBaseInstructions();
+      } catch (e) {
+        showAssistantErrorInline("base", `base instructions load failed — ${e?.message || String(e)}`);
+      }
 
+      await loadPersona(key);
       connect();
 
       maybeTryDeepLinkSend();
-      renderAttachBar();
     })();
   </script>
 </body>
