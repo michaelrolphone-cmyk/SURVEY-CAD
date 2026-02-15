@@ -38,8 +38,10 @@
     .msg{max-width:980px; width:fit-content; border-radius:16px; border:1px solid var(--line); background:rgba(0,0,0,.28); padding:10px 12px;}
     .msg.user{align-self:flex-end; background:rgba(255,213,74,.08); border-color:rgba(255,213,74,.24);}
     .msg.assistant{align-self:flex-start;}
+
+    /* Header now shows ONLY the name, so keep it clean */
     .meta{display:flex; gap:10px; align-items:center; margin-bottom:6px; color:var(--muted); font-size:11px;}
-    .meta .role{font-weight:800; letter-spacing:.3px;}
+    .meta .role{font-weight:800; letter-spacing:.2px;}
     .meta .small{font-family:var(--mono); opacity:.85;}
 
     .plain{
@@ -103,7 +105,6 @@
       padding-bottom: 6px;
     }
 
-    /* Tables wrap */
     .md .table-wrap{
       max-width:100%;
       overflow-x:auto;
@@ -142,7 +143,6 @@
       background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
     }
 
-    /* Persona picker (compact) */
     .personaRow{
       display:flex;
       align-items:center;
@@ -249,7 +249,6 @@
       .personaSelect{max-width:100%; width:100%;}
     }
 
-    /* Thinking indicator */
     .thinking{
       display:flex;
       align-items:center;
@@ -293,7 +292,6 @@
           <span id="subtitle">LM socket proxy chat</span>
         </div>
       </div>
-      <!-- only Connected indicator up here -->
       <span class="pill">
         <span class="dot bad" id="statusDot"></span>
         <span id="statusText">Disconnected</span>
@@ -338,10 +336,8 @@
     let helloSent = false;
     let handshakeOk = false;
 
-    // single in-flight request (UI is "single-threaded" for clarity)
     let inflight = null; // { id, raw, contentEl, thinkingEl, scheduled }
 
-    // SYSTEM is dynamic from persona json
     const SYSTEM = { role: "system", content: "" };
     const history = [SYSTEM];
     const HISTORY_MAX = 24;
@@ -391,13 +387,15 @@
       $("chat").scrollTop = $("chat").scrollHeight;
     }
 
+    // USER bubble header: "You" only (id in tooltip)
     function addUserMsg(id, text) {
       const wrap = document.createElement("div");
       wrap.className = "msg user";
 
       const metaRow = document.createElement("div");
       metaRow.className = "meta";
-      metaRow.innerHTML = `<span class="role">USER</span><span class="small">id=${id}</span>`;
+      metaRow.title = `id=${id}`;
+      metaRow.innerHTML = `<span class="role">You</span>`;
 
       const body = document.createElement("pre");
       body.className = "plain";
@@ -409,14 +407,15 @@
       scrollBottom();
     }
 
-    // Placeholder assistant bubble that starts as "Thinking…" and becomes streamed content.
+    // ASSISTANT bubble header: "Marks" only (id in tooltip)
     function addAssistantPlaceholder(id) {
       const wrap = document.createElement("div");
       wrap.className = "msg assistant";
 
       const metaRow = document.createElement("div");
       metaRow.className = "meta";
-      metaRow.innerHTML = `<span class="role">MARKS</span><span class="small">id=${id}</span>`;
+      metaRow.title = `id=${id}`;
+      metaRow.innerHTML = `<span class="role">Marks</span>`;
 
       const thinkingEl = document.createElement("div");
       thinkingEl.className = "thinking";
@@ -424,7 +423,7 @@
 
       const contentEl = document.createElement("div");
       contentEl.className = "md";
-      contentEl.style.display = "none"; // hidden until we receive content
+      contentEl.style.display = "none";
 
       wrap.appendChild(metaRow);
       wrap.appendChild(thinkingEl);
@@ -437,7 +436,6 @@
     }
 
     function showAssistantErrorInline(id, message) {
-      // if inflight matches, reuse its bubble
       if (inflight && inflight.id === id) {
         inflight.thinkingEl.style.display = "none";
         inflight.contentEl.style.display = "";
@@ -447,7 +445,6 @@
         setUiBusy(false);
         return;
       }
-      // otherwise add a new assistant msg
       const p = addAssistantPlaceholder(id);
       p.thinkingEl.style.display = "none";
       p.contentEl.style.display = "";
@@ -492,50 +489,30 @@
       handshakeOk = false;
     }
 
-    // --- Persona loading ---
     function extractSystemPrompt(json) {
       if (typeof json === "string") return json.trim();
-
       if (json && typeof json === "object") {
-        // Support single OpenAI-style message object: {role:"system", content:"..."}
-        if (json.role === "system" && typeof json.content === "string" && json.content.trim()) {
-          return json.content.trim();
-        }
-
-        const candidates = [
-          json.system,
-          json.system_prompt,
-          json.systemPrompt,
-          json.prompt,
-          json.content,
-          json.instructions
-        ].filter(v => typeof v === "string" && v.trim().length);
-
+        if (json.role === "system" && typeof json.content === "string" && json.content.trim()) return json.content.trim();
+        const candidates = [json.system, json.system_prompt, json.systemPrompt, json.prompt, json.content, json.instructions]
+          .filter(v => typeof v === "string" && v.trim().length);
         if (candidates.length) return candidates[0].trim();
-
         if (Array.isArray(json.messages)) {
           const sys = json.messages.find(m => m && m.role === "system" && typeof m.content === "string");
           if (sys && sys.content.trim()) return sys.content.trim();
         }
       }
-
       return JSON.stringify(json, null, 2);
     }
 
     async function loadPersona(key) {
       const p = PERSONAS[key] || PERSONAS.field;
       setUiBusy(true, `Loading: ${p.label}…`);
-
       try {
         const resp = await fetch(p.url, { cache: "no-store" });
         if (!resp.ok) throw new Error(`persona fetch failed: ${resp.status} ${resp.statusText}`);
-
         const json = await resp.json();
-        const sys = extractSystemPrompt(json);
+        SYSTEM.content = extractSystemPrompt(json);
 
-        SYSTEM.content = sys;
-
-        // reset context on persona change
         history.length = 0;
         history.push(SYSTEM);
         inflight = null;
@@ -543,7 +520,7 @@
         localStorage.setItem(PERSONA_STORAGE_KEY, p.key);
 
         setUiBusy(false, `Active: ${p.label}`);
-        // light confirmation
+
         const id = "persona-" + Math.random().toString(16).slice(2, 8);
         const a = addAssistantPlaceholder(id);
         a.thinkingEl.style.display = "none";
@@ -555,7 +532,6 @@
       }
     }
 
-    // --- WS connection ---
     function connect() {
       helloSent = false;
       handshakeOk = false;
@@ -585,7 +561,6 @@
         try { msg = JSON.parse(ev.data); } catch { return; }
 
         const type = String(msg?.type || "");
-
         if (type === "ping") { wsSend({ type: "pong", ts: Date.now() }); return; }
         if (type === "pong") return;
 
@@ -594,21 +569,14 @@
 
         const id = String(msg?.id || "");
 
-        if (type === "started") {
-          // IMPORTANT: do NOT remove thinking here.
-          // We keep it visible until we actually receive content (delta/done/error).
-          return;
-        }
+        if (type === "started") return; // keep thinking visible until delta/done/error
 
         if (type === "delta") {
           const delta = (msg.delta || "");
-
           if (!inflight || inflight.id !== id) {
-            // if we somehow missed creating the placeholder, create one now
             const p = addAssistantPlaceholder(id);
             inflight = { id, raw: "", contentEl: p.contentEl, thinkingEl: p.thinkingEl, scheduled: false };
           }
-
           inflight.raw += delta;
 
           if (!inflight.scheduled) {
@@ -627,7 +595,6 @@
 
         if (type === "done") {
           const finalText = msg.message || "";
-
           if (!inflight || inflight.id !== id) {
             const p = addAssistantPlaceholder(id);
             p.thinkingEl.style.display = "none";
@@ -693,13 +660,11 @@
       history.push({ role: "user", content: userText });
       trimHistory();
 
-      // Create placeholder assistant bubble FIRST so it paints immediately
       const p = addAssistantPlaceholder(id);
       inflight = { id, raw: "", contentEl: p.contentEl, thinkingEl: p.thinkingEl, scheduled: false };
 
       setUiBusy(true, $("personaHint").textContent || "");
 
-      // Send on next frame so the "Thinking…" bubble is guaranteed to render
       const payload = {
         type: "chat",
         id,
@@ -724,7 +689,6 @@
       $("input").focus();
     }
 
-    // --- Bind UI ---
     $("btnSend").onclick = sendChat;
     $("input").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
@@ -734,7 +698,6 @@
       await loadPersona(e.target.value);
     });
 
-    // --- Boot ---
     (async function boot(){
       const saved = localStorage.getItem(PERSONA_STORAGE_KEY);
       const key = (saved && PERSONAS[saved]) ? saved : "field";
