@@ -6,6 +6,18 @@ import { createHash, randomUUID } from 'node:crypto';
 function decodeFrame(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 2) return null;
   const first = buffer[0];
+
+  const fin = (first & 0x80) !== 0;
+  const rsv1 = (first & 0x40) !== 0;  // RSV1 bit
+  const rsv2 = (first & 0x20) !== 0;
+  const rsv3 = (first & 0x10) !== 0;
+  
+  if (rsv1 || rsv2 || rsv3) {
+    // Log for debugging
+    console.warn(`Rejected frame with reserved bits set (RSV1=${rsv1}, RSV2=${rsv2}, RSV3=${rsv3})`);
+    return null;  // or throw / close connection
+  }
+  
   const second = buffer[1];
   const opcode = first & 0x0f;
   const masked = (second & 0x80) !== 0;
