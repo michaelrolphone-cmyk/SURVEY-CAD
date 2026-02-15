@@ -11,7 +11,7 @@ import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
-import { workerSchedulerInternals } from './worker-task-ws.js';
+import { createWebSocketAccept } from './worker-task-ws.js';
 import { loadFldConfig } from './fld-config.js';
 import {
   getCrewProfiles,
@@ -315,7 +315,7 @@ export function createSurveyServer({
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
-  const workerSocket = workerSchedulerInternals.createWebSocketAccept();
+  const workerSocket = createWebSocketAccept();
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
