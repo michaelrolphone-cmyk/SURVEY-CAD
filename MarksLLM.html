@@ -201,6 +201,7 @@
       max-width: 45vw;
     }
 
+    /* Composer row */
     .composer .box{
       display:flex;
       gap:10px;
@@ -237,13 +238,126 @@
       white-space:nowrap;
     }
     .btn[disabled]{opacity:.55; cursor:not-allowed;}
+
+    /* Attachments UI */
+    .iconBtn{
+      width:42px;
+      height:42px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+      box-sizing:border-box;
+    }
+    .iconBtn:hover{ background:rgba(255,255,255,.06); }
+    .iconBtn svg{ width:18px; height:18px; fill: currentColor; }
+
+    .attachmentsBar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin: 0 0 10px;
+      padding: 2px 0;
+    }
+    .fileChip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+      max-width: 100%;
+    }
+    .fileChip .ext{
+      font-weight:900;
+      font-size:10px;
+      letter-spacing:.08em;
+      padding:3px 8px;
+      border-radius:999px;
+      background: rgba(255,213,74,.10);
+      border: 1px solid rgba(255,213,74,.24);
+      flex:0 0 auto;
+      color: rgba(230,238,252,.95);
+    }
+    .fileChip .name{
+      font-size:12px;
+      color: rgba(230,238,252,.92);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width: min(60vw, 520px);
+    }
+    .fileChip .rm{
+      border:0;
+      background:transparent;
+      color: rgba(154,176,208,.85);
+      cursor:pointer;
+      padding:2px 6px;
+      border-radius:10px;
+      font-size:14px;
+      line-height:1;
+      flex:0 0 auto;
+    }
+    .fileChip .rm:hover{
+      color: rgba(230,238,252,1);
+      background: rgba(255,255,255,.06);
+    }
+
+    .composerError{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border: 1px solid rgba(239,68,68,.45);
+      background: rgba(127,29,29,.20);
+      color: rgba(254,202,202,.95);
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    /* Attachments in user messages (chips only, no remove) */
+    .msgAttRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin: 2px 0 8px;
+      padding: 0;
+    }
+    .msgAttRow .fileChip{ background: rgba(0,0,0,.14); }
+    .msgAttRow .fileChip .rm{ display:none; }
+
+    /* Drag/drop overlay */
+    .dropOverlay{
+      position: fixed;
+      inset: 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: rgba(2,6,23,.68);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      color: rgba(230,238,252,.95);
+      font-weight: 900;
+      letter-spacing:.05em;
+      text-align:center;
+      padding: 24px;
+    }
+    .dropOverlay.hidden{ display:none; }
+
     @media (max-width: 520px){
       .personaSelect{min-width: 160px;}
       .personaHint{display:none;}
+      .fileChip .name{ max-width: 70vw; }
     }
     @media (max-width: 420px){
       .composer .box{flex-direction:column; align-items:stretch;}
       .btn{width:100%;}
+      .iconBtn{ width:100%; height:44px; border-radius:14px; }
       .personaRow{flex-direction:column; align-items:stretch;}
       .personaRow .left{justify-content:space-between;}
       .personaSelect{max-width:100%; width:100%;}
@@ -315,12 +429,26 @@
         <div class="personaHint" id="personaHint">Loading…</div>
       </div>
 
+      <!-- Attachments chips (composer) -->
+      <div class="attachmentsBar" id="attachmentsBar" hidden></div>
+
       <div class="box">
+        <button class="iconBtn" id="btnAttach" type="button" title="Attach a text file" aria-label="Attach a text file">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M11 5h2v14h-2zM5 11h14v2H5z"></path>
+          </svg>
+        </button>
+        <input id="fileInput" type="file" multiple hidden />
         <textarea id="input" placeholder="Message Marks… (Shift+Enter for newline)"></textarea>
         <button class="btn" id="btnSend">Send</button>
       </div>
+
+      <div class="composerError" id="composerError" hidden></div>
     </footer>
   </div>
+
+  <!-- Drag/drop overlay -->
+  <div class="dropOverlay hidden" id="dropOverlay">Drop text files to attach</div>
 
   <script>
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
@@ -410,8 +538,236 @@
       $("chat").scrollTop = $("chat").scrollHeight;
     }
 
+    // ---------- Attachments (text files) ----------
+    const attachmentsBar = $("attachmentsBar");
+    const composerError = $("composerError");
+    const btnAttach = $("btnAttach");
+    const fileInput = $("fileInput");
+    const dropOverlay = $("dropOverlay");
+
+    const ATTACH_MAX_FILE_BYTES = 256 * 1024;   // 256KB per file
+    const ATTACH_MAX_TOTAL_BYTES = 512 * 1024;  // 512KB total
+    const ATTACH_ALLOWED_EXT = new Set([
+      "txt","md","csv","json","geojson","xml","yaml","yml","log","wkt","kml","gpx","prj","tfw","fld","rw5"
+    ]);
+
+    let attached = []; // [{id, file, name, ext, type, size}]
+
+    function showComposerError(msg) {
+      const t = String(msg || "").trim();
+      if (!t) {
+        composerError.hidden = true;
+        composerError.textContent = "";
+        return;
+      }
+      composerError.hidden = false;
+      composerError.textContent = t;
+    }
+
+    function fileExt(name="") {
+      const m = String(name).toLowerCase().match(/\.([a-z0-9]{1,12})$/);
+      return m ? m[1] : "";
+    }
+
+    function isLikelyTextFile(file) {
+      const ext = fileExt(file?.name || "");
+      if (ATTACH_ALLOWED_EXT.has(ext)) return true;
+      const type = String(file?.type || "").toLowerCase();
+      if (type.startsWith("text/")) return true;
+      if (type === "application/json" || type === "application/xml" || type.endsWith("+xml")) return true;
+      if (type === "application/x-yaml" || type === "text/yaml") return true;
+      return false;
+    }
+
+    function totalBytes(list) {
+      return list.reduce((sum, a) => sum + (Number(a.size) || 0), 0);
+    }
+
+    function renderFileChip(meta, { removable = false, onRemove = null } = {}) {
+      const chip = document.createElement("div");
+      chip.className = "fileChip";
+
+      const ext = document.createElement("span");
+      ext.className = "ext";
+      ext.textContent = (meta.ext || "FILE").toUpperCase();
+
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = meta.name || "attachment";
+      name.title = `${meta.name || "attachment"} • ${Math.round((meta.size || 0)/1024)} KB`;
+
+      chip.appendChild(ext);
+      chip.appendChild(name);
+
+      if (removable) {
+        const rm = document.createElement("button");
+        rm.className = "rm";
+        rm.type = "button";
+        rm.title = "Remove";
+        rm.textContent = "×";
+        rm.addEventListener("click", () => onRemove && onRemove());
+        chip.appendChild(rm);
+      } else {
+        const rm = document.createElement("span");
+        rm.className = "rm";
+        rm.textContent = ""; // hidden via CSS in message row
+        chip.appendChild(rm);
+      }
+
+      return chip;
+    }
+
+    function renderAttachmentsBar() {
+      attachmentsBar.innerHTML = "";
+      if (!attached.length) {
+        attachmentsBar.hidden = true;
+        return;
+      }
+      attachmentsBar.hidden = false;
+
+      for (const a of attached) {
+        const chip = renderFileChip(
+          { name: a.name, ext: a.ext, size: a.size, type: a.type },
+          {
+            removable: true,
+            onRemove: () => {
+              attached = attached.filter(x => x.id !== a.id);
+              renderAttachmentsBar();
+              if (!attached.length) showComposerError("");
+            }
+          }
+        );
+        attachmentsBar.appendChild(chip);
+      }
+    }
+
+    function addFiles(fileList) {
+      const files = Array.from(fileList || []);
+      if (!files.length) return;
+      showComposerError("");
+
+      for (const f of files) {
+        if (!isLikelyTextFile(f)) {
+          showComposerError(`Skipped "${f.name}" (not recognized as a text file).`);
+          continue;
+        }
+        if ((f.size || 0) > ATTACH_MAX_FILE_BYTES) {
+          showComposerError(`"${f.name}" is too large (${Math.round(f.size/1024)} KB). Max per file is ${Math.round(ATTACH_MAX_FILE_BYTES/1024)} KB.`);
+          continue;
+        }
+
+        const next = {
+          id: `att-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          file: f,
+          name: f.name,
+          ext: fileExt(f.name),
+          type: f.type || "",
+          size: f.size || 0
+        };
+
+        const candidate = [...attached, next];
+        if (totalBytes(candidate) > ATTACH_MAX_TOTAL_BYTES) {
+          showComposerError(`Total attachments exceed ${Math.round(ATTACH_MAX_TOTAL_BYTES/1024)} KB. Remove a file or attach fewer.`);
+          continue;
+        }
+
+        attached.push(next);
+      }
+
+      renderAttachmentsBar();
+    }
+
+    btnAttach.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files && fileInput.files.length) addFiles(fileInput.files);
+      fileInput.value = "";
+    });
+
+    // Drag/drop overlay
+    let dragDepth = 0;
+    function showDropOverlay(show) {
+      dropOverlay.classList.toggle("hidden", !show);
+    }
+    window.addEventListener("dragenter", (e) => {
+      if (!e.dataTransfer) return;
+      dragDepth++;
+      showDropOverlay(true);
+    });
+    window.addEventListener("dragleave", () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) showDropOverlay(false);
+    });
+    window.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+    window.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dragDepth = 0;
+      showDropOverlay(false);
+      const files = e.dataTransfer?.files;
+      if (files && files.length) addFiles(files);
+    });
+
+    function longestBacktickRun(s) {
+      let max = 0, cur = 0;
+      for (const ch of String(s || "")) {
+        if (ch === "`") { cur++; max = Math.max(max, cur); }
+        else cur = 0;
+      }
+      return max;
+    }
+    function fenceFor(text) {
+      const n = Math.max(3, longestBacktickRun(text) + 1);
+      return "`".repeat(n);
+    }
+    function langForExt(ext) {
+      const e = (ext || "").toLowerCase();
+      if (e === "csv") return "csv";
+      if (e === "json" || e === "geojson") return "json";
+      if (e === "xml") return "xml";
+      if (e === "yaml" || e === "yml") return "yaml";
+      if (e === "md") return "markdown";
+      if (e === "wkt") return "wkt";
+      if (e === "fld") return "";
+      return "";
+    }
+
+    function snapshotAttachmentMeta(list) {
+      return (list || []).map(a => ({
+        name: a.name,
+        ext: a.ext,
+        size: a.size,
+        type: a.type
+      }));
+    }
+
+    async function buildAttachmentInjection(list) {
+      const files = list || [];
+      if (!files.length) return "";
+
+      const blocks = [];
+      blocks.push("\n\n---\nAttached files (inline text):\n");
+
+      for (const a of files) {
+        let raw = "";
+        try {
+          raw = await a.file.text();
+        } catch (e) {
+          raw = `<<FAILED TO READ FILE: ${a.name} — ${e?.message || String(e)}>>`;
+        }
+        const text = String(raw || "").replace(/\r\n/g, "\n");
+        const fence = fenceFor(text);
+        const lang = langForExt(a.ext);
+
+        blocks.push(`\nFile: ${a.name} (${a.type || "text"}, ${a.size} bytes)\n${fence}${lang}\n${text}\n${fence}\n`);
+      }
+
+      return blocks.join("");
+    }
+    // ---------- end Attachments ----------
+
     // USER bubble header: "You" only (id in tooltip)
-    function addUserMsg(id, text) {
+    function addUserMsg(id, text, attachmentsMeta = []) {
       const wrap = document.createElement("div");
       wrap.className = "msg user";
 
@@ -420,11 +776,21 @@
       metaRow.title = `id=${id}`;
       metaRow.innerHTML = `<span class="role">You</span>`;
 
+      wrap.appendChild(metaRow);
+
+      if (Array.isArray(attachmentsMeta) && attachmentsMeta.length) {
+        const attRow = document.createElement("div");
+        attRow.className = "msgAttRow";
+        for (const m of attachmentsMeta) {
+          attRow.appendChild(renderFileChip(m, { removable: false }));
+        }
+        wrap.appendChild(attRow);
+      }
+
       const body = document.createElement("pre");
       body.className = "plain";
       body.textContent = text || "";
 
-      wrap.appendChild(metaRow);
       wrap.appendChild(body);
       $("chat").appendChild(wrap);
       scrollBottom();
@@ -478,6 +844,7 @@
     function setUiBusy(busy, hintText) {
       $("btnSend").disabled = !!busy;
       $("personaSelect").disabled = !!busy;
+      btnAttach.disabled = !!busy;
       if (typeof hintText === "string") $("personaHint").textContent = hintText;
     }
 
@@ -663,30 +1030,51 @@
       };
     }
 
-    // Send a chat with an explicit string (used by deeplink + normal send)
-    function sendChatText(text) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    // Send a chat with explicit string + optional attachments (attachments injected into LLM message only)
+    async function sendChatText(text, attachmentsList = []) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showAssistantErrorInline("ui", "socket not open.");
+        return false;
+      }
       if (!handshakeOk) {
         showAssistantErrorInline("ui", "not ready (hello handshake pending).");
         sendHello(false);
-        return;
+        return false;
       }
       if (!SYSTEM.content || !String(SYSTEM.content).trim()) {
         showAssistantErrorInline("ui", "persona not loaded yet.");
-        return;
+        return false;
       }
       if (inflight) {
         showAssistantErrorInline("ui", "wait for Marks to finish (or add queueing).");
-        return;
+        return false;
       }
 
-      const userText = String(text || "").trim();
-      if (!userText) return;
+      const userText = String(text || "");
+      const trimmed = userText.trim();
+      const hasFiles = Array.isArray(attachmentsList) && attachmentsList.length > 0;
+
+      if (!trimmed && !hasFiles) return false;
+
+      // Prepare LLM-visible content (inject file contents)
+      if (hasFiles) {
+        setUiBusy(true, "Preparing attachments…");
+      }
+
+      const injection = hasFiles ? await buildAttachmentInjection(attachmentsList) : "";
+      const llmContent = `${trimmed || ""}${injection}`.trim();
+
+      // If user sent only files with no text, show a minimal label in UI, but LLM still gets contents.
+      const uiText = trimmed || (hasFiles ? "(attached files)" : "");
 
       const id = newId();
+      const uiAttachments = hasFiles ? snapshotAttachmentMeta(attachmentsList) : [];
 
-      addUserMsg(id, userText);
-      history.push({ role: "user", content: userText });
+      // UI bubble: text + chips only
+      addUserMsg(id, uiText, uiAttachments);
+
+      // History to LLM: includes injected file text
+      history.push({ role: "user", content: llmContent });
       trimHistory();
 
       const p = addAssistantPlaceholder(id);
@@ -705,6 +1093,7 @@
         }
       };
 
+      // Send now; keep your rAF so UI paints before send on slower devices.
       requestAnimationFrame(() => {
         const ok = wsSend(payload);
         if (!ok) {
@@ -713,14 +1102,23 @@
           setUiBusy(false);
         }
       });
+
+      return true;
     }
 
-    function sendChat() {
-      const userText = $("input").value.trim();
-      if (!userText) return;
+    async function sendChat() {
+      const userText = $("input").value;
+      const files = attached.slice();
+
+      const ok = await sendChatText(userText, files);
+      if (!ok) return;
+
+      // Clear composer only after successfully queued
       $("input").value = "";
+      attached = [];
+      renderAttachmentsBar();
+      showComposerError("");
       $("input").focus();
-      sendChatText(userText);
     }
 
     // Attempt to consume+send deep-link question if everything is ready.
@@ -741,12 +1139,12 @@
       $("input").focus();
 
       if (DEEPLINK_AUTOSEND) {
-        // send immediately; input will be cleared by sendChat()
+        // send immediately
         sendChat();
       }
     }
 
-    $("btnSend").onclick = sendChat;
+    $("btnSend").onclick = () => sendChat();
     $("input").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
     });
@@ -769,6 +1167,9 @@
       // If deep-link exists, we might already be persona-ready. WS handshake might come later.
       // maybeTryDeepLinkSend() is invoked again on hello_ack and after persona load.
       maybeTryDeepLinkSend();
+
+      // Initial render for attachments bar state
+      renderAttachmentsBar();
     })();
   </script>
 </body>
