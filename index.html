@@ -756,6 +756,130 @@ header {
   }
 }
 
+    /* Crew member picker */
+    .crew-picker {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid rgba(230, 190, 132, 0.24);
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(53, 36, 25, 0.62), rgba(37, 26, 19, 0.78));
+      flex-wrap: wrap;
+    }
+
+    .crew-picker-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(165, 103, 47, 0.55), rgba(73, 48, 30, 0.72));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--ember);
+      flex-shrink: 0;
+      overflow: hidden;
+      border: 2px solid rgba(230, 190, 132, 0.35);
+    }
+
+    .crew-picker-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .crew-picker-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .crew-picker-info strong {
+      font-size: 0.95rem;
+    }
+
+    .crew-picker-info small {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .crew-picker-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .crew-select-modal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      padding: 0.9rem;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    .crew-select-item {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.5);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .crew-select-item:hover {
+      border-color: rgba(245, 158, 11, 0.55);
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    .crew-select-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(165, 103, 47, 0.55), rgba(73, 48, 30, 0.72));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--ember);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .crew-select-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .crew-select-name {
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+
+    .crew-select-title {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .crew-online-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+      flex-shrink: 0;
+    }
+
     iframe {
       width: 100%;
       flex: 1;
@@ -808,6 +932,32 @@ header {
 
   <main>
     <section class="home" id="homeView" aria-label="App launcher home">
+      <!-- Crew Member Picker -->
+      <div class="crew-picker" id="crewPicker" aria-label="Active crew member identity">
+        <div class="crew-picker-avatar" id="crewPickerAvatar">?</div>
+        <div class="crew-picker-info">
+          <strong id="crewPickerName">No crew member selected</strong>
+          <small id="crewPickerDetail">Choose who you are on this device</small>
+        </div>
+        <div class="crew-picker-actions">
+          <button id="chooseCrewMemberButton" type="button">Choose crew member</button>
+          <button id="clearCrewMemberButton" type="button" style="display:none">Clear</button>
+        </div>
+      </div>
+
+      <!-- Crew Member Selection Modal -->
+      <div id="crewSelectModalBackdrop" class="project-modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="Choose crew member">
+        <div class="project-modal" style="width:min(520px,100%)">
+          <div class="project-modal-header">
+            <strong>Choose crew member</strong>
+            <button id="closeCrewSelectModal" type="button">Close</button>
+          </div>
+          <div id="crewSelectList" class="crew-select-modal-list">
+            <small>Loading crew members...</small>
+          </div>
+        </div>
+      </div>
+
       <div class="project-manager-launch" aria-label="RecordQuarry project manager">
         <div class="project-manager-meta">
           <strong>Project manager</strong>
@@ -2064,6 +2214,203 @@ if (marksQuickQa) {
   syncAskEnabled();
 }
 
+
+    // --- Crew Member Picker & Online Presence ---
+    const ACTIVE_CREW_MEMBER_KEY = 'surveyfoundryActiveCrewMemberId';
+    const CREW_PROFILES_KEY = 'surveyfoundryCrewProfiles';
+    const crewPickerAvatar = document.getElementById('crewPickerAvatar');
+    const crewPickerName = document.getElementById('crewPickerName');
+    const crewPickerDetail = document.getElementById('crewPickerDetail');
+    const chooseCrewMemberButton = document.getElementById('chooseCrewMemberButton');
+    const clearCrewMemberButton = document.getElementById('clearCrewMemberButton');
+    const crewSelectModalBackdrop = document.getElementById('crewSelectModalBackdrop');
+    const closeCrewSelectModal = document.getElementById('closeCrewSelectModal');
+    const crewSelectList = document.getElementById('crewSelectList');
+
+    let onlineCrewMemberIds = [];
+    let crewPresenceSocket = null;
+    let crewPresenceReconnectDelay = 1500;
+
+    function getCrewProfiles() {
+      try {
+        const raw = localStorage.getItem(CREW_PROFILES_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    }
+
+    function getActiveCrewMemberId() {
+      return localStorage.getItem(ACTIVE_CREW_MEMBER_KEY) || null;
+    }
+
+    function setActiveCrewMemberId(id) {
+      if (id) {
+        localStorage.setItem(ACTIVE_CREW_MEMBER_KEY, id);
+      } else {
+        localStorage.removeItem(ACTIVE_CREW_MEMBER_KEY);
+      }
+      renderCrewPicker();
+      sendCrewPresenceIdentity();
+    }
+
+    function getCrewInitials(first, last) {
+      const f = (first || '').trim().charAt(0).toUpperCase();
+      const l = (last || '').trim().charAt(0).toUpperCase();
+      return f + l || '?';
+    }
+
+    function renderCrewPicker() {
+      const activeId = getActiveCrewMemberId();
+      const profiles = getCrewProfiles();
+      const member = activeId ? profiles.find((p) => p.id === activeId) : null;
+
+      if (member) {
+        const fullName = [member.firstName, member.lastName].filter(Boolean).join(' ') || 'Unnamed';
+        if (member.photo) {
+          crewPickerAvatar.innerHTML = `<img src="${member.photo}" alt="${fullName}" />`;
+        } else {
+          crewPickerAvatar.textContent = getCrewInitials(member.firstName, member.lastName);
+          crewPickerAvatar.querySelectorAll('img').forEach((img) => img.remove());
+        }
+        crewPickerName.textContent = fullName;
+        crewPickerDetail.textContent = member.jobTitle || 'Crew member';
+        chooseCrewMemberButton.textContent = 'Change';
+        clearCrewMemberButton.style.display = '';
+      } else {
+        crewPickerAvatar.textContent = '?';
+        crewPickerAvatar.querySelectorAll('img').forEach((img) => img.remove());
+        crewPickerName.textContent = 'No crew member selected';
+        crewPickerDetail.textContent = 'Choose who you are on this device';
+        chooseCrewMemberButton.textContent = 'Choose crew member';
+        clearCrewMemberButton.style.display = 'none';
+      }
+    }
+
+    function renderCrewSelectList() {
+      const profiles = getCrewProfiles();
+      const activeId = getActiveCrewMemberId();
+
+      if (!profiles.length) {
+        crewSelectList.innerHTML = '<small>No crew members found. Add members in CrewManager first.</small>';
+        return;
+      }
+
+      const sorted = [...profiles].sort((a, b) => {
+        const na = `${a.lastName || ''} ${a.firstName || ''}`.trim().toLowerCase();
+        const nb = `${b.lastName || ''} ${b.firstName || ''}`.trim().toLowerCase();
+        return na.localeCompare(nb);
+      });
+
+      crewSelectList.innerHTML = '';
+      sorted.forEach((p) => {
+        const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unnamed';
+        const isActive = p.id === activeId;
+        const isOnline = onlineCrewMemberIds.includes(p.id);
+        const item = document.createElement('div');
+        item.className = 'crew-select-item';
+        if (isActive) item.style.borderColor = 'rgba(245, 158, 11, 0.65)';
+
+        const avatarHtml = p.photo
+          ? `<img src="${p.photo}" alt="${fullName}" />`
+          : getCrewInitials(p.firstName, p.lastName);
+
+        item.innerHTML = `
+          <div class="crew-select-avatar">${avatarHtml}</div>
+          <div style="flex:1;min-width:0">
+            <div class="crew-select-name">${fullName}${isActive ? ' (you)' : ''}</div>
+            ${p.jobTitle ? `<div class="crew-select-title">${p.jobTitle}</div>` : ''}
+          </div>
+          ${isOnline ? '<div class="crew-online-dot" title="Online"></div>' : ''}
+        `;
+
+        item.addEventListener('click', () => {
+          setActiveCrewMemberId(p.id);
+          crewSelectModalBackdrop.classList.add('hidden');
+        });
+
+        crewSelectList.appendChild(item);
+      });
+    }
+
+    function openCrewSelectModal() {
+      renderCrewSelectList();
+      crewSelectModalBackdrop.classList.remove('hidden');
+    }
+
+    chooseCrewMemberButton.addEventListener('click', openCrewSelectModal);
+    clearCrewMemberButton.addEventListener('click', () => setActiveCrewMemberId(null));
+    closeCrewSelectModal.addEventListener('click', () => crewSelectModalBackdrop.classList.add('hidden'));
+    crewSelectModalBackdrop.addEventListener('click', (event) => {
+      if (event.target === crewSelectModalBackdrop) crewSelectModalBackdrop.classList.add('hidden');
+    });
+
+    // --- Crew Presence WebSocket Client ---
+    function buildCrewPresenceWsUrl() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${location.host}/ws/crew-presence`;
+    }
+
+    function sendCrewPresenceIdentity() {
+      if (!crewPresenceSocket || crewPresenceSocket.readyState !== WebSocket.OPEN) return;
+      crewPresenceSocket.send(JSON.stringify({
+        type: 'crew-presence-identify',
+        crewMemberId: getActiveCrewMemberId(),
+      }));
+    }
+
+    function connectCrewPresence() {
+      if (crewPresenceSocket && (crewPresenceSocket.readyState === WebSocket.OPEN || crewPresenceSocket.readyState === WebSocket.CONNECTING)) return;
+
+      try {
+        crewPresenceSocket = new WebSocket(buildCrewPresenceWsUrl());
+      } catch {
+        scheduleCrewPresenceReconnect();
+        return;
+      }
+
+      crewPresenceSocket.addEventListener('open', () => {
+        crewPresenceReconnectDelay = 1500;
+        sendCrewPresenceIdentity();
+      });
+
+      crewPresenceSocket.addEventListener('message', (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch { return; }
+
+        if (msg.type === 'crew-presence-welcome' || msg.type === 'crew-presence-update') {
+          onlineCrewMemberIds = Array.isArray(msg.online) ? msg.online : [];
+          renderCrewPicker();
+          // Re-render the modal list if open
+          if (!crewSelectModalBackdrop.classList.contains('hidden')) {
+            renderCrewSelectList();
+          }
+        }
+      });
+
+      crewPresenceSocket.addEventListener('close', () => {
+        crewPresenceSocket = null;
+        scheduleCrewPresenceReconnect();
+      });
+
+      crewPresenceSocket.addEventListener('error', () => {
+        if (crewPresenceSocket) crewPresenceSocket.close();
+      });
+    }
+
+    function scheduleCrewPresenceReconnect() {
+      setTimeout(connectCrewPresence, crewPresenceReconnectDelay);
+      crewPresenceReconnectDelay = Math.min(crewPresenceReconnectDelay * 2, 60000);
+    }
+
+    // React to crew profile changes from sync
+    window.addEventListener('surveyfoundry-localstorage-sync', () => {
+      renderCrewPicker();
+      if (!crewSelectModalBackdrop.classList.contains('hidden')) {
+        renderCrewSelectList();
+      }
+    });
+
+    renderCrewPicker();
+    connectCrewPresence();
 
     loadProjects();
     loadActiveProject();

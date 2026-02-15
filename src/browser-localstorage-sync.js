@@ -2,6 +2,7 @@ const SYNC_DISABLED_ATTR = 'data-localstorage-sync-disabled';
 const INTERNAL_KEYS = new Set([
   'surveyfoundryLocalStoragePendingDiffs',
   'surveyfoundryLocalStorageSyncMeta',
+  'surveyfoundryActiveCrewMemberId',
 ]);
 const PENDING_DIFFS_KEY = 'surveyfoundryLocalStoragePendingDiffs';
 const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';

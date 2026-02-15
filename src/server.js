@@ -11,6 +11,7 @@ import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
+import { createCrewPresenceWsService } from './crew-presence-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
 import { createLmProxyHubWsService } from "./lmstudio-proxy-control-ws.js";
 
@@ -318,6 +319,7 @@ export function createSurveyServer({
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
   const workerSocket = createWorkerSchedulerService();
+  const crewPresence = createCrewPresenceWsService();
   const lmProxy = createLmProxyHubWsService({
     path: "/ws/lmproxy",
     token: process.env.CONTROL_TOKEN || "",   // optional
@@ -482,6 +484,15 @@ if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worke
           return;
         }
         sendJson(res, 200, { crew: profiles });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/crew-presence' || urlObj.pathname === '/api/crew-presence/') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        sendJson(res, 200, { online: crewPresence.getOnlineCrewMemberIds() });
         return;
       }
 
@@ -931,6 +942,8 @@ server.on('upgrade', (req, socket, head) => {
       handled = !!workerSocket.handleUpgrade(req, socket, head);
     } else if (path === '/ws/lineforge') {
       handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
+    } else if (path === '/ws/crew-presence') {
+      handled = !!crewPresence.handleUpgrade(req, socket, head);
     } else if (path === '/ws/localstorage-sync') {
       handled = !!localStorageSyncWsService.handleUpgrade(req, socket, head);
     } else {
