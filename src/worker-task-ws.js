@@ -475,4 +475,5 @@ export {
   decodeFrame,
   encodeTextFrame,
   createWebSocketAccept,
+  createWorkerSchedulerService
 };
