@@ -273,7 +273,7 @@ export function createWorkerSchedulerService(opts = {}) {
 
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
     const url = new URL(req.url || '/', 'http://localhost');
-    if (url.pathname !== PATH) {
+    if (url.pathname.indexOf(PATH) === -1) {
       socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
       socket.destroy();
       return false;
