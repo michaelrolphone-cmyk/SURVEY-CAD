@@ -471,7 +471,7 @@ export function createWorkerSchedulerService(opts = {}) {
   };
 }
 
-export const workerSchedulerInternals = {
+export {
   decodeFrame,
   encodeTextFrame,
   createWebSocketAccept,
