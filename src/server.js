@@ -847,36 +847,7 @@ export function createSurveyServer({
       sendJson(res, getErrorStatusCode(err), { error: err.message || 'Bad request.' });
     }
   });
-server.on('upgrade', (req, socket, head) => {
-  try {
-    const url = new URL(req.url || '/', 'http://localhost');
-    const path = url.pathname.replace(/\/+$/, ''); // normalize trailing slash
-
-    let handled = false;
-
-
-    if (path === '/ws/lineforge') {
-      handled = lineforgeCollab.handleUpgrade(req, socket, head);
-    } else if (path === '/ws/worker') {
-      handled = workerSocket.handleUpgrade(req, socket, head);
-    } else if (path === '/ws/localstorage-sync') {
-      // CHANGE THIS PATH to whatever your localStorageSyncWsService actually uses
-      handled = localStorageSyncWsService.handleUpgrade(req, socket, head);
-    } else {
-      handled = false;
-    }
-
-    if (!handled && !socket.destroyed) {
-      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-      socket.destroy();
-    }
-  } catch (e){
-    console.error(e);
-    if (!socket.destroyed) socket.destroy();
-  }
-});
-
-
+  
 server.on('upgrade', (req, socket, head) => {
   // Detect if ANY handler wrote a 101 to this socket
   let wrote101 = false;
