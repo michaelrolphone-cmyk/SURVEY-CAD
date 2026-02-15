@@ -471,10 +471,11 @@
 
     let inflight = null; // { id, raw, contentEl, thinkingEl, scheduled }
 
-    const BASE_SYSTEM = { role: "system", content: "" };
-    const PERSONA_SYSTEM = { role: "system", content: "" };
+    // ✅ NEW: Base/persona are now arrays of messages (not one system blob)
+    let baseSeedMessages = [];    // [{role, content}, ...]
+    let personaSeedMessages = []; // [{role, content}, ...]
 
-    const history = [BASE_SYSTEM, PERSONA_SYSTEM];
+    const history = [];           // seeded with base+persona, then conversation
     const HISTORY_MAX = 24;
 
     const $ = (id) => document.getElementById(id);
@@ -512,7 +513,7 @@
       let html = marked.parse(md || "");
       html = wrapTables(html);
       if (window.DOMPurify) {
-        // Intentionally sanitize as HTML only — SVG will be rendered from code blocks via our SVG sanitizer.
+        // sanitize as HTML only — SVG is rendered from code blocks via our SVG sanitizer.
         return DOMPurify.sanitize(html, {
           USE_PROFILES: { html: true },
           ADD_TAGS: ["table","thead","tbody","tr","th","td","div"],
@@ -608,7 +609,6 @@
         inflight.thinkingEl.style.display = "none";
         inflight.contentEl.style.display = "";
         inflight.contentEl.innerHTML = renderMarkdownToHtml(`**ERROR:** ${message}`);
-        // finalize SVG replacements if any
         progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
         inlineSvgsFromCodeBlocks(inflight.contentEl);
         scrollBottom();
@@ -630,10 +630,6 @@
       $("personaSelect").disabled = !!busy;
       $("btnAttach").disabled = !!busy;
       if (typeof hintText === "string") $("personaHint").textContent = hintText;
-    }
-
-    function trimHistory() {
-      while (history.length > 2 + HISTORY_MAX) history.splice(2, 1); // keep base+persona
     }
 
     function newId() {
@@ -663,49 +659,135 @@
       handshakeOk = false;
     }
 
-    function extractSystemPrompt(json) {
-      if (typeof json === "string") return json.trim();
-      if (json && typeof json === "object") {
-        if (json.role === "system" && typeof json.content === "string" && json.content.trim()) return json.content.trim();
-        const candidates = [json.system, json.system_prompt, json.systemPrompt, json.prompt, json.content, json.instructions]
-          .filter(v => typeof v === "string" && v.trim().length);
-        if (candidates.length) return candidates[0].trim();
-        if (Array.isArray(json.messages)) {
-          const sys = json.messages.find(m => m && m.role === "system" && typeof m.content === "string");
-          if (sys && sys.content.trim()) return sys.content.trim();
-        }
-      }
-      return JSON.stringify(json, null, 2);
+    // ==========================
+    // ✅ NEW: Use *all* messages[]
+    // ==========================
+    const ALLOWED_ROLES = new Set(["system", "user", "assistant"]); // keep proxy-compatible
+
+    function normalizeRole(role, fallback = "system") {
+      const r = String(role || "").toLowerCase();
+      return ALLOWED_ROLES.has(r) ? r : fallback;
     }
+
+    function coerceContentToString(content) {
+      if (typeof content === "string") return content;
+      // Handle "content parts" style: [{type:'text', text:'...'}, ...]
+      if (Array.isArray(content)) {
+        return content.map(p => {
+          if (!p) return "";
+          if (typeof p === "string") return p;
+          if (typeof p.text === "string") return p.text;
+          return "";
+        }).join("");
+      }
+      if (content == null) return "";
+      if (typeof content === "number" || typeof content === "boolean") return String(content);
+      try { return JSON.stringify(content, null, 2); } catch { return String(content); }
+    }
+
+    // Accepts:
+    //  - string => [{role:'system', content:string}]
+    //  - {messages:[...]} => all items in order
+    //  - {role, content} => one message
+    //  - {system/system_prompt/...} => one system message
+    //  - otherwise => system message with JSON stringified
+    function normalizeConfigToMessages(json, fallbackRole = "system") {
+      // string
+      if (typeof json === "string") {
+        const c = json.trim();
+        return c ? [{ role: fallbackRole, content: c }] : [];
+      }
+      // object
+      if (json && typeof json === "object") {
+        // messages array => USE ALL
+        if (Array.isArray(json.messages)) {
+          const msgs = json.messages
+            .filter(m => m && typeof m === "object")
+            .map(m => {
+              const role = normalizeRole(m.role, fallbackRole);
+              const content = coerceContentToString(m.content).trim();
+              return content ? { role, content } : null;
+            })
+            .filter(Boolean);
+
+          if (msgs.length) return msgs;
+        }
+
+        // direct role/content
+        if (typeof json.role === "string" && "content" in json) {
+          const role = normalizeRole(json.role, fallbackRole);
+          const content = coerceContentToString(json.content).trim();
+          return content ? [{ role, content }] : [];
+        }
+
+        // common prompt keys => single system
+        const candidates = [
+          json.system,
+          json.system_prompt,
+          json.systemPrompt,
+          json.prompt,
+          json.content,
+          json.instructions
+        ].filter(v => typeof v === "string" && v.trim().length);
+
+        if (candidates.length) return [{ role: fallbackRole, content: candidates[0].trim() }];
+
+        // fallback stringified
+        const s = JSON.stringify(json, null, 2);
+        return s && s.trim() ? [{ role: fallbackRole, content: s }] : [];
+      }
+
+      // other => string
+      const s = String(json ?? "").trim();
+      return s ? [{ role: fallbackRole, content: s }] : [];
+    }
+
+    function seedLen() {
+      return (baseSeedMessages?.length || 0) + (personaSeedMessages?.length || 0);
+    }
+
+    function reseedHistory() {
+      history.length = 0;
+      if (baseSeedMessages && baseSeedMessages.length) history.push(...baseSeedMessages);
+      if (personaSeedMessages && personaSeedMessages.length) history.push(...personaSeedMessages);
+    }
+
+    function trimHistory() {
+      const keep = seedLen();
+      while (history.length > keep + HISTORY_MAX) history.splice(keep, 1);
+    }
+
+    // ---- Loading base + persona ----
 
     async function loadBaseInstructions() {
       setUiBusy(true, "Loading base instructions…");
       const resp = await fetch(BASE_INSTRUCTIONS_URL, { cache: "no-store" });
       if (!resp.ok) throw new Error(`base instructions fetch failed: ${resp.status} ${resp.statusText}`);
       const json = await resp.json();
-      BASE_SYSTEM.content = extractSystemPrompt(json);
-      if (!String(BASE_SYSTEM.content || "").trim()) {
-        throw new Error("base instructions empty");
-      }
+
+      const msgs = normalizeConfigToMessages(json, "system");
+      if (!msgs.length) throw new Error("base instructions empty (no usable messages)");
+
+      baseSeedMessages = msgs;
     }
 
     async function loadPersona(key) {
       const p = PERSONAS[key] || PERSONAS.field;
       setUiBusy(true, `Loading: ${p.label}…`);
       try {
-        // Ensure base is loaded first (and keep it fresh if you’re editing it)
-        if (!String(BASE_SYSTEM.content || "").trim()) {
-          await loadBaseInstructions();
-        }
+        if (!baseSeedMessages.length) await loadBaseInstructions();
 
         const resp = await fetch(p.url, { cache: "no-store" });
         if (!resp.ok) throw new Error(`persona fetch failed: ${resp.status} ${resp.statusText}`);
         const json = await resp.json();
-        PERSONA_SYSTEM.content = extractSystemPrompt(json);
 
-        // Reset conversation history but keep base+persona system messages
-        history.length = 0;
-        history.push(BASE_SYSTEM, PERSONA_SYSTEM);
+        const msgs = normalizeConfigToMessages(json, "system");
+        if (!msgs.length) throw new Error("persona empty (no usable messages)");
+
+        personaSeedMessages = msgs;
+
+        // Reset conversation history but keep base+persona seed messages (ALL of them)
+        reseedHistory();
         inflight = null;
 
         localStorage.setItem(PERSONA_STORAGE_KEY, p.key);
@@ -715,7 +797,7 @@
         const a = addAssistantPlaceholder(id);
         a.thinkingEl.style.display = "none";
         a.contentEl.style.display = "";
-        a.contentEl.innerHTML = renderMarkdownToHtml(`Persona loaded: **${p.label}**`);
+        a.contentEl.innerHTML = renderMarkdownToHtml(`Persona loaded: **${p.label}**\n\nSeed messages: base **${baseSeedMessages.length}**, persona **${personaSeedMessages.length}**.`);
         progressiveInlineSvgsFromCodeBlocks(a.contentEl);
         inlineSvgsFromCodeBlocks(a.contentEl);
 
@@ -785,7 +867,6 @@
               inflight.contentEl.style.display = "";
               inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
 
-              // Progressive SVG rendering (hides raw SVG code blocks early, renders when parseable)
               progressiveInlineSvgsFromCodeBlocks(inflight.contentEl);
 
               scrollBottom();
@@ -869,7 +950,6 @@
       if (type.startsWith("text/")) return true;
       if (type === "application/json" || type === "application/xml" || type === "image/svg+xml") return true;
       if (type === "application/vnd.geo+json") return true;
-      // fall back by extension
       const name = (file?.name || "").toLowerCase();
       return /\.(txt|md|csv|tsv|json|geojson|xml|yml|yaml|log|ini|cfg|py|js|ts|html|css|sql|wkt|gml|dxf|fld)$/i.test(name);
     }
@@ -908,7 +988,6 @@
       const list = Array.from(files || []);
       if (!list.length) return;
 
-      // enforce max count
       const room = Math.max(0, MAX_ATTACH_FILES - attachments.length);
       const incoming = list.slice(0, room);
 
@@ -923,9 +1002,8 @@
         }
 
         let text = "";
-        try {
-          text = await f.text();
-        } catch (e) {
+        try { text = await f.text(); }
+        catch {
           showAssistantErrorInline("attach", `Could not read file. Skipped: ${f.name}`);
           continue;
         }
@@ -964,7 +1042,6 @@
       const raw = String(svgText || "").trim();
       if (!raw) return null;
 
-      // Parse as SVG
       const parser = new DOMParser();
       const doc = parser.parseFromString(raw, "image/svg+xml");
       const svg = doc.documentElement;
@@ -972,10 +1049,8 @@
       if (!svg || svg.nodeName.toLowerCase() !== "svg") return null;
       if (svg.querySelector("parsererror")) return null;
 
-      // Remove dangerous nodes
       svg.querySelectorAll("script, foreignObject, iframe, object, embed").forEach(n => n.remove());
 
-      // Strip event handlers and external links
       svg.querySelectorAll("*").forEach((el) => {
         Array.from(el.attributes || []).forEach((attr) => {
           const name = String(attr.name || "").toLowerCase();
@@ -983,35 +1058,29 @@
           if (name.startsWith("on")) el.removeAttribute(attr.name);
           if (name === "href" || name === "xlink:href") {
             const v = value.trim();
-            // allow only internal fragment refs
             if (v && !v.startsWith("#")) el.removeAttribute(attr.name);
           }
         });
       });
 
-      // Import into current document
       const frag = document.createDocumentFragment();
       frag.appendChild(document.importNode(svg, true));
       return frag;
     }
 
-    // Track progressive SVG frames (avoid duplicates)
     const svgPreToFrame = new WeakMap();
 
     function bestEffortSvgMarkup(svgText) {
       let s = String(svgText || "").trim();
       if (!s.startsWith("<svg") && !(s.startsWith("<?xml") && s.includes("<svg"))) return null;
 
-      // If there's an xml header, keep from <svg onward (browser parser is happier)
       const svgStart = s.indexOf("<svg");
       if (svgStart > 0) s = s.slice(svgStart);
 
-      // Truncate if stream ends mid-tag
       const lastLt = s.lastIndexOf("<");
       const lastGt = s.lastIndexOf(">");
       if (lastLt > lastGt) s = s.slice(0, lastLt);
 
-      // Ensure closing tag so DOMParser can build DOM
       if (!s.includes("</svg>")) s += "\n</svg>";
       return s;
     }
@@ -1028,7 +1097,6 @@
       return true;
     }
 
-    // Progressive rendering: hide SVG code blocks and show a live-rendered frame instead
     function progressiveInlineSvgsFromCodeBlocks(containerEl) {
       if (!containerEl) return;
 
@@ -1036,14 +1104,11 @@
       codeEls.forEach((code) => {
         const raw = (code.textContent || "").trim();
         if (!raw) return;
-
-        // Detect SVG even if the code fence language isn't "svg"
         if (!looksLikeSvg(raw)) return;
 
         const pre = code.closest("pre");
         if (!pre) return;
 
-        // Create or reuse a frame
         let frame = svgPreToFrame.get(pre);
         if (!frame) {
           frame = document.createElement("div");
@@ -1056,7 +1121,6 @@
           pre.style.display = "none";
         }
 
-        // Throttle rerender by length
         const lenKey = String(raw.length);
         if (frame.dataset.lastLen === lenKey) return;
         frame.dataset.lastLen = lenKey;
@@ -1069,7 +1133,6 @@
       });
     }
 
-    // Final pass: replace SVG code blocks fully with rendered SVG
     function inlineSvgsFromCodeBlocks(containerEl) {
       if (!containerEl) return;
 
@@ -1081,7 +1144,6 @@
         const pre = code.closest("pre");
         if (!pre) return;
 
-        // If we already created a progressive frame, finalize into it and remove the pre
         const existingFrame = svgPreToFrame.get(pre);
         if (existingFrame) {
           const frag = sanitizeSvgToFragment(svgText);
@@ -1114,11 +1176,11 @@
         sendHello(false);
         return;
       }
-      if (!String(BASE_SYSTEM.content || "").trim()) {
+      if (!baseSeedMessages.length) {
         showAssistantErrorInline("ui", "base instructions not loaded yet.");
         return;
       }
-      if (!String(PERSONA_SYSTEM.content || "").trim()) {
+      if (!personaSeedMessages.length) {
         showAssistantErrorInline("ui", "persona not loaded yet.");
         return;
       }
@@ -1127,18 +1189,15 @@
         return;
       }
 
-      // Attachment-only helper
       let userText = String(text || "").trim();
       if (!userText && attachList && attachList.length) userText = ATTACHMENT_ONLY_HELPER;
       if (!userText && (!attachList || !attachList.length)) return;
 
-      // Injection wrapper
       const injection = buildAttachmentsInjectionBlock(attachList);
       const messageToModel = userText + (injection || "");
 
       const id = newId();
 
-      // Show only the user text + attachment icons (NOT the injected content)
       addUserMsg(id, userText, attachList);
 
       history.push({ role: "user", content: messageToModel });
@@ -1179,20 +1238,18 @@
       $("input").value = "";
       $("input").focus();
 
-      // clear attachments for next message
       attachments = [];
       renderAttachRow();
 
       sendChatText(userText, attachList);
     }
 
-    // Attempt to consume+send deep-link question if everything is ready.
     function maybeTryDeepLinkSend() {
       if (!pendingDeepLinkQuestion) return;
 
-      const personaReady = !!(String(BASE_SYSTEM.content || "").trim() && String(PERSONA_SYSTEM.content || "").trim());
+      const seedReady = !!(baseSeedMessages.length && personaSeedMessages.length);
       const wsReady = !!(ws && ws.readyState === WebSocket.OPEN);
-      if (!personaReady || !wsReady || !handshakeOk) return;
+      if (!seedReady || !wsReady || !handshakeOk) return;
 
       const q = pendingDeepLinkQuestion;
       pendingDeepLinkQuestion = null;
@@ -1200,9 +1257,7 @@
       $("input").value = q;
       $("input").focus();
 
-      if (DEEPLINK_AUTOSEND) {
-        sendChat();
-      }
+      if (DEEPLINK_AUTOSEND) sendChat();
     }
 
     // -------- Wire UI events --------
@@ -1222,7 +1277,6 @@
       e.target.value = ""; // allow reselect same file
     });
 
-    // Drag/drop support (drop onto composer / textarea)
     const dropTargets = [$("composer"), $("input")];
     dropTargets.forEach((el) => {
       el.addEventListener("dragover", (e) => {
@@ -1249,7 +1303,6 @@
       const key = (saved && PERSONAS[saved]) ? saved : "field";
       $("personaSelect").value = key;
 
-      // Load base first, then persona, then connect
       try {
         await loadBaseInstructions();
       } catch (e) {
@@ -1257,8 +1310,11 @@
       }
 
       await loadPersona(key);
-      connect();
 
+      // Ensure history is seeded even if loadPersona didn't run due to errors
+      if (!history.length && (baseSeedMessages.length || personaSeedMessages.length)) reseedHistory();
+
+      connect();
       maybeTryDeepLinkSend();
     })();
   </script>
