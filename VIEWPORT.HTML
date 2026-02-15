@@ -3998,6 +3998,8 @@
           color: message.color || collab.peers.get(message.clientId)?.color || "#ffffff",
           x: Number(message.cursor?.x) || 0,
           y: Number(message.cursor?.y) || 0,
+          crewMemberId: message.crewMemberId || null,
+          crewName: message.crewName || null,
           at: Number(message.at) || Date.now()
         });
         return;
@@ -4103,13 +4105,26 @@
     });
   }
 
+  function getLocalCrewInfo() {
+    const id = localStorage.getItem('surveyfoundryActiveCrewMemberId') || null;
+    if (!id) return { crewMemberId: null, crewName: null };
+    try {
+      const profiles = JSON.parse(localStorage.getItem('surveyfoundryCrewProfiles') || '[]');
+      const member = profiles.find(p => p.id === id);
+      return { crewMemberId: id, crewName: member?.firstName || null };
+    } catch { return { crewMemberId: id, crewName: null }; }
+  }
+
   function broadcastCursor() {
+    const crew = getLocalCrewInfo();
     sendCollabMessage({
       type: "cursor",
       cursor: {
         x: mouse.wx,
         y: mouse.wy
-      }
+      },
+      crewMemberId: crew.crewMemberId,
+      crewName: crew.crewName
     });
   }
 
@@ -4204,7 +4219,7 @@ function paintBackground(ctx, w, h){
       ctx.lineTo(sp.x, sp.y + 8);
       ctx.stroke();
       ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(clientId.slice(0, 6), sp.x + 10, sp.y - 10);
+      ctx.fillText(cursor.crewName || clientId.slice(0, 6), sp.x + 10, sp.y - 10);
       ctx.restore();
     }
   }
