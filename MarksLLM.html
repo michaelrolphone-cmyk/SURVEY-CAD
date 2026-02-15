@@ -39,10 +39,8 @@
     .msg.user{align-self:flex-end; background:rgba(255,213,74,.08); border-color:rgba(255,213,74,.24);}
     .msg.assistant{align-self:flex-start;}
 
-    /* Header now shows ONLY the name, so keep it clean */
     .meta{display:flex; gap:10px; align-items:center; margin-bottom:6px; color:var(--muted); font-size:11px;}
     .meta .role{font-weight:800; letter-spacing:.2px;}
-    .meta .small{font-family:var(--mono); opacity:.85;}
 
     .plain{
       white-space:pre-wrap;
@@ -105,6 +103,7 @@
       padding-bottom: 6px;
     }
 
+    /* Tables wrap */
     .md .table-wrap{
       max-width:100%;
       overflow-x:auto;
@@ -143,6 +142,7 @@
       background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
     }
 
+    /* Persona picker (compact) */
     .personaRow{
       display:flex;
       align-items:center;
@@ -249,6 +249,7 @@
       .personaSelect{max-width:100%; width:100%;}
     }
 
+    /* Thinking indicator */
     .thinking{
       display:flex;
       align-items:center;
@@ -329,6 +330,28 @@
       legal: { key: "legal", label: "Legal Expert", url: "/config/personas/marks-legal.json" }
     };
     const PERSONA_STORAGE_KEY = "marks.persona.key";
+
+    // ---- Deep-link Quick Q&A ----
+    // Launcher writes the question here, then opens this page with "#deeplink"
+    const DEEPLINK_HASH = "#deeplink";
+    const DEEPLINK_Q_KEY = "marks.deeplink.question";
+    const DEEPLINK_AUTOSEND = true; // set false if you want prefill only (no auto-send)
+
+    let pendingDeepLinkQuestion = null;
+
+    function readDeepLinkQuestionIfAny() {
+      // Only honor/clear the question if the URL hash is exactly "#deeplink"
+      if (location.hash !== DEEPLINK_HASH) return null;
+
+      const q = localStorage.getItem(DEEPLINK_Q_KEY);
+      if (q && String(q).trim()) {
+        // Requirement: clear from localStorage once read, only under #deeplink
+        localStorage.removeItem(DEEPLINK_Q_KEY);
+        return String(q).trim();
+      }
+      return null;
+    }
+    // ----------------------------
 
     let ws = null;
     let keepalive = null;
@@ -526,6 +549,9 @@
         a.thinkingEl.style.display = "none";
         a.contentEl.style.display = "";
         a.contentEl.innerHTML = renderMarkdownToHtml(`Persona loaded: **${p.label}**`);
+
+        // If deep-link question is pending, try to send now (if WS is also ready)
+        maybeTryDeepLinkSend();
       } catch (e) {
         setUiBusy(false, `Persona load failed`);
         showAssistantErrorInline("persona", `persona load failed — ${e?.message || String(e)}`);
@@ -565,7 +591,12 @@
         if (type === "pong") return;
 
         if (type === "server_hello") { if (!helloSent) sendHello(false); return; }
-        if (type === "hello_ack") { handshakeOk = true; return; }
+        if (type === "hello_ack") {
+          handshakeOk = true;
+          // If deep-link question is pending, try to send now (if persona is also ready)
+          maybeTryDeepLinkSend();
+          return;
+        }
 
         const id = String(msg?.id || "");
 
@@ -632,26 +663,24 @@
       };
     }
 
-    function sendChat() {
+    // Send a chat with an explicit string (used by deeplink + normal send)
+    function sendChatText(text) {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
       if (!handshakeOk) {
         showAssistantErrorInline("ui", "not ready (hello handshake pending).");
         sendHello(false);
         return;
       }
-
       if (!SYSTEM.content || !String(SYSTEM.content).trim()) {
         showAssistantErrorInline("ui", "persona not loaded yet.");
         return;
       }
-
       if (inflight) {
         showAssistantErrorInline("ui", "wait for Marks to finish (or add queueing).");
         return;
       }
 
-      const userText = $("input").value.trim();
+      const userText = String(text || "").trim();
       if (!userText) return;
 
       const id = newId();
@@ -684,9 +713,37 @@
           setUiBusy(false);
         }
       });
+    }
 
+    function sendChat() {
+      const userText = $("input").value.trim();
+      if (!userText) return;
       $("input").value = "";
       $("input").focus();
+      sendChatText(userText);
+    }
+
+    // Attempt to consume+send deep-link question if everything is ready.
+    function maybeTryDeepLinkSend() {
+      if (!pendingDeepLinkQuestion) return;
+
+      // We only ever set pendingDeepLinkQuestion if hash is #deeplink.
+      // Now ensure persona + handshake are ready before sending.
+      const personaReady = !!(SYSTEM.content && String(SYSTEM.content).trim());
+      const wsReady = !!(ws && ws.readyState === WebSocket.OPEN);
+      if (!personaReady || !wsReady || !handshakeOk) return;
+
+      const q = pendingDeepLinkQuestion;
+      pendingDeepLinkQuestion = null;
+
+      // Prefill so user can see what was asked; auto-send optionally
+      $("input").value = q;
+      $("input").focus();
+
+      if (DEEPLINK_AUTOSEND) {
+        // send immediately; input will be cleared by sendChat()
+        sendChat();
+      }
     }
 
     $("btnSend").onclick = sendChat;
@@ -699,12 +756,19 @@
     });
 
     (async function boot(){
+      // Read & clear deep-link question ONLY if opened with #deeplink
+      pendingDeepLinkQuestion = readDeepLinkQuestionIfAny();
+
       const saved = localStorage.getItem(PERSONA_STORAGE_KEY);
       const key = (saved && PERSONAS[saved]) ? saved : "field";
       $("personaSelect").value = key;
 
       await loadPersona(key);
       connect();
+
+      // If deep-link exists, we might already be persona-ready. WS handshake might come later.
+      // maybeTryDeepLinkSend() is invoked again on hello_ack and after persona load.
+      maybeTryDeepLinkSend();
     })();
   </script>
 </body>
