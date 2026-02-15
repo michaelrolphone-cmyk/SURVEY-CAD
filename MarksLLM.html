@@ -472,8 +472,10 @@
     // ---- Deep-link Quick Q&A ----
     const DEEPLINK_HASH = "#deeplink";
     const DEEPLINK_Q_KEY = "marks.deeplink.question";
+    const DEEPLINK_ATTACH_KEY = "marks.deeplink.attachments";
     const DEEPLINK_AUTOSEND = true;
     let pendingDeepLinkQuestion = null;
+    let pendingDeepLinkAttachments = [];
 
     function readDeepLinkQuestionIfAny() {
       if (location.hash !== DEEPLINK_HASH) return null;
@@ -483,6 +485,25 @@
         return String(q).trim();
       }
       return null;
+    }
+
+    function readDeepLinkAttachmentsIfAny() {
+      if (location.hash !== DEEPLINK_HASH) return [];
+      const raw = localStorage.getItem(DEEPLINK_ATTACH_KEY);
+      localStorage.removeItem(DEEPLINK_ATTACH_KEY);
+      if (!raw) return [];
+      try {
+        const list = JSON.parse(raw);
+        if (!Array.isArray(list)) return [];
+        return list.map((a) => ({
+          id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("att-" + Math.random().toString(16).slice(2)),
+          name: a.name || "attachment",
+          type: a.type || "",
+          size: a.size || 0,
+          text: a.text || "",
+          clipped: Boolean(a.clipped),
+        }));
+      } catch { return []; }
     }
     // ----------------------------
 
@@ -1417,6 +1438,13 @@
       const q = pendingDeepLinkQuestion;
       pendingDeepLinkQuestion = null;
 
+      // Inject any deep-link file attachments (e.g. LineSmith drawing points)
+      const dlAttach = pendingDeepLinkAttachments.splice(0);
+      if (dlAttach.length) {
+        attachments.push(...dlAttach);
+        renderAttachRow();
+      }
+
       $("input").value = q;
       $("input").focus();
 
@@ -1462,6 +1490,7 @@
 
     (async function boot(){
       pendingDeepLinkQuestion = readDeepLinkQuestionIfAny();
+      pendingDeepLinkAttachments = readDeepLinkAttachmentsIfAny();
 
       const saved = localStorage.getItem(PERSONA_STORAGE_KEY);
       const key = (saved && PERSONAS[saved]) ? saved : "field";

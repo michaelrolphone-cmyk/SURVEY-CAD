@@ -2178,15 +2178,33 @@ header {
 
     // --- Marks Quick Q&A (launcher header) ---
 const MARKS_DEEPLINK_KEY = "marks.deeplink.question";
+const MARKS_DEEPLINK_ATTACHMENTS_KEY = "marks.deeplink.attachments";
 const MARKS_APP_ENTRY = "MarksLLM.html#deeplink";
 
 const marksQuickQa = document.getElementById("marksQuickQa");
 const marksQuestionInput = document.getElementById("marksQuestionInput");
 const marksAskButton = document.getElementById("marksAskButton");
 
-function launchMarksWithQuestion(question) {
+async function launchMarksWithQuestion(question) {
   const q = String(question || "").trim();
   if (!q) return;
+
+  // If LineSmith is active, grab the drawing points as a CSV attachment
+  localStorage.removeItem(MARKS_DEEPLINK_ATTACHMENTS_KEY);
+  if (isLineSmithActive()) {
+    const result = await requestAppFrameMessage("survey-cad:request-drawing-points");
+    if (result && result.csv && result.pointCount > 0) {
+      const csvText = result.csv;
+      const attach = [{
+        name: "drawing-points.csv",
+        type: "text/csv",
+        size: csvText.length,
+        text: csvText,
+        clipped: false,
+      }];
+      localStorage.setItem(MARKS_DEEPLINK_ATTACHMENTS_KEY, JSON.stringify(attach));
+    }
+  }
 
   // Store the deeplink question where MarksLLM expects it
   localStorage.setItem(MARKS_DEEPLINK_KEY, q);

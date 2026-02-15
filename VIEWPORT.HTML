@@ -11732,6 +11732,27 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
         requestId: message.requestId,
         saved: Boolean(saved),
       }, window.location.origin);
+      return;
+    }
+
+    if (message.type === "survey-cad:request-drawing-points") {
+      const rows = ["Point,Northing,Easting,Elevation,Code,Notes"];
+      for (const p of points.values()) {
+        const num = p.num ?? p.id;
+        const n = p.y ?? "";
+        const e = p.x ?? "";
+        const z = p.z ?? "";
+        const code = String(p.code || "").replace(/"/g, '""');
+        const notes = String(p.notes || "").replace(/"/g, '""');
+        rows.push(`${num},${n},${e},${z},"${code}","${notes}"`);
+      }
+      window.parent.postMessage({
+        type: "survey-cad:request-drawing-points:response",
+        requestId: message.requestId,
+        csv: rows.join("\n"),
+        pointCount: points.size,
+      }, window.location.origin);
+      return;
     }
   });
 
