@@ -272,9 +272,13 @@ export function createWorkerSchedulerService(opts = {}) {
   }
 
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
-    const url = new URL(req.url || '/', 'http://localhost');
-    if (url.pathname.indexOf(PATH) === -1) {
-      console.log(JSON.stringify(url));
+      const url = new URL(req.url || '/', 'http://localhost');
+      const pathname = url.pathname.replace(/\/+$/, '');
+      const expected = String(PATH).replace(/\/+$/, '');
+    
+      // IMPORTANT: on mismatch, do NOT write to the socket, do NOT destroy
+      if (pathname !== expected) {
+        console.error(JSON.stringify(url));
       socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
       socket.destroy();
       return false;
