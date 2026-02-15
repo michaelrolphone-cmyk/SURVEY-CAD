@@ -206,6 +206,7 @@ export function createLmProxyHubWsService({
     // Keepalive helpers
     if (type === "ping") { wsSend(ws, { type: "pong", ts: Date.now() }); return; }
     if (type === "pong") return;
+    if (type === "hello") { wsSend(ws, { type:"hello_ack", ts:Date.now() }); return; }
 
     if (!id && (type === "chat" || type === "models" || type === "cancel")) {
       wsSend(ws, { type: "error", id: null, error: { message: "missing id" } });
