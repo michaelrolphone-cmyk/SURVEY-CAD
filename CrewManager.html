@@ -49,6 +49,22 @@
     .roles-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
     .badge { display: inline-block; background: #1e3a5f; color: #60a5fa; border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
 
+    .crew-online-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .crew-online-label {
+      font-size: 0.75rem;
+      color: #22c55e;
+      font-weight: 600;
+      margin-left: 0.3rem;
+    }
+
     .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
     .empty-state p { margin: 8px 0; }
     .hidden { display: none; }
@@ -203,6 +219,7 @@
     let editingId = null;
     let currentPhoto = null;
     let currentRoles = [];
+    let onlineCrewMemberIds = [];
 
     function loadProfiles() {
       try {
@@ -298,6 +315,10 @@
         const rolesHtml = (p.roles || []).length > 0
           ? `<div class="roles-list">${p.roles.map((r) => `<span class="badge">${esc(r)}</span>`).join('')}</div>`
           : '';
+        const isOnline = onlineCrewMemberIds.includes(p.id);
+        const onlineHtml = isOnline
+          ? '<div class="crew-online-indicator" title="Online"></div><span class="crew-online-label">Online</span>'
+          : '';
 
         return `
           <div class="crew-card" data-id="${p.id}">
@@ -305,6 +326,7 @@
             <div class="crew-card-body">
               <div class="crew-card-header">
                 <span class="crew-card-name">${esc(fullName)}</span>
+                ${onlineHtml}
                 ${p.jobTitle ? `<span class="crew-card-title">${esc(p.jobTitle)}</span>` : ''}
               </div>
               <div class="crew-card-details">
@@ -640,9 +662,71 @@
       }
     }
 
+    // --- Crew Presence WebSocket Client ---
+    let crewPresenceSocket = null;
+    let crewPresenceReconnectDelay = 1500;
+
+    function buildCrewPresenceWsUrl() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${location.host}/ws/crew-presence`;
+    }
+
+    function getActiveCrewMemberId() {
+      return localStorage.getItem('surveyfoundryActiveCrewMemberId') || null;
+    }
+
+    function sendCrewPresenceIdentity() {
+      if (!crewPresenceSocket || crewPresenceSocket.readyState !== WebSocket.OPEN) return;
+      crewPresenceSocket.send(JSON.stringify({
+        type: 'crew-presence-identify',
+        crewMemberId: getActiveCrewMemberId(),
+      }));
+    }
+
+    function connectCrewPresence() {
+      if (crewPresenceSocket && (crewPresenceSocket.readyState === WebSocket.OPEN || crewPresenceSocket.readyState === WebSocket.CONNECTING)) return;
+
+      try {
+        crewPresenceSocket = new WebSocket(buildCrewPresenceWsUrl());
+      } catch {
+        scheduleCrewPresenceReconnect();
+        return;
+      }
+
+      crewPresenceSocket.addEventListener('open', () => {
+        crewPresenceReconnectDelay = 1500;
+        sendCrewPresenceIdentity();
+      });
+
+      crewPresenceSocket.addEventListener('message', (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch { return; }
+
+        if (msg.type === 'crew-presence-welcome' || msg.type === 'crew-presence-update') {
+          onlineCrewMemberIds = Array.isArray(msg.online) ? msg.online : [];
+          renderProfiles();
+        }
+      });
+
+      crewPresenceSocket.addEventListener('close', () => {
+        crewPresenceSocket = null;
+        scheduleCrewPresenceReconnect();
+      });
+
+      crewPresenceSocket.addEventListener('error', () => {
+        if (crewPresenceSocket) crewPresenceSocket.close();
+      });
+    }
+
+    function scheduleCrewPresenceReconnect() {
+      setTimeout(connectCrewPresence, crewPresenceReconnectDelay);
+      crewPresenceReconnectDelay = Math.min(crewPresenceReconnectDelay * 2, 60000);
+    }
+
     loadProfiles();
     renderProfiles();
     fetchLatestFromApi();
+    connectCrewPresence();
   </script>
 </body>
 </html>
