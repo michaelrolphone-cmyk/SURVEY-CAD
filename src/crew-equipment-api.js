@@ -52,28 +52,28 @@ function upsertInCollection(snapshot, key, item) {
   return JSON.stringify(collection);
 }
 
-export function saveCrewMember(store, member) {
-  const state = store.getState();
+export async function saveCrewMember(store, member) {
+  const state = await store.getState();
   const updatedValue = upsertInCollection(state.snapshot, CREW_KEY, member);
-  return store.applyDifferential({
+  return await store.applyDifferential({
     operations: [{ type: 'set', key: CREW_KEY, value: updatedValue }],
     baseChecksum: state.checksum,
   });
 }
 
-export function saveEquipmentItem(store, item) {
-  const state = store.getState();
+export async function saveEquipmentItem(store, item) {
+  const state = await store.getState();
   const updatedValue = upsertInCollection(state.snapshot, EQUIPMENT_KEY, item);
-  return store.applyDifferential({
+  return await store.applyDifferential({
     operations: [{ type: 'set', key: EQUIPMENT_KEY, value: updatedValue }],
     baseChecksum: state.checksum,
   });
 }
 
-export function saveEquipmentLog(store, log) {
-  const state = store.getState();
+export async function saveEquipmentLog(store, log) {
+  const state = await store.getState();
   const updatedValue = upsertInCollection(state.snapshot, EQUIPMENT_LOGS_KEY, log);
-  return store.applyDifferential({
+  return await store.applyDifferential({
     operations: [{ type: 'set', key: EQUIPMENT_LOGS_KEY, value: updatedValue }],
     baseChecksum: state.checksum,
   });
