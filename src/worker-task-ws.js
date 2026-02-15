@@ -1,28 +1,27 @@
 // worker-scheduler-ws.js
 import { createHash, randomUUID } from 'node:crypto';
 
-/* ---------- minimal ws frame helpers ---------- */
+/* ---------- minimal ws frame helpers (same style as your service) ---------- */
+
 function decodeFrame(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 2) return null;
 
   const first = buffer[0];
-  const fin   = (first & 0x80) !== 0;
-  const rsv1  = (first & 0x40) !== 0;
-  const rsv2  = (first & 0x20) !== 0;
-  const rsv3  = (first & 0x10) !== 0;
-  const opcode = first & 0x0f;
+  const rsv1 = (first & 0x40) !== 0;
+  const rsv2 = (first & 0x20) !== 0;
+  const rsv3 = (first & 0x10) !== 0;
 
-  // Reject any frame using reserved bits (most common cause: permessage-deflate)
+  // We do not negotiate extensions. If RSV bits are set, it's a protocol error.
   if (rsv1 || rsv2 || rsv3) {
-    console.warn(
-      `Protocol error: frame with reserved bits set ` +
-      `(RSV1=${rsv1}, RSV2=${rsv2}, RSV3=${rsv3}, opcode=0x${opcode.toString(16)}) ` +
-      `— likely client sent compressed frame but extension not supported`
-    );
-    return null; // will trigger close in caller
+    return {
+      opcode: 0x8, // treat as close-worthy protocol error
+      payload: Buffer.alloc(0),
+      _protocolError: { code: 1002, reason: 'reserved-bits-set' },
+    };
   }
 
   const second = buffer[1];
+  const opcode = first & 0x0f;
   const masked = (second & 0x80) !== 0;
   let payloadLen = second & 0x7f;
   let offset = 2;
@@ -44,16 +43,13 @@ function decodeFrame(buffer) {
     const mask = buffer.subarray(offset, offset + 4);
     offset += 4;
     if (buffer.length < offset + payloadLen) return null;
-
     const payload = Buffer.allocUnsafe(payloadLen);
-    for (let i = 0; i < payloadLen; i++) {
-      payload[i] = buffer[offset + i] ^ mask[i % 4];
-    }
-    return { fin, opcode, payload };
+    for (let i = 0; i < payloadLen; i++) payload[i] = buffer[offset + i] ^ mask[i % 4];
+    return { opcode, payload };
   }
 
   if (buffer.length < offset + payloadLen) return null;
-  return { fin, opcode, payload: buffer.subarray(offset, offset + payloadLen) };
+  return { opcode, payload: buffer.subarray(offset, offset + payloadLen) };
 }
 
 function decodeNextFrame(buffer) {
@@ -77,13 +73,11 @@ function decodeNextFrame(buffer) {
   }
 
   if (masked) offset += 4;
-
   const totalLength = offset + payloadLen;
   if (buffer.length < totalLength) return null;
 
   const frame = decodeFrame(buffer.subarray(0, totalLength));
   if (!frame) return null;
-
   return { ...frame, consumed: totalLength };
 }
 
@@ -91,9 +85,8 @@ function encodeTextFrame(text) {
   const payload = Buffer.from(String(text), 'utf8');
   const len = payload.length;
 
-  if (len < 126) {
-    return Buffer.concat([Buffer.from([0x81, len]), payload]);
-  }
+  if (len < 126) return Buffer.concat([Buffer.from([0x81, len]), payload]);
+
   if (len < 65536) {
     const header = Buffer.allocUnsafe(4);
     header[0] = 0x81;
@@ -109,6 +102,30 @@ function encodeTextFrame(text) {
   return Buffer.concat([header, payload]);
 }
 
+function encodeCloseFrame(code = 1000, reason = '') {
+  const reasonBuf = Buffer.from(String(reason), 'utf8');
+  const payload = Buffer.allocUnsafe(2 + reasonBuf.length);
+  payload.writeUInt16BE(code, 0);
+  reasonBuf.copy(payload, 2);
+  const len = payload.length;
+
+  if (len < 126) return Buffer.concat([Buffer.from([0x88, len]), payload]);
+
+  if (len < 65536) {
+    const header = Buffer.allocUnsafe(4);
+    header[0] = 0x88;
+    header[1] = 126;
+    header.writeUInt16BE(len, 2);
+    return Buffer.concat([header, payload]);
+  }
+
+  const header = Buffer.allocUnsafe(10);
+  header[0] = 0x88;
+  header[1] = 127;
+  header.writeBigUInt64BE(BigInt(len), 2);
+  return Buffer.concat([header, payload]);
+}
+
 function createWebSocketAccept(secWebSocketKey) {
   return createHash('sha1')
     .update(`${secWebSocketKey}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`, 'utf8')
@@ -116,19 +133,43 @@ function createWebSocketAccept(secWebSocketKey) {
 }
 
 function safeJsonParse(buf) {
-  try {
-    return JSON.parse(buf.toString('utf8'));
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(buf.toString('utf8')); } catch { return null; }
+}
+
+// After 101, make it *impossible* to accidentally send raw HTTP/JSON bytes.
+// Any string writes become WS text frames; HTTP status lines after upgrade cause a 1002 close.
+function installPostUpgradeWriteGuard(socket) {
+  if (socket.__wsWriteGuardInstalled) return;
+  socket.__wsWriteGuardInstalled = true;
+
+  const rawWrite = socket.write.bind(socket);
+  socket.__rawWrite = rawWrite;
+
+  socket.write = (data, ...args) => {
+    // Buffers are assumed to be already-framed.
+    if (Buffer.isBuffer(data)) return rawWrite(data, ...args);
+
+    const s = String(data);
+    // If someone tries to write an HTTP response after upgrade, that's a protocol violation.
+    if (s.startsWith('HTTP/1.1') || s.startsWith('HTTP/1.0')) {
+      try { rawWrite(encodeCloseFrame(1002, 'http-after-upgrade')); } catch {}
+      try { socket.destroy(); } catch {}
+      return false;
+    }
+
+    // Otherwise, frame it as text to avoid RSV1/invalid-frame explosions client-side.
+    return rawWrite(encodeTextFrame(s), ...args);
+  };
 }
 
 /* --------------------------- worker scheduler --------------------------- */
+
 export function createWorkerSchedulerService(opts = {}) {
   const PATH = String(opts.path || '/ws/worker');
   const OFFLINE_AFTER_MS = Number.isFinite(opts.offlineAfterMs) ? Number(opts.offlineAfterMs) : 30_000;
   const HEARTBEAT_MS = Number.isFinite(opts.heartbeatMs) ? Number(opts.heartbeatMs) : 10_000;
 
+  // poolId -> { workers: Map, queue: [], tasks: Map, rr: number }
   const pools = new Map();
 
   function getOrCreatePool(poolId) {
@@ -136,9 +177,9 @@ export function createWorkerSchedulerService(opts = {}) {
     if (!pools.has(id)) {
       pools.set(id, {
         id,
-        workers: new Map(),
-        queue: [],
-        tasks: new Map(),
+        workers: new Map(), // workerId -> worker
+        queue: [],          // taskIds FIFO
+        tasks: new Map(),   // taskId -> task
         rr: 0,
         pingSeq: 0,
       });
@@ -149,8 +190,12 @@ export function createWorkerSchedulerService(opts = {}) {
   function send(worker, payload) {
     const sock = worker?.socket;
     if (!sock || sock.destroyed || !sock.writable) return false;
-    sock.write(encodeTextFrame(JSON.stringify(payload)));
-    return true;
+    try {
+      sock.write(encodeTextFrame(JSON.stringify(payload)));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function isOnline(worker, at = Date.now()) {
@@ -167,9 +212,9 @@ export function createWorkerSchedulerService(opts = {}) {
 
   function pickWorker(pool) {
     const at = Date.now();
-    const candidates = Array.from(pool.workers.values())
-      .filter((w) => workerCapacity(w, at) > 0);
+    const candidates = Array.from(pool.workers.values()).filter((w) => workerCapacity(w, at) > 0);
     if (!candidates.length) return null;
+
     pool.rr = (pool.rr + 1) >>> 0;
     return candidates[pool.rr % candidates.length] || candidates[0];
   }
@@ -178,6 +223,7 @@ export function createWorkerSchedulerService(opts = {}) {
     while (pool.queue.length) {
       const worker = pickWorker(pool);
       if (!worker) return;
+
       const taskId = pool.queue[0];
       const task = pool.tasks.get(taskId);
       pool.queue.shift();
@@ -187,6 +233,7 @@ export function createWorkerSchedulerService(opts = {}) {
       task.workerId = worker.id;
       task.assignedAt = Date.now();
       task.updatedAt = task.assignedAt;
+
       worker.inFlight.add(task.id);
 
       const ok = send(worker, {
@@ -222,13 +269,13 @@ export function createWorkerSchedulerService(opts = {}) {
       pump(pool);
     }
   }, HEARTBEAT_MS);
-
   if (heartbeatTimer.unref) heartbeatTimer.unref();
 
   function submitTask(poolId, kind, payload = null) {
     const pool = getOrCreatePool(poolId);
     const id = randomUUID();
     const createdAt = Date.now();
+
     let resolve, reject;
     const p = new Promise((res, rej) => { resolve = res; reject = rej; });
     p.taskId = id;
@@ -290,209 +337,206 @@ export function createWorkerSchedulerService(opts = {}) {
     const pathname = url.pathname.replace(/\/+$/, '');
     const expected = String(PATH).replace(/\/+$/, '');
 
+    // mismatch must be non-destructive (so other ws handlers can try)
     if (pathname !== expected) return false;
 
-    if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-      socket.destroy();
-      return false;
-    }
-
-    const key = req.headers['sec-websocket-key'];
-    if (!key) {
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-      socket.destroy();
-      return false;
-    }
-
-    const poolId = String(url.searchParams.get('pool') || 'default');
-    const pool = getOrCreatePool(poolId);
-
-    const responseHeaders = [
-      'HTTP/1.1 101 Switching Protocols',
-      'Upgrade: websocket',
-      'Connection: Upgrade',
-      `Sec-WebSocket-Accept: ${createWebSocketAccept(key)}`,
-      '\r\n',
-    ];
-    socket.write(responseHeaders.join('\r\n'));
-
-    socket.setTimeout(0);
-    socket.setNoDelay(true);
-    socket.setKeepAlive(true);
-
-    const pending = {
-      buffer: head.length ? Buffer.from(head) : Buffer.alloc(0),
-      workerId: null,
-      registered: false,
-      decodeFailures: 0,
-    };
-
-    function registerWorker(msg) {
-      const desiredId = msg?.workerId ? String(msg.workerId).trim() : '';
-      const workerId = desiredId || randomUUID();
-
-      const existing = pool.workers.get(workerId);
-      if (existing && existing.socket && !existing.socket.destroyed) {
-        try { existing.socket.destroy(); } catch {}
+    // From here on, we "own" this socket for this path.
+    // IMPORTANT: return true for all outcomes (so your router never appends HTTP onto WS).
+    try {
+      if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return true;
       }
 
-      const worker = {
-        id: workerId,
-        name: msg?.name ? String(msg.name).slice(0, 120) : null,
-        concurrency: Number.isFinite(msg?.concurrency) ? Math.max(1, Math.trunc(msg.concurrency)) : 1,
-        capabilities: msg?.capabilities ?? null,
-        socket,
-        lastSeen: Date.now(),
-        inFlight: new Set(),
+      const key = req.headers['sec-websocket-key'];
+      if (!key) {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return true;
+      }
+
+      const poolId = String(url.searchParams.get('pool') || 'default');
+      const pool = getOrCreatePool(poolId);
+
+      const responseHeaders = [
+        'HTTP/1.1 101 Switching Protocols',
+        'Upgrade: websocket',
+        'Connection: Upgrade',
+        `Sec-WebSocket-Accept: ${createWebSocketAccept(key)}`,
+        '\r\n',
+      ];
+      socket.write(responseHeaders.join('\r\n'));
+
+      // mark upgraded for any outer safety checks you might add
+      socket.__wsUpgraded = true;
+
+      // After upgrade, prevent accidental raw writes from producing invalid WS frames
+      installPostUpgradeWriteGuard(socket);
+
+      socket.setTimeout(0);
+      socket.setNoDelay(true);
+      socket.setKeepAlive(true);
+
+      const pending = {
+        buffer: head.length ? Buffer.from(head) : Buffer.alloc(0),
+        workerId: null,
+        registered: false,
       };
 
-      pool.workers.set(workerId, worker);
-      pending.workerId = workerId;
-      pending.registered = true;
+      function registerWorker(msg) {
+        const desiredId = msg?.workerId ? String(msg.workerId).trim() : '';
+        const workerId = desiredId || randomUUID();
 
-      send(worker, {
-        type: 'welcome',
-        workerId,
-        poolId: pool.id,
-        heartbeatMs: HEARTBEAT_MS,
-        offlineAfterMs: OFFLINE_AFTER_MS,
-        now: Date.now(),
+        const existing = pool.workers.get(workerId);
+        if (existing && existing.socket && !existing.socket.destroyed) {
+          try { existing.socket.destroy(); } catch {}
+        }
+
+        const worker = {
+          id: workerId,
+          name: msg?.name ? String(msg.name).slice(0, 120) : null,
+          concurrency: Number.isFinite(msg?.concurrency) ? Math.max(1, Math.trunc(msg.concurrency)) : 1,
+          capabilities: msg?.capabilities ?? null,
+          socket,
+          lastSeen: Date.now(),
+          inFlight: new Set(),
+        };
+
+        pool.workers.set(workerId, worker);
+        pending.workerId = workerId;
+        pending.registered = true;
+
+        send(worker, {
+          type: 'welcome',
+          workerId,
+          poolId: pool.id,
+          heartbeatMs: HEARTBEAT_MS,
+          offlineAfterMs: OFFLINE_AFTER_MS,
+          now: Date.now(),
+        });
+
+        pump(pool);
+        return worker;
+      }
+
+      function getWorkerObj() {
+        if (!pending.registered || !pending.workerId) return null;
+        return pool.workers.get(pending.workerId) || null;
+      }
+
+      socket.on('data', (chunk) => {
+        try {
+          pending.buffer = pending.buffer.length ? Buffer.concat([pending.buffer, chunk]) : Buffer.from(chunk);
+
+          while (pending.buffer.length) {
+            const frame = decodeNextFrame(pending.buffer);
+            if (!frame) break;
+            pending.buffer = pending.buffer.subarray(frame.consumed);
+
+            // protocol error from decodeFrame (RSV bits etc)
+            if (frame._protocolError) {
+              try { socket.__rawWrite?.(encodeCloseFrame(frame._protocolError.code, frame._protocolError.reason)); } catch {}
+              try { socket.destroy(); } catch {}
+              return;
+            }
+
+            if (frame.opcode === 0x8) {
+              // peer close
+              try { socket.__rawWrite?.(encodeCloseFrame(1000, 'bye')); } catch {}
+              try { socket.end(); } catch {}
+              return;
+            }
+
+            if (frame.opcode !== 0x1) continue;
+
+            const msg = safeJsonParse(frame.payload);
+            if (!msg || typeof msg.type !== 'string') continue;
+
+            const at = Date.now();
+
+            if (!pending.registered) {
+              if (msg.type !== 'hello') continue;
+              registerWorker(msg);
+              continue;
+            }
+
+            const worker = getWorkerObj();
+            if (!worker) continue;
+            worker.lastSeen = at;
+
+            if (msg.type === 'pong') continue;
+
+            if (msg.type === 'hello') {
+              if (msg.name) worker.name = String(msg.name).slice(0, 120);
+              if (Number.isFinite(msg.concurrency)) worker.concurrency = Math.max(1, Math.trunc(msg.concurrency));
+              if (msg.capabilities !== undefined) worker.capabilities = msg.capabilities;
+              continue;
+            }
+
+            if (msg.type === 'task-result' && msg.taskId) {
+              const taskId = String(msg.taskId);
+              const task = pool.tasks.get(taskId);
+              if (!task) continue;
+              if (task.workerId !== worker.id) continue;
+
+              task.status = msg.ok ? 'completed' : 'failed';
+              task.finishedAt = at;
+              task.updatedAt = at;
+
+              worker.inFlight.delete(taskId);
+
+              const resolve = task._resolve;
+              const reject = task._reject;
+              task._resolve = null;
+              task._reject = null;
+
+              if (msg.ok) {
+                if (resolve) resolve(msg.result);
+              } else {
+                const err = new Error(msg.error?.message || msg.error || 'task failed');
+                err.details = msg.error;
+                if (reject) reject(err);
+              }
+
+              pump(pool);
+              continue;
+            }
+          }
+        } catch (err) {
+          console.error('[ws/worker] data handler threw', err);
+          try { socket.destroy(); } catch {}
+        }
       });
 
-      pump(pool);
-      return worker;
-    }
-
-    function getWorkerObj() {
-      if (!pending.registered || !pending.workerId) return null;
-      return pool.workers.get(pending.workerId) || null;
-    }
-
-    socket.on('data', (chunk) => {
-      pending.buffer = pending.buffer.length
-        ? Buffer.concat([pending.buffer, chunk])
-        : Buffer.from(chunk);
-
-      // First frame protection
-      if (!pending.registered && pending.buffer.length >= 2) {
-        const firstByte = pending.buffer[0];
-        const fin = (firstByte & 0x80) !== 0;
-        const opcode = firstByte & 0x0f;
-        if (!fin || opcode !== 0x1) {
-          console.warn(`Invalid first frame (fin=${fin}, opcode=0x${opcode.toString(16)})`);
-          socket.destroy();
-          return;
-        }
-      }
-
-      while (pending.buffer.length >= 2) {
-        const frame = decodeNextFrame(pending.buffer);
-        if (!frame) {
-          pending.decodeFailures++;
-          if (pending.decodeFailures > 5 || pending.buffer.length > 8192) {
-            console.warn(`Too many decode failures or buffer overflow → closing connection`);
-            socket.destroy();
-            return;
-          }
-          break;
-        }
-
-        pending.decodeFailures = 0;
-        pending.buffer = pending.buffer.subarray(frame.consumed);
-
-        if (frame.opcode === 0x8) { // close
-          socket.end();
-          return;
-        }
-
-        if (frame.opcode !== 0x1) {
-          console.warn(`Unsupported opcode 0x${frame.opcode.toString(16)}`);
-          continue;
-        }
-
-        const msg = safeJsonParse(frame.payload);
-        if (!msg || typeof msg.type !== 'string') {
-          console.warn('Invalid or non-string .type in JSON message');
-          continue;
-        }
-
-        const at = Date.now();
-
-        if (!pending.registered) {
-          if (msg.type !== 'hello') continue;
-          registerWorker(msg);
-          continue;
-        }
-
+      socket.on('close', () => {
         const worker = getWorkerObj();
-        if (!worker) continue;
+        if (!worker) return;
 
-        worker.lastSeen = at;
-
-        if (msg.type === 'pong') continue;
-
-        if (msg.type === 'hello') {
-          if (msg.name) worker.name = String(msg.name).slice(0, 120);
-          if (Number.isFinite(msg.concurrency)) {
-            worker.concurrency = Math.max(1, Math.trunc(msg.concurrency));
-          }
-          if (msg.capabilities !== undefined) worker.capabilities = msg.capabilities;
-          continue;
-        }
-
-        if (msg.type === 'task-result' && msg.taskId) {
-          const taskId = String(msg.taskId);
+        for (const taskId of worker.inFlight) {
           const task = pool.tasks.get(taskId);
           if (!task) continue;
-          if (task.workerId !== worker.id) continue;
-
-          task.status = msg.ok ? 'completed' : 'failed';
-          task.finishedAt = at;
-          task.updatedAt = at;
-          worker.inFlight.delete(taskId);
-
-          const resolve = task._resolve;
-          const reject = task._reject;
-          task._resolve = null;
-          task._reject = null;
-
-          if (msg.ok) {
-            if (resolve) resolve(msg.result);
-          } else {
-            const err = new Error(msg.error?.message || msg.error || 'task failed');
-            err.details = msg.error;
-            if (reject) reject(err);
-          }
-
-          pump(pool);
+          task.status = 'queued';
+          task.workerId = null;
+          task.assignedAt = null;
+          task.updatedAt = Date.now();
+          pool.queue.unshift(task.id);
         }
-      }
-    });
 
-    socket.on('close', () => {
-      const worker = getWorkerObj();
-      if (!worker) return;
+        pool.workers.delete(worker.id);
+        pump(pool);
+      });
 
-      for (const taskId of worker.inFlight) {
-        const task = pool.tasks.get(taskId);
-        if (!task) continue;
-        task.status = 'queued';
-        task.workerId = null;
-        task.assignedAt = null;
-        task.updatedAt = Date.now();
-        pool.queue.unshift(task.id);
-      }
+      socket.on('error', () => {
+        try { socket.destroy(); } catch {}
+      });
 
-      pool.workers.delete(worker.id);
-      pump(pool);
-    });
-
-    socket.on('error', () => {
+      return true;
+    } catch (err) {
+      console.error('[ws/worker] handleUpgrade threw', err);
       try { socket.destroy(); } catch {}
-    });
-
-    return true;
+      return true; // path matched; prevent outer router from writing HTTP onto this socket
+    }
   }
 
   return {
@@ -505,5 +549,4 @@ export function createWorkerSchedulerService(opts = {}) {
   };
 }
 
-// optional named exports
 export { decodeFrame, encodeTextFrame, createWebSocketAccept };
