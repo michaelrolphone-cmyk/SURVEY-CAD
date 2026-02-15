@@ -97,35 +97,35 @@ test('handles non-array JSON gracefully', () => {
 
 // --- Unit tests for save functions ---
 
-test('saveCrewMember adds a new member to empty store', () => {
+test('saveCrewMember adds a new member to empty store', async () => {
   const store = new LocalStorageSyncStore({ version: 1, snapshot: {} });
-  const result = saveCrewMember(store, { id: 'new-1', firstName: 'Test', lastName: 'User' });
+  const result = await saveCrewMember(store, { id: 'new-1', firstName: 'Test', lastName: 'User' });
   assert.equal(result.status, 'applied');
   const profiles = getCrewProfiles(store.getState().snapshot);
   assert.equal(profiles.length, 1);
   assert.equal(profiles[0].firstName, 'Test');
 });
 
-test('saveCrewMember updates existing member by id', () => {
+test('saveCrewMember updates existing member by id', async () => {
   const store = new LocalStorageSyncStore({ version: 1, snapshot: buildSnapshot() });
-  const result = saveCrewMember(store, { id: 'crew-1', firstName: 'Updated', lastName: 'Smith' });
+  const result = await saveCrewMember(store, { id: 'crew-1', firstName: 'Updated', lastName: 'Smith' });
   assert.equal(result.status, 'applied');
   const member = findCrewMemberById(store.getState().snapshot, 'crew-1');
   assert.equal(member.firstName, 'Updated');
 });
 
-test('saveEquipmentItem adds a new item to empty store', () => {
+test('saveEquipmentItem adds a new item to empty store', async () => {
   const store = new LocalStorageSyncStore({ version: 1, snapshot: {} });
-  const result = saveEquipmentItem(store, { id: 'eq-1', make: 'Topcon', model: 'GT-1' });
+  const result = await saveEquipmentItem(store, { id: 'eq-1', make: 'Topcon', model: 'GT-1' });
   assert.equal(result.status, 'applied');
   const items = getEquipmentInventory(store.getState().snapshot);
   assert.equal(items.length, 1);
   assert.equal(items[0].make, 'Topcon');
 });
 
-test('saveEquipmentLog adds a new log to empty store', () => {
+test('saveEquipmentLog adds a new log to empty store', async () => {
   const store = new LocalStorageSyncStore({ version: 1, snapshot: {} });
-  const result = saveEquipmentLog(store, { id: 'log-new', rodman: 'crew-1', jobFileName: 'Test.job' });
+  const result = await saveEquipmentLog(store, { id: 'log-new', rodman: 'crew-1', jobFileName: 'Test.job' });
   assert.equal(result.status, 'applied');
   const logs = getEquipmentLogs(store.getState().snapshot);
   assert.equal(logs.length, 1);

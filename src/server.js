@@ -399,7 +399,7 @@ export function createSurveyServer({
             createdAt: body.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          const result = saveCrewMember(localStorageSyncStore, member);
+          const result = await saveCrewMember(localStorageSyncStore, member);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: result.operations,
@@ -442,7 +442,7 @@ export function createSurveyServer({
             createdAt: body.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          const result = saveEquipmentItem(localStorageSyncStore, item);
+          const result = await saveEquipmentItem(localStorageSyncStore, item);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: result.operations,
@@ -489,7 +489,7 @@ export function createSurveyServer({
             createdAt: body.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          const result = saveEquipmentLog(localStorageSyncStore, log);
+          const result = await saveEquipmentLog(localStorageSyncStore, log);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: result.operations,
