@@ -22,6 +22,7 @@ export function createLocalStorageSyncWsService({ store }) {
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
     const url = new URL(req.url || '/', 'http://localhost');
     const pathname = url.pathname || '/';
+    const PATH = "/ws/localstorage-sync";
     const isLocalStorageSyncPath = pathname === '/ws/localstorage-sync'
       || pathname === '/ws/localstorage-sync/'
       || pathname.endsWith('/ws/localstorage-sync')
