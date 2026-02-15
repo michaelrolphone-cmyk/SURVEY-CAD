@@ -28,11 +28,14 @@ export function createLocalStorageSyncWsService({ store }) {
       || pathname.endsWith('/ws/localstorage-sync/');
     if (!isLocalStorageSyncPath) return false;
 
-    if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-      socket.destroy();
-      return true;
+    if (url.pathname.replace(/\/+$/, '') !== PATH.replace(/\/+$/, '')) {
+      return false; // don't touch the socket
     }
+    // if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
+    //   socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+    //   socket.destroy();
+    //   return true;
+    // }
 
     const key = req.headers['sec-websocket-key'];
     if (!key) {
