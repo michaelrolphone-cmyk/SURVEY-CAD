@@ -895,7 +895,8 @@ server.on('upgrade', (req, socket, head) => {
       socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
       socket.destroy();
     }
-  } catch {
+  } catch (e) {
+    console.error(e);
     if (!socket.destroyed) socket.destroy();
   }
 });
