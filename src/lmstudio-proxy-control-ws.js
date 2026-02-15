@@ -1,88 +1,58 @@
-// lmstudio-proxy-control-ws.js
-// Drop-in WS control plane for LM Studio proxy clients.
-// Requires: npm i ws
+// lmproxy-hub-ws.js
+// npm i ws
 //
-// Protocol expected from proxy client:
-//  - Client connects to ws://SERVER/ws/lmproxy (or your path)
-//  - Client sends: { type:"hello", client_id:"...", capabilities:{...}, ... }
-//  - Server sends: { type:"chat"|"models"|"cancel", id:"...", body:{...} }
+// This WS hub allows BOTH:
+//  - proxy clients (lmstudio-proxy-client.js) to connect and register
+//  - browser UI clients ("Marks") to send chat/models/cancel, which are forwarded to a proxy
 //
-// Client sends back events: started, delta, done, error, models, cancelled.
+// Path stays /ws/lmproxy so your HTML can connect to the same endpoint.
 //
-// Usage:
-//   const lmProxy = createLmProxyControlWsService({ path: "/ws/lmproxy", token: process.env.CONTROL_TOKEN });
-//   server.on("upgrade", (req, socket, head) => {
-//     if (lmProxy.canHandleUpgrade(req)) return lmProxy.handleUpgrade(req, socket, head);
-//     // ... other services
-//     socket.destroy();
-//   });
+// Expected HELLO:
+//  Proxy sends: {type:"hello", client_id, capabilities:{...}, ...}
+//  UI sends:    {type:"hello", client_id:"marks-ui", role:"ui"}
 //
-//   // somewhere in your code:
-//   const { message } = await lmProxy.requestChat({ body: { model, messages, stream:true }, onDelta: d => process.stdout.write(d) });
+// UI commands:
+//  {type:"chat", id, body:{messages:[...], temperature, max_tokens, stream, model?}}
+//  {type:"models", id}
+//  {type:"cancel", id}
+//
+// Proxy events forwarded back to UI by matching id:
+//  started / delta / chunk / done / error / models / cancelled
 
 import { WebSocketServer } from "ws";
-import { randomUUID } from "node:crypto";
-
-function now() { return Date.now(); }
 
 function parseUrl(req) {
-  // req.url is path + query only in Node http server
   return new URL(req.url, "http://ws.local");
 }
-
-function jsonTryParse(s) {
+function safeJsonParse(s) {
   try { return { ok: true, value: JSON.parse(s) }; }
   catch (e) { return { ok: false, error: e }; }
 }
-
 function wsSend(ws, obj) {
   if (!ws || ws.readyState !== ws.OPEN) return false;
   ws.send(JSON.stringify(obj));
   return true;
 }
 
-/**
- * createLmProxyControlWsService
- *
- * A WS endpoint that accepts proxy clients and offers a programmatic API
- * for your server to dispatch chat/models/cancel to those proxies.
- */
-export function createLmProxyControlWsService({
+export function createLmProxyHubWsService({
   path = "/ws/lmproxy",
-  token = "",                  // optional shared secret
+  token = "",
   pingIntervalMs = 25_000,
   requestTimeoutMs = 120_000,
-  selectClient = null,         // optional: (clientsArray) => clientId
   log = console
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 10 * 1024 * 1024 });
 
-  /** client_id -> { ws, meta, lastSeen, isAlive } */
-  const clients = new Map();
+  // proxyId -> { ws, hello, lastSeen }
+  const proxies = new Map();
 
-  /** requestId -> { clientId, resolve, reject, onDelta, timer, startedAt } */
+  // uiId -> { ws, hello, lastSeen }
+  const uis = new Map();
+
+  // requestId -> { uiWs, proxyId, timer }
   const inflight = new Map();
 
-  let rrIndex = 0;
-
-  function listClientIds() {
-    return Array.from(clients.keys());
-  }
-
-  function pickClientId() {
-    const ids = listClientIds();
-    if (ids.length === 0) return null;
-
-    if (typeof selectClient === "function") {
-      const chosen = selectClient(ids.slice());
-      if (chosen && clients.has(chosen)) return chosen;
-    }
-
-    // default: round-robin
-    const id = ids[rrIndex % ids.length];
-    rrIndex += 1;
-    return id;
-  }
+  let rr = 0;
 
   function authOk(req) {
     if (!token) return true;
@@ -93,8 +63,7 @@ export function createLmProxyControlWsService({
   }
 
   function canHandleUpgrade(req) {
-    const url = parseUrl(req);
-    return url.pathname === path;
+    return parseUrl(req).pathname === path;
   }
 
   function handleUpgrade(req, socket, head) {
@@ -113,281 +82,276 @@ export function createLmProxyControlWsService({
     return true;
   }
 
-  function registerClient(clientId, ws, helloMsg = {}) {
-    // If duplicate client_id connects, drop old one.
-    const existing = clients.get(clientId);
+  function listProxyIds() {
+    return Array.from(proxies.keys());
+  }
+
+  function pickProxyId() {
+    const ids = listProxyIds();
+    if (ids.length === 0) return null;
+    const id = ids[rr % ids.length];
+    rr += 1;
+    return id;
+  }
+
+  function registerProxy(clientId, ws, hello) {
+    // Replace old if duplicate
+    const existing = proxies.get(clientId);
     if (existing?.ws && existing.ws !== ws) {
       try { existing.ws.close(4000, "replaced"); } catch {}
     }
 
-    ws.__clientId = clientId;
+    ws.__role = "proxy";
+    ws.__id = clientId;
     ws.isAlive = true;
 
-    clients.set(clientId, {
-      ws,
-      meta: helloMsg,
-      lastSeen: now()
-    });
-
-    log.info?.(`[lmproxy] registered client_id=${clientId}`);
+    proxies.set(clientId, { ws, hello, lastSeen: Date.now() });
+    log.info?.(`[lmproxy-hub] proxy registered ${clientId}`);
   }
 
-  function unregisterClient(clientId, reason = "disconnect") {
-    const entry = clients.get(clientId);
-    if (!entry) return;
-    clients.delete(clientId);
-
-    // fail any inflight requests assigned to this client
-    for (const [rid, inf] of inflight) {
-      if (inf.clientId !== clientId) continue;
-      clearTimeout(inf.timer);
-      inflight.delete(rid);
-      inf.reject(Object.assign(new Error(`lmproxy client disconnected (${reason})`), { code: "client_disconnected" }));
+  function registerUi(clientId, ws, hello) {
+    const existing = uis.get(clientId);
+    if (existing?.ws && existing.ws !== ws) {
+      try { existing.ws.close(4000, "replaced"); } catch {}
     }
 
-    log.warn?.(`[lmproxy] unregistered client_id=${clientId} (${reason})`);
+    ws.__role = "ui";
+    ws.__id = clientId;
+    ws.isAlive = true;
+
+    uis.set(clientId, { ws, hello, lastSeen: Date.now() });
+    log.info?.(`[lmproxy-hub] ui registered ${clientId}`);
   }
 
-  function onProxyMessage(ws, msg) {
-    const clientId = ws.__clientId;
+  function unregister(ws, reason) {
+    const role = ws.__role;
+    const id = ws.__id;
 
-    // allow hello before client_id is set
-    if (msg?.type === "hello") {
-      const cid = String(msg.client_id || "").trim();
-      if (!cid) {
-        wsSend(ws, { type: "error", id: null, error: { message: "hello missing client_id" } });
-        return;
+    if (role === "proxy" && id) {
+      proxies.delete(id);
+
+      // Fail any inflight requests assigned to this proxy
+      for (const [rid, inf] of inflight) {
+        if (inf.proxyId !== id) continue;
+        clearTimeout(inf.timer);
+        inflight.delete(rid);
+        wsSend(inf.uiWs, { type: "error", id: rid, error: { message: `proxy_disconnected:${reason}` } });
       }
-      registerClient(cid, ws, msg);
-      wsSend(ws, { type: "hello_ack", client_id: cid, ts: now() });
-      return;
+
+      log.warn?.(`[lmproxy-hub] proxy unregistered ${id} (${reason})`);
     }
 
-    // until hello arrives, ignore everything else
-    if (!clientId) {
-      wsSend(ws, { type: "error", id: msg?.id ?? null, error: { message: "must send hello first" } });
-      return;
+    if (role === "ui" && id) {
+      uis.delete(id);
+
+      // Cancel any inflight owned by this UI
+      for (const [rid, inf] of inflight) {
+        if (inf.uiWs !== ws) continue;
+        clearTimeout(inf.timer);
+        inflight.delete(rid);
+        const p = proxies.get(inf.proxyId)?.ws;
+        if (p) wsSend(p, { type: "cancel", id: rid });
+      }
+
+      log.warn?.(`[lmproxy-hub] ui unregistered ${id} (${reason})`);
     }
+  }
 
-    // update last seen
-    const entry = clients.get(clientId);
-    if (entry) entry.lastSeen = now();
-
-    const type = String(msg?.type || "");
-
-    if (type === "pong") {
-      ws.isAlive = true;
-      return;
-    }
-
-    if (type === "started" || type === "delta" || type === "done" || type === "error" || type === "models" || type === "cancelled" || type === "chunk") {
-      const id = String(msg?.id || "");
-      if (!id) return;
-
+  function setInflight(id, uiWs, proxyId) {
+    const timer = setTimeout(() => {
       const inf = inflight.get(id);
+      if (!inf) return;
+      inflight.delete(id);
+      wsSend(uiWs, { type: "error", id, error: { message: `timeout:${requestTimeoutMs}ms` } });
+      const p = proxies.get(proxyId)?.ws;
+      if (p) wsSend(p, { type: "cancel", id });
+    }, requestTimeoutMs);
 
-      // models responses are also correlated via id
-      if (type === "models") {
-        if (inf) {
-          clearTimeout(inf.timer);
-          inflight.delete(id);
-          inf.resolve({ type: "models", ok: msg.ok !== false, data: msg.data, error: msg.error });
-        }
-        return;
-      }
+    inflight.set(id, { uiWs, proxyId, timer });
+  }
 
-      if (!inf) {
-        // Not necessarily an error; could be a late message after timeout.
-        return;
-      }
+  function clearInflight(id) {
+    const inf = inflight.get(id);
+    if (!inf) return;
+    clearTimeout(inf.timer);
+    inflight.delete(id);
+  }
 
-      if (type === "delta") {
-        if (typeof inf.onDelta === "function") {
-          const d = msg.delta;
-          if (typeof d === "string" && d.length) inf.onDelta(d, msg);
-        }
-        return;
-      }
-
-      if (type === "done") {
-        clearTimeout(inf.timer);
-        inflight.delete(id);
-        inf.resolve({
-          message: msg.message ?? "",
-          finish_reason: msg.finish_reason ?? null,
-          usage: msg.usage ?? null,
-          raw: msg.raw
-        });
-        return;
-      }
-
-      if (type === "error") {
-        clearTimeout(inf.timer);
-        inflight.delete(id);
-        const e = Object.assign(new Error(msg?.error?.message || "lmproxy error"), {
-          code: msg?.error?.code || "lmproxy_error",
-          details: msg?.error
-        });
-        inf.reject(e);
-        return;
-      }
-
-      if (type === "cancelled") {
-        // cancellation is acknowledged; the inflight chat may still emit an Abort error
-        return;
-      }
-
+  function handleHello(ws, msg) {
+    const clientId = String(msg?.client_id || "").trim();
+    if (!clientId) {
+      wsSend(ws, { type: "error", id: null, error: { message: "hello missing client_id" } });
       return;
     }
 
-    // Unknown message type from proxy
-    wsSend(ws, { type: "error", id: msg?.id ?? null, error: { message: `unknown proxy message type: ${type}` } });
+    const role = String(msg?.role || "").toLowerCase();
+
+    // Classify:
+    // - explicit role:"ui" => UI
+    // - presence of capabilities.chat/models etc => proxy
+    // - otherwise default proxy
+    const looksProxy = !!msg?.capabilities || !!msg?.lm_base_url;
+
+    if (role === "ui") registerUi(clientId, ws, msg);
+    else if (looksProxy) registerProxy(clientId, ws, msg);
+    else registerProxy(clientId, ws, msg);
+
+    wsSend(ws, { type: "hello_ack", client_id: clientId, role: ws.__role, ts: Date.now() });
   }
 
-  // Attach WS server behavior
+  function handleUiCommand(ws, msg) {
+    const type = String(msg?.type || "");
+    const id = String(msg?.id || "");
+
+    // Keepalive helpers
+    if (type === "ping") { wsSend(ws, { type: "pong", ts: Date.now() }); return; }
+    if (type === "pong") return;
+
+    if (!id && (type === "chat" || type === "models" || type === "cancel")) {
+      wsSend(ws, { type: "error", id: null, error: { message: "missing id" } });
+      return;
+    }
+
+    const proxyId = pickProxyId();
+    if (!proxyId) {
+      wsSend(ws, { type: "error", id, error: { message: "no_proxy_clients_connected" } });
+      return;
+    }
+
+    const proxyWs = proxies.get(proxyId)?.ws;
+    if (!proxyWs || proxyWs.readyState !== proxyWs.OPEN) {
+      wsSend(ws, { type: "error", id, error: { message: "proxy_unavailable" } });
+      return;
+    }
+
+    if (type === "models") {
+      setInflight(id, ws, proxyId);
+      wsSend(proxyWs, { type: "models", id });
+      return;
+    }
+
+    if (type === "cancel") {
+      // forward cancel; do not require inflight to exist
+      wsSend(proxyWs, { type: "cancel", id });
+      return;
+    }
+
+    if (type === "chat") {
+      const body = msg?.body;
+      if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
+        wsSend(ws, { type: "error", id, error: { message: "chat missing body.messages[]" } });
+        return;
+      }
+      setInflight(id, ws, proxyId);
+      wsSend(proxyWs, { type: "chat", id, body });
+      return;
+    }
+
+    wsSend(ws, { type: "error", id: id || null, error: { message: `unknown_ui_type:${type}` } });
+  }
+
+  function handleProxyEvent(ws, msg) {
+    const type = String(msg?.type || "");
+    const id = String(msg?.id || "");
+
+    // Keepalive helpers
+    if (type === "ping") { wsSend(ws, { type: "pong", ts: Date.now() }); return; }
+    if (type === "pong") return;
+
+    // If proxy sends models response (correlated by id), forward to UI
+    if (!id) return;
+
+    const inf = inflight.get(id);
+    if (!inf) {
+      // Late/no-owner message; ignore
+      return;
+    }
+
+    // Forward as-is to UI
+    wsSend(inf.uiWs, msg);
+
+    if (type === "done" || type === "error" || type === "models") {
+      clearInflight(id);
+    }
+  }
+
   wss.on("connection", (ws) => {
     ws.isAlive = true;
+    ws.__role = null;
+    ws.__id = null;
 
     ws.on("pong", () => { ws.isAlive = true; });
 
     ws.on("message", (data) => {
       const text = Buffer.isBuffer(data) ? data.toString("utf8") : String(data);
-      const parsed = jsonTryParse(text);
+      const parsed = safeJsonParse(text);
       if (!parsed.ok) {
         wsSend(ws, { type: "error", id: null, error: { message: "bad_json" } });
         return;
       }
-      try {
-        onProxyMessage(ws, parsed.value);
-      } catch (e) {
-        wsSend(ws, { type: "error", id: parsed.value?.id ?? null, error: { message: e?.message || String(e) } });
+
+      const msg = parsed.value;
+      const type = String(msg?.type || "");
+
+      // Require hello first
+      if (!ws.__role) {
+        if (type === "hello") return handleHello(ws, msg);
+        wsSend(ws, { type: "error", id: msg?.id ?? null, error: { message: "must send hello first" } });
+        return;
       }
+
+      // Update lastSeen
+      const entry = (ws.__role === "proxy") ? proxies.get(ws.__id) : uis.get(ws.__id);
+      if (entry) entry.lastSeen = Date.now();
+
+      if (ws.__role === "ui") return handleUiCommand(ws, msg);
+      if (ws.__role === "proxy") return handleProxyEvent(ws, msg);
+
+      wsSend(ws, { type: "error", id: msg?.id ?? null, error: { message: "unknown_role" } });
     });
 
-    ws.on("close", () => {
-      const cid = ws.__clientId;
-      if (cid) unregisterClient(cid, "ws_close");
-    });
+    ws.on("close", () => unregister(ws, "close"));
+    ws.on("error", () => unregister(ws, "error"));
 
-    ws.on("error", () => {
-      const cid = ws.__clientId;
-      if (cid) unregisterClient(cid, "ws_error");
-    });
-
-    // ask for hello if client doesn't send immediately
-    wsSend(ws, { type: "server_hello", want: ["hello"], ts: now() });
+    // Prompt hello
+    wsSend(ws, { type: "server_hello", want: ["hello"], ts: Date.now() });
   });
 
-  // heartbeat/ping
+  // Heartbeat (both roles)
   const pingTimer = setInterval(() => {
-    for (const [clientId, entry] of clients) {
+    for (const [, entry] of proxies) {
       const ws = entry.ws;
-      if (!ws || ws.readyState !== ws.OPEN) {
-        unregisterClient(clientId, "dead_socket");
-        continue;
-      }
-
-      if (ws.isAlive === false) {
-        try { ws.terminate(); } catch {}
-        unregisterClient(clientId, "no_pong");
-        continue;
-      }
-
+      if (!ws || ws.readyState !== ws.OPEN) continue;
+      if (ws.isAlive === false) { try { ws.terminate(); } catch {} continue; }
       ws.isAlive = false;
       try { ws.ping(); } catch {}
-      wsSend(ws, { type: "ping", ts: now() });
+    }
+    for (const [, entry] of uis) {
+      const ws = entry.ws;
+      if (!ws || ws.readyState !== ws.OPEN) continue;
+      if (ws.isAlive === false) { try { ws.terminate(); } catch {} continue; }
+      ws.isAlive = false;
+      try { ws.ping(); } catch {}
     }
   }, pingIntervalMs);
 
   function stop() {
     clearInterval(pingTimer);
     try { wss.close(); } catch {}
-    // reject all inflight
     for (const [rid, inf] of inflight) {
       clearTimeout(inf.timer);
       inflight.delete(rid);
-      inf.reject(Object.assign(new Error("lmproxy service stopped"), { code: "service_stopped" }));
+      try { wsSend(inf.uiWs, { type: "error", id: rid, error: { message: "service_stopped" } }); } catch {}
     }
-    clients.clear();
-  }
-
-  function ensureClient(clientId) {
-    const id = clientId || pickClientId();
-    if (!id) throw Object.assign(new Error("No lmproxy clients connected"), { code: "no_clients" });
-    const entry = clients.get(id);
-    if (!entry?.ws || entry.ws.readyState !== entry.ws.OPEN) {
-      throw Object.assign(new Error(`lmproxy client not available: ${id}`), { code: "client_unavailable" });
-    }
-    return id;
-  }
-
-  function makeTimeout(id) {
-    return setTimeout(() => {
-      const inf = inflight.get(id);
-      if (!inf) return;
-      inflight.delete(id);
-      inf.reject(Object.assign(new Error(`lmproxy request timeout (${requestTimeoutMs}ms)`), { code: "timeout" }));
-    }, requestTimeoutMs);
-  }
-
-  async function requestModels({ clientId = null } = {}) {
-    const cid = ensureClient(clientId);
-    const entry = clients.get(cid);
-    const id = randomUUID();
-
-    return new Promise((resolve, reject) => {
-      const timer = makeTimeout(id);
-      inflight.set(id, { clientId: cid, resolve, reject, onDelta: null, timer, startedAt: now() });
-
-      const ok = wsSend(entry.ws, { type: "models", id });
-      if (!ok) {
-        clearTimeout(timer);
-        inflight.delete(id);
-        reject(Object.assign(new Error("failed to send models request"), { code: "send_failed" }));
-      }
-    });
-  }
-
-  async function requestChat({ clientId = null, body, onDelta } = {}) {
-    const cid = ensureClient(clientId);
-    const entry = clients.get(cid);
-    const id = String(body?.id || randomUUID()); // allow caller to force id if desired
-
-    return new Promise((resolve, reject) => {
-      const timer = makeTimeout(id);
-      inflight.set(id, { clientId: cid, resolve, reject, onDelta, timer, startedAt: now() });
-
-      const ok = wsSend(entry.ws, { type: "chat", id, body });
-      if (!ok) {
-        clearTimeout(timer);
-        inflight.delete(id);
-        reject(Object.assign(new Error("failed to send chat request"), { code: "send_failed" }));
-      }
-    });
-  }
-
-  function cancel({ clientId = null, id }) {
-    if (!id) return false;
-    const cid = ensureClient(clientId);
-    const entry = clients.get(cid);
-    return wsSend(entry.ws, { type: "cancel", id });
+    proxies.clear();
+    uis.clear();
   }
 
   return {
-    // upgrade-chain hooks
     path,
     canHandleUpgrade,
     handleUpgrade,
-
-    // runtime API
     stop,
-    listClientIds,
-    requestModels,
-    requestChat,
-    cancel,
-
-    // optional debug info
-    _clients: clients,
-    _inflight: inflight
+    listProxyIds
   };
 }
