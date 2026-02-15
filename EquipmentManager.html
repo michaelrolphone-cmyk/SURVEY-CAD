@@ -192,6 +192,9 @@
     const emptyStateEl = document.getElementById('emptyState');
     const countBarEl   = document.getElementById('countBar');
 
+    // API config
+    const EQUIPMENT_API_URL = '/api/equipment';
+
     let items = [];
     let editingId = null;
     let searchTerm = '';
@@ -206,6 +209,49 @@
 
     function saveItems() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    /* ── API helpers ── */
+    function mergeById(localList, serverList) {
+      const out = new Map();
+      for (const item of (localList || [])) {
+        if (item && item.id) out.set(item.id, item);
+      }
+      for (const item of (serverList || [])) {
+        if (item && item.id) out.set(item.id, { ...(out.get(item.id) || {}), ...item });
+      }
+      return Array.from(out.values());
+    }
+
+    function normalizeServerEquipmentList(json) {
+      if (Array.isArray(json)) return json;
+      if (Array.isArray(json?.equipment)) return json.equipment;
+      if (Array.isArray(json?.data)) return json.data;
+      return null;
+    }
+
+    function normalizeServerEquipmentItem(json) {
+      if (json && typeof json === 'object') {
+        if (json.equipment && typeof json.equipment === 'object' && json.equipment.id) return json.equipment;
+        if (json.data && typeof json.data === 'object') return json.data;
+        if (json.id) return json;
+      }
+      return null;
+    }
+
+    async function postEquipmentItem(item) {
+      const res = await fetch(EQUIPMENT_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`POST ${EQUIPMENT_API_URL} failed (${res.status}) ${text}`.trim());
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) return null;
+      return await res.json();
     }
 
     /* ── helpers ── */
@@ -293,7 +339,7 @@
     }
 
     /* ── events ── */
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
       const make = fields.make.value.trim();
       const model = fields.model.value.trim();
       const equipmentType = fields.equipmentType.value;
@@ -301,23 +347,73 @@
 
       if (!make && !model) { fields.make.focus(); return; }
 
-      if (editingId) {
-        const idx = items.findIndex(i => i.id === editingId);
-        if (idx !== -1) {
-          items[idx] = { ...items[idx], make, model, equipmentType, serialNumber, updatedAt: new Date().toISOString() };
-        }
-      } else {
-        items.push({
-          id: crypto.randomUUID(),
-          make, model, equipmentType, serialNumber,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      const nowIso = new Date().toISOString();
+      const wasEditing = !!editingId;
 
-      saveItems();
-      clearForm();
-      render();
+      // UI lock
+      const prevText = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = wasEditing ? 'Saving…' : 'Saving & Syncing…';
+
+      try {
+        if (wasEditing) {
+          const idx = items.findIndex(i => i.id === editingId);
+          if (idx !== -1) {
+            items[idx] = { ...items[idx], make, model, equipmentType, serialNumber, updatedAt: nowIso };
+          }
+          saveItems();
+          clearForm();
+          render();
+          return;
+        }
+
+        // NEW item: create local record first (fast)
+        const localId = crypto.randomUUID();
+        const newLocal = {
+          id: localId,
+          make, model, equipmentType, serialNumber,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        items.push(newLocal);
+        saveItems();
+        clearForm();
+        render();
+
+        // Then POST to API
+        try {
+          const apiJson = await postEquipmentItem(newLocal);
+
+          const serverList = normalizeServerEquipmentList(apiJson);
+          if (serverList) {
+            items = mergeById(items, serverList);
+            saveItems();
+            render();
+            return;
+          }
+
+          const serverItem = normalizeServerEquipmentItem(apiJson);
+          if (serverItem && serverItem.id) {
+            const localIdx = items.findIndex(i => i.id === localId);
+            if (localIdx !== -1) {
+              if (serverItem.id !== localId) {
+                const merged = { ...items[localIdx], ...serverItem };
+                items.splice(localIdx, 1);
+                items.push(merged);
+              } else {
+                items[localIdx] = { ...items[localIdx], ...serverItem };
+              }
+              saveItems();
+              render();
+            }
+          }
+        } catch (err) {
+          console.warn('Equipment POST failed; kept local copy:', err);
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = prevText;
+      }
     });
 
     cancelBtn.addEventListener('click', clearForm);
@@ -383,12 +479,14 @@
 
     async function fetchLatestFromApi() {
       try {
-        const res = await fetch('/api/equipment');
+        const res = await fetch(EQUIPMENT_API_URL);
         if (!res.ok) return;
         const data = await res.json();
         const serverItems = Array.isArray(data?.equipment) ? data.equipment : [];
         if (serverItems.length === 0) return;
-        items = serverItems;
+
+        // Merge instead of replacing (prevents wiping local-only items)
+        items = mergeById(items, serverItems);
         saveItems();
         render();
       } catch {
