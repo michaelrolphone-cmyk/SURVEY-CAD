@@ -243,6 +243,8 @@ export function createLineforgeCollabService() {
             x: Number(message.cursor.x) || 0,
             y: Number(message.cursor.y) || 0,
           },
+          crewMemberId: message.crewMemberId || null,
+          crewName: typeof message.crewName === 'string' ? message.crewName : null,
           at: Date.now(),
         }, clientId);
           continue;
