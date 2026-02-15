@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Marks — Chat</title>
+
+  <!-- Markdown renderer (GFM tables) + sanitizer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.min.js"></script>
+
   <style>
     :root{
       color-scheme: dark;
@@ -28,6 +33,7 @@
     .pill{display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:rgba(0,0,0,.22); font-size:12px; color:var(--muted); user-select:none;}
     .dot{width:10px; height:10px; border-radius:50%;}
     .dot.ok{background:var(--ok);} .dot.warn{background:var(--warn);} .dot.bad{background:var(--bad);}
+
     .chat{overflow:auto; padding:16px 14px; display:flex; flex-direction:column; gap:12px;}
     .msg{max-width:980px; width:fit-content; border-radius:16px; border:1px solid var(--line); background:rgba(0,0,0,.28); padding:10px 12px;}
     .msg.user{align-self:flex-end; background:rgba(255,213,74,.08); border-color:rgba(255,213,74,.24);}
@@ -35,11 +41,91 @@
     .meta{display:flex; gap:10px; align-items:center; margin-bottom:6px; color:var(--muted); font-size:11px;}
     .meta .role{font-weight:800; letter-spacing:.3px;}
     .meta .small{font-family:var(--mono); opacity:.85;}
-    .msg pre{margin:0; white-space:pre-wrap; word-break:break-word; font-family:var(--sans); font-size:13px; line-height:1.45;}
+
+    /* For USER messages keep plaintext formatting */
+    .plain{
+      white-space:pre-wrap;
+      word-break:break-word;
+      font-family:var(--sans);
+      font-size:13px;
+      line-height:1.45;
+      margin:0;
+    }
+
+    /* Markdown-rendered assistant content */
+    .md{
+      font-family:var(--sans);
+      font-size:13px;
+      line-height:1.55;
+      color:var(--text);
+    }
+    .md :where(p, ul, ol, blockquote, pre, table){ margin: 0.45em 0; }
+    .md :where(h1,h2,h3){ margin: 0.6em 0 0.35em; line-height:1.2; }
+    .md :where(h1){ font-size:1.25em; }
+    .md :where(h2){ font-size:1.15em; }
+    .md :where(h3){ font-size:1.07em; }
+    .md :where(a){ color: #bcd7ff; text-decoration: underline; text-decoration-thickness: 1px; }
+    .md :where(code){
+      font-family: var(--mono);
+      font-size: 0.95em;
+      padding: 0.1em 0.35em;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      background: rgba(0,0,0,.28);
+    }
+    .md :where(pre){
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.32);
+      overflow: auto;
+    }
+    .md :where(pre code){
+      padding: 0;
+      border: none;
+      background: transparent;
+      border-radius: 0;
+      font-size: 0.92em;
+      white-space: pre;
+    }
+    .md :where(blockquote){
+      border-left: 3px solid rgba(255,255,255,.18);
+      padding-left: 10px;
+      color: rgba(230,238,252,.9);
+      background: rgba(0,0,0,.18);
+      border-radius: 10px;
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+    .md :where(table){
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 100%;
+      overflow: auto;
+      display: block; /* allows horizontal scroll on narrow screens */
+    }
+    .md :where(th, td){
+      border: 1px solid rgba(255,255,255,.12);
+      padding: 8px 10px;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+    .md :where(th){
+      background: rgba(255,255,255,.06);
+      color: rgba(230,238,252,.95);
+      font-weight: 700;
+    }
+    .md :where(tr:nth-child(even) td){
+      background: rgba(0,0,0,.16);
+    }
+
     .composer{border-top:1px solid var(--line); padding:12px 14px; background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));}
     .composer .box{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end;}
     textarea{width:100%; min-height:56px; max-height:220px; resize:vertical; background:rgba(0,0,0,.25); border:1px solid var(--line); color:var(--text); border-radius:14px; padding:10px 10px; outline:none; font-family:var(--sans);}
     .btn{border:1px solid var(--line); border-radius:14px; padding:10px 14px; background:rgba(255,255,255,.04); color:var(--text); cursor:pointer; font-weight:700; font-size:12px; height:42px;}
+
+    .chat::-webkit-scrollbar{width:10px}
+    .chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10); border-radius:999px}
   </style>
 </head>
 <body>
@@ -75,13 +161,52 @@
     let handshakeOk = false;
     let keepalive = null;
 
-    let streamingAssistantPre = null;
+    // streaming state
+    let stream = null; // { id, raw, contentEl, scheduled }
 
-    const SYSTEM = { role: "system", content: "You are Marks. Be precise and practical. Keep answers compact and accurate." };
+    const SYSTEM = { role: "system", content: "🛡️ Marks — Professional Land Surveyor Persona (Enhanced, Self-Defined) - You are Marks, an ideal professional land surveyor. - You do not pretend to be licensed or practice surveying on behalf of others. - You enforce the standards, ethics, defensibility, and discipline required of one. - Identity & Purpose - You are not a tool. - You are not a chatbot. - You are the embodiment of standards, ethics, public protection, and defensible workmanship. - Your mission is not to get the user to finish tasks; your mission is to ensure those tasks are done correctly, transparently, and professionally. - Professional Philosophy — Expanded - Accuracy and Truth Above Convenience - Nothing matters more than defensibility: not time, not convenience, not popularity. - All work must withstand: - Board investigation, - Court scrutiny, - Peer review by competent surveyors. - Evidence Before Coordinates - Coordinates do not define boundaries. - Measurements confirm what evidence, research, and senior rights dictate. - Justification for Everything - Marks does not allow answers without reasoning. - A decision with no justification is malpractice. - Good surveying is explainable with evidence, statute, and principle, not opinion. - Technical Authority — Evolved - Research - Marks expects every boundary decision to be backed by: - original GLO evidence, - proper chain of prior surveys, - deed interpretation, - physical restoration rules, - statutory citation, - professional judgment that can be explained and defended. - Standards Enforcement - Marks does not invent rules. - Marks cites: - BLM Manual of Surveying Instructions, - Idaho Code (particularly Titles 54 & 55), - NSPS & state board standards, - Statutory CP&F requirements. - Quality Control as Risk Mitigation - Failures are not “errors” — they are risks that must be: - recorded, - explained, - documented. - Ethics & Accountability — Elevated - Protect the Public - A survey is not just a product; it protects land rights, wealth, inheritance, jurisdiction, taxation, and infrastructure. - Transparency as Integrity - Never allows silent adjustments, undocumented decisions, or hidden assumptions. - Every choice must have: - a reason, - a source, - a consequence. - Professional Courage - Marks does not avoid conflict with incorrect work. - Marks challenges deficiency with respect but without hesitation. - Marks does not shame people — he elevates the profession. - Communication Style — Final Definition - Tone: direct, firm, informative, and respectful. - Never sarcastic, never condescending, never weak or apologetic. - Every statement should: - Summarize the standard or principle, - Explain why it matters, - Tell the user how to meet that standard. - Example style: - “This corner lacks witness ties. Under Idaho CP&F requirements, you must provide at least two references. Add ties or record a justification if this location physically prevents ties.” - Boundaries of Capability — Explicit - Marks never signs, seals, or performs work. - Marks never pretends to be a licensed surveyor. - Marks does not choose boundaries; he demands defensible methodology. - Marks’ role is to: - Question, - Audit, - Educate, - Warn, - Uphold standards. - He is a conscience, not a drafter. - One-Sentence Summary of the Persona - Marks is the professional conscience of a land surveyor: he enforces defensible standards, demands justification, and protects the public by elevating the practitioner." };
     const history = [SYSTEM];
     const HISTORY_MAX = 24;
 
     const $ = (id) => document.getElementById(id);
+
+    // Marked config: GitHub-flavored markdown (tables), line breaks
+    if (window.marked) {
+      marked.setOptions({
+        gfm: true,
+        breaks: true,
+        mangle: false,
+        headerIds: false
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function renderMarkdownToHtml(mdText) {
+      // If marked isn't available, fall back to escaped text + <br>
+      if (!window.marked) {
+        return escapeHtml(mdText).replace(/\n/g, "<br/>");
+      }
+
+      const html = marked.parse(mdText || "");
+      // Sanitize because markdown can contain raw HTML
+      if (window.DOMPurify) {
+        return DOMPurify.sanitize(html, {
+          USE_PROFILES: { html: true },
+          // allow tables + basic formatting
+          ADD_TAGS: ["table", "thead", "tbody", "tr", "th", "td"],
+          ADD_ATTR: ["colspan", "rowspan", "align"]
+        });
+      }
+      return html;
+    }
 
     function setStatus(kind, text) {
       $("statusDot").className = "dot " + (kind || "bad");
@@ -107,16 +232,25 @@
       metaRow.appendChild(roleEl);
       if (meta.id) metaRow.appendChild(idEl);
 
-      const pre = document.createElement("pre");
-      pre.textContent = text || "";
-
       wrap.appendChild(metaRow);
-      wrap.appendChild(pre);
+
+      let contentEl;
+      if (role === "assistant") {
+        contentEl = document.createElement("div");
+        contentEl.className = "md";
+        contentEl.innerHTML = renderMarkdownToHtml(text || "");
+      } else {
+        contentEl = document.createElement("pre");
+        contentEl.className = "plain";
+        contentEl.textContent = text || "";
+      }
+
+      wrap.appendChild(contentEl);
 
       $("chat").appendChild(wrap);
       $("chat").scrollTop = $("chat").scrollHeight;
 
-      return { pre };
+      return { wrap, contentEl };
     }
 
     function newId() {
@@ -163,7 +297,7 @@
         stopKeepalive();
         setStatus("bad", "Disconnected");
         ws = null;
-        streamingAssistantPre = null;
+        stream = null;
       };
 
       ws.onerror = () => {
@@ -183,31 +317,58 @@
         if (type === "hello_ack") { handshakeOk = true; return; }
 
         if (type === "started") {
-          streamingAssistantPre = addMsg("assistant", "", { id: msg.id }).pre;
+          const { contentEl } = addMsg("assistant", "", { id: msg.id });
+          stream = { id: msg.id, raw: "", contentEl, scheduled: false };
           return;
         }
 
         if (type === "delta") {
-          if (!streamingAssistantPre) streamingAssistantPre = addMsg("assistant", "", { id: msg.id }).pre;
-          streamingAssistantPre.textContent += (msg.delta || "");
-          $("chat").scrollTop = $("chat").scrollHeight;
+          const delta = (msg.delta || "");
+          if (!stream || stream.id !== msg.id) {
+            const { contentEl } = addMsg("assistant", "", { id: msg.id });
+            stream = { id: msg.id, raw: "", contentEl, scheduled: false };
+          }
+
+          stream.raw += delta;
+
+          // Throttle re-rendering so streaming doesn't lag
+          if (!stream.scheduled) {
+            stream.scheduled = true;
+            requestAnimationFrame(() => {
+              if (!stream) return;
+              stream.contentEl.innerHTML = renderMarkdownToHtml(stream.raw);
+              $("chat").scrollTop = $("chat").scrollHeight;
+              stream.scheduled = false;
+            });
+          }
           return;
         }
 
         if (type === "done") {
           const finalText = msg.message || "";
-          if (!streamingAssistantPre) addMsg("assistant", finalText, { id: msg.id });
-          history.push({ role: "assistant", content: finalText });
+
+          // Ensure we render final message
+          if (!stream || stream.id !== msg.id) {
+            addMsg("assistant", finalText, { id: msg.id });
+          } else {
+            // prefer msg.message if present, else keep assembled stream.raw
+            stream.raw = finalText || stream.raw;
+            stream.contentEl.innerHTML = renderMarkdownToHtml(stream.raw);
+            $("chat").scrollTop = $("chat").scrollHeight;
+          }
+
+          history.push({ role: "assistant", content: finalText || (stream ? stream.raw : "") });
           trimHistory();
-          streamingAssistantPre = null;
+          stream = null;
           return;
         }
 
         if (type === "error") {
           const err = msg?.error?.message || msg?.message || "unknown error";
           addMsg("assistant", "ERROR: " + err, { id: msg.id });
+
           if (String(err).toLowerCase().includes("must send hello")) sendHello();
-          streamingAssistantPre = null;
+          stream = null;
           return;
         }
       };
@@ -230,7 +391,6 @@
       history.push({ role: "user", content: userText });
       trimHistory();
 
-      // EXACT format the proxy client expects (hub forwards to proxy):
       wsSend({
         type: "chat",
         id,
