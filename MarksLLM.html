@@ -8,7 +8,6 @@
     :root{
       color-scheme: dark;
       --bg:#070b12;
-      --panel:#0c1220;
       --text:#e6eefc;
       --muted:#9ab0d0;
       --line:rgba(255,255,255,.10);
@@ -21,7 +20,12 @@
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
     }
-    html,body{height:100%; margin:0; background:radial-gradient(1200px 700px at 30% 0%, #101c35 0%, var(--bg) 60%); color:var(--text); font-family:var(--sans);}
+    html,body{
+      height:100%; margin:0;
+      background:radial-gradient(1200px 700px at 30% 0%, #101c35 0%, var(--bg) 60%);
+      color:var(--text);
+      font-family:var(--sans);
+    }
     .app{display:grid; grid-template-rows:auto 1fr auto; height:100%;}
     .topbar{
       display:flex; align-items:center; justify-content:space-between;
@@ -41,6 +45,7 @@
     .brand .stack{display:flex; flex-direction:column; gap:2px; min-width:0;}
     .brand .stack b{font-size:13px;}
     .brand .stack span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
     .pill{
       display:inline-flex; align-items:center; gap:8px;
       padding:7px 10px;
@@ -50,6 +55,7 @@
       font-size:12px;
       color:var(--muted);
       flex:0 0 auto;
+      user-select:none;
     }
     .dot{width:10px; height:10px; border-radius:50%;}
     .dot.ok{background:var(--ok);}
@@ -133,7 +139,6 @@
     .chat::-webkit-scrollbar{width:10px}
     .chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10); border-radius:999px}
 
-    /* Small screens: keep topbar compact */
     @media (max-width: 520px){
       .brand .stack span{display:none;}
       .pill{padding:6px 9px;}
@@ -144,13 +149,15 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <img src="/assets/icons/MarksAI.png" alt="Marks" onerror="this.style.opacity=.4; this.title='Missing /assets/icons/MarksAI.png';" />
+        <img src="/assets/icons/MarksAI.png" alt="Marks"
+             onerror="this.style.opacity=.4; this.title='Missing /assets/icons/MarksAI.png';" />
         <div class="stack">
           <b>Marks</b>
           <span id="subtitle">LM socket proxy chat</span>
         </div>
       </div>
 
+      <!-- Only indicator kept -->
       <span class="pill" title="WebSocket connection status">
         <span class="dot bad" id="statusDot"></span>
         <span id="statusText">Disconnected</span>
@@ -168,13 +175,27 @@
   </div>
 
   <script>
-    // Hardwired per your request:
+    // Your WS endpoint:
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
+
+    // IMPORTANT: This client sends messages in the EXACT command format your
+    // lmstudio-proxy-client understands:
+    //   { type:"chat",   id:"...", body:{ model?, messages:[...], temperature?, max_tokens?, stream? } }
+    //   { type:"models", id:"..." }
+    //   { type:"cancel", id:"..." }
+    //
+    // It expects to receive:
+    //   started / delta / done / error / models / cancelled (and optionally ping/pong)
 
     let ws = null;
     let keepalive = null;
+
     let lastReqId = null;
-    let streamingAssistantEl = null;
+    let streamingAssistantPre = null;
+
+    // We keep a running conversation history (so this behaves like a real chat).
+    const SYSTEM_MESSAGE = { role: "system", content: "You are Marks. Be precise and practical. Keep answers compact and accurate." };
+    const history = [ SYSTEM_MESSAGE ];
 
     const $ = (id) => document.getElementById(id);
 
@@ -227,8 +248,9 @@
     function startKeepalive() {
       stopKeepalive();
       keepalive = setInterval(() => {
+        // Proxy client understands ping/pong (it will reply pong to ping).
         wsSend({ type: "ping", ts: Date.now() });
-      }, 20000);
+      }, 25_000);
     }
 
     function stopKeepalive() {
@@ -245,15 +267,13 @@
       ws.onopen = () => {
         setStatus("ok", "Connected");
         startKeepalive();
-        // harmless hello (ignored if server doesn't use it)
-        wsSend({ type: "hello", client_id: "marks-ui", role: "ui", ts: Date.now() });
       };
 
       ws.onclose = () => {
         stopKeepalive();
         setStatus("bad", "Disconnected");
         ws = null;
-        streamingAssistantEl = null;
+        streamingAssistantPre = null;
       };
 
       ws.onerror = () => {
@@ -264,41 +284,69 @@
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
 
-        // respond to app-level ping/pong if your server uses it
-        if (msg.type === "ping") { wsSend({ type: "pong", ts: Date.now() }); return; }
-        if (msg.type === "server_hello") { wsSend({ type: "hello", client_id: "marks-ui", role: "ui", ts: Date.now() }); return; }
+        const type = String(msg?.type || "");
 
-        if (msg.type === "started") {
+        // Keep the proxy client happy if pings are forwarded both ways.
+        if (type === "ping") { wsSend({ type: "pong", ts: Date.now() }); return; }
+        if (type === "pong") { return; }
+
+        // Proxy client emits hello on connect to the server; if your server forwards it to the browser, ignore.
+        if (type === "hello" || type === "hello_ack") return;
+
+        if (type === "started") {
+          // Create the assistant bubble that we'll stream into.
           const { pre } = addMsg("assistant", "", { id: msg.id });
-          streamingAssistantEl = pre;
+          streamingAssistantPre = pre;
           return;
         }
 
-        if (msg.type === "delta") {
-          if (!streamingAssistantEl) {
+        if (type === "delta") {
+          if (!streamingAssistantPre) {
             const { pre } = addMsg("assistant", "", { id: msg.id });
-            streamingAssistantEl = pre;
+            streamingAssistantPre = pre;
           }
-          streamingAssistantEl.textContent += (msg.delta || "");
+          streamingAssistantPre.textContent += (msg.delta || "");
           $("chat").scrollTop = $("chat").scrollHeight;
           return;
         }
 
-        if (msg.type === "done") {
-          if (!streamingAssistantEl) {
-            addMsg("assistant", msg.message || "", { id: msg.id });
-          } else if ((msg.message || "").length && streamingAssistantEl.textContent.trim().length === 0) {
-            streamingAssistantEl.textContent = msg.message;
+        if (type === "done") {
+          const finalText = (msg.message || "");
+
+          if (!streamingAssistantPre) {
+            addMsg("assistant", finalText, { id: msg.id });
+          } else if (finalText && streamingAssistantPre.textContent.trim().length === 0) {
+            // if server didn't stream but sent done
+            streamingAssistantPre.textContent = finalText;
           }
-          streamingAssistantEl = null;
+
+          // Persist assistant reply into history for multi-turn chat.
+          history.push({ role: "assistant", content: finalText });
+
+          streamingAssistantPre = null;
           return;
         }
 
-        if (msg.type === "error") {
-          addMsg("assistant", "ERROR: " + (msg.error?.message || msg.message || "unknown error"), { id: msg.id });
-          streamingAssistantEl = null;
+        if (type === "error") {
+          const errText = msg?.error?.message || msg?.message || "unknown error";
+          addMsg("assistant", "ERROR: " + errText, { id: msg.id });
+          streamingAssistantPre = null;
           return;
         }
+
+        // Optional: models response (if you ever send {type:"models"})
+        if (type === "models") {
+          const ok = msg.ok !== false;
+          const models =
+            Array.isArray(msg?.data?.data) ? msg.data.data.map(x => x.id).filter(Boolean) :
+            Array.isArray(msg?.models) ? msg.models :
+            [];
+          addMsg("assistant", ok ? ("Models:\n" + models.join("\n")) : ("Models error: " + (msg?.error?.message || "unknown")), { id: msg.id });
+          return;
+        }
+
+        // Optional: cancelled acknowledgement
+        if (type === "cancelled") return;
       };
     }
 
@@ -313,13 +361,14 @@
 
       addMsg("user", userText, { id });
 
-      // Minimal payload: server should forward to LM Studio proxy.
-      // If your server requires a different shape, adjust here.
+      // Persist user message into history
+      history.push({ role: "user", content: userText });
+
+      // Build body exactly as proxy expects.
+      // No UI settings: hard-coded defaults here.
       const body = {
-        messages: [
-          { role: "system", content: "You are Marks. Be precise and practical. Keep answers compact and accurate." },
-          { role: "user", content: userText }
-        ],
+        // model: omitted => LM Studio server default (proxy will pass it through)
+        messages: history.slice(), // include system + conversation history
         temperature: 0.2,
         max_tokens: 600,
         stream: true
