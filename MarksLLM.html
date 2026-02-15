@@ -490,6 +490,10 @@
     };
     const PERSONA_STORAGE_KEY = "marks.persona.key";
 
+    // Base instructions (injected BEFORE persona prompt for all personas)
+    const BASE_INSTRUCTIONS_URL = "/config/base-instructions.json";
+    let BASE_INSTRUCTIONS = "";
+
     // ---- Deep-link Quick Q&A ----
     const DEEPLINK_HASH = "#deeplink";
     const DEEPLINK_Q_KEY = "marks.deeplink.question";
@@ -580,7 +584,6 @@
       }
     }
 
-    // Replace ```...``` SVG code blocks with rendered SVG inline
     function inlineSvgsFromCodeBlocks(containerEl) {
       if (!containerEl) return;
 
@@ -610,7 +613,6 @@
       let html = marked.parse(mdText || "");
       html = wrapTables(html);
 
-      // Allow *raw* SVG in assistant markdown too (DOMPurify still sanitizes hard).
       if (window.DOMPurify) {
         return DOMPurify.sanitize(html, {
           USE_PROFILES: { html: true, svg: true, svgFilters: true },
@@ -631,10 +633,7 @@
             "clip-path","mask","filter","patternUnits","patternTransform",
             "marker-start","marker-mid","marker-end"
           ],
-          ADD_TAGS_FOR: ["svg"],
-          FORBID_TAGS: ["script","foreignObject"],
-          ADD_TAGS_FORCE_BODY: false,
-          ADD_TAGS_FORCE_HEAD: false
+          FORBID_TAGS: ["script","foreignObject"]
         });
       }
 
@@ -663,6 +662,7 @@
       if (n.endsWith(".js")) return "JS";
       if (n.endsWith(".ts")) return "TS";
       if (n.endsWith(".py")) return "PY";
+      if (n.endsWith(".svg")) return "SVG";
       return "TXT";
     }
 
@@ -920,14 +920,52 @@
       return JSON.stringify(json, null, 2);
     }
 
+    async function fetchJsonOrText(url) {
+      const resp = await fetch(url, { cache: "no-store" });
+      if (!resp.ok) throw new Error(`fetch failed: ${resp.status} ${resp.statusText}`);
+
+      const raw = await resp.text();
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return raw; // allow plain-text fallback
+      }
+    }
+
+    async function loadBaseInstructions() {
+      try {
+        const data = await fetchJsonOrText(BASE_INSTRUCTIONS_URL);
+        BASE_INSTRUCTIONS = extractSystemPrompt(data);
+        return true;
+      } catch (e) {
+        BASE_INSTRUCTIONS = "";
+        showAssistantErrorInline("base", `base-instructions load failed — ${e?.message || String(e)}`);
+        return false;
+      }
+    }
+
+    function combineSystemPrompt(baseText, personaText) {
+      const a = String(baseText || "").trim();
+      const b = String(personaText || "").trim();
+      if (a && b) return `${a}\n\n${b}`;
+      return (a || b || "").trim();
+    }
+
     async function loadPersona(key) {
       const p = PERSONAS[key] || PERSONAS.field;
       setUiBusy(true, `Loading: ${p.label}…`);
       try {
+        // Ensure base instructions are loaded (injected before persona)
+        if (!BASE_INSTRUCTIONS || !String(BASE_INSTRUCTIONS).trim()) {
+          await loadBaseInstructions(); // errors are already surfaced inline
+        }
+
         const resp = await fetch(p.url, { cache: "no-store" });
         if (!resp.ok) throw new Error(`persona fetch failed: ${resp.status} ${resp.statusText}`);
         const json = await resp.json();
-        SYSTEM.content = extractSystemPrompt(json);
+        const personaPrompt = extractSystemPrompt(json);
+
+        SYSTEM.content = combineSystemPrompt(BASE_INSTRUCTIONS, personaPrompt);
 
         history.length = 0;
         history.push(SYSTEM);
@@ -1009,7 +1047,6 @@
               inflight.contentEl.style.display = "";
               inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
 
-              // Only attempt inline SVG once we have a complete closing tag to avoid thrash during streaming
               if (inflight.raw.includes("</svg>")) {
                 inlineSvgsFromCodeBlocks(inflight.contentEl);
               }
@@ -1207,7 +1244,10 @@
       const key = (saved && PERSONAS[saved]) ? saved : "field";
       $("personaSelect").value = key;
 
+      // Load base first (then persona will combine base + persona into SYSTEM)
+      await loadBaseInstructions();
       await loadPersona(key);
+
       connect();
 
       maybeTryDeepLinkSend();
