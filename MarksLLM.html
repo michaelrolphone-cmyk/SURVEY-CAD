@@ -21,16 +21,32 @@
       --bad:#ff5b5b;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+
+      --accent: rgba(255,213,74,.55);
+      --accentBg: rgba(255,213,74,.10);
     }
+
+    *{box-sizing:border-box}
     html,body{height:100%; margin:0; background:radial-gradient(1200px 700px at 30% 0%, #101c35 0%, var(--bg) 60%); color:var(--text); font-family:var(--sans);}
     .app{display:grid; grid-template-rows:auto 1fr auto; height:100%;}
-    .topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line); background:linear-gradient(180deg, rgba(0,0,0,.35), transparent); gap:12px;}
+
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px; border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(0,0,0,.35), transparent);
+      gap:12px;
+    }
     .brand{display:flex; gap:10px; align-items:center; min-width:0;}
     .brand img{width:34px; height:34px; border-radius:12px; object-fit:cover; border:1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.25); flex:0 0 auto;}
     .brand .stack{display:flex; flex-direction:column; gap:2px; min-width:0;}
     .brand .stack b{font-size:13px;}
     .brand .stack span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-    .pill{display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:rgba(0,0,0,.22); font-size:12px; color:var(--muted); user-select:none;}
+
+    .pill{
+      display:inline-flex; align-items:center; gap:8px; padding:7px 10px;
+      border-radius:999px; border:1px solid var(--line); background:rgba(0,0,0,.22);
+      font-size:12px; color:var(--muted); user-select:none;
+    }
     .dot{width:10px; height:10px; border-radius:50%;}
     .dot.ok{background:var(--ok);} .dot.warn{background:var(--warn);} .dot.bad{background:var(--bad);}
 
@@ -38,7 +54,6 @@
     .msg{max-width:980px; width:fit-content; border-radius:16px; border:1px solid var(--line); background:rgba(0,0,0,.28); padding:10px 12px;}
     .msg.user{align-self:flex-end; background:rgba(255,213,74,.08); border-color:rgba(255,213,74,.24);}
     .msg.assistant{align-self:flex-start;}
-
     .meta{display:flex; gap:10px; align-items:center; margin-bottom:6px; color:var(--muted); font-size:11px;}
     .meta .role{font-weight:800; letter-spacing:.2px;}
 
@@ -136,6 +151,23 @@
       background: rgba(0,0,0,.12);
     }
 
+    /* Inline SVG frame (when SVG came from a markdown code block) */
+    .svgFrame{
+      margin-top: 8px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      background: rgba(0,0,0,.22);
+      padding: 10px 12px;
+      overflow: auto;
+      max-width: 100%;
+    }
+    .svgFrame svg,
+    .md svg{
+      display:block;
+      max-width:100%;
+      height:auto;
+    }
+
     .composer{
       border-top:1px solid var(--line);
       padding:12px 14px;
@@ -201,12 +233,85 @@
       max-width: 45vw;
     }
 
-    /* Composer row */
+    /* Attachments bar */
+    .attachBar{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin: 0 0 10px;
+      min-height: 0;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.22);
+      color: rgba(230,238,252,.92);
+      max-width: 100%;
+    }
+    .chip .fileIcon{
+      width:18px; height:18px;
+      border-radius: 6px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      font-size: 11px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+    .chip .name{
+      font-size: 12px;
+      color: rgba(230,238,252,.92);
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: min(55vw, 520px);
+    }
+    .chip .x{
+      border:0;
+      background: transparent;
+      color: rgba(230,238,252,.7);
+      cursor:pointer;
+      font-weight: 900;
+      padding: 0 2px;
+      line-height: 1;
+      font-size: 14px;
+    }
+    .chip .x:hover{ color: rgba(230,238,252,.95); }
+    .chip small{
+      color: rgba(154,176,208,.85);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
     .composer .box{
       display:flex;
       gap:10px;
       align-items:flex-end;
     }
+
+    .attachBtn{
+      flex:0 0 auto;
+      width:42px;
+      height:42px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: rgba(230,238,252,.92);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      font-size: 18px;
+      font-weight: 900;
+      user-select:none;
+      box-sizing:border-box;
+    }
+    .attachBtn:hover{ background: rgba(255,255,255,.06); }
+    .attachBtn[disabled]{opacity:.55; cursor:not-allowed;}
+
     textarea{
       flex:1 1 auto;
       min-width:0;
@@ -223,6 +328,14 @@
       box-sizing:border-box;
     }
     textarea:focus{border-color: rgba(255,213,74,.55); box-shadow:0 0 0 3px rgba(255,213,74,.12);}
+
+    /* Drop highlight */
+    .dropActive{
+      border-color: var(--accent) !important;
+      box-shadow: 0 0 0 3px rgba(255,213,74,.16) !important;
+      background: linear-gradient(180deg, rgba(255,213,74,.06), rgba(0,0,0,.25));
+    }
+
     .btn{
       flex:0 0 auto;
       border:1px solid var(--line);
@@ -239,128 +352,19 @@
     }
     .btn[disabled]{opacity:.55; cursor:not-allowed;}
 
-    /* Attachments UI */
-    .iconBtn{
-      width:42px;
-      height:42px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      cursor:pointer;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      flex:0 0 auto;
-      box-sizing:border-box;
-    }
-    .iconBtn:hover{ background:rgba(255,255,255,.06); }
-    .iconBtn svg{ width:18px; height:18px; fill: currentColor; }
-
-    .attachmentsBar{
-      display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      margin: 0 0 10px;
-      padding: 2px 0;
-    }
-    .fileChip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.18);
-      max-width: 100%;
-    }
-    .fileChip .ext{
-      font-weight:900;
-      font-size:10px;
-      letter-spacing:.08em;
-      padding:3px 8px;
-      border-radius:999px;
-      background: rgba(255,213,74,.10);
-      border: 1px solid rgba(255,213,74,.24);
-      flex:0 0 auto;
-      color: rgba(230,238,252,.95);
-    }
-    .fileChip .name{
-      font-size:12px;
-      color: rgba(230,238,252,.92);
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-      max-width: min(60vw, 520px);
-    }
-    .fileChip .rm{
-      border:0;
-      background:transparent;
-      color: rgba(154,176,208,.85);
-      cursor:pointer;
-      padding:2px 6px;
-      border-radius:10px;
-      font-size:14px;
-      line-height:1;
-      flex:0 0 auto;
-    }
-    .fileChip .rm:hover{
-      color: rgba(230,238,252,1);
-      background: rgba(255,255,255,.06);
-    }
-
-    .composerError{
-      margin-top:10px;
-      padding:10px 12px;
-      border-radius:14px;
-      border: 1px solid rgba(239,68,68,.45);
-      background: rgba(127,29,29,.20);
-      color: rgba(254,202,202,.95);
-      font-size:12px;
-      line-height:1.35;
-    }
-
-    /* Attachments in user messages (chips only, no remove) */
-    .msgAttRow{
-      display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      margin: 2px 0 8px;
-      padding: 0;
-    }
-    .msgAttRow .fileChip{ background: rgba(0,0,0,.14); }
-    .msgAttRow .fileChip .rm{ display:none; }
-
-    /* Drag/drop overlay */
-    .dropOverlay{
-      position: fixed;
-      inset: 0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background: rgba(2,6,23,.68);
-      backdrop-filter: blur(4px);
-      z-index: 9999;
-      color: rgba(230,238,252,.95);
-      font-weight: 900;
-      letter-spacing:.05em;
-      text-align:center;
-      padding: 24px;
-    }
-    .dropOverlay.hidden{ display:none; }
-
     @media (max-width: 520px){
       .personaSelect{min-width: 160px;}
       .personaHint{display:none;}
-      .fileChip .name{ max-width: 70vw; }
+      .chip .name{max-width: 58vw;}
     }
     @media (max-width: 420px){
       .composer .box{flex-direction:column; align-items:stretch;}
       .btn{width:100%;}
-      .iconBtn{ width:100%; height:44px; border-radius:14px; }
+      .attachBtn{width:100%;}
       .personaRow{flex-direction:column; align-items:stretch;}
       .personaRow .left{justify-content:space-between;}
       .personaSelect{max-width:100%; width:100%;}
+      .chip .name{max-width: 72vw;}
     }
 
     /* Thinking indicator */
@@ -393,6 +397,42 @@
       40% { transform: translateY(-5px); opacity:1; }
     }
 
+    /* Message attachment chips (inside chat bubble) */
+    .msgAttachRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top: 8px;
+    }
+    .msgChip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      color: rgba(230,238,252,.92);
+      max-width: 100%;
+    }
+    .msgChip .fileIcon{
+      width:18px; height:18px;
+      border-radius: 6px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      font-size: 11px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+    .msgChip .name{
+      font-size: 12px;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: min(55vw, 520px);
+    }
+
     .chat::-webkit-scrollbar{width:10px}
     .chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10); border-radius:999px}
   </style>
@@ -415,7 +455,7 @@
 
     <main class="chat" id="chat"></main>
 
-    <footer class="composer">
+    <footer class="composer" id="composer">
       <div class="personaRow">
         <div class="left">
           <span class="personaLabel">Persona</span>
@@ -429,26 +469,17 @@
         <div class="personaHint" id="personaHint">Loading…</div>
       </div>
 
-      <!-- Attachments chips (composer) -->
-      <div class="attachmentsBar" id="attachmentsBar" hidden></div>
+      <div class="attachBar" id="attachBar" aria-label="Attachments"></div>
 
       <div class="box">
-        <button class="iconBtn" id="btnAttach" type="button" title="Attach a text file" aria-label="Attach a text file">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M11 5h2v14h-2zM5 11h14v2H5z"></path>
-          </svg>
-        </button>
-        <input id="fileInput" type="file" multiple hidden />
+        <button class="attachBtn" id="btnAttach" type="button" title="Attach text file" aria-label="Attach file">+</button>
+        <input id="fileInput" type="file" multiple hidden
+               accept=".txt,.csv,.tsv,.json,.geojson,.xml,.html,.md,.log,.yaml,.yml,.js,.ts,.css,.py,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.rb,.php,.sql,.ini,.cfg,.toml,.properties,application/json,text/*" />
         <textarea id="input" placeholder="Message Marks… (Shift+Enter for newline)"></textarea>
         <button class="btn" id="btnSend">Send</button>
       </div>
-
-      <div class="composerError" id="composerError" hidden></div>
     </footer>
   </div>
-
-  <!-- Drag/drop overlay -->
-  <div class="dropOverlay hidden" id="dropOverlay">Drop text files to attach</div>
 
   <script>
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
@@ -460,20 +491,36 @@
     const PERSONA_STORAGE_KEY = "marks.persona.key";
 
     // ---- Deep-link Quick Q&A ----
-    // Launcher writes the question here, then opens this page with "#deeplink"
     const DEEPLINK_HASH = "#deeplink";
     const DEEPLINK_Q_KEY = "marks.deeplink.question";
-    const DEEPLINK_AUTOSEND = true; // set false if you want prefill only (no auto-send)
+    const DEEPLINK_AUTOSEND = true;
+
+    // ---- Attachments ----
+    const MAX_ATTACH_BYTES = 750_000; // per file
+    const MAX_ATTACH_FILES = 8;
+
+    const ATTACH_ONLY_PROMPT_HELPER = "Analyze the attached file(s) and respond with a clear, practical answer.";
+
+    // Injection wrapper format
+    function wrapAttachmentForInjection(fileMeta, index1) {
+      const name = fileMeta.name || `attachment-${index1}`;
+      const bytes = Number.isFinite(fileMeta.size) ? fileMeta.size : 0;
+      const mime = fileMeta.type || "text/plain";
+      const header = `=== BEGIN ATTACHMENT ${index1}: ${name} (${bytes} bytes, ${mime}) ===`;
+      const footer = `=== END ATTACHMENT ${index1}: ${name} ===`;
+      return `${header}\n${fileMeta.text}\n${footer}`;
+    }
+
+    // Keep in-memory only
+    let attachments = []; // [{aid,name,size,type,text}]
 
     let pendingDeepLinkQuestion = null;
 
     function readDeepLinkQuestionIfAny() {
-      // Only honor/clear the question if the URL hash is exactly "#deeplink"
       if (location.hash !== DEEPLINK_HASH) return null;
 
       const q = localStorage.getItem(DEEPLINK_Q_KEY);
       if (q && String(q).trim()) {
-        // Requirement: clear from localStorage once read, only under #deeplink
         localStorage.removeItem(DEEPLINK_Q_KEY);
         return String(q).trim();
       }
@@ -514,17 +561,83 @@
       });
     }
 
+    // --- SVG inline rendering (from markdown code blocks) ---
+    function looksLikeSvg(text) {
+      const t = String(text || "").trim();
+      return t.startsWith("<svg") && t.includes("</svg>");
+    }
+
+    function sanitizeSvgToFragment(svgText) {
+      if (!window.DOMPurify) return null;
+      try {
+        return DOMPurify.sanitize(String(svgText || ""), {
+          USE_PROFILES: { svg: true, svgFilters: true },
+          RETURN_DOM_FRAGMENT: true,
+          FORBID_TAGS: ["script","foreignObject"]
+        });
+      } catch {
+        return null;
+      }
+    }
+
+    // Replace ```...``` SVG code blocks with rendered SVG inline
+    function inlineSvgsFromCodeBlocks(containerEl) {
+      if (!containerEl) return;
+
+      const codeEls = containerEl.querySelectorAll("pre > code");
+      codeEls.forEach((code) => {
+        const svgText = code.textContent || "";
+        if (!looksLikeSvg(svgText)) return;
+
+        const pre = code.closest("pre");
+        if (!pre) return;
+
+        const frag = sanitizeSvgToFragment(svgText);
+        if (!frag) return;
+
+        const frame = document.createElement("div");
+        frame.className = "svgFrame";
+        frame.appendChild(frag);
+
+        pre.replaceWith(frame);
+      });
+    }
+    // -----------------------------------------------
+
     function renderMarkdownToHtml(mdText) {
       if (!window.marked) return escapeHtml(mdText).replace(/\n/g, "<br/>");
+
       let html = marked.parse(mdText || "");
       html = wrapTables(html);
+
+      // Allow *raw* SVG in assistant markdown too (DOMPurify still sanitizes hard).
       if (window.DOMPurify) {
         return DOMPurify.sanitize(html, {
-          USE_PROFILES: { html: true },
-          ADD_TAGS: ["table","thead","tbody","tr","th","td","div"],
-          ADD_ATTR: ["colspan","rowspan","align","class"]
+          USE_PROFILES: { html: true, svg: true, svgFilters: true },
+          ADD_TAGS: [
+            "svg","g","path","circle","rect","line","polyline","polygon","ellipse",
+            "text","tspan","defs","linearGradient","radialGradient","stop","clipPath","mask",
+            "pattern","filter","feGaussianBlur","feOffset","feColorMatrix","feBlend",
+            "feComponentTransfer","feFuncR","feFuncG","feFuncB","feFuncA","feMerge","feMergeNode",
+            "symbol","use","marker","title","desc","image"
+          ],
+          ADD_ATTR: [
+            "viewBox","xmlns","preserveAspectRatio","width","height","x","y","cx","cy","r","rx","ry",
+            "d","points","fill","stroke","stroke-width","stroke-linecap","stroke-linejoin","stroke-dasharray",
+            "stroke-dashoffset","opacity","transform","class","id","style",
+            "font-size","font-family","text-anchor","dominant-baseline",
+            "href","xlink:href",
+            "gradientUnits","gradientTransform","offset","stop-color","stop-opacity",
+            "clip-path","mask","filter","patternUnits","patternTransform",
+            "marker-start","marker-mid","marker-end"
+          ],
+          ADD_TAGS_FOR: ["svg"],
+          FORBID_TAGS: ["script","foreignObject"],
+          ADD_TAGS_FORCE_BODY: false,
+          ADD_TAGS_FORCE_HEAD: false
         });
       }
+
       return html;
     }
 
@@ -538,236 +651,134 @@
       $("chat").scrollTop = $("chat").scrollHeight;
     }
 
-    // ---------- Attachments (text files) ----------
-    const attachmentsBar = $("attachmentsBar");
-    const composerError = $("composerError");
-    const btnAttach = $("btnAttach");
-    const fileInput = $("fileInput");
-    const dropOverlay = $("dropOverlay");
-
-    const ATTACH_MAX_FILE_BYTES = 256 * 1024;   // 256KB per file
-    const ATTACH_MAX_TOTAL_BYTES = 512 * 1024;  // 512KB total
-    const ATTACH_ALLOWED_EXT = new Set([
-      "txt","md","csv","json","geojson","xml","yaml","yml","log","wkt","kml","gpx","prj","tfw","fld","rw5"
-    ]);
-
-    let attached = []; // [{id, file, name, ext, type, size}]
-
-    function showComposerError(msg) {
-      const t = String(msg || "").trim();
-      if (!t) {
-        composerError.hidden = true;
-        composerError.textContent = "";
-        return;
-      }
-      composerError.hidden = false;
-      composerError.textContent = t;
+    function fileKindLabel(name = "") {
+      const n = String(name).toLowerCase();
+      if (n.endsWith(".csv") || n.endsWith(".tsv")) return "CSV";
+      if (n.endsWith(".json") || n.endsWith(".geojson")) return "JSON";
+      if (n.endsWith(".xml")) return "XML";
+      if (n.endsWith(".md")) return "MD";
+      if (n.endsWith(".sql")) return "SQL";
+      if (n.endsWith(".txt") || n.endsWith(".log")) return "TXT";
+      if (n.endsWith(".yaml") || n.endsWith(".yml")) return "YML";
+      if (n.endsWith(".js")) return "JS";
+      if (n.endsWith(".ts")) return "TS";
+      if (n.endsWith(".py")) return "PY";
+      return "TXT";
     }
 
-    function fileExt(name="") {
-      const m = String(name).toLowerCase().match(/\.([a-z0-9]{1,12})$/);
-      return m ? m[1] : "";
+    function formatBytes(n) {
+      const v = Number(n) || 0;
+      if (v < 1024) return `${v}B`;
+      if (v < 1024*1024) return `${(v/1024).toFixed(1)}KB`;
+      return `${(v/(1024*1024)).toFixed(2)}MB`;
     }
 
-    function isLikelyTextFile(file) {
-      const ext = fileExt(file?.name || "");
-      if (ATTACH_ALLOWED_EXT.has(ext)) return true;
+    function renderAttachBar() {
+      const bar = $("attachBar");
+      bar.innerHTML = "";
+      if (!attachments.length) return;
+
+      attachments.forEach((a) => {
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.title = `${a.name} (${formatBytes(a.size)})`;
+
+        const icon = document.createElement("span");
+        icon.className = "fileIcon";
+        icon.textContent = fileKindLabel(a.name);
+
+        const name = document.createElement("span");
+        name.className = "name";
+        name.textContent = a.name;
+
+        const size = document.createElement("small");
+        size.textContent = formatBytes(a.size);
+
+        const x = document.createElement("button");
+        x.className = "x";
+        x.type = "button";
+        x.title = "Remove";
+        x.textContent = "×";
+        x.addEventListener("click", () => {
+          attachments = attachments.filter((it) => it.aid !== a.aid);
+          renderAttachBar();
+        });
+
+        chip.appendChild(icon);
+        chip.appendChild(name);
+        chip.appendChild(size);
+        chip.appendChild(x);
+        bar.appendChild(chip);
+      });
+    }
+
+    function normalizeNewlines(s) {
+      return String(s || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    }
+
+    function isTextLikeFile(file) {
       const type = String(file?.type || "").toLowerCase();
+      const name = String(file?.name || "").toLowerCase();
+
       if (type.startsWith("text/")) return true;
-      if (type === "application/json" || type === "application/xml" || type.endsWith("+xml")) return true;
-      if (type === "application/x-yaml" || type === "text/yaml") return true;
-      return false;
+      if (["application/json","application/xml","application/x-yaml","application/yaml","application/javascript"].includes(type)) return true;
+
+      const okExt = [
+        ".txt",".csv",".tsv",".json",".geojson",".xml",".html",".md",".log",".yaml",".yml",
+        ".js",".ts",".css",".py",".java",".c",".cpp",".h",".hpp",".cs",".go",".rs",".rb",".php",
+        ".sql",".ini",".cfg",".toml",".properties",".svg"
+      ];
+      return okExt.some(ext => name.endsWith(ext));
     }
 
-    function totalBytes(list) {
-      return list.reduce((sum, a) => sum + (Number(a.size) || 0), 0);
-    }
-
-    function renderFileChip(meta, { removable = false, onRemove = null } = {}) {
-      const chip = document.createElement("div");
-      chip.className = "fileChip";
-
-      const ext = document.createElement("span");
-      ext.className = "ext";
-      ext.textContent = (meta.ext || "FILE").toUpperCase();
-
-      const name = document.createElement("span");
-      name.className = "name";
-      name.textContent = meta.name || "attachment";
-      name.title = `${meta.name || "attachment"} • ${Math.round((meta.size || 0)/1024)} KB`;
-
-      chip.appendChild(ext);
-      chip.appendChild(name);
-
-      if (removable) {
-        const rm = document.createElement("button");
-        rm.className = "rm";
-        rm.type = "button";
-        rm.title = "Remove";
-        rm.textContent = "×";
-        rm.addEventListener("click", () => onRemove && onRemove());
-        chip.appendChild(rm);
-      } else {
-        const rm = document.createElement("span");
-        rm.className = "rm";
-        rm.textContent = ""; // hidden via CSS in message row
-        chip.appendChild(rm);
-      }
-
-      return chip;
-    }
-
-    function renderAttachmentsBar() {
-      attachmentsBar.innerHTML = "";
-      if (!attached.length) {
-        attachmentsBar.hidden = true;
-        return;
-      }
-      attachmentsBar.hidden = false;
-
-      for (const a of attached) {
-        const chip = renderFileChip(
-          { name: a.name, ext: a.ext, size: a.size, type: a.type },
-          {
-            removable: true,
-            onRemove: () => {
-              attached = attached.filter(x => x.id !== a.id);
-              renderAttachmentsBar();
-              if (!attached.length) showComposerError("");
-            }
-          }
-        );
-        attachmentsBar.appendChild(chip);
-      }
-    }
-
-    function addFiles(fileList) {
+    async function addFiles(fileList) {
       const files = Array.from(fileList || []);
       if (!files.length) return;
-      showComposerError("");
+
+      if (attachments.length >= MAX_ATTACH_FILES) {
+        showAssistantErrorInline("attach", `Too many attachments (max ${MAX_ATTACH_FILES}). Remove some first.`);
+        return;
+      }
 
       for (const f of files) {
-        if (!isLikelyTextFile(f)) {
-          showComposerError(`Skipped "${f.name}" (not recognized as a text file).`);
+        if (attachments.length >= MAX_ATTACH_FILES) break;
+
+        if (!isTextLikeFile(f)) {
+          showAssistantErrorInline("attach", `Skipping non-text file: ${f.name}`);
           continue;
         }
-        if ((f.size || 0) > ATTACH_MAX_FILE_BYTES) {
-          showComposerError(`"${f.name}" is too large (${Math.round(f.size/1024)} KB). Max per file is ${Math.round(ATTACH_MAX_FILE_BYTES/1024)} KB.`);
-          continue;
-        }
-
-        const next = {
-          id: `att-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          file: f,
-          name: f.name,
-          ext: fileExt(f.name),
-          type: f.type || "",
-          size: f.size || 0
-        };
-
-        const candidate = [...attached, next];
-        if (totalBytes(candidate) > ATTACH_MAX_TOTAL_BYTES) {
-          showComposerError(`Total attachments exceed ${Math.round(ATTACH_MAX_TOTAL_BYTES/1024)} KB. Remove a file or attach fewer.`);
+        if ((f.size || 0) > MAX_ATTACH_BYTES) {
+          showAssistantErrorInline("attach", `File too large (max ${formatBytes(MAX_ATTACH_BYTES)}): ${f.name} (${formatBytes(f.size)})`);
           continue;
         }
 
-        attached.push(next);
-      }
-
-      renderAttachmentsBar();
-    }
-
-    btnAttach.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", () => {
-      if (fileInput.files && fileInput.files.length) addFiles(fileInput.files);
-      fileInput.value = "";
-    });
-
-    // Drag/drop overlay
-    let dragDepth = 0;
-    function showDropOverlay(show) {
-      dropOverlay.classList.toggle("hidden", !show);
-    }
-    window.addEventListener("dragenter", (e) => {
-      if (!e.dataTransfer) return;
-      dragDepth++;
-      showDropOverlay(true);
-    });
-    window.addEventListener("dragleave", () => {
-      dragDepth = Math.max(0, dragDepth - 1);
-      if (dragDepth === 0) showDropOverlay(false);
-    });
-    window.addEventListener("dragover", (e) => {
-      e.preventDefault();
-    });
-    window.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dragDepth = 0;
-      showDropOverlay(false);
-      const files = e.dataTransfer?.files;
-      if (files && files.length) addFiles(files);
-    });
-
-    function longestBacktickRun(s) {
-      let max = 0, cur = 0;
-      for (const ch of String(s || "")) {
-        if (ch === "`") { cur++; max = Math.max(max, cur); }
-        else cur = 0;
-      }
-      return max;
-    }
-    function fenceFor(text) {
-      const n = Math.max(3, longestBacktickRun(text) + 1);
-      return "`".repeat(n);
-    }
-    function langForExt(ext) {
-      const e = (ext || "").toLowerCase();
-      if (e === "csv") return "csv";
-      if (e === "json" || e === "geojson") return "json";
-      if (e === "xml") return "xml";
-      if (e === "yaml" || e === "yml") return "yaml";
-      if (e === "md") return "markdown";
-      if (e === "wkt") return "wkt";
-      if (e === "fld") return "";
-      return "";
-    }
-
-    function snapshotAttachmentMeta(list) {
-      return (list || []).map(a => ({
-        name: a.name,
-        ext: a.ext,
-        size: a.size,
-        type: a.type
-      }));
-    }
-
-    async function buildAttachmentInjection(list) {
-      const files = list || [];
-      if (!files.length) return "";
-
-      const blocks = [];
-      blocks.push("\n\n---\nAttached files (inline text):\n");
-
-      for (const a of files) {
-        let raw = "";
         try {
-          raw = await a.file.text();
+          const text = normalizeNewlines(await f.text());
+          const aid = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("a-" + Math.random().toString(16).slice(2));
+          attachments.push({
+            aid,
+            name: f.name || "untitled.txt",
+            size: f.size || 0,
+            type: f.type || "text/plain",
+            text
+          });
         } catch (e) {
-          raw = `<<FAILED TO READ FILE: ${a.name} — ${e?.message || String(e)}>>`;
+          showAssistantErrorInline("attach", `Failed to read file: ${f.name} (${e?.message || String(e)})`);
         }
-        const text = String(raw || "").replace(/\r\n/g, "\n");
-        const fence = fenceFor(text);
-        const lang = langForExt(a.ext);
-
-        blocks.push(`\nFile: ${a.name} (${a.type || "text"}, ${a.size} bytes)\n${fence}${lang}\n${text}\n${fence}\n`);
       }
 
-      return blocks.join("");
+      renderAttachBar();
     }
-    // ---------- end Attachments ----------
+
+    function clearAttachments() {
+      attachments = [];
+      renderAttachBar();
+      const fi = $("fileInput");
+      if (fi) fi.value = "";
+    }
 
     // USER bubble header: "You" only (id in tooltip)
-    function addUserMsg(id, text, attachmentsMeta = []) {
+    function addUserMsg(id, text, attachMetas = []) {
       const wrap = document.createElement("div");
       wrap.className = "msg user";
 
@@ -776,22 +787,36 @@
       metaRow.title = `id=${id}`;
       metaRow.innerHTML = `<span class="role">You</span>`;
 
-      wrap.appendChild(metaRow);
-
-      if (Array.isArray(attachmentsMeta) && attachmentsMeta.length) {
-        const attRow = document.createElement("div");
-        attRow.className = "msgAttRow";
-        for (const m of attachmentsMeta) {
-          attRow.appendChild(renderFileChip(m, { removable: false }));
-        }
-        wrap.appendChild(attRow);
-      }
-
       const body = document.createElement("pre");
       body.className = "plain";
       body.textContent = text || "";
 
+      wrap.appendChild(metaRow);
       wrap.appendChild(body);
+
+      if (attachMetas && attachMetas.length) {
+        const row = document.createElement("div");
+        row.className = "msgAttachRow";
+        attachMetas.forEach((a) => {
+          const chip = document.createElement("div");
+          chip.className = "msgChip";
+          chip.title = `${a.name} (${formatBytes(a.size)})`;
+
+          const icon = document.createElement("span");
+          icon.className = "fileIcon";
+          icon.textContent = fileKindLabel(a.name);
+
+          const name = document.createElement("span");
+          name.className = "name";
+          name.textContent = a.name;
+
+          chip.appendChild(icon);
+          chip.appendChild(name);
+          row.appendChild(chip);
+        });
+        wrap.appendChild(row);
+      }
+
       $("chat").appendChild(wrap);
       scrollBottom();
     }
@@ -844,7 +869,8 @@
     function setUiBusy(busy, hintText) {
       $("btnSend").disabled = !!busy;
       $("personaSelect").disabled = !!busy;
-      btnAttach.disabled = !!busy;
+      $("btnAttach").disabled = !!busy;
+      $("fileInput").disabled = !!busy;
       if (typeof hintText === "string") $("personaHint").textContent = hintText;
     }
 
@@ -917,7 +943,6 @@
         a.contentEl.style.display = "";
         a.contentEl.innerHTML = renderMarkdownToHtml(`Persona loaded: **${p.label}**`);
 
-        // If deep-link question is pending, try to send now (if WS is also ready)
         maybeTryDeepLinkSend();
       } catch (e) {
         setUiBusy(false, `Persona load failed`);
@@ -960,14 +985,13 @@
         if (type === "server_hello") { if (!helloSent) sendHello(false); return; }
         if (type === "hello_ack") {
           handshakeOk = true;
-          // If deep-link question is pending, try to send now (if persona is also ready)
           maybeTryDeepLinkSend();
           return;
         }
 
         const id = String(msg?.id || "");
 
-        if (type === "started") return; // keep thinking visible until delta/done/error
+        if (type === "started") return;
 
         if (type === "delta") {
           const delta = (msg.delta || "");
@@ -984,6 +1008,12 @@
               inflight.thinkingEl.style.display = "none";
               inflight.contentEl.style.display = "";
               inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
+
+              // Only attempt inline SVG once we have a complete closing tag to avoid thrash during streaming
+              if (inflight.raw.includes("</svg>")) {
+                inlineSvgsFromCodeBlocks(inflight.contentEl);
+              }
+
               scrollBottom();
               inflight.scheduled = false;
             });
@@ -998,11 +1028,13 @@
             p.thinkingEl.style.display = "none";
             p.contentEl.style.display = "";
             p.contentEl.innerHTML = renderMarkdownToHtml(finalText);
+            inlineSvgsFromCodeBlocks(p.contentEl);
           } else {
             inflight.raw = finalText || inflight.raw;
             inflight.thinkingEl.style.display = "none";
             inflight.contentEl.style.display = "";
             inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
+            inlineSvgsFromCodeBlocks(inflight.contentEl);
           }
 
           history.push({ role: "assistant", content: finalText || (inflight ? inflight.raw : "") });
@@ -1030,51 +1062,48 @@
       };
     }
 
-    // Send a chat with explicit string + optional attachments (attachments injected into LLM message only)
-    async function sendChatText(text, attachmentsList = []) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        showAssistantErrorInline("ui", "socket not open.");
-        return false;
-      }
+    function buildInjectedUserMessage(displayText, attachList) {
+      const base = String(displayText || "").trim();
+      if (!attachList || !attachList.length) return base;
+
+      const wrapped = attachList.map((a, i) => wrapAttachmentForInjection(a, i + 1)).join("\n\n");
+      return `${base}\n\n${wrapped}`.trim();
+    }
+
+    function sendChat() {
+      const typed = $("input").value.trim();
+
+      const attachList = attachments.slice();
+      const hasAttach = attachList.length > 0;
+      const displayText = typed || (hasAttach ? ATTACH_ONLY_PROMPT_HELPER : "");
+
+      if (!displayText) return;
+
+      const injectedText = hasAttach ? buildInjectedUserMessage(displayText, attachList) : displayText;
+
+      $("input").value = "";
+      $("input").focus();
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (!handshakeOk) {
         showAssistantErrorInline("ui", "not ready (hello handshake pending).");
         sendHello(false);
-        return false;
+        return;
       }
       if (!SYSTEM.content || !String(SYSTEM.content).trim()) {
         showAssistantErrorInline("ui", "persona not loaded yet.");
-        return false;
+        return;
       }
       if (inflight) {
         showAssistantErrorInline("ui", "wait for Marks to finish (or add queueing).");
-        return false;
+        return;
       }
-
-      const userText = String(text || "");
-      const trimmed = userText.trim();
-      const hasFiles = Array.isArray(attachmentsList) && attachmentsList.length > 0;
-
-      if (!trimmed && !hasFiles) return false;
-
-      // Prepare LLM-visible content (inject file contents)
-      if (hasFiles) {
-        setUiBusy(true, "Preparing attachments…");
-      }
-
-      const injection = hasFiles ? await buildAttachmentInjection(attachmentsList) : "";
-      const llmContent = `${trimmed || ""}${injection}`.trim();
-
-      // If user sent only files with no text, show a minimal label in UI, but LLM still gets contents.
-      const uiText = trimmed || (hasFiles ? "(attached files)" : "");
 
       const id = newId();
-      const uiAttachments = hasFiles ? snapshotAttachmentMeta(attachmentsList) : [];
 
-      // UI bubble: text + chips only
-      addUserMsg(id, uiText, uiAttachments);
+      addUserMsg(id, displayText, attachList.map(a => ({ name: a.name, size: a.size })));
 
-      // History to LLM: includes injected file text
-      history.push({ role: "user", content: llmContent });
+      history.push({ role: "user", content: injectedText });
       trimHistory();
 
       const p = addAssistantPlaceholder(id);
@@ -1093,40 +1122,21 @@
         }
       };
 
-      // Send now; keep your rAF so UI paints before send on slower devices.
       requestAnimationFrame(() => {
         const ok = wsSend(payload);
         if (!ok) {
           showAssistantErrorInline(id, "socket not open");
           inflight = null;
           setUiBusy(false);
+          return;
         }
+        if (hasAttach) clearAttachments();
       });
-
-      return true;
     }
 
-    async function sendChat() {
-      const userText = $("input").value;
-      const files = attached.slice();
-
-      const ok = await sendChatText(userText, files);
-      if (!ok) return;
-
-      // Clear composer only after successfully queued
-      $("input").value = "";
-      attached = [];
-      renderAttachmentsBar();
-      showComposerError("");
-      $("input").focus();
-    }
-
-    // Attempt to consume+send deep-link question if everything is ready.
     function maybeTryDeepLinkSend() {
       if (!pendingDeepLinkQuestion) return;
 
-      // We only ever set pendingDeepLinkQuestion if hash is #deeplink.
-      // Now ensure persona + handshake are ready before sending.
       const personaReady = !!(SYSTEM.content && String(SYSTEM.content).trim());
       const wsReady = !!(ws && ws.readyState === WebSocket.OPEN);
       if (!personaReady || !wsReady || !handshakeOk) return;
@@ -1134,17 +1144,54 @@
       const q = pendingDeepLinkQuestion;
       pendingDeepLinkQuestion = null;
 
-      // Prefill so user can see what was asked; auto-send optionally
       $("input").value = q;
       $("input").focus();
 
       if (DEEPLINK_AUTOSEND) {
-        // send immediately
         sendChat();
       }
     }
 
-    $("btnSend").onclick = () => sendChat();
+    // ---- Attach UI wiring ----
+    $("btnAttach").addEventListener("click", () => {
+      if ($("btnAttach").disabled) return;
+      $("fileInput").click();
+    });
+
+    $("fileInput").addEventListener("change", async (e) => {
+      const files = e.target.files;
+      if (files && files.length) await addFiles(files);
+      e.target.value = "";
+    });
+
+    // Drag+drop onto composer / textarea
+    const dropTargets = [$("composer"), $("input")];
+    let dropDepth = 0;
+
+    function prevent(e){ e.preventDefault(); e.stopPropagation(); }
+
+    function setDropActive(on) {
+      const t = $("input");
+      if (!t) return;
+      if (on) t.classList.add("dropActive");
+      else t.classList.remove("dropActive");
+    }
+
+    dropTargets.forEach((el) => {
+      el.addEventListener("dragenter", (e) => { prevent(e); dropDepth++; setDropActive(true); });
+      el.addEventListener("dragover", (e) => { prevent(e); setDropActive(true); });
+      el.addEventListener("dragleave", (e) => { prevent(e); dropDepth = Math.max(0, dropDepth - 1); if (dropDepth === 0) setDropActive(false); });
+      el.addEventListener("drop", async (e) => {
+        prevent(e);
+        dropDepth = 0;
+        setDropActive(false);
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length) await addFiles(dt.files);
+      });
+    });
+
+    // ---- Send wiring ----
+    $("btnSend").onclick = sendChat;
     $("input").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
     });
@@ -1154,7 +1201,6 @@
     });
 
     (async function boot(){
-      // Read & clear deep-link question ONLY if opened with #deeplink
       pendingDeepLinkQuestion = readDeepLinkQuestionIfAny();
 
       const saved = localStorage.getItem(PERSONA_STORAGE_KEY);
@@ -1164,12 +1210,8 @@
       await loadPersona(key);
       connect();
 
-      // If deep-link exists, we might already be persona-ready. WS handshake might come later.
-      // maybeTryDeepLinkSend() is invoked again on hello_ack and after persona load.
       maybeTryDeepLinkSend();
-
-      // Initial render for attachments bar state
-      renderAttachmentsBar();
+      renderAttachBar();
     })();
   </script>
 </body>
