@@ -103,7 +103,7 @@
       padding-bottom: 6px;
     }
 
-    /* Tables: wrap text + allow responsive fit */
+    /* Tables wrap */
     .md .table-wrap{
       max-width:100%;
       overflow-x:auto;
@@ -142,7 +142,7 @@
       background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
     }
 
-    /* Persona picker row */
+    /* Persona picker (compact) */
     .personaRow{
       display:flex;
       align-items:center;
@@ -293,7 +293,7 @@
           <span id="subtitle">LM socket proxy chat</span>
         </div>
       </div>
-      <!-- Only the connected indicator stays in the top bar -->
+      <!-- only Connected indicator up here -->
       <span class="pill">
         <span class="dot bad" id="statusDot"></span>
         <span id="statusText">Disconnected</span>
@@ -303,7 +303,6 @@
     <main class="chat" id="chat"></main>
 
     <footer class="composer">
-      <!-- Persona picker (not a sidebar; compact row) -->
       <div class="personaRow">
         <div class="left">
           <span class="personaLabel">Persona</span>
@@ -327,7 +326,6 @@
   <script>
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
 
-    // Persona configs (JSON files served by your app)
     const PERSONAS = {
       field: { key: "field", label: "Field Assistant", url: "/config/personas/marks-field.json" },
       legal: { key: "legal", label: "Legal Expert", url: "/config/personas/marks-legal.json" }
@@ -340,14 +338,10 @@
     let helloSent = false;
     let handshakeOk = false;
 
-    // streaming state
-    let stream = null; // { id, raw, contentEl, scheduled }
+    // single in-flight request (UI is "single-threaded" for clarity)
+    let inflight = null; // { id, raw, contentEl, thinkingEl, scheduled }
 
-    // thinking indicator state
-    let thinkingRow = null;
-    let pendingReqId = null;
-
-    // SYSTEM message is dynamic (loaded from persona JSON)
+    // SYSTEM is dynamic from persona json
     const SYSTEM = { role: "system", content: "" };
     const history = [SYSTEM];
     const HISTORY_MAX = 24;
@@ -375,10 +369,8 @@
 
     function renderMarkdownToHtml(mdText) {
       if (!window.marked) return escapeHtml(mdText).replace(/\n/g, "<br/>");
-
       let html = marked.parse(mdText || "");
       html = wrapTables(html);
-
       if (window.DOMPurify) {
         return DOMPurify.sanitize(html, {
           USE_PROFILES: { html: true },
@@ -395,80 +387,78 @@
       $("subtitle").textContent = (kind === "ok") ? "Connected" : (kind === "warn") ? "Connecting…" : "LM socket proxy chat";
     }
 
-    function addMsg(role, text, meta = {}) {
+    function scrollBottom() {
+      $("chat").scrollTop = $("chat").scrollHeight;
+    }
+
+    function addUserMsg(id, text) {
       const wrap = document.createElement("div");
-      wrap.className = "msg " + (role === "user" ? "user" : "assistant");
+      wrap.className = "msg user";
 
       const metaRow = document.createElement("div");
       metaRow.className = "meta";
+      metaRow.innerHTML = `<span class="role">USER</span><span class="small">id=${id}</span>`;
 
-      const roleEl = document.createElement("span");
-      roleEl.className = "role";
-      roleEl.textContent = role.toUpperCase();
-
-      const idEl = document.createElement("span");
-      idEl.className = "small";
-      idEl.textContent = meta.id ? `id=${meta.id}` : "";
-
-      metaRow.appendChild(roleEl);
-      if (meta.id) metaRow.appendChild(idEl);
+      const body = document.createElement("pre");
+      body.className = "plain";
+      body.textContent = text || "";
 
       wrap.appendChild(metaRow);
-
-      let contentEl;
-      if (role === "assistant") {
-        contentEl = document.createElement("div");
-        contentEl.className = "md";
-        contentEl.innerHTML = renderMarkdownToHtml(text || "");
-      } else {
-        contentEl = document.createElement("pre");
-        contentEl.className = "plain";
-        contentEl.textContent = text || "";
-      }
-
-      wrap.appendChild(contentEl);
+      wrap.appendChild(body);
       $("chat").appendChild(wrap);
-      $("chat").scrollTop = $("chat").scrollHeight;
-
-      return { contentEl };
+      scrollBottom();
     }
 
-    function showThinking(id) {
-      hideThinking();
-      pendingReqId = id;
-
-      const row = document.createElement("div");
-      row.className = "msg assistant";
-      row.style.opacity = "0.95";
+    // Placeholder assistant bubble that starts as "Thinking…" and becomes streamed content.
+    function addAssistantPlaceholder(id) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg assistant";
 
       const metaRow = document.createElement("div");
       metaRow.className = "meta";
-      const roleEl = document.createElement("span");
-      roleEl.className = "role";
-      roleEl.textContent = "MARKS";
-      const idEl = document.createElement("span");
-      idEl.className = "small";
-      idEl.textContent = `id=${id}`;
-      metaRow.appendChild(roleEl);
-      metaRow.appendChild(idEl);
+      metaRow.innerHTML = `<span class="role">MARKS</span><span class="small">id=${id}</span>`;
 
-      const think = document.createElement("div");
-      think.className = "thinking";
-      think.innerHTML = `<span>Thinking</span><span class="dots"><i></i><i></i><i></i></span>`;
+      const thinkingEl = document.createElement("div");
+      thinkingEl.className = "thinking";
+      thinkingEl.innerHTML = `<span>Thinking</span><span class="dots"><i></i><i></i><i></i></span>`;
 
-      row.appendChild(metaRow);
-      row.appendChild(think);
+      const contentEl = document.createElement("div");
+      contentEl.className = "md";
+      contentEl.style.display = "none"; // hidden until we receive content
 
-      $("chat").appendChild(row);
-      $("chat").scrollTop = $("chat").scrollHeight;
+      wrap.appendChild(metaRow);
+      wrap.appendChild(thinkingEl);
+      wrap.appendChild(contentEl);
 
-      thinkingRow = row;
+      $("chat").appendChild(wrap);
+      scrollBottom();
+
+      return { wrap, thinkingEl, contentEl };
     }
 
-    function hideThinking() {
-      pendingReqId = null;
-      if (thinkingRow && thinkingRow.parentNode) thinkingRow.parentNode.removeChild(thinkingRow);
-      thinkingRow = null;
+    function showAssistantErrorInline(id, message) {
+      // if inflight matches, reuse its bubble
+      if (inflight && inflight.id === id) {
+        inflight.thinkingEl.style.display = "none";
+        inflight.contentEl.style.display = "";
+        inflight.contentEl.innerHTML = renderMarkdownToHtml(`**ERROR:** ${message}`);
+        scrollBottom();
+        inflight = null;
+        setUiBusy(false);
+        return;
+      }
+      // otherwise add a new assistant msg
+      const p = addAssistantPlaceholder(id);
+      p.thinkingEl.style.display = "none";
+      p.contentEl.style.display = "";
+      p.contentEl.innerHTML = renderMarkdownToHtml(`**ERROR:** ${message}`);
+      scrollBottom();
+    }
+
+    function setUiBusy(busy, hintText) {
+      $("btnSend").disabled = !!busy;
+      $("personaSelect").disabled = !!busy;
+      if (typeof hintText === "string") $("personaHint").textContent = hintText;
     }
 
     function trimHistory() {
@@ -502,18 +492,16 @@
       handshakeOk = false;
     }
 
-    function setUiBusy(busy, hintText) {
-      $("btnSend").disabled = !!busy;
-      $("personaSelect").disabled = !!busy;
-      if (typeof hintText === "string") $("personaHint").textContent = hintText;
-    }
-
     // --- Persona loading ---
     function extractSystemPrompt(json) {
-      // Accept a few shapes so you can evolve the persona files without breaking UI.
       if (typeof json === "string") return json.trim();
 
       if (json && typeof json === "object") {
+        // Support single OpenAI-style message object: {role:"system", content:"..."}
+        if (json.role === "system" && typeof json.content === "string" && json.content.trim()) {
+          return json.content.trim();
+        }
+
         const candidates = [
           json.system,
           json.system_prompt,
@@ -525,14 +513,12 @@
 
         if (candidates.length) return candidates[0].trim();
 
-        // OpenAI-ish messages array
         if (Array.isArray(json.messages)) {
           const sys = json.messages.find(m => m && m.role === "system" && typeof m.content === "string");
           if (sys && sys.content.trim()) return sys.content.trim();
         }
       }
 
-      // Fallback: stringify (still valid, but not ideal)
       return JSON.stringify(json, null, 2);
     }
 
@@ -549,28 +535,31 @@
 
         SYSTEM.content = sys;
 
-        // Reset conversational context to the new persona
+        // reset context on persona change
         history.length = 0;
         history.push(SYSTEM);
-        stream = null;
-        hideThinking();
+        inflight = null;
 
         localStorage.setItem(PERSONA_STORAGE_KEY, p.key);
 
         setUiBusy(false, `Active: ${p.label}`);
-        addMsg("assistant", `Persona loaded: **${p.label}**`);
+        // light confirmation
+        const id = "persona-" + Math.random().toString(16).slice(2, 8);
+        const a = addAssistantPlaceholder(id);
+        a.thinkingEl.style.display = "none";
+        a.contentEl.style.display = "";
+        a.contentEl.innerHTML = renderMarkdownToHtml(`Persona loaded: **${p.label}**`);
       } catch (e) {
         setUiBusy(false, `Persona load failed`);
-        addMsg("assistant", `ERROR: persona load failed — ${e?.message || String(e)}`);
+        showAssistantErrorInline("persona", `persona load failed — ${e?.message || String(e)}`);
       }
     }
 
-    // --- WS ---
+    // --- WS connection ---
     function connect() {
       helloSent = false;
       handshakeOk = false;
-      stream = null;
-      hideThinking();
+      inflight = null;
 
       setStatus("warn", "Connecting…");
       ws = new WebSocket(WS_URL);
@@ -585,13 +574,11 @@
         stopKeepalive();
         setStatus("bad", "Disconnected");
         ws = null;
-        stream = null;
-        hideThinking();
+        inflight = null;
+        setUiBusy(false);
       };
 
-      ws.onerror = () => {
-        setStatus("bad", "Socket error");
-      };
+      ws.onerror = () => setStatus("bad", "Socket error");
 
       ws.onmessage = (ev) => {
         let msg;
@@ -605,65 +592,74 @@
         if (type === "server_hello") { if (!helloSent) sendHello(false); return; }
         if (type === "hello_ack") { handshakeOk = true; return; }
 
+        const id = String(msg?.id || "");
+
         if (type === "started") {
-          if (pendingReqId === msg.id) hideThinking();
-          const { contentEl } = addMsg("assistant", "", { id: msg.id });
-          stream = { id: msg.id, raw: "", contentEl, scheduled: false };
+          // IMPORTANT: do NOT remove thinking here.
+          // We keep it visible until we actually receive content (delta/done/error).
           return;
         }
 
         if (type === "delta") {
-          if (pendingReqId === msg.id) hideThinking();
           const delta = (msg.delta || "");
 
-          if (!stream || stream.id !== msg.id) {
-            const { contentEl } = addMsg("assistant", "", { id: msg.id });
-            stream = { id: msg.id, raw: "", contentEl, scheduled: false };
+          if (!inflight || inflight.id !== id) {
+            // if we somehow missed creating the placeholder, create one now
+            const p = addAssistantPlaceholder(id);
+            inflight = { id, raw: "", contentEl: p.contentEl, thinkingEl: p.thinkingEl, scheduled: false };
           }
 
-          stream.raw += delta;
+          inflight.raw += delta;
 
-          if (!stream.scheduled) {
-            stream.scheduled = true;
+          if (!inflight.scheduled) {
+            inflight.scheduled = true;
             requestAnimationFrame(() => {
-              if (!stream) return;
-              stream.contentEl.innerHTML = renderMarkdownToHtml(stream.raw);
-              $("chat").scrollTop = $("chat").scrollHeight;
-              stream.scheduled = false;
+              if (!inflight) return;
+              inflight.thinkingEl.style.display = "none";
+              inflight.contentEl.style.display = "";
+              inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
+              scrollBottom();
+              inflight.scheduled = false;
             });
           }
           return;
         }
 
         if (type === "done") {
-          if (pendingReqId === msg.id) hideThinking();
-
           const finalText = msg.message || "";
-          if (!stream || stream.id !== msg.id) {
-            addMsg("assistant", finalText, { id: msg.id });
+
+          if (!inflight || inflight.id !== id) {
+            const p = addAssistantPlaceholder(id);
+            p.thinkingEl.style.display = "none";
+            p.contentEl.style.display = "";
+            p.contentEl.innerHTML = renderMarkdownToHtml(finalText);
           } else {
-            stream.raw = finalText || stream.raw;
-            stream.contentEl.innerHTML = renderMarkdownToHtml(stream.raw);
-            $("chat").scrollTop = $("chat").scrollHeight;
+            inflight.raw = finalText || inflight.raw;
+            inflight.thinkingEl.style.display = "none";
+            inflight.contentEl.style.display = "";
+            inflight.contentEl.innerHTML = renderMarkdownToHtml(inflight.raw);
           }
 
-          history.push({ role: "assistant", content: finalText || (stream ? stream.raw : "") });
+          history.push({ role: "assistant", content: finalText || (inflight ? inflight.raw : "") });
           trimHistory();
-          stream = null;
+
+          inflight = null;
+          setUiBusy(false);
+          scrollBottom();
           return;
         }
 
         if (type === "error") {
-          if (pendingReqId === msg.id) hideThinking();
-
           const err = msg?.error?.message || msg?.message || "unknown error";
-          addMsg("assistant", "ERROR: " + err, { id: msg.id });
+          showAssistantErrorInline(id || "error", err);
 
           if (String(err).toLowerCase().includes("must send hello")) {
             helloSent = false;
             sendHello(true);
           }
-          stream = null;
+
+          inflight = null;
+          setUiBusy(false);
           return;
         }
       };
@@ -671,14 +667,20 @@
 
     function sendChat() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
       if (!handshakeOk) {
-        addMsg("assistant", "ERROR: not ready (hello handshake pending).");
+        showAssistantErrorInline("ui", "not ready (hello handshake pending).");
         sendHello(false);
         return;
       }
 
       if (!SYSTEM.content || !String(SYSTEM.content).trim()) {
-        addMsg("assistant", "ERROR: persona not loaded yet.");
+        showAssistantErrorInline("ui", "persona not loaded yet.");
+        return;
+      }
+
+      if (inflight) {
+        showAssistantErrorInline("ui", "wait for Marks to finish (or add queueing).");
         return;
       }
 
@@ -687,13 +689,18 @@
 
       const id = newId();
 
-      addMsg("user", userText, { id });
+      addUserMsg(id, userText);
       history.push({ role: "user", content: userText });
       trimHistory();
 
-      showThinking(id);
+      // Create placeholder assistant bubble FIRST so it paints immediately
+      const p = addAssistantPlaceholder(id);
+      inflight = { id, raw: "", contentEl: p.contentEl, thinkingEl: p.thinkingEl, scheduled: false };
 
-      const ok = wsSend({
+      setUiBusy(true, $("personaHint").textContent || "");
+
+      // Send on next frame so the "Thinking…" bubble is guaranteed to render
+      const payload = {
         type: "chat",
         id,
         body: {
@@ -702,12 +709,16 @@
           max_tokens: 600,
           stream: true
         }
-      });
+      };
 
-      if (!ok) {
-        hideThinking();
-        addMsg("assistant", "ERROR: socket not open", { id });
-      }
+      requestAnimationFrame(() => {
+        const ok = wsSend(payload);
+        if (!ok) {
+          showAssistantErrorInline(id, "socket not open");
+          inflight = null;
+          setUiBusy(false);
+        }
+      });
 
       $("input").value = "";
       $("input").focus();
@@ -720,21 +731,16 @@
     });
 
     $("personaSelect").addEventListener("change", async (e) => {
-      const key = e.target.value;
-      await loadPersona(key);
+      await loadPersona(e.target.value);
     });
 
     // --- Boot ---
     (async function boot(){
-      // Pick last persona or default
       const saved = localStorage.getItem(PERSONA_STORAGE_KEY);
       const key = (saved && PERSONAS[saved]) ? saved : "field";
       $("personaSelect").value = key;
 
-      // Load persona first (so SYSTEM exists before you chat)
       await loadPersona(key);
-
-      // Then connect WS
       connect();
     })();
   </script>
