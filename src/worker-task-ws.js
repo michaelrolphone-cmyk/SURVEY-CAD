@@ -1,25 +1,28 @@
 // worker-scheduler-ws.js
 import { createHash, randomUUID } from 'node:crypto';
 
-/* ---------- minimal ws frame helpers (same style as your service) ---------- */
-
+/* ---------- minimal ws frame helpers ---------- */
 function decodeFrame(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 2) return null;
-  const first = buffer[0];
 
-  const fin = (first & 0x80) !== 0;
-  const rsv1 = (first & 0x40) !== 0;  // RSV1 bit
-  const rsv2 = (first & 0x20) !== 0;
-  const rsv3 = (first & 0x10) !== 0;
-  
-  if (rsv1 || rsv2 || rsv3) {
-    // Log for debugging
-    console.warn(`Rejected frame with reserved bits set (RSV1=${rsv1}, RSV2=${rsv2}, RSV3=${rsv3})`);
-    return null;  // or throw / close connection
-  }
-  
-  const second = buffer[1];
+  const first = buffer[0];
+  const fin   = (first & 0x80) !== 0;
+  const rsv1  = (first & 0x40) !== 0;
+  const rsv2  = (first & 0x20) !== 0;
+  const rsv3  = (first & 0x10) !== 0;
   const opcode = first & 0x0f;
+
+  // Reject any frame using reserved bits (most common cause: permessage-deflate)
+  if (rsv1 || rsv2 || rsv3) {
+    console.warn(
+      `Protocol error: frame with reserved bits set ` +
+      `(RSV1=${rsv1}, RSV2=${rsv2}, RSV3=${rsv3}, opcode=0x${opcode.toString(16)}) ` +
+      `— likely client sent compressed frame but extension not supported`
+    );
+    return null; // will trigger close in caller
+  }
+
+  const second = buffer[1];
   const masked = (second & 0x80) !== 0;
   let payloadLen = second & 0x7f;
   let offset = 2;
@@ -41,17 +44,21 @@ function decodeFrame(buffer) {
     const mask = buffer.subarray(offset, offset + 4);
     offset += 4;
     if (buffer.length < offset + payloadLen) return null;
+
     const payload = Buffer.allocUnsafe(payloadLen);
-    for (let i = 0; i < payloadLen; i++) payload[i] = buffer[offset + i] ^ mask[i % 4];
-    return { opcode, payload };
+    for (let i = 0; i < payloadLen; i++) {
+      payload[i] = buffer[offset + i] ^ mask[i % 4];
+    }
+    return { fin, opcode, payload };
   }
 
   if (buffer.length < offset + payloadLen) return null;
-  return { opcode, payload: buffer.subarray(offset, offset + payloadLen) };
+  return { fin, opcode, payload: buffer.subarray(offset, offset + payloadLen) };
 }
 
 function decodeNextFrame(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 2) return null;
+
   const second = buffer[1];
   const masked = (second & 0x80) !== 0;
   let payloadLen = second & 0x7f;
@@ -70,18 +77,23 @@ function decodeNextFrame(buffer) {
   }
 
   if (masked) offset += 4;
+
   const totalLength = offset + payloadLen;
   if (buffer.length < totalLength) return null;
 
   const frame = decodeFrame(buffer.subarray(0, totalLength));
   if (!frame) return null;
+
   return { ...frame, consumed: totalLength };
 }
 
 function encodeTextFrame(text) {
   const payload = Buffer.from(String(text), 'utf8');
   const len = payload.length;
-  if (len < 126) return Buffer.concat([Buffer.from([0x81, len]), payload]);
+
+  if (len < 126) {
+    return Buffer.concat([Buffer.from([0x81, len]), payload]);
+  }
   if (len < 65536) {
     const header = Buffer.allocUnsafe(4);
     header[0] = 0x81;
@@ -89,6 +101,7 @@ function encodeTextFrame(text) {
     header.writeUInt16BE(len, 2);
     return Buffer.concat([header, payload]);
   }
+
   const header = Buffer.allocUnsafe(10);
   header[0] = 0x81;
   header[1] = 127;
@@ -103,17 +116,19 @@ function createWebSocketAccept(secWebSocketKey) {
 }
 
 function safeJsonParse(buf) {
-  try { return JSON.parse(buf.toString('utf8')); } catch { return null; }
+  try {
+    return JSON.parse(buf.toString('utf8'));
+  } catch {
+    return null;
+  }
 }
 
 /* --------------------------- worker scheduler --------------------------- */
-
 export function createWorkerSchedulerService(opts = {}) {
   const PATH = String(opts.path || '/ws/worker');
   const OFFLINE_AFTER_MS = Number.isFinite(opts.offlineAfterMs) ? Number(opts.offlineAfterMs) : 30_000;
   const HEARTBEAT_MS = Number.isFinite(opts.heartbeatMs) ? Number(opts.heartbeatMs) : 10_000;
 
-  // poolId -> { workers: Map, queue: [], tasks: Map, rr: number }
   const pools = new Map();
 
   function getOrCreatePool(poolId) {
@@ -121,9 +136,9 @@ export function createWorkerSchedulerService(opts = {}) {
     if (!pools.has(id)) {
       pools.set(id, {
         id,
-        workers: new Map(), // workerId -> worker
-        queue: [],          // taskIds FIFO
-        tasks: new Map(),   // taskId -> task
+        workers: new Map(),
+        queue: [],
+        tasks: new Map(),
         rr: 0,
         pingSeq: 0,
       });
@@ -154,9 +169,7 @@ export function createWorkerSchedulerService(opts = {}) {
     const at = Date.now();
     const candidates = Array.from(pool.workers.values())
       .filter((w) => workerCapacity(w, at) > 0);
-
     if (!candidates.length) return null;
-
     pool.rr = (pool.rr + 1) >>> 0;
     return candidates[pool.rr % candidates.length] || candidates[0];
   }
@@ -165,7 +178,6 @@ export function createWorkerSchedulerService(opts = {}) {
     while (pool.queue.length) {
       const worker = pickWorker(pool);
       if (!worker) return;
-
       const taskId = pool.queue[0];
       const task = pool.tasks.get(taskId);
       pool.queue.shift();
@@ -175,7 +187,6 @@ export function createWorkerSchedulerService(opts = {}) {
       task.workerId = worker.id;
       task.assignedAt = Date.now();
       task.updatedAt = task.assignedAt;
-
       worker.inFlight.add(task.id);
 
       const ok = send(worker, {
@@ -211,13 +222,13 @@ export function createWorkerSchedulerService(opts = {}) {
       pump(pool);
     }
   }, HEARTBEAT_MS);
+
   if (heartbeatTimer.unref) heartbeatTimer.unref();
 
   function submitTask(poolId, kind, payload = null) {
     const pool = getOrCreatePool(poolId);
     const id = randomUUID();
     const createdAt = Date.now();
-
     let resolve, reject;
     const p = new Promise((res, rej) => { resolve = res; reject = rej; });
     p.taskId = id;
@@ -279,7 +290,6 @@ export function createWorkerSchedulerService(opts = {}) {
     const pathname = url.pathname.replace(/\/+$/, '');
     const expected = String(PATH).replace(/\/+$/, '');
 
-    // IMPORTANT: mismatch must be non-destructive (so other ws handlers can try)
     if (pathname !== expected) return false;
 
     if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
@@ -307,7 +317,6 @@ export function createWorkerSchedulerService(opts = {}) {
     ];
     socket.write(responseHeaders.join('\r\n'));
 
-    // Make Heroku/proxies less likely to kill idle sockets
     socket.setTimeout(0);
     socket.setNoDelay(true);
     socket.setKeepAlive(true);
@@ -316,6 +325,7 @@ export function createWorkerSchedulerService(opts = {}) {
       buffer: head.length ? Buffer.from(head) : Buffer.alloc(0),
       workerId: null,
       registered: false,
+      decodeFailures: 0,
     };
 
     function registerWorker(msg) {
@@ -360,21 +370,52 @@ export function createWorkerSchedulerService(opts = {}) {
     }
 
     socket.on('data', (chunk) => {
-      pending.buffer = pending.buffer.length ? Buffer.concat([pending.buffer, chunk]) : Buffer.from(chunk);
+      pending.buffer = pending.buffer.length
+        ? Buffer.concat([pending.buffer, chunk])
+        : Buffer.from(chunk);
 
-      while (pending.buffer.length) {
+      // First frame protection
+      if (!pending.registered && pending.buffer.length >= 2) {
+        const firstByte = pending.buffer[0];
+        const fin = (firstByte & 0x80) !== 0;
+        const opcode = firstByte & 0x0f;
+        if (!fin || opcode !== 0x1) {
+          console.warn(`Invalid first frame (fin=${fin}, opcode=0x${opcode.toString(16)})`);
+          socket.destroy();
+          return;
+        }
+      }
+
+      while (pending.buffer.length >= 2) {
         const frame = decodeNextFrame(pending.buffer);
-        if (!frame) break;
+        if (!frame) {
+          pending.decodeFailures++;
+          if (pending.decodeFailures > 5 || pending.buffer.length > 8192) {
+            console.warn(`Too many decode failures or buffer overflow → closing connection`);
+            socket.destroy();
+            return;
+          }
+          break;
+        }
+
+        pending.decodeFailures = 0;
         pending.buffer = pending.buffer.subarray(frame.consumed);
 
-        if (frame.opcode === 0x8) {
+        if (frame.opcode === 0x8) { // close
           socket.end();
           return;
         }
-        if (frame.opcode !== 0x1) continue;
+
+        if (frame.opcode !== 0x1) {
+          console.warn(`Unsupported opcode 0x${frame.opcode.toString(16)}`);
+          continue;
+        }
 
         const msg = safeJsonParse(frame.payload);
-        if (!msg || typeof msg.type !== 'string') continue;
+        if (!msg || typeof msg.type !== 'string') {
+          console.warn('Invalid or non-string .type in JSON message');
+          continue;
+        }
 
         const at = Date.now();
 
@@ -386,13 +427,16 @@ export function createWorkerSchedulerService(opts = {}) {
 
         const worker = getWorkerObj();
         if (!worker) continue;
+
         worker.lastSeen = at;
 
         if (msg.type === 'pong') continue;
 
         if (msg.type === 'hello') {
           if (msg.name) worker.name = String(msg.name).slice(0, 120);
-          if (Number.isFinite(msg.concurrency)) worker.concurrency = Math.max(1, Math.trunc(msg.concurrency));
+          if (Number.isFinite(msg.concurrency)) {
+            worker.concurrency = Math.max(1, Math.trunc(msg.concurrency));
+          }
           if (msg.capabilities !== undefined) worker.capabilities = msg.capabilities;
           continue;
         }
@@ -406,7 +450,6 @@ export function createWorkerSchedulerService(opts = {}) {
           task.status = msg.ok ? 'completed' : 'failed';
           task.finishedAt = at;
           task.updatedAt = at;
-
           worker.inFlight.delete(taskId);
 
           const resolve = task._resolve;
@@ -423,7 +466,6 @@ export function createWorkerSchedulerService(opts = {}) {
           }
 
           pump(pool);
-          continue;
         }
       }
     });
@@ -450,7 +492,7 @@ export function createWorkerSchedulerService(opts = {}) {
       try { socket.destroy(); } catch {}
     });
 
-    return true; // CRITICAL for your server’s `handled = a() || b() || c()`
+    return true;
   }
 
   return {
@@ -463,5 +505,5 @@ export function createWorkerSchedulerService(opts = {}) {
   };
 }
 
-// optional named exports (if you *really* want to import helpers elsewhere)
+// optional named exports
 export { decodeFrame, encodeTextFrame, createWebSocketAccept };
