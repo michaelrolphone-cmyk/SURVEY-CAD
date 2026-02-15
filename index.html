@@ -574,6 +574,95 @@
       color: var(--muted);
       font-size: 0.86rem;
     }
+/* --- Marks Quick Q&A (header) --- */
+.marks-qa {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-left: auto; /* sit at right side of header */
+  min-width: 0;
+  flex: 1 1 420px;
+  justify-content: flex-end;
+}
+
+.marks-qa .marks-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 190, 132, 0.28);
+  background: rgba(15, 10, 6, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 223, 181, 0.08);
+}
+
+.marks-qa img {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 214, 155, 0.4);
+}
+
+.marks-qa input {
+  width: min(44vw, 420px);
+  min-width: 140px;
+  background: rgba(0,0,0,0.18);
+  color: var(--text);
+  border: 1px solid rgba(230, 190, 132, 0.35);
+  border-radius: 999px;
+  padding: 0.52rem 0.75rem;
+  font-size: 0.92rem;
+  outline: none;
+}
+
+.marks-qa input::placeholder {
+  color: rgba(244, 232, 209, 0.65);
+}
+
+.marks-qa input:focus {
+  border-color: rgba(245, 158, 11, 0.65);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.marks-qa button {
+  border-radius: 999px;
+  padding: 0.52rem 0.85rem;
+  font-weight: 750;
+  border-color: rgba(245, 158, 11, 0.55);
+  background: linear-gradient(135deg, rgba(245,158,11,0.22), rgba(255,179,71,0.10));
+}
+
+.marks-qa button:hover {
+  background: linear-gradient(135deg, rgba(245,158,11,0.30), rgba(255,179,71,0.14));
+}
+
+/* Mobile wrap: Ask box drops to its own row cleanly */
+@media (max-width: 860px) {
+  header {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .marks-qa {
+    flex: 1 1 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+  .marks-qa input {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .marks-qa button {
+    flex: 0 0 auto;
+  }
+
+  /* keep your project pills readable */
+  .header-meta-index,
+  .header-meta {
+    max-width: 100%;
+  }
+}
 
     iframe {
       width: 100%;
@@ -606,6 +695,15 @@
     <h1 id="launcherHeaderTitle">SurveyFoundry App Launcher</h1>
     <span id="activeProjectHeaderIndex" class="header-meta-index" aria-live="polite"></span>
     <span id="activeProjectHeader" class="header-meta" aria-live="polite"></span>
+    <form id="marksQuickQa" class="marks-qa" autocomplete="off">
+  <div class="marks-pill" title="Ask Marks (opens MarksLLM in the viewer)">
+    <img src="/assets/icons/MarksAI.png" alt="Marks" />
+    <input id="marksQuestionInput" type="text" inputmode="text"
+      placeholder="Ask Marks…" aria-label="Ask Marks a question" />
+  </div>
+  <button id="marksAskButton" type="submit" aria-label="Ask Marks">Ask</button>
+</form>
+
     <button id="fullscreenButton" class="fullscreen-button" type="button" aria-label="Toggle fullscreen" title="Toggle fullscreen">
       <svg id="fullscreenEnterIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
       <svg id="fullscreenExitIcon" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
@@ -1828,6 +1926,45 @@
 
       openApp(`${file}${url.search}`);
     });
+
+    // --- Marks Quick Q&A (launcher header) ---
+const MARKS_DEEPLINK_KEY = "marks.deeplink.question";
+const MARKS_APP_ENTRY = "MarksLLM.html#deeplink";
+
+const marksQuickQa = document.getElementById("marksQuickQa");
+const marksQuestionInput = document.getElementById("marksQuestionInput");
+const marksAskButton = document.getElementById("marksAskButton");
+
+function launchMarksWithQuestion(question) {
+  const q = String(question || "").trim();
+  if (!q) return;
+
+  // Store the deeplink question where MarksLLM expects it
+  localStorage.setItem(MARKS_DEEPLINK_KEY, q);
+
+  // Open Marks inside the iframe viewer with #deeplink
+  openApp(MARKS_APP_ENTRY);
+
+  // Clear launcher input
+  marksQuestionInput.value = "";
+  marksQuestionInput.blur();
+}
+
+if (marksQuickQa) {
+  marksQuickQa.addEventListener("submit", (e) => {
+    e.preventDefault();
+    launchMarksWithQuestion(marksQuestionInput.value);
+  });
+
+  // Optional UX: enable/disable Ask based on content
+  const syncAskEnabled = () => {
+    const hasText = !!String(marksQuestionInput.value || "").trim();
+    marksAskButton.disabled = !hasText;
+  };
+  marksQuestionInput.addEventListener("input", syncAskEnabled);
+  syncAskEnabled();
+}
+
 
     loadProjects();
     loadActiveProject();
