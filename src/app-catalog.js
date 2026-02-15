@@ -123,6 +123,17 @@ export const APP_CATALOG = [
     section: 'Field Tools',
   },
   {
+    id: 'marks-llm',
+    name: 'MarksAI',
+    description: 'An AI surveyor.',
+    entryHtml: 'MarksLLM.html',
+    iconPath: '/assets/icons/MarksAI.png',
+    color: '#0F766E',
+    accent: '#CCFBF1',
+    glyph: 'AI',
+    experimental: true,
+  },
+  {
     id: 'arrowhead-ar',
     name: 'ArrowHead',
     description: 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.',
