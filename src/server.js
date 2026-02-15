@@ -878,28 +878,55 @@ server.on('upgrade', (req, socket, head) => {
 
 
 server.on('upgrade', (req, socket, head) => {
+  // Detect if ANY handler wrote a 101 to this socket
+  let wrote101 = false;
+  const rawWrite = socket.write.bind(socket);
+
+  socket.write = (chunk, ...args) => {
+    try {
+      const s = Buffer.isBuffer(chunk)
+        ? chunk.toString('utf8', 0, 16)
+        : String(chunk).slice(0, 16);
+      if (s.startsWith('HTTP/1.1 101')) wrote101 = true;
+    } catch {}
+    return rawWrite(chunk, ...args);
+  };
+
+  let handled = false;
   try {
     const url = new URL(req.url || '/', 'http://localhost');
-    const path = url.pathname.replace(/\/+$/, ''); // normalize trailing slash
-
-    let handled = false;
+    const path = url.pathname.replace(/\/+$/, '');
 
     if (path === '/ws/worker') {
-      handled = workerSocket.handleUpgrade(req, socket, head);
+      handled = !!workerSocket.handleUpgrade(req, socket, head);
+    } else if (path === '/ws/lineforge') {
+      handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
+    } else if (path === '/ws/localstorage-sync') {
+      handled = !!localStorageSyncWsService.handleUpgrade(req, socket, head);
     } else {
-      handled = lineforgeCollab.handleUpgrade(req, socket, head)
-      || localStorageSyncWsService.handleUpgrade(req, socket, head);
-    }
-
-    if (!handled && !socket.destroyed) {
-      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-      socket.destroy();
+      handled = false;
     }
   } catch (e) {
     console.error(e);
-    if (!socket.destroyed) socket.destroy();
+    handled = false;
+  } finally {
+    // restore original write so WS handler can keep using it normally
+    socket.write = rawWrite;
+  }
+
+  // If a 101 was written, DO NOT write any HTTP fallback onto the socket.
+  if (!handled) {
+    if (wrote101 || socket.__wsUpgraded) {
+      if (!socket.destroyed) socket.destroy();
+      return;
+    }
+    if (!socket.destroyed) {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+    }
   }
 });
+
 
 
   return server;
