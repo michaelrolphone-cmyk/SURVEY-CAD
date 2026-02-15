@@ -342,6 +342,56 @@ export function createSurveyServer({
         return;
       }
 
+    // --- Worker task submit (MUST be before the "Only GET is supported" gate) ---
+if (urlObj.pathname === '/api/worker/submit' || urlObj.pathname === '/api/worker/submit/') {
+  if (req.method !== 'POST') {
+    sendJson(res, 405, { error: 'Only POST is supported.' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+
+  const poolId = String(body.poolId || 'default');
+  const kind = String(body.kind || '');
+  const payload = body.payload ?? null;
+
+  if (!kind) {
+    sendJson(res, 400, { error: 'kind is required.' });
+    return;
+  }
+
+  // optional: check workers
+  const workers = workerSocket.listWorkers(poolId);
+  if (!workers.some(w => w.online)) {
+    sendJson(res, 503, { error: 'No online workers in pool.', workers });
+    return;
+  }
+
+  const p = workerSocket.submitTask(poolId, kind, payload);
+  const taskId = p.taskId;
+
+  try {
+    const result = await p;
+    sendJson(res, 200, { ok: true, taskId, result });
+  } catch (err) {
+    sendJson(res, 500, {
+      ok: false,
+      taskId,
+      error: err?.message || String(err),
+      details: err?.details ?? null,
+    });
+  }
+  return;
+}
+
+// optional: list workers
+if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worker/workers/') {
+  const poolId = String(urlObj.searchParams.get('pool') || 'default');
+  sendJson(res, 200, { workers: workerSocket.listWorkers(poolId) });
+  return;
+}
+
+      
       if (urlObj.pathname === '/api/fld-config') {
         if (req.method !== 'GET') {
           sendJson(res, 405, { error: 'Only GET is supported.' });
