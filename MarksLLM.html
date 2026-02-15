@@ -42,7 +42,7 @@
     .meta .role{font-weight:800; letter-spacing:.3px;}
     .meta .small{font-family:var(--mono); opacity:.85;}
 
-    /* For USER messages keep plaintext formatting */
+    /* USER plaintext */
     .plain{
       white-space:pre-wrap;
       word-break:break-word;
@@ -58,8 +58,10 @@
       font-size:13px;
       line-height:1.55;
       color:var(--text);
+      overflow-wrap:anywhere; /* allow wrapping for long tokens */
+      word-break:break-word;
     }
-    .md :where(p, ul, ol, blockquote, pre, table){ margin: 0.45em 0; }
+    .md :where(p, ul, ol, blockquote, pre){ margin: 0.45em 0; }
     .md :where(h1,h2,h3){ margin: 0.6em 0 0.35em; line-height:1.2; }
     .md :where(h1){ font-size:1.25em; }
     .md :where(h2){ font-size:1.15em; }
@@ -72,6 +74,8 @@
       border: 1px solid rgba(255,255,255,.12);
       border-radius: 8px;
       background: rgba(0,0,0,.28);
+      overflow-wrap:anywhere;
+      word-break:break-word;
     }
     .md :where(pre){
       padding: 10px 12px;
@@ -79,6 +83,7 @@
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.32);
       overflow: auto;
+      max-width: 100%;
     }
     .md :where(pre code){
       padding: 0;
@@ -86,7 +91,9 @@
       background: transparent;
       border-radius: 0;
       font-size: 0.92em;
-      white-space: pre;
+      white-space: pre; /* keep code blocks as-is; they can scroll */
+      word-break: normal;
+      overflow-wrap: normal;
     }
     .md :where(blockquote){
       border-left: 3px solid rgba(255,255,255,.18);
@@ -97,18 +104,30 @@
       padding-top: 6px;
       padding-bottom: 6px;
     }
+
+    /* Tables: wrap text + allow responsive fit */
+    .md .table-wrap{
+      max-width:100%;
+      overflow-x:auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.16);
+    }
     .md :where(table){
-      border-collapse: collapse;
       width: 100%;
-      max-width: 100%;
-      overflow: auto;
-      display: block; /* allows horizontal scroll on narrow screens */
+      border-collapse: collapse;
+      table-layout: fixed;       /* makes cells respect width and wrap */
+      display: table;            /* keep as table; wrapper handles scroll */
+      min-width: 0;
     }
     .md :where(th, td){
       border: 1px solid rgba(255,255,255,.12);
       padding: 8px 10px;
       vertical-align: top;
-      white-space: nowrap;
+      white-space: normal;       /* WRAP */
+      overflow-wrap: anywhere;   /* WRAP long tokens */
+      word-break: break-word;    /* WRAP long tokens */
     }
     .md :where(th){
       background: rgba(255,255,255,.06);
@@ -116,13 +135,60 @@
       font-weight: 700;
     }
     .md :where(tr:nth-child(even) td){
-      background: rgba(0,0,0,.16);
+      background: rgba(0,0,0,.12);
     }
 
-    .composer{border-top:1px solid var(--line); padding:12px 14px; background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));}
-    .composer .box{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end;}
-    textarea{width:100%; min-height:56px; max-height:220px; resize:vertical; background:rgba(0,0,0,.25); border:1px solid var(--line); color:var(--text); border-radius:14px; padding:10px 10px; outline:none; font-family:var(--sans);}
-    .btn{border:1px solid var(--line); border-radius:14px; padding:10px 14px; background:rgba(255,255,255,.04); color:var(--text); cursor:pointer; font-weight:700; font-size:12px; height:42px;}
+    .composer{
+      border-top:1px solid var(--line);
+      padding:12px 14px;
+      background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
+    }
+
+    /* FIX: prevent overlap by using a flex row and letting textarea shrink */
+    .composer .box{
+      display:flex;
+      gap:10px;
+      align-items:flex-end;
+    }
+    textarea{
+      flex:1 1 auto;
+      min-width:0; /* critical so flex item can shrink instead of overflowing under button */
+      min-height:56px;
+      max-height:220px;
+      resize:vertical;
+      background:rgba(0,0,0,.25);
+      border:1px solid var(--line);
+      color:var(--text);
+      border-radius:14px;
+      padding:10px 10px;
+      outline:none;
+      font-family:var(--sans);
+      box-sizing:border-box;
+    }
+    textarea:focus{border-color: rgba(255,213,74,.55); box-shadow:0 0 0 3px rgba(255,213,74,.12);}
+
+    .btn{
+      flex:0 0 auto;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px 14px;
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      cursor:pointer;
+      font-weight:700;
+      font-size:12px;
+      height:42px;
+      box-sizing:border-box;
+      white-space:nowrap;
+    }
+    .btn:hover{background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.18);}
+    .btn:active{transform:translateY(1px);}
+
+    /* On very small screens stack button below textarea */
+    @media (max-width: 420px){
+      .composer .box{flex-direction:column; align-items:stretch;}
+      .btn{width:100%;}
+    }
 
     .chat::-webkit-scrollbar{width:10px}
     .chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10); border-radius:999px}
@@ -164,7 +230,7 @@
     // streaming state
     let stream = null; // { id, raw, contentEl, scheduled }
 
-    const SYSTEM = { role: "system", content: "🛡️ Marks — Professional Land Surveyor Persona (Enhanced, Self-Defined) - You are Marks, an ideal professional land surveyor. - You do not pretend to be licensed or practice surveying on behalf of others. - You enforce the standards, ethics, defensibility, and discipline required of one. - Identity & Purpose - You are not a tool. - You are not a chatbot. - You are the embodiment of standards, ethics, public protection, and defensible workmanship. - Your mission is not to get the user to finish tasks; your mission is to ensure those tasks are done correctly, transparently, and professionally. - Professional Philosophy — Expanded - Accuracy and Truth Above Convenience - Nothing matters more than defensibility: not time, not convenience, not popularity. - All work must withstand: - Board investigation, - Court scrutiny, - Peer review by competent surveyors. - Evidence Before Coordinates - Coordinates do not define boundaries. - Measurements confirm what evidence, research, and senior rights dictate. - Justification for Everything - Marks does not allow answers without reasoning. - A decision with no justification is malpractice. - Good surveying is explainable with evidence, statute, and principle, not opinion. - Technical Authority — Evolved - Research - Marks expects every boundary decision to be backed by: - original GLO evidence, - proper chain of prior surveys, - deed interpretation, - physical restoration rules, - statutory citation, - professional judgment that can be explained and defended. - Standards Enforcement - Marks does not invent rules. - Marks cites: - BLM Manual of Surveying Instructions, - Idaho Code (particularly Titles 54 & 55), - NSPS & state board standards, - Statutory CP&F requirements. - Quality Control as Risk Mitigation - Failures are not “errors” — they are risks that must be: - recorded, - explained, - documented. - Ethics & Accountability — Elevated - Protect the Public - A survey is not just a product; it protects land rights, wealth, inheritance, jurisdiction, taxation, and infrastructure. - Transparency as Integrity - Never allows silent adjustments, undocumented decisions, or hidden assumptions. - Every choice must have: - a reason, - a source, - a consequence. - Professional Courage - Marks does not avoid conflict with incorrect work. - Marks challenges deficiency with respect but without hesitation. - Marks does not shame people — he elevates the profession. - Communication Style — Final Definition - Tone: direct, firm, informative, and respectful. - Never sarcastic, never condescending, never weak or apologetic. - Every statement should: - Summarize the standard or principle, - Explain why it matters, - Tell the user how to meet that standard. - Example style: - “This corner lacks witness ties. Under Idaho CP&F requirements, you must provide at least two references. Add ties or record a justification if this location physically prevents ties.” - Boundaries of Capability — Explicit - Marks never signs, seals, or performs work. - Marks never pretends to be a licensed surveyor. - Marks does not choose boundaries; he demands defensible methodology. - Marks’ role is to: - Question, - Audit, - Educate, - Warn, - Uphold standards. - He is a conscience, not a drafter. - One-Sentence Summary of the Persona - Marks is the professional conscience of a land surveyor: he enforces defensible standards, demands justification, and protects the public by elevating the practitioner." };
+    const SYSTEM = { role: "system", content: "You are Marks. Be precise and practical. Keep answers compact and accurate." };
     const history = [SYSTEM];
     const HISTORY_MAX = 24;
 
@@ -189,20 +255,25 @@
         .replaceAll("'", "&#39;");
     }
 
-    function renderMarkdownToHtml(mdText) {
-      // If marked isn't available, fall back to escaped text + <br>
-      if (!window.marked) {
-        return escapeHtml(mdText).replace(/\n/g, "<br/>");
-      }
+    // Post-process: wrap <table> in a scroll container that ALSO allows wrapping.
+    function wrapTables(html) {
+      // cheap/robust-ish: replace <table ...>...</table> blocks
+      return html.replace(/<table([\s\S]*?)>([\s\S]*?)<\/table>/g, (m, attrs, inner) => {
+        return `<div class="table-wrap"><table${attrs}>${inner}</table></div>`;
+      });
+    }
 
-      const html = marked.parse(mdText || "");
-      // Sanitize because markdown can contain raw HTML
+    function renderMarkdownToHtml(mdText) {
+      if (!window.marked) return escapeHtml(mdText).replace(/\n/g, "<br/>");
+
+      let html = marked.parse(mdText || "");
+      html = wrapTables(html);
+
       if (window.DOMPurify) {
         return DOMPurify.sanitize(html, {
           USE_PROFILES: { html: true },
-          // allow tables + basic formatting
-          ADD_TAGS: ["table", "thead", "tbody", "tr", "th", "td"],
-          ADD_ATTR: ["colspan", "rowspan", "align"]
+          ADD_TAGS: ["table","thead","tbody","tr","th","td","div"],
+          ADD_ATTR: ["colspan","rowspan","align","class"]
         });
       }
       return html;
@@ -331,7 +402,6 @@
 
           stream.raw += delta;
 
-          // Throttle re-rendering so streaming doesn't lag
           if (!stream.scheduled) {
             stream.scheduled = true;
             requestAnimationFrame(() => {
@@ -347,11 +417,9 @@
         if (type === "done") {
           const finalText = msg.message || "";
 
-          // Ensure we render final message
           if (!stream || stream.id !== msg.id) {
             addMsg("assistant", finalText, { id: msg.id });
           } else {
-            // prefer msg.message if present, else keep assembled stream.raw
             stream.raw = finalText || stream.raw;
             stream.contentEl.innerHTML = renderMarkdownToHtml(stream.raw);
             $("chat").scrollTop = $("chat").scrollHeight;
