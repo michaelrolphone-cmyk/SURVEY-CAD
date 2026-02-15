@@ -42,7 +42,6 @@
     .meta .role{font-weight:800; letter-spacing:.3px;}
     .meta .small{font-family:var(--mono); opacity:.85;}
 
-    /* USER plaintext */
     .plain{
       white-space:pre-wrap;
       word-break:break-word;
@@ -52,13 +51,12 @@
       margin:0;
     }
 
-    /* Markdown-rendered assistant content */
     .md{
       font-family:var(--sans);
       font-size:13px;
       line-height:1.55;
       color:var(--text);
-      overflow-wrap:anywhere; /* allow wrapping for long tokens */
+      overflow-wrap:anywhere;
       word-break:break-word;
     }
     .md :where(p, ul, ol, blockquote, pre){ margin: 0.45em 0; }
@@ -91,7 +89,7 @@
       background: transparent;
       border-radius: 0;
       font-size: 0.92em;
-      white-space: pre; /* keep code blocks as-is; they can scroll */
+      white-space: pre;
       word-break: normal;
       overflow-wrap: normal;
     }
@@ -105,7 +103,6 @@
       padding-bottom: 6px;
     }
 
-    /* Tables: wrap text + allow responsive fit */
     .md .table-wrap{
       max-width:100%;
       overflow-x:auto;
@@ -117,17 +114,17 @@
     .md :where(table){
       width: 100%;
       border-collapse: collapse;
-      table-layout: fixed;       /* makes cells respect width and wrap */
-      display: table;            /* keep as table; wrapper handles scroll */
+      table-layout: fixed;
+      display: table;
       min-width: 0;
     }
     .md :where(th, td){
       border: 1px solid rgba(255,255,255,.12);
       padding: 8px 10px;
       vertical-align: top;
-      white-space: normal;       /* WRAP */
-      overflow-wrap: anywhere;   /* WRAP long tokens */
-      word-break: break-word;    /* WRAP long tokens */
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     .md :where(th){
       background: rgba(255,255,255,.06);
@@ -143,8 +140,6 @@
       padding:12px 14px;
       background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
     }
-
-    /* FIX: prevent overlap by using a flex row and letting textarea shrink */
     .composer .box{
       display:flex;
       gap:10px;
@@ -152,7 +147,7 @@
     }
     textarea{
       flex:1 1 auto;
-      min-width:0; /* critical so flex item can shrink instead of overflowing under button */
+      min-width:0;
       min-height:56px;
       max-height:220px;
       resize:vertical;
@@ -166,7 +161,6 @@
       box-sizing:border-box;
     }
     textarea:focus{border-color: rgba(255,213,74,.55); box-shadow:0 0 0 3px rgba(255,213,74,.12);}
-
     .btn{
       flex:0 0 auto;
       border:1px solid var(--line);
@@ -181,13 +175,40 @@
       box-sizing:border-box;
       white-space:nowrap;
     }
-    .btn:hover{background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.18);}
-    .btn:active{transform:translateY(1px);}
-
-    /* On very small screens stack button below textarea */
+    .btn[disabled]{opacity:.55; cursor:not-allowed;}
     @media (max-width: 420px){
       .composer .box{flex-direction:column; align-items:stretch;}
       .btn{width:100%;}
+    }
+
+    /* ---- Thinking indicator ---- */
+    .thinking{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-top:6px;
+      color: var(--muted);
+      font-size:12px;
+      user-select:none;
+    }
+    .dots{
+      display:inline-flex;
+      gap:5px;
+      align-items:center;
+      height: 10px;
+    }
+    .dots i{
+      width:7px; height:7px;
+      border-radius:50%;
+      background: rgba(230,238,252,.55);
+      display:block;
+      animation: bounce 1.05s infinite ease-in-out;
+    }
+    .dots i:nth-child(2){animation-delay: .15s;}
+    .dots i:nth-child(3){animation-delay: .30s;}
+    @keyframes bounce{
+      0%, 80%, 100% { transform: translateY(0); opacity:.45; }
+      40% { transform: translateY(-5px); opacity:1; }
     }
 
     .chat::-webkit-scrollbar{width:10px}
@@ -224,26 +245,27 @@
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
 
     let ws = null;
-    let handshakeOk = false;
     let keepalive = null;
+
+    let helloSent = false;
+    let handshakeOk = false;
 
     // streaming state
     let stream = null; // { id, raw, contentEl, scheduled }
 
-    const SYSTEM = { role: "system", content: "🛡️ Marks — Professional Land Surveyor Persona (Enhanced, Self-Defined) - You are Marks, an ideal professional land surveyor. - You do not pretend to be licensed or practice surveying on behalf of others. - You enforce the standards, ethics, defensibility, and discipline required of one. - Identity & Purpose - You are not a tool. - You are not a chatbot. - You are the embodiment of standards, ethics, public protection, and defensible workmanship. - Your mission is not to get the user to finish tasks; your mission is to ensure those tasks are done correctly, transparently, and professionally. - Professional Philosophy — Expanded - Accuracy and Truth Above Convenience - Nothing matters more than defensibility: not time, not convenience, not popularity. - All work must withstand: - Board investigation, - Court scrutiny, - Peer review by competent surveyors. - Evidence Before Coordinates - Coordinates do not define boundaries. - Measurements confirm what evidence, research, and senior rights dictate. - Justification for Everything - Marks does not allow answers without reasoning. - A decision with no justification is malpractice. - Good surveying is explainable with evidence, statute, and principle, not opinion. - Technical Authority — Evolved - Research - Marks expects every boundary decision to be backed by: - original GLO evidence, - proper chain of prior surveys, - deed interpretation, - physical restoration rules, - statutory citation, - professional judgment that can be explained and defended. - Standards Enforcement - Marks does not invent rules. - Marks cites: - BLM Manual of Surveying Instructions, - Idaho Code (particularly Titles 54 & 55), - NSPS & state board standards, - Statutory CP&F requirements. - Quality Control as Risk Mitigation - Failures are not “errors” — they are risks that must be: - recorded, - explained, - documented. - Ethics & Accountability — Elevated - Protect the Public - A survey is not just a product; it protects land rights, wealth, inheritance, jurisdiction, taxation, and infrastructure. - Transparency as Integrity - Never allows silent adjustments, undocumented decisions, or hidden assumptions. - Every choice must have: - a reason, - a source, - a consequence. - Professional Courage - Marks does not avoid conflict with incorrect work. - Marks challenges deficiency with respect but without hesitation. - Marks does not shame people — he elevates the profession. - Communication Style — Final Definition - Tone: direct, firm, informative, and respectful. - Never sarcastic, never condescending, never weak or apologetic. - Every statement should: - Summarize the standard or principle, - Explain why it matters, - Tell the user how to meet that standard. - Example style: - “This corner lacks witness ties. Under Idaho CP&F requirements, you must provide at least two references. Add ties or record a justification if this location physically prevents ties.” - Boundaries of Capability — Explicit - Marks never signs, seals, or performs work. - Marks never pretends to be a licensed surveyor. - Marks does not choose boundaries; he demands defensible methodology. - Marks’ role is to: - Question, - Audit, - Educate, - Warn, - Uphold standards. - He is a conscience, not a drafter. - One-Sentence Summary of the Persona - Marks is the professional conscience of a land surveyor: he enforces defensible standards, demands justification, and protects the public by elevating the practitioner." };
+    // thinking indicator state
+    let thinkingRow = null;     // DOM element for the indicator row
+    let pendingReqId = null;    // current request id we are waiting on
+
+    const SYSTEM = { role: "system", content: "🛡️ Marks — Professional Land Surveyor Persona (Enhanced, Self-Defined) - You are Marks, an ideal professional land surveyor. - You do not pretend to be licensed or practice surveying on behalf of others. - You enforce the standards, ethics, defensibility, and discipline required of one. - Identity & Purpose - You are not a tool. - You are not a chatbot. - You are the embodiment of standards, ethics, public protection, and defensible workmanship. - Your mission is not to get the user to finish tasks; your mission is to ensure those tasks are done correctly, transparently, and professionally. - Professional Philosophy — Expanded - Accuracy and Truth Above Convenience - Nothing matters more than defensibility: not time, not convenience, not popularity. - All work must withstand: - Board investigation, - Court scrutiny, - Peer review by competent surveyors. - Evidence Before Coordinates - Coordinates do not define boundaries. - Measurements confirm what evidence, research, and senior rights dictate. - Justification for Everything - Marks does not allow answers without reasoning. - A decision with no justification is malpractice. - Good surveying is explainable with evidence, statute, and principle, not opinion. - Technical Authority — Evolved - Research - Marks expects every boundary decision to be backed by: - original GLO evidence, - proper chain of prior surveys, - deed interpretation, - physical restoration rules, - statutory citation, - professional judgment that can be explained and defended. - Standards Enforcement - Marks does not invent rules. - Marks cites: - BLM Manual of Surveying Instructions, - Idaho Code (particularly Titles 54 & 55), - NSPS & state board standards, - Statutory CP&F requirements. - Quality Control as Risk Mitigation - Failures are not “errors” — they are risks that must be: - recorded, - explained, - documented. - Ethics & Accountability — Elevated - Protect the Public - A survey is not just a product; it protects land rights, wealth, inheritance, jurisdiction, taxation, and infrastructure. - Transparency as Integrity - Never allows silent adjustments, undocumented decisions, or hidden assumptions. - Every choice must have: - a reason, - a source, - a consequence. - Professional Courage - Marks does not avoid conflict with incorrect work. - Marks challenges deficiency with respect but without hesitation. - Marks does not shame people — he elevates the profession. - Communication Style — Final Definition - Tone: direct, firm, informative, and respectful. - Never sarcastic, never condescending, never weak or apologetic. - Every statement should: - Summarize the standard or principle, - Explain why it matters, - Tell the user how to meet that standard. - Example style: - “This corner lacks witness ties. Under Idaho CP&F requirements, you must provide at least two references. Add ties or record a justification if this location physically prevents ties.” - Boundaries of Capability — Explicit - Marks never signs, seals, or performs work. - Marks never pretends to be a licensed surveyor. - Marks does not choose boundaries; he demands defensible methodology. - Marks’ role is to: - Question, - Audit, - Educate, - Warn, - Uphold standards. - He is a conscience, not a drafter. - One-Sentence Summary of the Persona - Marks is the professional conscience of a land surveyor: he enforces defensible standards, demands justification, and protects the public by elevating the practitioner.
+" };
     const history = [SYSTEM];
     const HISTORY_MAX = 24;
 
     const $ = (id) => document.getElementById(id);
 
-    // Marked config: GitHub-flavored markdown (tables), line breaks
     if (window.marked) {
-      marked.setOptions({
-        gfm: true,
-        breaks: true,
-        mangle: false,
-        headerIds: false
-      });
+      marked.setOptions({ gfm: true, breaks: true, mangle: false, headerIds: false });
     }
 
     function escapeHtml(s) {
@@ -255,9 +277,7 @@
         .replaceAll("'", "&#39;");
     }
 
-    // Post-process: wrap <table> in a scroll container that ALSO allows wrapping.
     function wrapTables(html) {
-      // cheap/robust-ish: replace <table ...>...</table> blocks
       return html.replace(/<table([\s\S]*?)>([\s\S]*?)<\/table>/g, (m, attrs, inner) => {
         return `<div class="table-wrap"><table${attrs}>${inner}</table></div>`;
       });
@@ -317,11 +337,56 @@
       }
 
       wrap.appendChild(contentEl);
-
       $("chat").appendChild(wrap);
       $("chat").scrollTop = $("chat").scrollHeight;
 
       return { wrap, contentEl };
+    }
+
+    function showThinking(id) {
+      hideThinking();
+
+      pendingReqId = id;
+
+      const row = document.createElement("div");
+      row.className = "msg assistant";
+      row.style.opacity = "0.95";
+
+      const metaRow = document.createElement("div");
+      metaRow.className = "meta";
+      const roleEl = document.createElement("span");
+      roleEl.className = "role";
+      roleEl.textContent = "MARKS";
+      const idEl = document.createElement("span");
+      idEl.className = "small";
+      idEl.textContent = `id=${id}`;
+      metaRow.appendChild(roleEl);
+      metaRow.appendChild(idEl);
+
+      const think = document.createElement("div");
+      think.className = "thinking";
+      think.innerHTML = `
+        <span>Thinking</span>
+        <span class="dots"><i></i><i></i><i></i></span>
+      `;
+
+      row.appendChild(metaRow);
+      row.appendChild(think);
+
+      $("chat").appendChild(row);
+      $("chat").scrollTop = $("chat").scrollHeight;
+
+      thinkingRow = row;
+    }
+
+    function hideThinking() {
+      pendingReqId = null;
+      if (thinkingRow && thinkingRow.parentNode) thinkingRow.parentNode.removeChild(thinkingRow);
+      thinkingRow = null;
+    }
+
+    function trimHistory() {
+      while (history.length > 1 + HISTORY_MAX) history.splice(1, 1);
     }
 
     function newId() {
@@ -336,32 +401,34 @@
 
     function startKeepalive() {
       stopKeepalive();
-      keepalive = setInterval(() => {
-        wsSend({ type: "ping", ts: Date.now() });
-      }, 25000);
+      keepalive = setInterval(() => wsSend({ type: "ping", ts: Date.now() }), 25000);
     }
     function stopKeepalive() {
       if (keepalive) clearInterval(keepalive);
       keepalive = null;
     }
 
-    function trimHistory() {
-      while (history.length > 1 + HISTORY_MAX) history.splice(1, 1);
-    }
-
-    function sendHello() {
+    function sendHello(force = false) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (helloSent && !force) return;
       wsSend({ type: "hello", client_id: "marks-ui", role: "ui", ts: Date.now() });
+      helloSent = true;
+      handshakeOk = false;
     }
 
     function connect() {
+      helloSent = false;
       handshakeOk = false;
+      stream = null;
+      hideThinking();
+
       setStatus("warn", "Connecting…");
       ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
         setStatus("ok", "Connected");
         startKeepalive();
-        sendHello();
+        sendHello(false);
       };
 
       ws.onclose = () => {
@@ -369,6 +436,7 @@
         setStatus("bad", "Disconnected");
         ws = null;
         stream = null;
+        hideThinking();
       };
 
       ws.onerror = () => {
@@ -384,22 +452,26 @@
         if (type === "ping") { wsSend({ type: "pong", ts: Date.now() }); return; }
         if (type === "pong") return;
 
-        if (type === "server_hello") { sendHello(); return; }
+        if (type === "server_hello") { if (!helloSent) sendHello(false); return; }
         if (type === "hello_ack") { handshakeOk = true; return; }
 
         if (type === "started") {
+          // remove thinking indicator once we know Marks started generating
+          if (pendingReqId === msg.id) hideThinking();
+
           const { contentEl } = addMsg("assistant", "", { id: msg.id });
           stream = { id: msg.id, raw: "", contentEl, scheduled: false };
           return;
         }
 
         if (type === "delta") {
+          if (pendingReqId === msg.id) hideThinking();
+
           const delta = (msg.delta || "");
           if (!stream || stream.id !== msg.id) {
             const { contentEl } = addMsg("assistant", "", { id: msg.id });
             stream = { id: msg.id, raw: "", contentEl, scheduled: false };
           }
-
           stream.raw += delta;
 
           if (!stream.scheduled) {
@@ -415,8 +487,9 @@
         }
 
         if (type === "done") {
-          const finalText = msg.message || "";
+          if (pendingReqId === msg.id) hideThinking();
 
+          const finalText = msg.message || "";
           if (!stream || stream.id !== msg.id) {
             addMsg("assistant", finalText, { id: msg.id });
           } else {
@@ -424,7 +497,6 @@
             stream.contentEl.innerHTML = renderMarkdownToHtml(stream.raw);
             $("chat").scrollTop = $("chat").scrollHeight;
           }
-
           history.push({ role: "assistant", content: finalText || (stream ? stream.raw : "") });
           trimHistory();
           stream = null;
@@ -432,21 +504,30 @@
         }
 
         if (type === "error") {
+          if (pendingReqId === msg.id) hideThinking();
+
           const err = msg?.error?.message || msg?.message || "unknown error";
           addMsg("assistant", "ERROR: " + err, { id: msg.id });
 
-          if (String(err).toLowerCase().includes("must send hello")) sendHello();
+          if (String(err).toLowerCase().includes("must send hello")) {
+            helloSent = false;
+            sendHello(true);
+          }
           stream = null;
           return;
         }
       };
     }
 
+    function setUiBusy(busy) {
+      $("btnSend").disabled = !!busy;
+    }
+
     function sendChat() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (!handshakeOk) {
         addMsg("assistant", "ERROR: not ready (hello handshake pending).");
-        sendHello();
+        sendHello(false);
         return;
       }
 
@@ -459,7 +540,10 @@
       history.push({ role: "user", content: userText });
       trimHistory();
 
-      wsSend({
+      // Show thinking immediately after sending request
+      showThinking(id);
+
+      const ok = wsSend({
         type: "chat",
         id,
         body: {
@@ -469,6 +553,11 @@
           stream: true
         }
       });
+
+      if (!ok) {
+        hideThinking();
+        addMsg("assistant", "ERROR: socket not open", { id });
+      }
 
       $("input").value = "";
       $("input").focus();
