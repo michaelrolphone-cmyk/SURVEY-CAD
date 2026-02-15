@@ -104,6 +104,98 @@
       justify-content: center;
       transition: color 0.15s ease, border-color 0.15s ease;
     }
+/* Header becomes a 2-row layout: top row = existing content, bottom row = Marks Q&A */
+header {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* everything that was already in header stays in row 1 by default */
+.header-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+/* Marks row sits below, full width */
+.marks-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+  min-width: 0;
+}
+
+/* Marks input group */
+.marks-qa {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.marks-qa .marks-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.38rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 190, 132, 0.28);
+  background: rgba(15, 10, 6, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 223, 181, 0.08);
+}
+
+.marks-qa img {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 214, 155, 0.4);
+  flex: 0 0 auto;
+}
+
+.marks-qa input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: rgba(0,0,0,0.18);
+  color: var(--text);
+  border: 0;
+  outline: none;
+  font-size: 0.92rem;
+  padding: 0.5rem 0.2rem;
+}
+
+.marks-qa input::placeholder {
+  color: rgba(244, 232, 209, 0.65);
+}
+
+.marks-qa button {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.58rem 0.95rem;
+  font-weight: 750;
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  background: linear-gradient(135deg, rgba(245,158,11,0.22), rgba(255,179,71,0.10));
+}
+
+.marks-qa button:hover {
+  background: linear-gradient(135deg, rgba(245,158,11,0.30), rgba(255,179,71,0.14));
+}
+
+/* Make sure the project pills don’t get crushed */
+.header-meta-index {
+  margin-left: auto;
+}
+
+@media (max-width: 520px) {
+  .marks-qa button { padding: 0.58rem 0.8rem; }
+}
 
     .fullscreen-button:hover {
       color: var(--text);
@@ -687,7 +779,8 @@
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 <body>
-  <header>
+<header>
+  <div class="header-row">
     <a href="/" id="launcherHomeLink" class="launcher-home-link" aria-label="Go to SurveyFoundry launcher home page">
       <span id="launcherBackChevron" class="launcher-back-chevron" aria-hidden="true">‹</span>
       <img id="launcherHeaderIcon" src="/assets/icons/SurveyFoundry.png" alt="SurveyFoundry app icon" class="launcher-icon" />
@@ -695,21 +788,23 @@
     <h1 id="launcherHeaderTitle">SurveyFoundry App Launcher</h1>
     <span id="activeProjectHeaderIndex" class="header-meta-index" aria-live="polite"></span>
     <span id="activeProjectHeader" class="header-meta" aria-live="polite"></span>
-    <form id="marksQuickQa" class="marks-qa" autocomplete="off">
-  <div class="marks-pill" title="Ask Marks (opens MarksLLM in the viewer)">
-    <img src="/assets/icons/MarksAI.png" alt="Marks" />
-    <input id="marksQuestionInput" type="text" inputmode="text"
-      placeholder="Ask Marks…" aria-label="Ask Marks a question" />
-  </div>
-  <button id="marksAskButton" type="submit" aria-label="Ask Marks">Ask</button>
-</form>
-
     <button id="fullscreenButton" class="fullscreen-button" type="button" aria-label="Toggle fullscreen" title="Toggle fullscreen">
       <svg id="fullscreenEnterIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
       <svg id="fullscreenExitIcon" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
     </button>
-    
-  </header>
+  </div>
+
+  <div class="marks-row">
+    <form id="marksQuickQa" class="marks-qa" autocomplete="off">
+      <div class="marks-pill" title="Ask Marks (opens MarksLLM in the viewer)">
+        <img src="/assets/icons/MarksAI.png" alt="Marks" />
+        <input id="marksQuestionInput" type="text" inputmode="text"
+          placeholder="Ask Marks…" aria-label="Ask Marks a question" />
+      </div>
+      <button id="marksAskButton" type="submit" aria-label="Ask Marks">Ask</button>
+    </form>
+  </div>
+</header>
 
   <main>
     <section class="home" id="homeView" aria-label="App launcher home">
@@ -1324,12 +1419,16 @@
     function withActiveProject(file) {
       const project = getActiveProject();
       if (!project) return file;
-
+    
       const url = new URL(file, window.location.origin);
       url.searchParams.set('activeProjectId', String(project.id));
       url.searchParams.set('activeProjectName', String(project.name || ''));
-      return `${url.pathname.replace(/^\//, '')}${url.search}`;
+    
+      // IMPORTANT: preserve hash so MarksLLM.html#deeplink survives
+      const pathname = url.pathname.replace(/^\//, '');
+      return `${pathname}${url.search}${url.hash || ''}`;
     }
+
 
     function openProject(project) {
       setActiveProject(project.id);
