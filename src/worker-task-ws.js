@@ -11,10 +11,10 @@ function decodeFrame(buffer) {
   const rsv2 = (first & 0x20) !== 0;
   const rsv3 = (first & 0x10) !== 0;
 
-  // We do not negotiate extensions. If RSV bits are set, it's a protocol error.
+  // No extensions negotiated; RSV bits must be clear.
   if (rsv1 || rsv2 || rsv3) {
     return {
-      opcode: 0x8, // treat as close-worthy protocol error
+      opcode: 0x8,
       payload: Buffer.alloc(0),
       _protocolError: { code: 1002, reason: 'reserved-bits-set' },
     };
@@ -107,8 +107,8 @@ function encodeCloseFrame(code = 1000, reason = '') {
   const payload = Buffer.allocUnsafe(2 + reasonBuf.length);
   payload.writeUInt16BE(code, 0);
   reasonBuf.copy(payload, 2);
-  const len = payload.length;
 
+  const len = payload.length;
   if (len < 126) return Buffer.concat([Buffer.from([0x88, len]), payload]);
 
   if (len < 65536) {
@@ -136,8 +136,11 @@ function safeJsonParse(buf) {
   try { return JSON.parse(buf.toString('utf8')); } catch { return null; }
 }
 
-// After 101, make it *impossible* to accidentally send raw HTTP/JSON bytes.
-// Any string writes become WS text frames; HTTP status lines after upgrade cause a 1002 close.
+/**
+ * After 101, prevent accidental raw writes that would corrupt the WS stream.
+ * - Buffer writes must look like framed WS. If they look like HTTP or raw JSON, we close/frame.
+ * - String writes are framed as text, except HTTP which triggers a 1002 close.
+ */
 function installPostUpgradeWriteGuard(socket) {
   if (socket.__wsWriteGuardInstalled) return;
   socket.__wsWriteGuardInstalled = true;
@@ -145,19 +148,52 @@ function installPostUpgradeWriteGuard(socket) {
   const rawWrite = socket.write.bind(socket);
   socket.__rawWrite = rawWrite;
 
+  function looksLikeHttp(buf) {
+    const s = buf.toString('utf8', 0, Math.min(buf.length, 8));
+    return s.startsWith('HTTP/1.');
+  }
+
+  function looksLikeJson(buf) {
+    const b0 = buf[0];
+    return b0 === 0x7b /* { */ || b0 === 0x5b /* [ */;
+  }
+
+  function looksLikeWsFrame(buf) {
+    if (!buf || buf.length < 2) return false;
+    const b0 = buf[0];
+    const fin = (b0 & 0x80) !== 0;
+    const rsv = (b0 & 0x70);
+    const op = (b0 & 0x0f);
+    const okOp = op === 0x1 || op === 0x2 || op === 0x8 || op === 0x9 || op === 0xa;
+    return fin && rsv === 0 && okOp;
+  }
+
   socket.write = (data, ...args) => {
-    // Buffers are assumed to be already-framed.
-    if (Buffer.isBuffer(data)) return rawWrite(data, ...args);
+    if (Buffer.isBuffer(data)) {
+      if (looksLikeWsFrame(data)) return rawWrite(data, ...args);
+
+      if (looksLikeHttp(data)) {
+        try { rawWrite(encodeCloseFrame(1002, 'http-after-upgrade')); } catch {}
+        try { socket.destroy(); } catch {}
+        return false;
+      }
+
+      if (looksLikeJson(data)) {
+        return rawWrite(encodeTextFrame(data.toString('utf8')), ...args);
+      }
+
+      try { rawWrite(encodeCloseFrame(1002, 'unframed-bytes')); } catch {}
+      try { socket.destroy(); } catch {}
+      return false;
+    }
 
     const s = String(data);
-    // If someone tries to write an HTTP response after upgrade, that's a protocol violation.
     if (s.startsWith('HTTP/1.1') || s.startsWith('HTTP/1.0')) {
       try { rawWrite(encodeCloseFrame(1002, 'http-after-upgrade')); } catch {}
       try { socket.destroy(); } catch {}
       return false;
     }
 
-    // Otherwise, frame it as text to avoid RSV1/invalid-frame explosions client-side.
     return rawWrite(encodeTextFrame(s), ...args);
   };
 }
@@ -165,11 +201,11 @@ function installPostUpgradeWriteGuard(socket) {
 /* --------------------------- worker scheduler --------------------------- */
 
 export function createWorkerSchedulerService(opts = {}) {
-  const PATH = String(opts.path || '/ws/worker');
+  const PATH = String(opts.path || '/ws/worker').replace(/\/+$/, '');
   const OFFLINE_AFTER_MS = Number.isFinite(opts.offlineAfterMs) ? Number(opts.offlineAfterMs) : 30_000;
   const HEARTBEAT_MS = Number.isFinite(opts.heartbeatMs) ? Number(opts.heartbeatMs) : 10_000;
 
-  // poolId -> { workers: Map, queue: [], tasks: Map, rr: number }
+  // poolId -> { workers: Map, queue: [], tasks: Map, rr: number, pingSeq: number }
   const pools = new Map();
 
   function getOrCreatePool(poolId) {
@@ -257,6 +293,7 @@ export function createWorkerSchedulerService(opts = {}) {
     }
   }
 
+  // heartbeat / pump loop
   const heartbeatTimer = setInterval(() => {
     const at = Date.now();
     for (const pool of pools.values()) {
@@ -271,6 +308,11 @@ export function createWorkerSchedulerService(opts = {}) {
   }, HEARTBEAT_MS);
   if (heartbeatTimer.unref) heartbeatTimer.unref();
 
+  /**
+   * submitTask(poolId, kind, payload) -> Promise(result)
+   * Resolves on {type:'task-result', taskId, ok:true, result}
+   * Rejects on {ok:false, error}
+   */
   function submitTask(poolId, kind, payload = null) {
     const pool = getOrCreatePool(poolId);
     const id = randomUUID();
@@ -331,42 +373,46 @@ export function createWorkerSchedulerService(opts = {}) {
       capabilities: w.capabilities || null,
     };
   }
-function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
-  const url = new URL(req.url || '/', 'http://localhost');
-  const pathname = url.pathname.replace(/\/+$/, '');
-  const expected = String(PATH).replace(/\/+$/, '');
 
-  if (pathname !== expected) return false; // mismatch = non-destructive
+  function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
+    const url = new URL(req.url || '/', 'http://localhost');
+    const pathname = url.pathname.replace(/\/+$/, '');
+    const expected = PATH;
 
-  let upgraded = false;
-  try {
-    if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-      socket.destroy();
-      return true; // path matched; we touched socket
-    }
+    if (pathname !== expected) return false; // mismatch = non-destructive
 
-    const key = req.headers['sec-websocket-key'];
-    if (!key) {
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-      socket.destroy();
-      return true;
-    }
+    let upgraded = false;
+    try {
+      if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return true; // path matched; prevent router fallback
+      }
 
-    const responseHeaders = [
-      'HTTP/1.1 101 Switching Protocols',
-      'Upgrade: websocket',
-      'Connection: Upgrade',
-      `Sec-WebSocket-Accept: ${createWebSocketAccept(key)}`,
-      '\r\n',
-    ];
-    socket.write(responseHeaders.join('\r\n'));
-    upgraded = true;
+      const key = req.headers['sec-websocket-key'];
+      if (!key) {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return true;
+      }
 
-    socket.__wsUpgraded = true;
+      const poolId = String(url.searchParams.get('pool') || 'default');
+      const pool = getOrCreatePool(poolId);
 
+      const responseHeaders = [
+        'HTTP/1.1 101 Switching Protocols',
+        'Upgrade: websocket',
+        'Connection: Upgrade',
+        `Sec-WebSocket-Accept: ${createWebSocketAccept(key)}`,
+        '\r\n',
+      ];
+      socket.write(responseHeaders.join('\r\n'));
+      upgraded = true;
 
-      // After upgrade, prevent accidental raw writes from producing invalid WS frames
+      // mark upgraded so your server upgrade router can avoid writing HTTP fallback
+      socket.__wsUpgraded = true;
+
+      // Guard against accidental raw writes after upgrade
       installPostUpgradeWriteGuard(socket);
 
       socket.setTimeout(0);
@@ -429,7 +475,6 @@ function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
             if (!frame) break;
             pending.buffer = pending.buffer.subarray(frame.consumed);
 
-            // protocol error from decodeFrame (RSV bits etc)
             if (frame._protocolError) {
               try { socket.__rawWrite?.(encodeCloseFrame(frame._protocolError.code, frame._protocolError.reason)); } catch {}
               try { socket.destroy(); } catch {}
@@ -437,7 +482,6 @@ function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
             }
 
             if (frame.opcode === 0x8) {
-              // peer close
               try { socket.__rawWrite?.(encodeCloseFrame(1000, 'bye')); } catch {}
               try { socket.end(); } catch {}
               return;
@@ -521,20 +565,19 @@ function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
         pool.workers.delete(worker.id);
         pump(pool);
       });
+
       socket.on('error', (e) => {
-        console.error(e);
+        console.error('[ws/worker] socket error', e);
         try { socket.destroy(); } catch {}
       });
 
-
-    return true; // NEVER falsy after 101
-  } catch (e) {
-    console.error('[ws/worker] handleUpgrade threw', e);
-    try { socket.destroy(); } catch {}
-    // If we already upgraded, MUST return true so router won't append HTTP
-    return upgraded ? true : false;
+      return true; // NEVER falsy after 101
+    } catch (e) {
+      console.error('[ws/worker] handleUpgrade threw', e);
+      try { socket.destroy(); } catch {}
+      return upgraded ? true : false;
+    }
   }
-}
 
   return {
     handleUpgrade,
