@@ -331,45 +331,40 @@ export function createWorkerSchedulerService(opts = {}) {
       capabilities: w.capabilities || null,
     };
   }
+function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
+  const url = new URL(req.url || '/', 'http://localhost');
+  const pathname = url.pathname.replace(/\/+$/, '');
+  const expected = String(PATH).replace(/\/+$/, '');
 
-  function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
-    const url = new URL(req.url || '/', 'http://localhost');
-    const pathname = url.pathname.replace(/\/+$/, '');
-    const expected = String(PATH).replace(/\/+$/, '');
+  if (pathname !== expected) return false; // mismatch = non-destructive
 
-    // mismatch must be non-destructive (so other ws handlers can try)
-    if (pathname !== expected) return false;
+  let upgraded = false;
+  try {
+    if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      socket.destroy();
+      return true; // path matched; we touched socket
+    }
 
-    // From here on, we "own" this socket for this path.
-    // IMPORTANT: return true for all outcomes (so your router never appends HTTP onto WS).
-    try {
-      if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
-        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-        socket.destroy();
-        return true;
-      }
+    const key = req.headers['sec-websocket-key'];
+    if (!key) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      socket.destroy();
+      return true;
+    }
 
-      const key = req.headers['sec-websocket-key'];
-      if (!key) {
-        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-        socket.destroy();
-        return true;
-      }
+    const responseHeaders = [
+      'HTTP/1.1 101 Switching Protocols',
+      'Upgrade: websocket',
+      'Connection: Upgrade',
+      `Sec-WebSocket-Accept: ${createWebSocketAccept(key)}`,
+      '\r\n',
+    ];
+    socket.write(responseHeaders.join('\r\n'));
+    upgraded = true;
 
-      const poolId = String(url.searchParams.get('pool') || 'default');
-      const pool = getOrCreatePool(poolId);
+    socket.__wsUpgraded = true;
 
-      const responseHeaders = [
-        'HTTP/1.1 101 Switching Protocols',
-        'Upgrade: websocket',
-        'Connection: Upgrade',
-        `Sec-WebSocket-Accept: ${createWebSocketAccept(key)}`,
-        '\r\n',
-      ];
-      socket.write(responseHeaders.join('\r\n'));
-
-      // mark upgraded for any outer safety checks you might add
-      socket.__wsUpgraded = true;
 
       // After upgrade, prevent accidental raw writes from producing invalid WS frames
       installPostUpgradeWriteGuard(socket);
@@ -526,18 +521,20 @@ export function createWorkerSchedulerService(opts = {}) {
         pool.workers.delete(worker.id);
         pump(pool);
       });
-
-      socket.on('error', () => {
+      socket.on('error', (e) => {
+        console.error(e);
         try { socket.destroy(); } catch {}
       });
 
-      return true;
-    } catch (err) {
-      console.error('[ws/worker] handleUpgrade threw', err);
-      try { socket.destroy(); } catch {}
-      return true; // path matched; prevent outer router from writing HTTP onto this socket
-    }
+
+    return true; // NEVER falsy after 101
+  } catch (e) {
+    console.error('[ws/worker] handleUpgrade threw', e);
+    try { socket.destroy(); } catch {}
+    // If we already upgraded, MUST return true so router won't append HTTP
+    return upgraded ? true : false;
   }
+}
 
   return {
     handleUpgrade,
