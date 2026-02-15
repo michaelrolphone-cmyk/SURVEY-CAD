@@ -11,6 +11,7 @@ import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
+import { createWebSocketAccept } from './worker-task-ws.js';
 import { loadFldConfig } from './fld-config.js';
 import {
   getCrewProfiles,
@@ -314,6 +315,7 @@ export function createSurveyServer({
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
+  const workerSocket = createWebSocketAccept();
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
@@ -848,7 +850,7 @@ export function createSurveyServer({
 
   server.on('upgrade', (req, socket, head) => {
     const handled = lineforgeCollab.handleUpgrade(req, socket, head)
-      || localStorageSyncWsService.handleUpgrade(req, socket, head);
+      || localStorageSyncWsService.handleUpgrade(req, socket, head) || workerSocket.handleUpgrade(req, socket, head);
     if (!handled && !socket.destroyed) {
       socket.destroy();
     }
