@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LM Proxy Chat — WebSocket Client</title>
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg:#070b12;
+      --panel:#0c1220;
+      --panel2:#0f1930;
+      --text:#e6eefc;
+      --muted:#9ab0d0;
+      --line:rgba(255,255,255,.10);
+      --accent:#ffd54a;
+      --ok:#37d67a;
+      --warn:#ffb020;
+      --bad:#ff5b5b;
+      --shadow: 0 12px 40px rgba(0,0,0,.55);
+      --r:16px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    html,body{height:100%; margin:0; background:radial-gradient(1200px 700px at 30% 0%, #101c35 0%, var(--bg) 60%); color:var(--text); font-family:var(--sans);}
+    .app{display:grid; grid-template-columns: 380px minmax(0,1fr); height:100%;}
+    .left{border-right:1px solid var(--line); padding:16px; background:linear-gradient(180deg, rgba(255,255,255,.03), transparent);}
+    .right{display:grid; grid-template-rows: auto 1fr auto; min-width:0;}
+    h1{font-size:16px; margin:0 0 10px;}
+    .sub{color:var(--muted); font-size:12px; margin:0 0 14px; line-height:1.35;}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:12px;}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    label{font-size:12px; color:var(--muted);}
+    input, select, textarea{
+      background:rgba(0,0,0,.25);
+      border:1px solid var(--line);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 10px;
+      outline:none;
+      font-family:var(--sans);
+    }
+    input:focus, select:focus, textarea:focus{border-color: rgba(255,213,74,.55); box-shadow:0 0 0 3px rgba(255,213,74,.12);}
+    textarea{width:100%; min-height:80px; resize:vertical;}
+    .btn{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 12px;
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      cursor:pointer;
+      user-select:none;
+      transition:transform .06s ease, background .15s ease, border-color .15s ease;
+      font-weight:600;
+      font-size:12px;
+    }
+    .btn:hover{background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.18);}
+    .btn:active{transform:translateY(1px);}
+    .btn.primary{background:rgba(255,213,74,.12); border-color:rgba(255,213,74,.30); color:var(--text);}
+    .btn.primary:hover{background:rgba(255,213,74,.16); border-color:rgba(255,213,74,.42);}
+    .btn.danger{background:rgba(255,91,91,.10); border-color:rgba(255,91,91,.30);}
+    .btn.danger:hover{background:rgba(255,91,91,.14); border-color:rgba(255,91,91,.42);}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.22);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .dot{width:10px; height:10px; border-radius:50%;}
+    .dot.ok{background:var(--ok);}
+    .dot.warn{background:var(--warn);}
+    .dot.bad{background:var(--bad);}
+    .kv{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:12px;}
+    .kv .k{font-size:12px; color:var(--muted); margin-bottom:6px;}
+    .kv .v{font-family:var(--mono); font-size:12px; color:#cfe1ff; opacity:.95; word-break:break-all;}
+    .divider{height:1px; background:var(--line); margin:12px 0;}
+    .chatHeader{
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(0,0,0,.35), transparent);
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+      min-width:0;
+    }
+    .chatTitle{display:flex; flex-direction:column; gap:2px; min-width:0;}
+    .chatTitle b{font-size:13px;}
+    .chatTitle span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    .chat{overflow:auto; padding:18px 16px; display:flex; flex-direction:column; gap:12px;}
+    .msg{
+      max-width: 900px;
+      width: fit-content;
+      border-radius: 16px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.28);
+      padding:10px 12px;
+      box-shadow: 0 8px 26px rgba(0,0,0,.35);
+      position:relative;
+    }
+    .msg.user{align-self:flex-end; background:rgba(255,213,74,.08); border-color:rgba(255,213,74,.24);}
+    .msg.assistant{align-self:flex-start;}
+    .msg .meta{display:flex; gap:10px; align-items:center; margin-bottom:6px; color:var(--muted); font-size:11px;}
+    .msg .meta .role{font-weight:700; letter-spacing:.3px;}
+    .msg .meta .small{font-family:var(--mono); opacity:.85;}
+    .msg pre{
+      margin:0;
+      white-space:pre-wrap;
+      word-break:break-word;
+      font-family:var(--sans);
+      font-size:13px;
+      line-height:1.45;
+      color:var(--text);
+    }
+    .composer{
+      border-top:1px solid var(--line);
+      padding:14px 16px;
+      background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
+    }
+    .composer .box{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:10px;
+      align-items:end;
+    }
+    .composer textarea{min-height:64px; max-height:210px;}
+    .tiny{font-size:11px; color:var(--muted); margin-top:10px; line-height:1.3;}
+    .debug{margin-top:10px; font-family:var(--mono); font-size:11px; color:#cfe1ff; opacity:.9; white-space:pre-wrap; max-height:160px; overflow:auto;}
+    .hint{font-size:11px; color:var(--muted); margin-top:8px;}
+    .right .chat::-webkit-scrollbar{width:10px}
+    .right .chat::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10); border-radius:999px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="left">
+      <h1>LM Proxy Chat</h1>
+      <p class="sub">
+        Standalone browser client that connects to your WebSocket endpoint and sends chat requests that your server should forward to a connected LM Studio proxy client.
+      </p>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <span class="pill" id="statusPill">
+            <span class="dot bad" id="statusDot"></span>
+            <span id="statusText">disconnected</span>
+          </span>
+          <button class="btn" id="btnConnect">Connect</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <label>WebSocket URL</label>
+        <input id="wsUrl" style="width:100%; margin-top:6px;" />
+
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="btnModels">List Models</button>
+          <button class="btn danger" id="btnDisconnect">Disconnect</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row" style="gap:12px; align-items:flex-start;">
+          <div style="flex:1; min-width:0;">
+            <label>Model</label>
+            <select id="model" style="width:100%; margin-top:6px;">
+              <option value="">(server default)</option>
+            </select>
+            <div class="hint">If your server forwards `/v1/models`, this will populate.</div>
+          </div>
+
+          <div style="width:140px;">
+            <label>Temperature</label>
+            <input id="temp" type="number" min="0" max="2" step="0.05" value="0.2" style="width:100%; margin-top:6px;" />
+          </div>
+        </div>
+
+        <div class="row" style="gap:12px; margin-top:10px;">
+          <div style="width:160px;">
+            <label>Max tokens</label>
+            <input id="maxTokens" type="number" min="1" step="1" value="600" style="width:100%; margin-top:6px;" />
+          </div>
+          <label style="display:flex; gap:8px; align-items:center; margin-top:22px;">
+            <input id="stream" type="checkbox" checked />
+            stream
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <label>System prompt</label>
+        <textarea id="systemPrompt" placeholder="Optional system prompt... (e.g., 'Be precise and return JSON')"
+          style="margin-top:6px;">You are a precise assistant. Keep answers compact and accurate.</textarea>
+
+        <div class="divider"></div>
+
+        <div class="kv">
+          <div>
+            <div class="k">Last request id</div>
+            <div class="v" id="lastReq">(none)</div>
+          </div>
+          <div>
+            <div class="k">Protocol</div>
+            <div class="v">
+              Sends: <span style="opacity:.9">{"type":"chat","id","body":{...}}</span><br/>
+              Receives: <span style="opacity:.9">started | delta | done | error | models</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tiny">
+          Keepalive: browser sends <span style="font-family:var(--mono);">{"type":"ping"}</span> every 20s (and replies with <span style="font-family:var(--mono);">pong</span> when asked).
+        </div>
+
+        <div class="debug" id="debug"></div>
+      </div>
+    </aside>
+
+    <main class="right">
+      <div class="chatHeader">
+        <div class="chatTitle">
+          <b>Chat</b>
+          <span id="chatSubtitle">Connect to start.</span>
+        </div>
+        <div class="row">
+          <button class="btn danger" id="btnCancel" title="Cancel the last request">Cancel</button>
+          <button class="btn" id="btnClear">Clear</button>
+        </div>
+      </div>
+
+      <div class="chat" id="chat"></div>
+
+      <div class="composer">
+        <div class="box">
+          <textarea id="input" placeholder="Type a message… (Shift+Enter for newline)"></textarea>
+          <button class="btn primary" id="btnSend">Send</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // ---- config ----
+    const DEFAULT_WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
+
+    // ---- state ----
+    let ws = null;
+    let keepalive = null;
+    let lastReqId = null;
+    let streamingAssistantEl = null; // <pre> element we append deltas into
+
+    const $ = (id) => document.getElementById(id);
+
+    function debug(line) {
+      const el = $("debug");
+      const ts = new Date().toISOString().slice(11,19);
+      el.textContent = `[${ts}] ${line}\n` + el.textContent;
+    }
+
+    function setStatus(kind, text) {
+      const dot = $("statusDot");
+      dot.className = "dot " + (kind || "bad");
+      $("statusText").textContent = text || "";
+      $("chatSubtitle").textContent = text || "";
+    }
+
+    function esc(s) {
+      // not used (we set textContent), kept for reference
+      return String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+    }
+
+    function addMsg(role, text, meta = {}) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg " + (role === "user" ? "user" : "assistant");
+
+      const metaRow = document.createElement("div");
+      metaRow.className = "meta";
+
+      const roleEl = document.createElement("span");
+      roleEl.className = "role";
+      roleEl.textContent = role.toUpperCase();
+
+      const idEl = document.createElement("span");
+      idEl.className = "small";
+      idEl.textContent = meta.id ? `id=${meta.id}` : "";
+
+      const extraEl = document.createElement("span");
+      extraEl.className = "small";
+      extraEl.textContent = meta.extra || "";
+
+      metaRow.appendChild(roleEl);
+      if (meta.id) metaRow.appendChild(idEl);
+      if (meta.extra) metaRow.appendChild(extraEl);
+
+      const pre = document.createElement("pre");
+      pre.textContent = text || "";
+
+      wrap.appendChild(metaRow);
+      wrap.appendChild(pre);
+
+      $("chat").appendChild(wrap);
+      $("chat").scrollTop = $("chat").scrollHeight;
+
+      return { wrap, pre };
+    }
+
+    function setLastReq(id) {
+      lastReqId = id || null;
+      $("lastReq").textContent = lastReqId || "(none)";
+    }
+
+    function wsSend(obj) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+      ws.send(JSON.stringify(obj));
+      return true;
+    }
+
+    function startKeepalive() {
+      stopKeepalive();
+      keepalive = setInterval(() => {
+        wsSend({ type: "ping", ts: Date.now() });
+      }, 20000);
+    }
+
+    function stopKeepalive() {
+      if (keepalive) clearInterval(keepalive);
+      keepalive = null;
+    }
+
+    function populateModels(list) {
+      const sel = $("model");
+      // preserve current selection
+      const current = sel.value;
+      // clear everything except the first "(server default)" option
+      while (sel.options.length > 1) sel.remove(1);
+      (list || []).forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        sel.appendChild(opt);
+      });
+      if (current) sel.value = current;
+    }
+
+    function newId() {
+      // crypto.randomUUID is widely supported
+      return (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("req-" + Math.random().toString(16).slice(2));
+    }
+
+    function connect() {
+      const url = $("wsUrl").value.trim();
+      if (!url) return;
+
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        debug("already connected/connecting");
+        return;
+      }
+
+      debug("connecting " + url);
+      setStatus("warn", "connecting…");
+
+      ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        debug("ws open");
+        setStatus("ok", "connected");
+        startKeepalive();
+
+        // Some servers want a hello. This is safe even if ignored.
+        wsSend({
+          type: "hello",
+          client_id: "browser-ui",
+          role: "ui",
+          ts: Date.now()
+        });
+      };
+
+      ws.onclose = () => {
+        debug("ws close");
+        stopKeepalive();
+        setStatus("bad", "disconnected");
+        ws = null;
+      };
+
+      ws.onerror = (e) => {
+        debug("ws error");
+        setStatus("bad", "socket error");
+      };
+
+      ws.onmessage = (ev) => {
+        let msg;
+        try { msg = JSON.parse(ev.data); }
+        catch { debug("bad json from server"); return; }
+
+        // Handle json ping/pong if your server uses it
+        if (msg.type === "ping") {
+          wsSend({ type: "pong", ts: Date.now() });
+          return;
+        }
+
+        if (msg.type === "server_hello") {
+          // optional handshake from server; respond with hello
+          wsSend({ type: "hello", client_id: "browser-ui", role: "ui", ts: Date.now() });
+          return;
+        }
+
+        if (msg.type === "hello" || msg.type === "hello_ack") {
+          debug("hello/ack received");
+          return;
+        }
+
+        if (msg.type === "models") {
+          // supports either: {type:"models", models:[...]} or {type:"models", data:{data:[{id}...]}}
+          const models =
+            Array.isArray(msg.models) ? msg.models :
+            Array.isArray(msg?.data?.data) ? msg.data.data.map(x => x.id).filter(Boolean) :
+            Array.isArray(msg?.raw?.data) ? msg.raw.data.map(x => x.id).filter(Boolean) :
+            [];
+
+          populateModels(models);
+          debug("models received: " + (models.length ? models.length : "(none)"));
+          addMsg("assistant", models.length ? ("Models:\n" + models.join("\n")) : "No models returned.", { extra: "models" });
+          return;
+        }
+
+        if (msg.type === "started") {
+          debug("started id=" + msg.id);
+          // create a streaming assistant bubble
+          const { pre } = addMsg("assistant", "", { id: msg.id, extra: "streaming" });
+          streamingAssistantEl = pre;
+          return;
+        }
+
+        if (msg.type === "delta") {
+          if (!streamingAssistantEl) {
+            // if server didn’t send started, create one
+            const { pre } = addMsg("assistant", "", { id: msg.id, extra: "streaming" });
+            streamingAssistantEl = pre;
+          }
+          streamingAssistantEl.textContent += (msg.delta || "");
+          $("chat").scrollTop = $("chat").scrollHeight;
+          return;
+        }
+
+        if (msg.type === "done") {
+          debug("done id=" + msg.id);
+          // If we were streaming, keep the final; if not streaming, render
+          if (!streamingAssistantEl) {
+            addMsg("assistant", msg.message || "", { id: msg.id, extra: "done" });
+          } else if ((msg.message || "").length && streamingAssistantEl.textContent.trim().length === 0) {
+            streamingAssistantEl.textContent = msg.message;
+          }
+          streamingAssistantEl = null;
+          return;
+        }
+
+        if (msg.type === "error") {
+          debug("error id=" + (msg.id || "(none)") + " " + (msg.error?.message || msg.message || ""));
+          addMsg("assistant",
+            "ERROR: " + (msg.error?.message || msg.message || "unknown error"),
+            { id: msg.id, extra: msg.error?.code || "error" }
+          );
+          streamingAssistantEl = null;
+          return;
+        }
+
+        // Unknown message
+        debug("unknown message type: " + msg.type);
+      };
+    }
+
+    function disconnect() {
+      if (!ws) return;
+      debug("disconnect");
+      stopKeepalive();
+      try { ws.close(); } catch {}
+      ws = null;
+      setStatus("bad", "disconnected");
+    }
+
+    function sendModels() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const id = newId();
+      wsSend({ type: "models", id });
+    }
+
+    function sendChat() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      const userText = $("input").value.trim();
+      if (!userText) return;
+
+      const id = newId();
+      setLastReq(id);
+
+      // Render user bubble immediately
+      addMsg("user", userText, { id });
+
+      // Build conversation: simplest approach is to send just system + user each turn.
+      // If your server expects full history, extend this to keep an array of past messages.
+      const sys = $("systemPrompt").value.trim();
+      const model = $("model").value.trim();
+      const temperature = parseFloat($("temp").value || "0.2");
+      const maxTokens = parseInt($("maxTokens").value || "600", 10);
+      const stream = $("stream").checked;
+
+      const body = {
+        model: model || undefined,
+        messages: [
+          ...(sys ? [{ role: "system", content: sys }] : []),
+          { role: "user", content: userText }
+        ],
+        temperature: Number.isFinite(temperature) ? temperature : 0.2,
+        max_tokens: Number.isFinite(maxTokens) ? maxTokens : 600,
+        stream
+      };
+
+      // Protocol assumption:
+      // Send {type:"chat", id, body:{...}} and expect started/delta/done.
+      const ok = wsSend({ type: "chat", id, body });
+      if (!ok) {
+        addMsg("assistant", "ERROR: socket not open", { id, extra: "client" });
+      }
+
+      $("input").value = "";
+      $("input").focus();
+    }
+
+    function cancelLast() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!lastReqId) return;
+      wsSend({ type: "cancel", id: lastReqId });
+      debug("cancel sent id=" + lastReqId);
+    }
+
+    function clearChat() {
+      $("chat").innerHTML = "";
+      streamingAssistantEl = null;
+    }
+
+    // ---- wire up ----
+    $("wsUrl").value = DEFAULT_WS_URL;
+
+    $("btnConnect").onclick = connect;
+    $("btnDisconnect").onclick = disconnect;
+    $("btnModels").onclick = sendModels;
+    $("btnSend").onclick = sendChat;
+    $("btnCancel").onclick = cancelLast;
+    $("btnClear").onclick = clearChat;
+
+    $("input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+      }
+    });
+
+    // auto-connect if you want (comment out to disable)
+    connect();
+  </script>
+</body>
+</html>
