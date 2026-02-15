@@ -140,6 +140,10 @@
     const STORAGE_KEY = 'surveyfoundryEquipmentLogs';
     const CREW_PROFILES_STORAGE_KEY = 'surveyfoundryCrewProfiles';
 
+    // API config
+    const EQUIPMENT_LOGS_API_URL = '/api/equipment-logs';
+    const CREW_API_URL = '/api/crew';
+
     const fields = {
       rodman: document.getElementById('rodman'),
       equipmentHeight: document.getElementById('equipmentHeight'),
@@ -188,6 +192,49 @@
 
     function saveLogs() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+    }
+
+    /* ── API helpers ── */
+    function mergeById(localList, serverList) {
+      const out = new Map();
+      for (const item of (localList || [])) {
+        if (item && item.id) out.set(item.id, item);
+      }
+      for (const item of (serverList || [])) {
+        if (item && item.id) out.set(item.id, { ...(out.get(item.id) || {}), ...item });
+      }
+      return Array.from(out.values());
+    }
+
+    function normalizeServerLogList(json) {
+      if (Array.isArray(json)) return json;
+      if (Array.isArray(json?.logs)) return json.logs;
+      if (Array.isArray(json?.data)) return json.data;
+      return null;
+    }
+
+    function normalizeServerLog(json) {
+      if (json && typeof json === 'object') {
+        if (json.log && typeof json.log === 'object' && json.log.id) return json.log;
+        if (json.data && typeof json.data === 'object') return json.data;
+        if (json.id) return json;
+      }
+      return null;
+    }
+
+    async function postEquipmentLog(log) {
+      const res = await fetch(EQUIPMENT_LOGS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(log),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`POST ${EQUIPMENT_LOGS_API_URL} failed (${res.status}) ${text}`.trim());
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) return null;
+      return await res.json();
     }
 
     function esc(v = '') {
@@ -285,7 +332,7 @@
       };
     }
 
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
       const data = getFormData();
 
       if (!data.rodman && !data.jobFileName) {
@@ -293,23 +340,73 @@
         return;
       }
 
-      if (editingId) {
-        const idx = logs.findIndex((l) => l.id === editingId);
-        if (idx !== -1) {
-          logs[idx] = { ...logs[idx], ...data, updatedAt: new Date().toISOString() };
-        }
-      } else {
-        logs.push({
-          id: crypto.randomUUID(),
-          ...data,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      const nowIso = new Date().toISOString();
+      const wasEditing = !!editingId;
 
-      saveLogs();
-      clearForm();
-      renderLogs();
+      // UI lock
+      const prevText = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = wasEditing ? 'Saving…' : 'Saving & Syncing…';
+
+      try {
+        if (wasEditing) {
+          const idx = logs.findIndex((l) => l.id === editingId);
+          if (idx !== -1) {
+            logs[idx] = { ...logs[idx], ...data, updatedAt: nowIso };
+          }
+          saveLogs();
+          clearForm();
+          renderLogs();
+          return;
+        }
+
+        // NEW log: create local record first (fast)
+        const localId = crypto.randomUUID();
+        const newLocal = {
+          id: localId,
+          ...data,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        logs.push(newLocal);
+        saveLogs();
+        clearForm();
+        renderLogs();
+
+        // Then POST to API
+        try {
+          const apiJson = await postEquipmentLog(newLocal);
+
+          const serverList = normalizeServerLogList(apiJson);
+          if (serverList) {
+            logs = mergeById(logs, serverList);
+            saveLogs();
+            renderLogs();
+            return;
+          }
+
+          const serverLog = normalizeServerLog(apiJson);
+          if (serverLog && serverLog.id) {
+            const localIdx = logs.findIndex(l => l.id === localId);
+            if (localIdx !== -1) {
+              if (serverLog.id !== localId) {
+                const merged = { ...logs[localIdx], ...serverLog };
+                logs.splice(localIdx, 1);
+                logs.push(merged);
+              } else {
+                logs[localIdx] = { ...logs[localIdx], ...serverLog };
+              }
+              saveLogs();
+              renderLogs();
+            }
+          }
+        } catch (err) {
+          console.warn('Equipment log POST failed; kept local copy:', err);
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = prevText;
+      }
     });
 
     cancelBtn.addEventListener('click', () => {
@@ -337,6 +434,10 @@
           log.updatedAt = now.toISOString();
           saveLogs();
           renderLogs();
+          // Sync teardown to API
+          postEquipmentLog(log).catch(err => {
+            console.warn('Equipment log teardown POST failed:', err);
+          });
         }
       } else if (target.classList.contains('edit-btn')) {
         const log = logs.find((l) => l.id === id);
@@ -394,15 +495,16 @@
     async function fetchLatestFromApi() {
       try {
         const [crewRes, logsRes] = await Promise.all([
-          fetch('/api/crew'),
-          fetch('/api/equipment-logs'),
+          fetch(CREW_API_URL),
+          fetch(EQUIPMENT_LOGS_API_URL),
         ]);
         let updated = false;
         if (crewRes.ok) {
           const crewData = await crewRes.json();
           const serverCrew = Array.isArray(crewData?.crew) ? crewData.crew : [];
           if (serverCrew.length > 0) {
-            crew = serverCrew;
+            // Merge instead of replacing (prevents wiping local-only items)
+            crew = mergeById(crew, serverCrew);
             localStorage.setItem(CREW_PROFILES_STORAGE_KEY, JSON.stringify(crew));
             updated = true;
           }
@@ -411,7 +513,8 @@
           const logsData = await logsRes.json();
           const serverLogs = Array.isArray(logsData?.logs) ? logsData.logs : [];
           if (serverLogs.length > 0) {
-            logs = serverLogs;
+            // Merge instead of replacing (prevents wiping local-only items)
+            logs = mergeById(logs, serverLogs);
             saveLogs();
             updated = true;
           }
