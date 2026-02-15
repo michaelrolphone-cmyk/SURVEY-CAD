@@ -12,7 +12,7 @@ import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-stor
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
-import { createLmProxyControlWsService } from "./lmstudio-proxy-control-ws.js";
+import { createLmProxyHubWsService } from "./lmstudio-proxy-control-ws.js";
 
 import { loadFldConfig } from './fld-config.js';
 import {
@@ -318,7 +318,7 @@ export function createSurveyServer({
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
   const workerSocket = createWorkerSchedulerService();
-  const lmProxy = createLmProxyControlWsService({
+  const lmProxy = createLmProxyHubWsService({
     path: "/ws/lmproxy",
     token: process.env.CONTROL_TOKEN || "",   // optional
     requestTimeoutMs: 120_000
