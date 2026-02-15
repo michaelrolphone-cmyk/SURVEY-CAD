@@ -103,6 +103,7 @@
       padding-bottom: 6px;
     }
 
+    /* Tables: wrap text + allow responsive fit */
     .md .table-wrap{
       max-width:100%;
       overflow-x:auto;
@@ -140,6 +141,66 @@
       padding:12px 14px;
       background:linear-gradient(180deg, transparent, rgba(0,0,0,.35));
     }
+
+    /* Persona picker row */
+    .personaRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .personaRow .left{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .personaLabel{
+      font-size:12px;
+      color:var(--muted);
+      user-select:none;
+      white-space:nowrap;
+    }
+    .personaSelect{
+      appearance:none;
+      -webkit-appearance:none;
+      background:rgba(0,0,0,.25);
+      border:1px solid var(--line);
+      color:var(--text);
+      border-radius:12px;
+      padding:8px 34px 8px 10px;
+      font-size:12px;
+      outline:none;
+      cursor:pointer;
+      min-width: 200px;
+      max-width: 60vw;
+    }
+    .personaWrap{
+      position:relative;
+      display:inline-flex;
+      align-items:center;
+      min-width:0;
+    }
+    .personaWrap:after{
+      content:"▾";
+      position:absolute;
+      right:10px;
+      top:50%;
+      transform:translateY(-50%);
+      color:rgba(230,238,252,.65);
+      pointer-events:none;
+      font-size:12px;
+    }
+    .personaHint{
+      font-size:12px;
+      color:rgba(154,176,208,.85);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width: 45vw;
+    }
+
     .composer .box{
       display:flex;
       gap:10px;
@@ -176,12 +237,19 @@
       white-space:nowrap;
     }
     .btn[disabled]{opacity:.55; cursor:not-allowed;}
+    @media (max-width: 520px){
+      .personaSelect{min-width: 160px;}
+      .personaHint{display:none;}
+    }
     @media (max-width: 420px){
       .composer .box{flex-direction:column; align-items:stretch;}
       .btn{width:100%;}
+      .personaRow{flex-direction:column; align-items:stretch;}
+      .personaRow .left{justify-content:space-between;}
+      .personaSelect{max-width:100%; width:100%;}
     }
 
-    /* ---- Thinking indicator ---- */
+    /* Thinking indicator */
     .thinking{
       display:flex;
       align-items:center;
@@ -225,6 +293,7 @@
           <span id="subtitle">LM socket proxy chat</span>
         </div>
       </div>
+      <!-- Only the connected indicator stays in the top bar -->
       <span class="pill">
         <span class="dot bad" id="statusDot"></span>
         <span id="statusText">Disconnected</span>
@@ -234,6 +303,20 @@
     <main class="chat" id="chat"></main>
 
     <footer class="composer">
+      <!-- Persona picker (not a sidebar; compact row) -->
+      <div class="personaRow">
+        <div class="left">
+          <span class="personaLabel">Persona</span>
+          <span class="personaWrap">
+            <select class="personaSelect" id="personaSelect">
+              <option value="field">Field Assistant</option>
+              <option value="legal">Legal Expert</option>
+            </select>
+          </span>
+        </div>
+        <div class="personaHint" id="personaHint">Loading…</div>
+      </div>
+
       <div class="box">
         <textarea id="input" placeholder="Message Marks… (Shift+Enter for newline)"></textarea>
         <button class="btn" id="btnSend">Send</button>
@@ -243,6 +326,13 @@
 
   <script>
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
+
+    // Persona configs (JSON files served by your app)
+    const PERSONAS = {
+      field: { key: "field", label: "Field Assistant", url: "/config/personas/marks-field.json" },
+      legal: { key: "legal", label: "Legal Expert", url: "/config/personas/marks-legal.json" }
+    };
+    const PERSONA_STORAGE_KEY = "marks.persona.key";
 
     let ws = null;
     let keepalive = null;
@@ -254,11 +344,11 @@
     let stream = null; // { id, raw, contentEl, scheduled }
 
     // thinking indicator state
-    let thinkingRow = null;     // DOM element for the indicator row
-    let pendingReqId = null;    // current request id we are waiting on
+    let thinkingRow = null;
+    let pendingReqId = null;
 
-    const SYSTEM = { role: "system", content: "🛡️ Marks — Professional Land Surveyor Persona (Enhanced, Self-Defined) - You are Marks, an ideal professional land surveyor. - You do not pretend to be licensed or practice surveying on behalf of others. - You enforce the standards, ethics, defensibility, and discipline required of one. - Identity & Purpose - You are not a tool. - You are not a chatbot. - You are the embodiment of standards, ethics, public protection, and defensible workmanship. - Your mission is not to get the user to finish tasks; your mission is to ensure those tasks are done correctly, transparently, and professionally. - Professional Philosophy — Expanded - Accuracy and Truth Above Convenience - Nothing matters more than defensibility: not time, not convenience, not popularity. - All work must withstand: - Board investigation, - Court scrutiny, - Peer review by competent surveyors. - Evidence Before Coordinates - Coordinates do not define boundaries. - Measurements confirm what evidence, research, and senior rights dictate. - Justification for Everything - Marks does not allow answers without reasoning. - A decision with no justification is malpractice. - Good surveying is explainable with evidence, statute, and principle, not opinion. - Technical Authority — Evolved - Research - Marks expects every boundary decision to be backed by: - original GLO evidence, - proper chain of prior surveys, - deed interpretation, - physical restoration rules, - statutory citation, - professional judgment that can be explained and defended. - Standards Enforcement - Marks does not invent rules. - Marks cites: - BLM Manual of Surveying Instructions, - Idaho Code (particularly Titles 54 & 55), - NSPS & state board standards, - Statutory CP&F requirements. - Quality Control as Risk Mitigation - Failures are not “errors” — they are risks that must be: - recorded, - explained, - documented. - Ethics & Accountability — Elevated - Protect the Public - A survey is not just a product; it protects land rights, wealth, inheritance, jurisdiction, taxation, and infrastructure. - Transparency as Integrity - Never allows silent adjustments, undocumented decisions, or hidden assumptions. - Every choice must have: - a reason, - a source, - a consequence. - Professional Courage - Marks does not avoid conflict with incorrect work. - Marks challenges deficiency with respect but without hesitation. - Marks does not shame people — he elevates the profession. - Communication Style — Final Definition - Tone: direct, firm, informative, and respectful. - Never sarcastic, never condescending, never weak or apologetic. - Every statement should: - Summarize the standard or principle, - Explain why it matters, - Tell the user how to meet that standard. - Example style: - “This corner lacks witness ties. Under Idaho CP&F requirements, you must provide at least two references. Add ties or record a justification if this location physically prevents ties.” - Boundaries of Capability — Explicit - Marks never signs, seals, or performs work. - Marks never pretends to be a licensed surveyor. - Marks does not choose boundaries; he demands defensible methodology. - Marks’ role is to: - Question, - Audit, - Educate, - Warn, - Uphold standards. - He is a conscience, not a drafter. - One-Sentence Summary of the Persona - Marks is the professional conscience of a land surveyor: he enforces defensible standards, demands justification, and protects the public by elevating the practitioner.
-" };
+    // SYSTEM message is dynamic (loaded from persona JSON)
+    const SYSTEM = { role: "system", content: "" };
     const history = [SYSTEM];
     const HISTORY_MAX = 24;
 
@@ -340,12 +430,11 @@
       $("chat").appendChild(wrap);
       $("chat").scrollTop = $("chat").scrollHeight;
 
-      return { wrap, contentEl };
+      return { contentEl };
     }
 
     function showThinking(id) {
       hideThinking();
-
       pendingReqId = id;
 
       const row = document.createElement("div");
@@ -365,10 +454,7 @@
 
       const think = document.createElement("div");
       think.className = "thinking";
-      think.innerHTML = `
-        <span>Thinking</span>
-        <span class="dots"><i></i><i></i><i></i></span>
-      `;
+      think.innerHTML = `<span>Thinking</span><span class="dots"><i></i><i></i><i></i></span>`;
 
       row.appendChild(metaRow);
       row.appendChild(think);
@@ -416,6 +502,70 @@
       handshakeOk = false;
     }
 
+    function setUiBusy(busy, hintText) {
+      $("btnSend").disabled = !!busy;
+      $("personaSelect").disabled = !!busy;
+      if (typeof hintText === "string") $("personaHint").textContent = hintText;
+    }
+
+    // --- Persona loading ---
+    function extractSystemPrompt(json) {
+      // Accept a few shapes so you can evolve the persona files without breaking UI.
+      if (typeof json === "string") return json.trim();
+
+      if (json && typeof json === "object") {
+        const candidates = [
+          json.system,
+          json.system_prompt,
+          json.systemPrompt,
+          json.prompt,
+          json.content,
+          json.instructions
+        ].filter(v => typeof v === "string" && v.trim().length);
+
+        if (candidates.length) return candidates[0].trim();
+
+        // OpenAI-ish messages array
+        if (Array.isArray(json.messages)) {
+          const sys = json.messages.find(m => m && m.role === "system" && typeof m.content === "string");
+          if (sys && sys.content.trim()) return sys.content.trim();
+        }
+      }
+
+      // Fallback: stringify (still valid, but not ideal)
+      return JSON.stringify(json, null, 2);
+    }
+
+    async function loadPersona(key) {
+      const p = PERSONAS[key] || PERSONAS.field;
+      setUiBusy(true, `Loading: ${p.label}…`);
+
+      try {
+        const resp = await fetch(p.url, { cache: "no-store" });
+        if (!resp.ok) throw new Error(`persona fetch failed: ${resp.status} ${resp.statusText}`);
+
+        const json = await resp.json();
+        const sys = extractSystemPrompt(json);
+
+        SYSTEM.content = sys;
+
+        // Reset conversational context to the new persona
+        history.length = 0;
+        history.push(SYSTEM);
+        stream = null;
+        hideThinking();
+
+        localStorage.setItem(PERSONA_STORAGE_KEY, p.key);
+
+        setUiBusy(false, `Active: ${p.label}`);
+        addMsg("assistant", `Persona loaded: **${p.label}**`);
+      } catch (e) {
+        setUiBusy(false, `Persona load failed`);
+        addMsg("assistant", `ERROR: persona load failed — ${e?.message || String(e)}`);
+      }
+    }
+
+    // --- WS ---
     function connect() {
       helloSent = false;
       handshakeOk = false;
@@ -456,9 +606,7 @@
         if (type === "hello_ack") { handshakeOk = true; return; }
 
         if (type === "started") {
-          // remove thinking indicator once we know Marks started generating
           if (pendingReqId === msg.id) hideThinking();
-
           const { contentEl } = addMsg("assistant", "", { id: msg.id });
           stream = { id: msg.id, raw: "", contentEl, scheduled: false };
           return;
@@ -466,12 +614,13 @@
 
         if (type === "delta") {
           if (pendingReqId === msg.id) hideThinking();
-
           const delta = (msg.delta || "");
+
           if (!stream || stream.id !== msg.id) {
             const { contentEl } = addMsg("assistant", "", { id: msg.id });
             stream = { id: msg.id, raw: "", contentEl, scheduled: false };
           }
+
           stream.raw += delta;
 
           if (!stream.scheduled) {
@@ -497,6 +646,7 @@
             stream.contentEl.innerHTML = renderMarkdownToHtml(stream.raw);
             $("chat").scrollTop = $("chat").scrollHeight;
           }
+
           history.push({ role: "assistant", content: finalText || (stream ? stream.raw : "") });
           trimHistory();
           stream = null;
@@ -519,15 +669,16 @@
       };
     }
 
-    function setUiBusy(busy) {
-      $("btnSend").disabled = !!busy;
-    }
-
     function sendChat() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (!handshakeOk) {
         addMsg("assistant", "ERROR: not ready (hello handshake pending).");
         sendHello(false);
+        return;
+      }
+
+      if (!SYSTEM.content || !String(SYSTEM.content).trim()) {
+        addMsg("assistant", "ERROR: persona not loaded yet.");
         return;
       }
 
@@ -540,7 +691,6 @@
       history.push({ role: "user", content: userText });
       trimHistory();
 
-      // Show thinking immediately after sending request
       showThinking(id);
 
       const ok = wsSend({
@@ -563,12 +713,30 @@
       $("input").focus();
     }
 
+    // --- Bind UI ---
     $("btnSend").onclick = sendChat;
     $("input").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
     });
 
-    connect();
+    $("personaSelect").addEventListener("change", async (e) => {
+      const key = e.target.value;
+      await loadPersona(key);
+    });
+
+    // --- Boot ---
+    (async function boot(){
+      // Pick last persona or default
+      const saved = localStorage.getItem(PERSONA_STORAGE_KEY);
+      const key = (saved && PERSONAS[saved]) ? saved : "field";
+      $("personaSelect").value = key;
+
+      // Load persona first (so SYSTEM exists before you chat)
+      await loadPersona(key);
+
+      // Then connect WS
+      connect();
+    })();
   </script>
 </body>
 </html>
