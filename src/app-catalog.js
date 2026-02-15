@@ -47,7 +47,7 @@ export const APP_CATALOG = [
     name: 'PointForge',
     description: 'Builds the canonical point set (coords + provenance + weights).',
     entryHtml: 'POINT_TRANSFORMER.HTML',
-    iconPath: '/assets/icons/PinSet.png',
+    iconPath: '/assets/icons/SetPoint.png',
     color: '#3A5A40',
     accent: '#D8F3DC',
     glyph: 'PT',
