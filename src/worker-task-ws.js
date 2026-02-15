@@ -145,7 +145,6 @@ export function createWorkerSchedulerService(opts = {}) {
 
     if (!candidates.length) return null;
 
-    // simple RR among candidates (stable)
     pool.rr = (pool.rr + 1) >>> 0;
     return candidates[pool.rr % candidates.length] || candidates[0];
   }
@@ -176,7 +175,6 @@ export function createWorkerSchedulerService(opts = {}) {
       });
 
       if (!ok) {
-        // couldn’t write => put task back and mark worker offline-ish
         worker.lastSeen = 0;
         worker.inFlight.delete(task.id);
         task.status = 'queued';
@@ -189,13 +187,11 @@ export function createWorkerSchedulerService(opts = {}) {
     }
   }
 
-  // light heartbeat to keep online status meaningful even if idle
   const heartbeatTimer = setInterval(() => {
     const at = Date.now();
     for (const pool of pools.values()) {
       pool.pingSeq = (pool.pingSeq + 1) >>> 0;
       for (const w of pool.workers.values()) {
-        // only ping if we haven't seen anything recently
         if (!w.socket || w.socket.destroyed) continue;
         if ((at - w.lastSeen) < Math.floor(HEARTBEAT_MS / 2)) continue;
         send(w, { type: 'ping', seq: pool.pingSeq, at });
@@ -205,10 +201,6 @@ export function createWorkerSchedulerService(opts = {}) {
   }, HEARTBEAT_MS);
   if (heartbeatTimer.unref) heartbeatTimer.unref();
 
-  /**
-   * submitTask(poolId, kind, payload) -> Promise(result)
-   * Minimal: resolves when worker returns {type:'task-result', taskId, ok, result|error}
-   */
   function submitTask(poolId, kind, payload = null) {
     const pool = getOrCreatePool(poolId);
     const id = randomUUID();
@@ -216,7 +208,6 @@ export function createWorkerSchedulerService(opts = {}) {
 
     let resolve, reject;
     const p = new Promise((res, rej) => { resolve = res; reject = rej; });
-    // convenience: let caller read p.taskId if they want
     p.taskId = id;
 
     const task = {
@@ -272,17 +263,12 @@ export function createWorkerSchedulerService(opts = {}) {
   }
 
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
-      const url = new URL(req.url || '/', 'http://localhost');
-      const pathname = url.pathname.replace(/\/+$/, '');
-      const expected = String(PATH).replace(/\/+$/, '');
-    
-      // IMPORTANT: on mismatch, do NOT write to the socket, do NOT destroy
-      if (pathname !== expected) {
-        console.error(JSON.stringify(url));
-      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-      socket.destroy();
-      return false;
-    }
+    const url = new URL(req.url || '/', 'http://localhost');
+    const pathname = url.pathname.replace(/\/+$/, '');
+    const expected = String(PATH).replace(/\/+$/, '');
+
+    // IMPORTANT: mismatch must be non-destructive (so other ws handlers can try)
+    if (pathname !== expected) return false;
 
     if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
       socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
@@ -309,7 +295,11 @@ export function createWorkerSchedulerService(opts = {}) {
     ];
     socket.write(responseHeaders.join('\r\n'));
 
-    // pending worker until "hello"
+    // Make Heroku/proxies less likely to kill idle sockets
+    socket.setTimeout(0);
+    socket.setNoDelay(true);
+    socket.setKeepAlive(true);
+
     const pending = {
       buffer: head.length ? Buffer.from(head) : Buffer.alloc(0),
       workerId: null,
@@ -320,7 +310,6 @@ export function createWorkerSchedulerService(opts = {}) {
       const desiredId = msg?.workerId ? String(msg.workerId).trim() : '';
       const workerId = desiredId || randomUUID();
 
-      // If workerId already connected, replace old socket (simple policy)
       const existing = pool.workers.get(workerId);
       if (existing && existing.socket && !existing.socket.destroyed) {
         try { existing.socket.destroy(); } catch {}
@@ -332,7 +321,6 @@ export function createWorkerSchedulerService(opts = {}) {
         concurrency: Number.isFinite(msg?.concurrency) ? Math.max(1, Math.trunc(msg.concurrency)) : 1,
         capabilities: msg?.capabilities ?? null,
         socket,
-        buffer: pending.buffer,
         lastSeen: Date.now(),
         inFlight: new Set(),
       };
@@ -388,12 +376,9 @@ export function createWorkerSchedulerService(opts = {}) {
         if (!worker) continue;
         worker.lastSeen = at;
 
-        if (msg.type === 'pong') {
-          continue;
-        }
+        if (msg.type === 'pong') continue;
 
         if (msg.type === 'hello') {
-          // allow updating worker metadata
           if (msg.name) worker.name = String(msg.name).slice(0, 120);
           if (Number.isFinite(msg.concurrency)) worker.concurrency = Math.max(1, Math.trunc(msg.concurrency));
           if (msg.capabilities !== undefined) worker.capabilities = msg.capabilities;
@@ -435,7 +420,6 @@ export function createWorkerSchedulerService(opts = {}) {
       const worker = getWorkerObj();
       if (!worker) return;
 
-      // Requeue any in-flight tasks (minimal behavior)
       for (const taskId of worker.inFlight) {
         const task = pool.tasks.get(taskId);
         if (!task) continue;
@@ -448,36 +432,24 @@ export function createWorkerSchedulerService(opts = {}) {
 
       pool.workers.delete(worker.id);
       pump(pool);
-
-      if (pool.workers.size === 0 && pool.queue.length === 0) {
-        // optional cleanup similar to your room cleanup
-        // pools.delete(pool.id);
-      }
     });
 
     socket.on('error', () => {
       try { socket.destroy(); } catch {}
     });
 
-    return true;
+    return true; // CRITICAL for your server’s `handled = a() || b() || c()`
   }
 
   return {
     handleUpgrade,
-
-    // minimal scheduling API (so you can give it tasks)
     submitTask,
     listWorkers,
     getWorker,
-
-    // internals like your collab service
     _pools: pools,
     _internals: { decodeFrame, encodeTextFrame, createWebSocketAccept, PATH, HEARTBEAT_MS, OFFLINE_AFTER_MS },
   };
 }
 
-export {
-  decodeFrame,
-  encodeTextFrame,
-  createWebSocketAccept,
-};
+// optional named exports (if you *really* want to import helpers elsewhere)
+export { decodeFrame, encodeTextFrame, createWebSocketAccept };
