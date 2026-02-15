@@ -46,6 +46,7 @@
     .brand .stack b{font-size:13px;}
     .brand .stack span{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
+    /* only indicator */
     .pill{
       display:inline-flex; align-items:center; gap:8px;
       padding:7px 10px;
@@ -54,7 +55,6 @@
       background:rgba(0,0,0,.22);
       font-size:12px;
       color:var(--muted);
-      flex:0 0 auto;
       user-select:none;
     }
     .dot{width:10px; height:10px; border-radius:50%;}
@@ -157,7 +157,6 @@
         </div>
       </div>
 
-      <!-- Only indicator kept -->
       <span class="pill" title="WebSocket connection status">
         <span class="dot bad" id="statusDot"></span>
         <span id="statusText">Disconnected</span>
@@ -178,31 +177,39 @@
     // Your WS endpoint:
     const WS_URL = "wss://record-of-survey-795c317ace89.herokuapp.com/ws/lmproxy";
 
-    // IMPORTANT: This client sends messages in the EXACT command format your
-    // lmstudio-proxy-client understands:
-    //   { type:"chat",   id:"...", body:{ model?, messages:[...], temperature?, max_tokens?, stream? } }
-    //   { type:"models", id:"..." }
-    //   { type:"cancel", id:"..." }
+    // The proxy client expects SERVER->CLIENT commands like:
+    //   { type:"chat", id:"...", body:{ messages:[...], temperature, max_tokens, stream, model? } }
     //
-    // It expects to receive:
-    //   started / delta / done / error / models / cancelled (and optionally ping/pong)
+    // You are connecting the browser to that same WS endpoint, and your server is responding:
+    //   "must send hello first"
+    //
+    // So we MUST send a hello immediately on connect, before any chat/models/cancel.
+    // This hello is the same shape the proxy ecosystem uses: {type:"hello", client_id:"..."}.
+    //
+    // If your server also sends hello_ack, we’ll mark handshakeComplete. If it doesn’t, we proceed anyway.
 
     let ws = null;
     let keepalive = null;
 
+    let handshakeSent = false;
+    let handshakeComplete = false;
+
     let lastReqId = null;
     let streamingAssistantPre = null;
 
-    // We keep a running conversation history (so this behaves like a real chat).
     const SYSTEM_MESSAGE = { role: "system", content: "You are Marks. Be precise and practical. Keep answers compact and accurate." };
     const history = [ SYSTEM_MESSAGE ];
+    const HISTORY_MAX_MESSAGES = 24; // keep it bounded
 
     const $ = (id) => document.getElementById(id);
 
     function setStatus(kind, text) {
       $("statusDot").className = "dot " + (kind || "bad");
       $("statusText").textContent = text || "";
-      $("subtitle").textContent = (kind === "ok") ? "Connected" : (kind === "warn" ? "Connecting…" : "LM socket proxy chat");
+      $("subtitle").textContent =
+        (kind === "ok") ? "Connected" :
+        (kind === "warn") ? "Connecting…" :
+        "LM socket proxy chat";
     }
 
     function addMsg(role, text, meta = {}) {
@@ -248,7 +255,7 @@
     function startKeepalive() {
       stopKeepalive();
       keepalive = setInterval(() => {
-        // Proxy client understands ping/pong (it will reply pong to ping).
+        // Proxy client understands ping/pong. Server may also.
         wsSend({ type: "ping", ts: Date.now() });
       }, 25_000);
     }
@@ -258,8 +265,28 @@
       keepalive = null;
     }
 
+    function sendHello() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      // This is the minimal "hello" your server is requiring before it will accept anything else.
+      // It also matches the proxy ecosystem style.
+      wsSend({
+        type: "hello",
+        client_id: "marks-ui",
+        role: "ui",
+        ts: Date.now()
+      });
+
+      handshakeSent = true;
+      // If server never acks, we still allow chat after a brief tick.
+      setTimeout(() => { if (!handshakeComplete) handshakeComplete = true; }, 200);
+    }
+
     function connect() {
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+      handshakeSent = false;
+      handshakeComplete = false;
 
       setStatus("warn", "Connecting…");
       ws = new WebSocket(WS_URL);
@@ -267,6 +294,7 @@
       ws.onopen = () => {
         setStatus("ok", "Connected");
         startKeepalive();
+        sendHello();
       };
 
       ws.onclose = () => {
@@ -286,15 +314,21 @@
 
         const type = String(msg?.type || "");
 
-        // Keep the proxy client happy if pings are forwarded both ways.
+        // server/proxy keepalives
         if (type === "ping") { wsSend({ type: "pong", ts: Date.now() }); return; }
         if (type === "pong") { return; }
 
-        // Proxy client emits hello on connect to the server; if your server forwards it to the browser, ignore.
-        if (type === "hello" || type === "hello_ack") return;
+        // handshake acks (some servers do this; your proxy client doesn’t)
+        if (type === "hello_ack" || type === "server_hello") {
+          handshakeComplete = true;
+          if (!handshakeSent) sendHello();
+          return;
+        }
+
+        // If server forwards proxy client's hello, ignore
+        if (type === "hello") return;
 
         if (type === "started") {
-          // Create the assistant bubble that we'll stream into.
           const { pre } = addMsg("assistant", "", { id: msg.id });
           streamingAssistantPre = pre;
           return;
@@ -316,13 +350,10 @@
           if (!streamingAssistantPre) {
             addMsg("assistant", finalText, { id: msg.id });
           } else if (finalText && streamingAssistantPre.textContent.trim().length === 0) {
-            // if server didn't stream but sent done
             streamingAssistantPre.textContent = finalText;
           }
 
-          // Persist assistant reply into history for multi-turn chat.
           history.push({ role: "assistant", content: finalText });
-
           streamingAssistantPre = null;
           return;
         }
@@ -330,28 +361,48 @@
         if (type === "error") {
           const errText = msg?.error?.message || msg?.message || "unknown error";
           addMsg("assistant", "ERROR: " + errText, { id: msg.id });
+
+          // If the server says we must hello first, do it immediately.
+          if (String(errText).toLowerCase().includes("must send hello first")) {
+            handshakeComplete = false;
+            sendHello();
+          }
+
           streamingAssistantPre = null;
           return;
         }
 
-        // Optional: models response (if you ever send {type:"models"})
         if (type === "models") {
           const ok = msg.ok !== false;
           const models =
             Array.isArray(msg?.data?.data) ? msg.data.data.map(x => x.id).filter(Boolean) :
             Array.isArray(msg?.models) ? msg.models :
             [];
-          addMsg("assistant", ok ? ("Models:\n" + models.join("\n")) : ("Models error: " + (msg?.error?.message || "unknown")), { id: msg.id });
+          addMsg("assistant",
+            ok ? ("Models:\n" + models.join("\n")) : ("Models error: " + (msg?.error?.message || "unknown")),
+            { id: msg.id }
+          );
           return;
         }
 
-        // Optional: cancelled acknowledgement
         if (type === "cancelled") return;
       };
     }
 
+    function trimHistory() {
+      // Always keep system message at index 0
+      while (history.length > 1 + HISTORY_MAX_MESSAGES) history.splice(1, 1);
+    }
+
     function sendChat() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      // Guarantee hello happened before chat
+      if (!handshakeSent) sendHello();
+      if (!handshakeComplete) {
+        addMsg("assistant", "ERROR: handshake not complete (sending hello… try again in a moment).");
+        return;
+      }
 
       const userText = $("input").value.trim();
       if (!userText) return;
@@ -361,14 +412,13 @@
 
       addMsg("user", userText, { id });
 
-      // Persist user message into history
       history.push({ role: "user", content: userText });
+      trimHistory();
 
-      // Build body exactly as proxy expects.
-      // No UI settings: hard-coded defaults here.
+      // EXACT format your lmstudio-proxy-client expects (server->proxy).
       const body = {
-        // model: omitted => LM Studio server default (proxy will pass it through)
-        messages: history.slice(), // include system + conversation history
+        // model: omitted => LM Studio default
+        messages: history.slice(),
         temperature: 0.2,
         max_tokens: 600,
         stream: true
@@ -382,12 +432,8 @@
     }
 
     $("btnSend").onclick = sendChat;
-
     $("input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendChat();
-      }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
     });
 
     // auto-connect
