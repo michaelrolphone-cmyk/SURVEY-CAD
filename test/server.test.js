@@ -768,3 +768,55 @@ test('server file upload, download, and list endpoints', async () => {
     await fs.rm(testProjectDir, { recursive: true, force: true }).catch(() => {});
   }
 });
+
+test('pointforge-exports API saves and loads original and modified points', async () => {
+  const app = await startApiServer(new SurveyCadClient());
+  try {
+    // POST a pointforge export
+    const createRes = await fetch(`http://127.0.0.1:${app.port}/api/pointforge-exports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        originalCsv: '1,100,200,0,IRON,original\n2,300,400,0,MAG,original',
+        modifiedCsv: '1,100,200,0,IRON,modified\n2,300,400,0,MAG,modified',
+        georeference: { type: 'idaho-state-plane-usft', zone: 'west' },
+        metadata: { source: 'pointforge-transformer' },
+      }),
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.ok(created.export.id, 'Response should include an export ID');
+    assert.equal(created.export.originalCsv, '1,100,200,0,IRON,original\n2,300,400,0,MAG,original');
+    assert.equal(created.export.modifiedCsv, '1,100,200,0,IRON,modified\n2,300,400,0,MAG,modified');
+    assert.equal(created.export.georeference.zone, 'west');
+
+    // GET by ID
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/pointforge-exports?id=${encodeURIComponent(created.export.id)}`);
+    assert.equal(getRes.status, 200);
+    const loaded = await getRes.json();
+    assert.equal(loaded.export.id, created.export.id);
+    assert.equal(loaded.export.originalCsv, created.export.originalCsv);
+    assert.equal(loaded.export.modifiedCsv, created.export.modifiedCsv);
+
+    // GET by room
+    const roomRes = await fetch(`http://127.0.0.1:${app.port}/api/pointforge-exports?room=default`);
+    assert.equal(roomRes.status, 200);
+    const roomExports = await roomRes.json();
+    assert.ok(roomExports.exports.length >= 1);
+    assert.ok(roomExports.exports.some((e) => e.id === created.export.id));
+
+    // 404 for nonexistent
+    const notFoundRes = await fetch(`http://127.0.0.1:${app.port}/api/pointforge-exports?id=nonexistent`);
+    assert.equal(notFoundRes.status, 404);
+
+    // Validation: modifiedCsv is required
+    const badRes = await fetch(`http://127.0.0.1:${app.port}/api/pointforge-exports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originalCsv: 'test' }),
+    });
+    assert.equal(badRes.status, 400);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});

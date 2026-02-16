@@ -326,6 +326,8 @@ export function createSurveyServer({
     requestTimeoutMs: 120_000
   });
 
+  const pointforgeExportStore = new Map();
+
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
 
@@ -418,6 +420,62 @@ if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worke
         return;
       }
 
+
+      // --- PointForge export persistence ---
+      if (urlObj.pathname === '/api/pointforge-exports' || urlObj.pathname === '/api/pointforge-exports/') {
+        if (req.method === 'POST') {
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') {
+            sendJson(res, 400, { error: 'Request body must be a JSON object.' });
+            return;
+          }
+          if (!body.modifiedCsv || typeof body.modifiedCsv !== 'string') {
+            sendJson(res, 400, { error: 'modifiedCsv (string) is required.' });
+            return;
+          }
+          const id = `pf-export-${Date.now()}-${randomUUID().slice(0, 8)}`;
+          const record = {
+            id,
+            roomId: String(body.roomId || 'default'),
+            originalCsv: typeof body.originalCsv === 'string' ? body.originalCsv : '',
+            modifiedCsv: body.modifiedCsv,
+            georeference: body.georeference || null,
+            metadata: body.metadata || {},
+            createdAt: new Date().toISOString(),
+          };
+          pointforgeExportStore.set(id, record);
+          // Notify LineSmith clients in the room via lineforge collab
+          lineforgeCollab.broadcastToRoom(record.roomId, {
+            type: 'pointforge-import',
+            exportId: id,
+            at: Date.now(),
+          });
+          sendJson(res, 201, { export: record });
+          return;
+        }
+        if (req.method === 'GET') {
+          const id = urlObj.searchParams.get('id');
+          if (id) {
+            const record = pointforgeExportStore.get(id);
+            if (!record) {
+              sendJson(res, 404, { error: 'Export not found.' });
+              return;
+            }
+            sendJson(res, 200, { export: record });
+            return;
+          }
+          const roomId = urlObj.searchParams.get('room') || 'default';
+          const exports = [];
+          for (const record of pointforgeExportStore.values()) {
+            if (record.roomId === roomId) exports.push(record);
+          }
+          exports.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+          sendJson(res, 200, { exports });
+          return;
+        }
+        sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+        return;
+      }
 
       if (urlObj.pathname === '/api/localstorage-sync') {
         if (req.method === 'GET') {
