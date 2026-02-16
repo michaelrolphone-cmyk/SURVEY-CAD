@@ -435,8 +435,15 @@ export function createLineforgeCollabService() {
     return true;
   }
 
+  function broadcastToRoom(roomId, payload) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    broadcast(room, payload);
+  }
+
   return {
     handleUpgrade,
+    broadcastToRoom,
     _rooms: rooms,
     _internals: { decodeFrame, encodeTextFrame, createWebSocketAccept },
   };

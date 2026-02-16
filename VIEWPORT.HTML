@@ -4102,6 +4102,10 @@
         collab.applyingRemoteState = false;
         flushCollabStateSync();
       }
+      if (message.type === "pointforge-import" && message.exportId) {
+        loadPointforgeExportFromApi(message.exportId);
+        return;
+      }
     });
   }
 
@@ -9056,9 +9060,82 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     return true;
   }
 
+  function applyPointforgePayload(payload) {
+    if (!payload?.csv) {
+      setStatus("PointForge payload was invalid (missing CSV content).", "warn");
+      return false;
+    }
+    importCsvText(payload.csv, "PointForge import");
+    const aligned = syncViewToGeoreference(payload);
+    setMapLayerEnabled(true);
+    if (aligned && mapLayerState.enabled) {
+      syncMapToView(true);
+    }
+    return true;
+  }
+
+  function loadPointforgeExportFromApi(exportId) {
+    if (!exportId) return;
+    fetch(`/api/pointforge-exports?id=${encodeURIComponent(exportId)}`)
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((result) => {
+        const record = result?.export;
+        if (!record) { setStatus("PointForge export not found on server.", "warn"); return; }
+        const payload = {
+          source: "pointforge-transformer",
+          exportedAt: record.createdAt,
+          csv: record.modifiedCsv,
+          georeference: record.georeference,
+        };
+        applyPointforgePayload(payload);
+        setStatus(`PointForge import loaded from server (${exportId}).`, "ok");
+      })
+      .catch((_err) => {
+        setStatus("Failed to load PointForge export from server.", "warn");
+      });
+  }
+
+  function savePointsToApi() {
+    const csv = serializePointsCsv();
+    if (!csv) return;
+    const roomId = collab.roomId || "default";
+    fetch("/api/pointforge-exports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId,
+        originalCsv: "",
+        modifiedCsv: csv,
+        metadata: { source: "linesmith-save", savedAt: new Date().toISOString() },
+      }),
+    }).catch(() => {});
+  }
+
+  function serializePointsCsv() {
+    const rows = [["number","x","y","z","code","notes"]];
+    for (const p of points.values()) {
+      rows.push([p.num, p.x, p.y, p.z, p.code || "", p.notes || ""]);
+    }
+    if (rows.length <= 1) return "";
+    return rows.map((r) => r.map((v) => {
+      const s = String(v ?? "");
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(",")).join("\n");
+  }
+
   function tryImportPointforgePayload() {
     if (launchSource !== "pointforge") return false;
 
+    // Try API-based loading first (via exportId URL param)
+    const params = new URLSearchParams(window.location.search);
+    const exportId = params.get("exportId");
+    if (exportId) {
+      loadPointforgeExportFromApi(exportId);
+      localStorage.removeItem(POINTFORGE_IMPORT_STORAGE_KEY);
+      return true;
+    }
+
+    // Fallback to localStorage handoff
     const raw = localStorage.getItem(POINTFORGE_IMPORT_STORAGE_KEY);
     if (!raw) {
       setStatus("PointForge launch detected, but no import payload was found in local storage.", "warn");
@@ -9067,18 +9144,13 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
 
     try {
       const payload = JSON.parse(raw);
-      if (!payload?.csv) {
-        setStatus("PointForge payload was invalid (missing CSV content).", "warn");
-        return false;
-      }
-      importCsvText(payload.csv, "PointForge import");
-      const aligned = syncViewToGeoreference(payload);
-      setMapLayerEnabled(true);
-      if (aligned && mapLayerState.enabled) {
-        syncMapToView(true);
-      }
+      const applied = applyPointforgePayload(payload);
       localStorage.removeItem(POINTFORGE_IMPORT_STORAGE_KEY);
-      return true;
+      if (applied) {
+        // Save the imported points to the API for persistence and sync
+        savePointsToApi();
+      }
+      return applied;
     } catch (_err) {
       setStatus("PointForge payload could not be parsed.", "warn");
       return false;

@@ -51,8 +51,32 @@ test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
   assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'LineSmith should define PointForge import bootstrap logic');
   assert.match(html, /launchSource\s*!==\s*"pointforge"/, 'LineSmith import bootstrap should be gated by query param');
   assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'LineSmith should reuse CSV import pipeline for PointForge payloads');
-  assert.match(html, /const\s+aligned\s*=\s*syncViewToGeoreference\(payload\)/, 'LineSmith should apply georeference alignment when PointForge provides it');
+  assert.match(html, /syncViewToGeoreference\(payload\)/, 'LineSmith should apply georeference alignment when PointForge provides it');
   assert.match(html, /if \(aligned && mapLayerState\.enabled\) \{[\s\S]*syncMapToView\(true\);/, 'LineSmith should refresh map view after georeference alignment when map layer is enabled');
+});
+
+test('POINT_TRANSFORMER.HTML saves original and modified points via API on export', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /fetch\("\/api\/pointforge-exports"/, 'PointForge should POST to the pointforge-exports API when exporting');
+  assert.match(html, /originalCsv/, 'PointForge API payload should include original CSV');
+  assert.match(html, /modifiedCsv/, 'PointForge API payload should include modified CSV');
+  assert.match(html, /exportId=/, 'PointForge should pass the export ID to LineSmith via URL param');
+  assert.match(html, /persistPointSetToProjectFile\(\{\s*kind:\s*"import"/, 'PointForge should persist original points to project file on export');
+  assert.match(html, /persistPointSetToProjectFile\(\{\s*kind:\s*"export"/, 'PointForge should persist modified points to project file on export');
+});
+
+test('VIEWPORT.HTML loads points from API and supports socket-based sync', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+loadPointforgeExportFromApi\(exportId\)/, 'LineSmith should define API-based point loading function');
+  assert.match(html, /\/api\/pointforge-exports\?id=/, 'LineSmith should fetch exports from the pointforge-exports API');
+  assert.match(html, /function\s+savePointsToApi\(\)/, 'LineSmith should define API-based point saving function');
+  assert.match(html, /function\s+serializePointsCsv\(\)/, 'LineSmith should define a CSV serialization function for points');
+  assert.match(html, /function\s+applyPointforgePayload\(payload\)/, 'LineSmith should define a reusable payload application function');
+  assert.match(html, /params\.get\("exportId"\)/, 'LineSmith should check for exportId URL parameter for API-based loading');
+  assert.match(html, /message\.type === "pointforge-import"/, 'LineSmith should handle pointforge-import socket messages for real-time sync');
+  assert.match(html, /loadPointforgeExportFromApi\(message\.exportId\)/, 'LineSmith should load from API when notified via socket');
 });
 
 

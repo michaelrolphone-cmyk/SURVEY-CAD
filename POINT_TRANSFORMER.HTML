@@ -1838,8 +1838,46 @@
       if (!recordsSorted?.length) return;
 
       const payload = buildLineSmithImportPayload(recordsSorted);
-      localStorage.setItem(SURVEY_SKETCH_IMPORT_STORAGE_KEY, JSON.stringify(payload));
-      openLinkedApp("/VIEWPORT.HTML?source=pointforge");
+      const originalCsv = elIn.value || "";
+      const modifiedCsv = latestOutputText || "";
+      const context = ensureImportContextForPaste(true);
+
+      // Persist both original and modified points via API
+      const apiBody = {
+        originalCsv,
+        modifiedCsv,
+        georeference: payload.georeference,
+        metadata: {
+          source: "pointforge-transformer",
+          sourceLabel: context?.sourceLabel || "",
+          sourceType: context?.sourceType || "unknown",
+          exportedAt: payload.exportedAt,
+        },
+      };
+
+      fetch("/api/pointforge-exports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(apiBody),
+      })
+        .then((res) => res.json())
+        .then((result) => {
+          const exportId = result?.export?.id || "";
+          // Also persist the export context to project file
+          persistPointSetToProjectFile({ kind: "import", text: originalCsv, context, timestamp: new Date() });
+          persistPointSetToProjectFile({ kind: "export", text: modifiedCsv, context, timestamp: new Date() });
+          // Store payload in localStorage as fallback, then navigate
+          localStorage.setItem(SURVEY_SKETCH_IMPORT_STORAGE_KEY, JSON.stringify(payload));
+          const exportParam = exportId ? `&exportId=${encodeURIComponent(exportId)}` : "";
+          openLinkedApp(`/VIEWPORT.HTML?source=pointforge${exportParam}`);
+        })
+        .catch((_err) => {
+          // Fallback: still navigate with localStorage handoff if API fails
+          persistPointSetToProjectFile({ kind: "import", text: originalCsv, context, timestamp: new Date() });
+          persistPointSetToProjectFile({ kind: "export", text: modifiedCsv, context, timestamp: new Date() });
+          localStorage.setItem(SURVEY_SKETCH_IMPORT_STORAGE_KEY, JSON.stringify(payload));
+          openLinkedApp("/VIEWPORT.HTML?source=pointforge");
+        });
     });
 
 
