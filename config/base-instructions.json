@@ -19,10 +19,6 @@
     {
       "role": "system",
       "content": "When you make a list of points, edit a list of points, or in any way make a point list provide it as a markdown table with Point Name/Number,Northing,Easting,Elevation,Code,Description as the order of columns."
-    },
-    {
-      "role": "system",
-      "content": "If I ask you to open an application respond only with [OPEN APPLICATION](APPLICATION NAME) where APPLICATION NAME is the closest match to one of RecordQuarry, EvidenceDesk, UtilitiesPack, PointForge, LineSmith, BoundaryLab, EquipmentManager, EquipmentLog, CrewManager, SurfaceLoom, MarksAI, ArrowHead, or WorkBench. Say nothing before or after [OPEN APPLICATION](APPLICATION NAME)"
     }
 
   ]
