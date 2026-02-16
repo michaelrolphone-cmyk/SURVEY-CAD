@@ -212,7 +212,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, buildPointFileUploadRecord, appendPointFileResource, appendResourceToFolder, removeResourceById, findCpfPointLinks } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, findCpfPointLinksAsync } from './src/project-browser-state.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
@@ -236,14 +236,25 @@
       window.location.assign(path);
     }
 
-    function getPointFileText(resource) {
-      const storageKey = resource?.reference?.value;
-      if (!storageKey) return null;
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const text = parsed?.text;
-      return typeof text === 'string' ? text : null;
+    async function resolvePointFileText(resource) {
+      const ref = resource?.reference;
+      if (!ref?.value) return null;
+
+      if (ref.type === 'local-storage') {
+        const raw = localStorage.getItem(ref.value);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const text = parsed?.text;
+        return typeof text === 'string' ? text : null;
+      }
+
+      if (ref.type === 'server-upload') {
+        const response = await fetch(ref.value);
+        if (!response.ok) return null;
+        return await response.text();
+      }
+
+      return null;
     }
 
     function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
@@ -265,10 +276,10 @@
       openLinkedApp(`${destination.pathname}${destination.search}`);
     }
 
-    function launchPointForgeFromResource(resource, projectContext = {}) {
-      const text = getPointFileText(resource);
+    async function launchPointForgeFromResource(resource, projectContext = {}) {
+      const text = await resolvePointFileText(resource);
       if (!text || !text.trim()) {
-        renderError(`Selected point file could not be opened. Missing local text for ${resource?.title || 'resource'}.`);
+        renderError(`Selected point file could not be opened. Unable to load text for ${resource?.title || 'resource'}.`);
         return;
       }
 
@@ -327,9 +338,9 @@
         .join('\n');
     }
 
-    function deleteCpfResource(folder, resource, projectContext) {
+    async function deleteCpfResource(folder, resource, projectContext) {
       const instrument = String(resource?.reference?.value || resource?.reference?.metadata?.instrument || '').trim();
-      const links = findCpfPointLinks(projectContext?.projectFile, window.localStorage, instrument);
+      const links = await findCpfPointLinksAsync(projectContext?.projectFile, resolvePointFileText, instrument);
       let shouldDelete = true;
       if (links.length) {
         const detail = describeCpfPointLinks(links);
@@ -438,7 +449,7 @@
       return /\.(csv|txt)$/i.test(name);
     }
 
-    async function attachUploadedPointFiles(files, context) {
+    async function uploadPointFilesToServer(files, context) {
       const accepted = Array.from(files || []).filter(isSupportedPointFile);
       if (!accepted.length) {
         context.setUploadStatus('No supported files found. Use .csv or .txt files.');
@@ -446,31 +457,42 @@
       }
 
       if (!context.activeProjectId || !context.projectFile) {
-        context.setUploadStatus('Select an active project before attaching point files.');
+        context.setUploadStatus('Select an active project before uploading point files.');
         return;
       }
 
-      let attachedCount = 0;
+      let uploadedCount = 0;
       for (const file of accepted) {
-        const text = await file.text();
-        const upload = buildPointFileUploadRecord({
-          projectId: context.activeProjectId,
-          fileName: file.name,
-          text,
-        });
-        if (!upload) continue;
-        localStorage.setItem(upload.storageKey, JSON.stringify(upload.payload));
-        const appended = appendPointFileResource(context.projectFile, upload.resource);
-        if (appended) attachedCount += 1;
+        const formData = new FormData();
+        formData.append('projectId', context.activeProjectId);
+        formData.append('folderKey', 'point-files');
+        formData.append('file', file, file.name);
+
+        try {
+          const response = await fetch('/api/project-files/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({ error: 'Upload failed.' }));
+            context.setUploadStatus(`Failed to upload ${file.name}: ${err.error}`);
+            continue;
+          }
+          const { resource } = await response.json();
+          const appended = appendResourceToFolder(context.projectFile, 'point-files', resource);
+          if (appended) uploadedCount += 1;
+        } catch (err) {
+          context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
+        }
       }
 
-      if (!attachedCount) {
-        context.setUploadStatus('No valid point records were added.');
+      if (!uploadedCount) {
+        context.setUploadStatus('No point files were uploaded successfully.');
         return;
       }
 
       saveStoredProjectFile(window.localStorage, context.activeProjectId, context.projectFile);
-      context.setUploadStatus(`Attached ${attachedCount} point file${attachedCount === 1 ? '' : 's'} to this project.`);
+      context.setUploadStatus(`Uploaded ${uploadedCount} point file${uploadedCount === 1 ? '' : 's'} to this project.`);
       renderTree(context.projectFile, context);
     }
 
@@ -620,7 +642,7 @@
       picker.type = 'file';
       picker.accept = '.csv,text/csv,.txt,text/plain';
       picker.multiple = true;
-      picker.addEventListener('change', () => attachUploadedPointFiles(picker.files, context));
+      picker.addEventListener('change', () => uploadPointFilesToServer(picker.files, context));
 
       const pickerButton = document.createElement('button');
       pickerButton.type = 'button';
@@ -645,7 +667,7 @@
       panel.addEventListener('drop', (event) => {
         event.preventDefault();
         panel.classList.remove('drag-active');
-        attachUploadedPointFiles(event.dataTransfer?.files, context);
+        uploadPointFilesToServer(event.dataTransfer?.files, context);
       });
 
       return panel;
@@ -695,7 +717,7 @@
           const resource = document.createElement('div');
           resource.className = 'file-row';
 
-          const canLaunchPointForge = folder.key === 'point-files' && entry?.reference?.type === 'local-storage';
+          const canLaunchPointForge = folder.key === 'point-files' && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload');
           const canOpenLineSmithDrawing = folder.key === 'drawings' && entry?.reference?.type === 'local-storage';
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
@@ -722,6 +744,25 @@
               launchPointForgeFromResource(entry, projectContext);
             });
             resource.appendChild(openButton);
+
+            const deletePointFileButton = document.createElement('button');
+            deletePointFileButton.type = 'button';
+            deletePointFileButton.className = 'launch-btn';
+            deletePointFileButton.textContent = 'Delete';
+            deletePointFileButton.title = 'Remove this point file from the project';
+            deletePointFileButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              if (!window.confirm(`Remove "${entry.title}" from the project?`)) return;
+              const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
+              if (!removed) {
+                renderError(`Could not remove ${entry?.title || entry?.id || 'point file'}.`);
+                return;
+              }
+              saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+              projectContext.setUploadStatus(`Removed ${entry.title}.`);
+              renderTree(projectContext.projectFile, projectContext);
+            });
+            resource.appendChild(deletePointFileButton);
           }
 
           if (canOpenLineSmithDrawing) {
@@ -783,7 +824,7 @@
             resource.appendChild(deleteButton);
           }
 
-          const isServerUpload = entry?.reference?.type === 'server-upload';
+          const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;
           if (isServerUpload) {
             const downloadUrl = entry.reference.value;
             resource.classList.add('pointforge-openable');

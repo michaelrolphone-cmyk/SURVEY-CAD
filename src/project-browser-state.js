@@ -178,3 +178,39 @@ export function findCpfPointLinks(projectFile, storage, instrument) {
   }
   return links;
 }
+
+export async function findCpfPointLinksAsync(projectFile, resolveText, instrument) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || typeof resolveText !== 'function' || !instrument) return [];
+  const pointFolder = projectFile.folders.find((folder) => folder.key === 'point-files');
+  if (!pointFolder || !Array.isArray(pointFolder.index)) return [];
+
+  const target = String(instrument).trim().toLowerCase();
+  if (!target) return [];
+
+  const links = [];
+  for (const pointFile of pointFolder.index) {
+    let text = '';
+    try {
+      text = String(await resolveText(pointFile) || '');
+    } catch {
+      continue;
+    }
+    if (!text.trim()) continue;
+
+    const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    for (let lineIndex = 1; lineIndex < lines.length; lineIndex += 1) {
+      const fields = parseCsvLine(lines[lineIndex]);
+      const pointNumber = String(fields[0] || '').trim();
+      const pointCode = String(fields[4] || '').trim();
+      const note = String(fields[5] || '').trim();
+      const instruments = extractCpfInstrumentsFromPointNote(note);
+      if (!instruments.some((value) => value.toLowerCase() === target)) continue;
+      links.push({
+        pointFileTitle: pointFile?.title || pointFile?.id || 'Point File',
+        pointNumber: pointNumber || '(unknown)',
+        pointCode: pointCode || '(none)',
+      });
+    }
+  }
+  return links;
+}

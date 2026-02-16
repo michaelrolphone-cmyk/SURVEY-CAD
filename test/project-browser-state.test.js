@@ -12,6 +12,7 @@ import {
   removeResourceById,
   extractCpfInstrumentsFromPointNote,
   findCpfPointLinks,
+  findCpfPointLinksAsync,
 } from '../src/project-browser-state.js';
 
 function makeStorage(entries = {}) {
@@ -142,6 +143,44 @@ test('findCpfPointLinks returns linked point numbers for a CP&F instrument', () 
   assert.equal(links[0].pointNumber, '10');
   assert.equal(links[0].pointCode, 'COR');
 });
+
+test('findCpfPointLinksAsync resolves point file text via async resolver function', async () => {
+  const csvText = [
+    'number,x,y,z,code,notes',
+    '10,1,2,0,COR,"CPNFS: 2019-12345...2021-22222"',
+    '11,3,4,0,SECOR,"CPNFS: 2020-00077"',
+  ].join('\n');
+
+  const projectFile = {
+    folders: [{
+      key: 'point-files',
+      index: [{
+        id: 'points-1',
+        title: 'Boundary Export.csv',
+        reference: { type: 'server-upload', value: '/api/project-files/download?test=1' },
+      }],
+    }],
+  };
+
+  async function resolveText(resource) {
+    if (resource?.id === 'points-1') return csvText;
+    return null;
+  }
+
+  const links = await findCpfPointLinksAsync(projectFile, resolveText, '2019-12345');
+
+  assert.equal(links.length, 1);
+  assert.equal(links[0].pointFileTitle, 'Boundary Export.csv');
+  assert.equal(links[0].pointNumber, '10');
+  assert.equal(links[0].pointCode, 'COR');
+});
+
+test('findCpfPointLinksAsync returns empty array for invalid inputs', async () => {
+  assert.deepEqual(await findCpfPointLinksAsync(null, async () => '', 'inst'), []);
+  assert.deepEqual(await findCpfPointLinksAsync({ folders: [] }, 'not-a-function', 'inst'), []);
+  assert.deepEqual(await findCpfPointLinksAsync({ folders: [{ key: 'point-files', index: [] }] }, async () => '', ''), []);
+});
+
 test('Project Browser prefers stored project file snapshots before loading API template', async () => {
   const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
 
@@ -151,21 +190,27 @@ test('Project Browser prefers stored project file snapshots before loading API t
   assert.match(projectBrowserHtml, /if \(storedProjectFile\) \{[\s\S]*renderTree\(storedProjectFile,\s*projectContext\);[\s\S]*return;/, 'Project Browser should render persisted files and skip template requests when available');
 });
 
-test('Project Browser supports point file drag-and-drop and mobile file picker attachments', async () => {
+test('Project Browser supports point file drag-and-drop and mobile file picker uploads via server API', async () => {
   const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
 
   assert.match(projectBrowserHtml, /picker\.accept\s*=\s*'\.csv,text\/csv,\.txt,text\/plain'/, 'Project Browser should allow csv and txt through file picker');
-  assert.match(projectBrowserHtml, /panel\.addEventListener\('drop',\s*\(event\)\s*=>\s*\{[\s\S]*attachUploadedPointFiles\(event\.dataTransfer\?\.files, context\)/, 'Project Browser should support desktop drag-and-drop upload');
-  assert.match(projectBrowserHtml, /saveStoredProjectFile\(window\.localStorage, context\.activeProjectId, context\.projectFile\)/, 'Project Browser should persist updated project-file snapshot after attaching uploads');
-  assert.match(projectBrowserHtml, /buildPointFileUploadRecord\(\{[\s\S]*projectId:\s*context\.activeProjectId,[\s\S]*fileName:\s*file\.name,[\s\S]*text,/, 'Project Browser should convert picked files into point-file project resources');
+  assert.match(projectBrowserHtml, /panel\.addEventListener\('drop',\s*\(event\)\s*=>\s*\{[\s\S]*uploadPointFilesToServer\(event\.dataTransfer\?\.files, context\)/, 'Project Browser should support desktop drag-and-drop upload via server API');
+  assert.match(projectBrowserHtml, /async function uploadPointFilesToServer\(files, context\)/, 'Project Browser should define an async server upload handler for point files');
+  assert.match(projectBrowserHtml, /formData\.append\('folderKey', 'point-files'\)/, 'Point file uploads should target the point-files folder');
+  assert.match(projectBrowserHtml, /fetch\('\/api\/project-files\/upload'/, 'Point file uploads should use the project-files upload API');
+  assert.match(projectBrowserHtml, /appendResourceToFolder\(context\.projectFile, 'point-files', resource\)/, 'Point file uploads should append server resource to project file');
   assert.doesNotMatch(projectBrowserHtml, /indexFile\.innerHTML\s*=\s*'<span class=\"icon\">📄<\/span>index\.json'/, 'Project Browser should hide folder metadata index.json rows from the visible tree');
 });
 
-test('Project Browser can open persisted point files directly in PointForge', async () => {
+test('Project Browser can open point files directly in PointForge via async text resolution', async () => {
   const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
 
   assert.match(projectBrowserHtml, /const\s+POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY\s*=\s*'pointforgeProjectBrowserImport'/, 'Project Browser should use a stable localStorage key for PointForge launches');
-  assert.match(projectBrowserHtml, /function\s+launchPointForgeFromResource\s*\(/, 'Project Browser should define PointForge launch helper for point-file resources');
+  assert.match(projectBrowserHtml, /async\s+function\s+launchPointForgeFromResource\s*\(/, 'Project Browser should define async PointForge launch helper for point-file resources');
+  assert.match(projectBrowserHtml, /async\s+function\s+resolvePointFileText\s*\(resource\)/, 'Project Browser should define an async text resolver for point files');
+  assert.match(projectBrowserHtml, /const\s+text\s*=\s*await\s+resolvePointFileText\(resource\)/, 'PointForge launch should resolve text asynchronously');
+  assert.match(projectBrowserHtml, /ref\.type\s*===\s*'server-upload'/, 'Text resolver should handle server-upload references');
+  assert.match(projectBrowserHtml, /await\s+response\.text\(\)/, 'Text resolver should fetch server-uploaded file content as text');
   assert.match(projectBrowserHtml, /localStorage\.setItem\(POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY,\s*JSON\.stringify\(\{[\s\S]*csv:\s*text/, 'Project Browser should persist selected point-file text before launching PointForge');
   assert.match(projectBrowserHtml, /destination\.searchParams\.set\('source',\s*'project-browser'\)/, 'Project Browser should tag PointForge navigation source as project-browser');
   assert.match(projectBrowserHtml, /resource\.classList\.add\('pointforge-openable'\)/, 'Project Browser should make point-file rows tappable for PointForge launch');
@@ -173,6 +218,7 @@ test('Project Browser can open persisted point files directly in PointForge', as
   assert.match(projectBrowserHtml, /resource\.addEventListener\('keydown',\s*\(event\)\s*=>\s*\{[\s\S]*event\.key\s*!==\s*'Enter'[\s\S]*event\.key\s*!==\s*' '\)/, 'Point-file row keyboard activation should support Enter and Space for accessibility');
   assert.match(projectBrowserHtml, /openButton\.addEventListener\('click',\s*\(event\)\s*=>\s*\{[\s\S]*event\.stopPropagation\(\)/, 'Open button click should stop propagation to avoid duplicate launches');
   assert.match(projectBrowserHtml, /textContent\s*=\s*'Open in PointForge'/, 'Project Browser should render an Open in PointForge button for supported point files');
+  assert.match(projectBrowserHtml, /entry\?\.reference\?\.type\s*===\s*'server-upload'\)/, 'PointForge launch should be available for server-uploaded point files');
 });
 
 test('Project Browser can open CP&F rows as PDF links in a new tab', async () => {
@@ -188,7 +234,7 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /openButton\.textContent\s*=\s*'Open PDF'/, 'Project Browser should render an Open PDF button for CP&F entries');
   assert.match(projectBrowserHtml, /deleteButton\.textContent\s*=\s*'Delete'/, 'Project Browser should render a delete button for CP&F entries');
   assert.match(projectBrowserHtml, /function\s+deleteCpfResource\s*\(/, 'Project Browser should define a CP&F delete handler');
-  assert.match(projectBrowserHtml, /findCpfPointLinks\(projectContext\?\.projectFile, window\.localStorage, instrument\)/, 'CP&F delete flow should detect linked point references by instrument');
+  assert.match(projectBrowserHtml, /findCpfPointLinksAsync\(projectContext\?\.projectFile, resolvePointFileText, instrument\)/, 'CP&F delete flow should detect linked point references by instrument using async resolver');
   assert.match(projectBrowserHtml, /window\.confirm\(`This CP&F is linked to/, 'CP&F delete flow should ask for confirmation when linked points exist');
   assert.match(projectBrowserHtml, /function\s+openCpfPrintPreview\s*\(/, 'Project Browser should define a bulk CP&F print-preview builder');
   assert.match(projectBrowserHtml, /window\.open\('', '_blank'\)/, 'Print preview should open a writable popup window for inline HTML content');
