@@ -426,6 +426,9 @@
       </div>
 
       <div class="statusbar">
+        <select id="pointFileSelect" style="min-width:200px; max-width:320px;">
+          <option value="">Select point file…</option>
+        </select>
         <button id="btnOpenLineSmith" class="btn workflowPrimary workflowHeaderAction" disabled>Open in LineSmith</button>
       </div>
     </div>
@@ -998,6 +1001,8 @@
     const elAnchorLon = document.getElementById("anchorLon");
     const elLocalizationHint = document.getElementById("localizationHint");
 
+    const elPointFileSelect = document.getElementById("pointFileSelect");
+
     const st_lines = document.getElementById("st_lines");
     const st_parsed = document.getElementById("st_parsed");
     const st_g = document.getElementById("st_g");
@@ -1358,6 +1363,7 @@
       projectFile.generatedAt = isoTimestamp;
       saveProjectFileSnapshot(projectContext.projectId, projectFile);
       if (kind === "import") saveLastOpenedProjectPointSet(projectContext.projectId, storageKey);
+      populatePointFileDropdown();
       return storageKey;
     }
 
@@ -1993,6 +1999,74 @@
       }
     }
 
+    // -----------------------------
+    // Point files dropdown
+    // -----------------------------
+    function populatePointFileDropdown(){
+      const projectContext = getProjectContext();
+      if (!projectContext.projectId){
+        elPointFileSelect.style.display = "none";
+        return;
+      }
+
+      const projectFile = loadProjectFileSnapshot(projectContext.projectId);
+      if (!projectFile) {
+        elPointFileSelect.style.display = "none";
+        return;
+      }
+
+      const pointFolder = projectFile.folders.find((f) => f.key === "point-files");
+      const items = (pointFolder && Array.isArray(pointFolder.index)) ? pointFolder.index : [];
+
+      // Clear existing options beyond the placeholder
+      while (elPointFileSelect.options.length > 1) elPointFileSelect.remove(1);
+
+      if (!items.length){
+        elPointFileSelect.options[0].textContent = "No point files in project";
+        elPointFileSelect.disabled = true;
+        return;
+      }
+
+      elPointFileSelect.options[0].textContent = "Select point file\u2026";
+      elPointFileSelect.disabled = false;
+
+      for (const item of items){
+        const option = document.createElement("option");
+        option.value = item.reference?.value || item.id || "";
+        option.textContent = item.title || item.id || "Untitled";
+        option.dataset.resourceId = item.id || "";
+        elPointFileSelect.appendChild(option);
+      }
+    }
+
+    elPointFileSelect.addEventListener("change", ()=>{
+      const storageKey = elPointFileSelect.value;
+      if (!storageKey) return;
+
+      const pointSet = loadStoredPointSet(storageKey);
+      if (!pointSet){
+        elMapHint.innerHTML = '<span class="warn">Could not load selected point file from storage.</span>';
+        return;
+      }
+
+      const title = normalizeBaseName(pointSet.fileName, "Project Point File");
+      currentImportContext = {
+        sourceType: "project-dropdown",
+        sourceLabel: title,
+        baseName: title,
+        extension: normalizeExtension(pointSet.fileName, ".csv"),
+      };
+
+      elIn.value = String(pointSet.text);
+      processNow();
+      refreshPointEditorTables();
+
+      const projectContext = getProjectContext();
+      if (projectContext.projectId) saveLastOpenedProjectPointSet(projectContext.projectId, storageKey);
+
+      elMapHint.innerHTML = `<span class="ok">Opened point file: ${escapeHtml(title)}.</span>`;
+    });
+
     // Init: blank textarea (no sample data), locked defaults already set in HTML
     initMap();
     setLocalizationInputsEnabled(false);
@@ -2012,6 +2086,7 @@
     tryImportProjectBrowserPayload();
     tryImportBoundaryLabPayload();
     tryRestoreLastOpenedProjectPointSet();
+    populatePointFileDropdown();
   </script>
 </body>
 </html>
