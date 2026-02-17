@@ -9112,9 +9112,9 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   }
 
   function serializePointsCsv() {
-    const rows = [["number","x","y","z","code","notes"]];
+    const rows = [["Point","Northing","Easting","Elevation","Code","Description"]];
     for (const p of points.values()) {
-      rows.push([p.num, p.x, p.y, p.z, p.code || "", p.notes || ""]);
+      rows.push([p.num, p.y, p.x, p.z, p.code || "", p.notes || ""]);
     }
     if (rows.length <= 1) return "";
     return rows.map((r) => r.map((v) => {
@@ -9564,9 +9564,9 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
 
   $("#exportCsv").addEventListener("click", () => {
     const rows = [];
-    rows.push(["number","x","y","z","code","notes"]);
+    rows.push(["Point","Northing","Easting","Elevation","Code","Description"]);
     const sorted = Array.from(points.values()).sort((a,b)=>Number(a.num)-Number(b.num));
-    for (const p of sorted) rows.push([p.num, p.x, p.y, p.z, p.code, p.notes].map(v => csvEscape(v)));
+    for (const p of sorted) rows.push([p.num, p.y, p.x, p.z, p.code, p.notes].map(v => csvEscape(v)));
     const csv = rows.map(r=>r.join(",")).join("\n");
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
     const url = URL.createObjectURL(blob);
