@@ -1,0 +1,1845 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Boundary Evidence Workbench API",
+    "version": "1.0.0",
+    "description": "REST API for Boundary Evidence Workbench (BEW): casefiles, evidence, extracted calls, corner matrix decisions, traverse computation, and printable exports."
+  },
+  "servers": [
+    { "url": "https://api.example.com" }
+  ],
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "tags": [
+    { "name": "Health" },
+    { "name": "Auth" },
+    { "name": "Users" },
+    { "name": "Casefiles" },
+    { "name": "Evidence" },
+    { "name": "Extractions" },
+    { "name": "Corners" },
+    { "name": "Candidates" },
+    { "name": "Traverse" },
+    { "name": "Decisions" },
+    { "name": "Exports" },
+    { "name": "Uploads" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Liveness check",
+        "operationId": "healthGet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok"],
+                  "properties": { "ok": { "type": "boolean" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login and obtain access token",
+        "operationId": "authLogin",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 8 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token pair",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthTokens" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh access token",
+        "operationId": "authRefresh",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string", "minLength": 20 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token pair",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AuthTokens" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get current user profile",
+        "operationId": "usersMeGet",
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/User" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/casefiles": {
+      "get": {
+        "tags": ["Casefiles"],
+        "summary": "List casefiles",
+        "operationId": "casefilesList",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search by name/jurisdiction/notes (implementation-defined)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "updatedAfter",
+            "in": "query",
+            "description": "Filter by casefile updatedAt (RFC3339)",
+            "schema": { "type": "string", "format": "date-time" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged list of casefiles",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PagedCasefileSummary" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Casefiles"],
+        "summary": "Create a new casefile",
+        "operationId": "casefilesCreate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CasefileCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "ETag": { "$ref": "#/components/headers/ETag" }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Casefile" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/casefiles/import": {
+      "post": {
+        "tags": ["Casefiles"],
+        "summary": "Import a full casefile JSON export",
+        "operationId": "casefilesImport",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CasefileImportRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Imported casefile",
+            "headers": {
+              "ETag": { "$ref": "#/components/headers/ETag" }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Casefile" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CasefileId" }
+      ],
+      "get": {
+        "tags": ["Casefiles"],
+        "summary": "Get full casefile",
+        "operationId": "casefilesGet",
+        "responses": {
+          "200": {
+            "description": "Casefile",
+            "headers": {
+              "ETag": { "$ref": "#/components/headers/ETag" }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Casefile" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Casefiles"],
+        "summary": "Replace full casefile (offline-friendly)",
+        "operationId": "casefilesReplace",
+        "parameters": [
+          { "$ref": "#/components/parameters/IfMatch" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/Casefile" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "headers": {
+              "ETag": { "$ref": "#/components/headers/ETag" }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Casefile" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" }
+        }
+      },
+      "patch": {
+        "tags": ["Casefiles"],
+        "summary": "Patch casefile meta only (common UI edit)",
+        "operationId": "casefilesPatch",
+        "parameters": [
+          { "$ref": "#/components/parameters/IfMatch" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": {
+              "schema": { "$ref": "#/components/schemas/CasefileMetaPatch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "headers": { "ETag": { "$ref": "#/components/headers/ETag" } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Casefile" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" }
+        }
+      },
+      "delete": {
+        "tags": ["Casefiles"],
+        "summary": "Delete casefile",
+        "operationId": "casefilesDelete",
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/duplicate": {
+      "post": {
+        "tags": ["Casefiles"],
+        "summary": "Duplicate casefile (server-side copy)",
+        "operationId": "casefilesDuplicate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "maxLength": 140 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Duplicated",
+            "headers": { "ETag": { "$ref": "#/components/headers/ETag" } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Casefile" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/export": {
+      "get": {
+        "tags": ["Exports"],
+        "summary": "Export casefile as JSON (attachments as URLs)",
+        "operationId": "casefilesExport",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          {
+            "name": "inlineAttachments",
+            "in": "query",
+            "description": "If true, includes base64 inline attachments when allowed by server policy (usually false).",
+            "schema": { "type": "boolean", "default": false }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Export payload",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CasefileExport" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/evidence": {
+      "get": {
+        "tags": ["Evidence"],
+        "summary": "List evidence items",
+        "operationId": "evidenceList",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "$ref": "#/components/schemas/EvidenceType" }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "description": "Filter evidence containing a tag (exact match)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged evidence list",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PagedEvidence" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Create evidence item (metadata-only by default)",
+        "operationId": "evidenceCreate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created evidence",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/evidence/{evidenceId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CasefileId" },
+        { "$ref": "#/components/parameters/EvidenceId" }
+      ],
+      "get": {
+        "tags": ["Evidence"],
+        "summary": "Get evidence item",
+        "operationId": "evidenceGet",
+        "responses": {
+          "200": {
+            "description": "Evidence item",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Evidence"],
+        "summary": "Patch evidence item",
+        "operationId": "evidencePatch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": {
+              "schema": { "$ref": "#/components/schemas/EvidencePatch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated evidence",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Evidence"],
+        "summary": "Delete evidence item",
+        "operationId": "evidenceDelete",
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/evidence/{evidenceId}/attachment": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CasefileId" },
+        { "$ref": "#/components/parameters/EvidenceId" }
+      ],
+      "post": {
+        "tags": ["Evidence"],
+        "summary": "Upload/replace an evidence attachment (multipart)",
+        "operationId": "evidenceAttachmentUploadMultipart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF/image/text etc."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated evidence with attachment info",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "get": {
+        "tags": ["Evidence"],
+        "summary": "Download evidence attachment",
+        "operationId": "evidenceAttachmentDownload",
+        "responses": {
+          "302": {
+            "description": "Redirect to a signed download URL (common production behavior)"
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Evidence"],
+        "summary": "Remove evidence attachment",
+        "operationId": "evidenceAttachmentDelete",
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/uploads/init": {
+      "post": {
+        "tags": ["Uploads"],
+        "summary": "Init a presigned upload (recommended for large files)",
+        "operationId": "uploadsInit",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UploadInitRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload session",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/UploadInitResponse" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/uploads/{uploadId}/complete": {
+      "post": {
+        "tags": ["Uploads"],
+        "summary": "Complete a presigned upload and attach to evidence",
+        "operationId": "uploadsComplete",
+        "parameters": [
+          { "$ref": "#/components/parameters/UploadId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UploadCompleteRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evidence item updated with attachment",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/extractions": {
+      "get": {
+        "tags": ["Extractions"],
+        "summary": "List extracted calls",
+        "operationId": "extractionsList",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "evidenceId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": { "type": "boolean" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged extractions",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PagedExtractions" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Extractions"],
+        "summary": "Create an extracted call",
+        "operationId": "extractionsCreate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created extraction",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCall" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/extractions/reorder": {
+      "post": {
+        "tags": ["Extractions"],
+        "summary": "Reorder extractions (supports ↑/↓ UI)",
+        "operationId": "extractionsReorder",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["orderedIds"],
+                "properties": {
+                  "orderedIds": {
+                    "type": "array",
+                    "items": { "type": "string", "format": "uuid" },
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated ordered list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["orderedIds"],
+                  "properties": {
+                    "orderedIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/extractions/{extractionId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CasefileId" },
+        { "$ref": "#/components/parameters/ExtractionId" }
+      ],
+      "get": {
+        "tags": ["Extractions"],
+        "summary": "Get an extracted call",
+        "operationId": "extractionsGet",
+        "responses": {
+          "200": {
+            "description": "Extraction",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCall" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Extractions"],
+        "summary": "Patch an extracted call",
+        "operationId": "extractionsPatch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": {
+              "schema": { "$ref": "#/components/schemas/ExtractionPatch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated extraction",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCall" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Extractions"],
+        "summary": "Delete an extracted call",
+        "operationId": "extractionsDelete",
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners": {
+      "get": {
+        "tags": ["Corners"],
+        "summary": "List corners",
+        "operationId": "cornersList",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged corners",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedCorners" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Corners"],
+        "summary": "Create a corner",
+        "operationId": "cornersCreate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CornerCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created corner",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CasefileId" },
+        { "$ref": "#/components/parameters/CornerId" }
+      ],
+      "get": {
+        "tags": ["Corners"],
+        "summary": "Get corner",
+        "operationId": "cornersGet",
+        "responses": {
+          "200": {
+            "description": "Corner",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Corners"],
+        "summary": "Patch corner fields",
+        "operationId": "cornersPatch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": { "schema": { "$ref": "#/components/schemas/CornerPatch" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated corner",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Corners"],
+        "summary": "Delete corner",
+        "operationId": "cornersDelete",
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/candidates": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CasefileId" },
+        { "$ref": "#/components/parameters/CornerId" }
+      ],
+      "get": {
+        "tags": ["Candidates"],
+        "summary": "List candidates for a corner",
+        "operationId": "candidatesList",
+        "responses": {
+          "200": {
+            "description": "Candidates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Candidate" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Candidates"],
+        "summary": "Create candidate",
+        "operationId": "candidatesCreate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CandidateCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created candidate",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Candidate" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/candidates/{candidateId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CasefileId" },
+        { "$ref": "#/components/parameters/CornerId" },
+        { "$ref": "#/components/parameters/CandidateId" }
+      ],
+      "patch": {
+        "tags": ["Candidates"],
+        "summary": "Patch candidate",
+        "operationId": "candidatesPatch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": { "schema": { "$ref": "#/components/schemas/CandidatePatch" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated candidate",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Candidate" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Candidates"],
+        "summary": "Delete candidate",
+        "operationId": "candidatesDelete",
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/choose": {
+      "post": {
+        "tags": ["Candidates", "Decisions"],
+        "summary": "Choose or unchoose a candidate (enforces single chosen per corner; logs decision)",
+        "operationId": "cornerChooseCandidate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["candidateId", "chosen"],
+                "properties": {
+                  "candidateId": { "type": "string", "format": "uuid" },
+                  "chosen": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated corner state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/justification": {
+      "put": {
+        "tags": ["Corners", "Decisions"],
+        "summary": "Save justification text for the currently chosen candidate (server enforces required-when-override)",
+        "operationId": "cornerSaveJustification",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["justification"],
+                "properties": {
+                  "justification": { "type": "string", "maxLength": 20000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated corner",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": {
+            "description": "Justification required but missing or invalid state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/decisions": {
+      "get": {
+        "tags": ["Decisions"],
+        "summary": "List decision log entries",
+        "operationId": "decisionsList",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "cornerId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged decisions",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PagedDecisions" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Decisions"],
+        "summary": "Add a manual decision log entry",
+        "operationId": "decisionsCreate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/DecisionCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created decision",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DecisionLogEntry" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/traverse": {
+      "get": {
+        "tags": ["Traverse"],
+        "summary": "Get traverse config and last results metadata",
+        "operationId": "traverseGet",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Traverse state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TraverseState" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Traverse"],
+        "summary": "Replace traverse config",
+        "operationId": "traversePut",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TraverseConfig" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated traverse state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TraverseState" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/traverse/run": {
+      "post": {
+        "tags": ["Traverse"],
+        "summary": "Compute traverse from extracted calls (preview or persist)",
+        "operationId": "traverseRun",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TraverseRunRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Traverse results",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TraverseRunResponse" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+
+    "headers": {
+      "ETag": {
+        "description": "Strong entity tag for optimistic concurrency (send back via If-Match on PUT/PATCH).",
+        "schema": { "type": "string" }
+      }
+    },
+
+    "parameters": {
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "schema": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "description": "ETag from last GET. Used to prevent overwriting newer server changes.",
+        "schema": { "type": "string" }
+      },
+      "CasefileId": {
+        "name": "casefileId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "EvidenceId": {
+        "name": "evidenceId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ExtractionId": {
+        "name": "extractionId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "CornerId": {
+        "name": "cornerId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "CandidateId": {
+        "name": "candidateId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "UploadId": {
+        "name": "uploadId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+
+    "responses": {
+      "BadRequest": {
+        "description": "Bad Request",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "Not Found",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "PreconditionFailed": {
+        "description": "Precondition Failed (ETag mismatch)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "PayloadTooLarge": {
+        "description": "Payload Too Large",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+
+    "schemas": {
+      "ID": { "type": "string", "format": "uuid" },
+
+      "AuthTokens": {
+        "type": "object",
+        "required": ["accessToken", "refreshToken", "expiresIn"],
+        "properties": {
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" },
+          "expiresIn": { "type": "integer", "description": "Seconds until access token expiry" }
+        }
+      },
+
+      "User": {
+        "type": "object",
+        "required": ["id", "email", "createdAt"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "email": { "type": "string", "format": "email" },
+          "displayName": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "EvidenceType": {
+        "type": "string",
+        "enum": ["Deed", "Plat", "ROS", "Corner Record", "Field Notes", "Photo", "PDF", "Other"]
+      },
+
+      "CornerStatus": {
+        "type": "string",
+        "enum": ["Existent", "Obliterated", "Lost", "Unknown"]
+      },
+
+      "CandidateKind": {
+        "type": "string",
+        "enum": ["Monument", "Record Call", "Occupation", "Computed", "Other"]
+      },
+
+      "DistanceUnit": {
+        "type": "string",
+        "enum": ["ft", "m"]
+      },
+
+      "CasefileMeta": {
+        "type": "object",
+        "required": ["name", "createdAt", "updatedAt"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 140 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "jurisdiction": { "type": "string", "maxLength": 140 },
+          "notes": { "type": "string", "maxLength": 20000 }
+        }
+      },
+
+      "CasefileMetaPatch": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "maxLength": 140 },
+              "jurisdiction": { "type": "string", "maxLength": 140 },
+              "notes": { "type": "string", "maxLength": 20000 }
+            }
+          }
+        }
+      },
+
+      "Attachment": {
+        "type": "object",
+        "required": ["id", "name", "mime", "size", "createdAt"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "name": { "type": "string" },
+          "mime": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "description": "Hex digest, optional" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "downloadUrl": { "type": "string", "format": "uri", "description": "Typically signed URL" },
+          "inlineBase64": { "type": "string", "description": "Only present when exporting with inlineAttachments=true (policy-dependent)" }
+        }
+      },
+
+      "EvidenceItem": {
+        "type": "object",
+        "required": ["id", "casefileId", "type", "title", "createdAt", "updatedAt", "tags"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "casefileId": { "$ref": "#/components/schemas/ID" },
+          "type": { "$ref": "#/components/schemas/EvidenceType" },
+          "title": { "type": "string", "maxLength": 300 },
+          "date": { "type": "string", "description": "YYYY-MM-DD (as entered in UI)", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "source": { "type": "string", "maxLength": 500 },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 64 }
+          },
+          "notes": { "type": "string", "maxLength": 20000 },
+          "attachment": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/Attachment" },
+              { "type": "null" }
+            ]
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "EvidenceCreateRequest": {
+        "type": "object",
+        "required": ["type", "title"],
+        "properties": {
+          "type": { "$ref": "#/components/schemas/EvidenceType" },
+          "title": { "type": "string", "maxLength": 300 },
+          "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "source": { "type": "string", "maxLength": 500 },
+          "tags": { "type": "array", "items": { "type": "string", "maxLength": 64 } },
+          "notes": { "type": "string", "maxLength": 20000 }
+        }
+      },
+
+      "EvidencePatch": {
+        "type": "object",
+        "properties": {
+          "type": { "$ref": "#/components/schemas/EvidenceType" },
+          "title": { "type": "string", "maxLength": 300 },
+          "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "source": { "type": "string", "maxLength": 500 },
+          "tags": { "type": "array", "items": { "type": "string", "maxLength": 64 } },
+          "notes": { "type": "string", "maxLength": 20000 }
+        }
+      },
+
+      "ExtractionCall": {
+        "type": "object",
+        "required": [
+          "id", "casefileId", "createdAt", "evidenceId", "page",
+          "label", "bearingText", "distance", "distanceUnit",
+          "include", "confidence", "sortIndex"
+        ],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "casefileId": { "$ref": "#/components/schemas/ID" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "evidenceId": { "$ref": "#/components/schemas/ID" },
+          "page": { "type": "integer", "minimum": 1 },
+          "snippet": { "type": "string", "maxLength": 4000 },
+          "label": { "type": "string", "maxLength": 140 },
+          "bearingText": { "type": "string", "maxLength": 80, "description": "Quadrant bearing text, normalized by client or server" },
+          "distance": { "type": "number", "minimum": 0 },
+          "distanceUnit": { "$ref": "#/components/schemas/DistanceUnit" },
+          "include": { "type": "boolean" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "sortIndex": { "type": "integer", "minimum": 0 }
+        }
+      },
+
+      "ExtractionCreateRequest": {
+        "type": "object",
+        "required": ["evidenceId", "page", "label", "bearingText", "distance", "distanceUnit"],
+        "properties": {
+          "evidenceId": { "$ref": "#/components/schemas/ID" },
+          "page": { "type": "integer", "minimum": 1 },
+          "snippet": { "type": "string", "maxLength": 4000 },
+          "label": { "type": "string", "maxLength": 140 },
+          "bearingText": { "type": "string", "maxLength": 80 },
+          "distance": { "type": "number", "minimum": 0 },
+          "distanceUnit": { "$ref": "#/components/schemas/DistanceUnit" },
+          "include": { "type": "boolean", "default": true },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.75 }
+        }
+      },
+
+      "ExtractionPatch": {
+        "type": "object",
+        "properties": {
+          "evidenceId": { "$ref": "#/components/schemas/ID" },
+          "page": { "type": "integer", "minimum": 1 },
+          "snippet": { "type": "string", "maxLength": 4000 },
+          "label": { "type": "string", "maxLength": 140 },
+          "bearingText": { "type": "string", "maxLength": 80 },
+          "distance": { "type": "number", "minimum": 0 },
+          "distanceUnit": { "$ref": "#/components/schemas/DistanceUnit" },
+          "include": { "type": "boolean" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "sortIndex": { "type": "integer", "minimum": 0 }
+        }
+      },
+
+      "Candidate": {
+        "type": "object",
+        "required": ["id", "cornerId", "kind", "refEvidenceId", "summary", "weight", "chosen", "justification", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "cornerId": { "$ref": "#/components/schemas/ID" },
+          "kind": { "$ref": "#/components/schemas/CandidateKind" },
+          "refEvidenceId": { "$ref": "#/components/schemas/ID" },
+          "summary": { "type": "string", "maxLength": 2000 },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "chosen": { "type": "boolean" },
+          "justification": { "type": "string", "maxLength": 20000 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "CandidateCreateRequest": {
+        "type": "object",
+        "required": ["kind", "refEvidenceId", "summary", "weight"],
+        "properties": {
+          "kind": { "$ref": "#/components/schemas/CandidateKind" },
+          "refEvidenceId": { "$ref": "#/components/schemas/ID" },
+          "summary": { "type": "string", "maxLength": 2000 },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5 }
+        }
+      },
+
+      "CandidatePatch": {
+        "type": "object",
+        "properties": {
+          "kind": { "$ref": "#/components/schemas/CandidateKind" },
+          "refEvidenceId": { "$ref": "#/components/schemas/ID" },
+          "summary": { "type": "string", "maxLength": 2000 },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5 }
+        }
+      },
+
+      "Corner": {
+        "type": "object",
+        "required": ["id", "casefileId", "name", "plss", "status", "candidates", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "casefileId": { "$ref": "#/components/schemas/ID" },
+          "name": { "type": "string", "maxLength": 200 },
+          "plss": { "type": "string", "maxLength": 400 },
+          "status": { "$ref": "#/components/schemas/CornerStatus" },
+          "candidates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Candidate" }
+          },
+          "chosenCandidateId": {
+            "anyOf": [
+              { "type": "string", "format": "uuid" },
+              { "type": "null" }
+            ],
+            "description": "Convenience field"
+          },
+          "requiresJustification": {
+            "type": "boolean",
+            "description": "Computed server-side using BEW rules (chosen weight < max weight OR computed chosen while monument exists)."
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "CornerCreateRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 200 },
+          "plss": { "type": "string", "maxLength": 400, "default": "" },
+          "status": { "$ref": "#/components/schemas/CornerStatus" }
+        }
+      },
+
+      "CornerPatch": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 200 },
+          "plss": { "type": "string", "maxLength": 400 },
+          "status": { "$ref": "#/components/schemas/CornerStatus" }
+        }
+      },
+
+      "DecisionLogEntry": {
+        "type": "object",
+        "required": ["id", "casefileId", "at", "action", "detail"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "casefileId": { "$ref": "#/components/schemas/ID" },
+          "cornerId": {
+            "anyOf": [
+              { "type": "string", "format": "uuid" },
+              { "type": "null" }
+            ]
+          },
+          "cornerName": { "type": "string", "maxLength": 200 },
+          "at": { "type": "string", "format": "date-time" },
+          "action": { "type": "string", "maxLength": 200 },
+          "detail": { "type": "string", "maxLength": 20000 },
+          "actor": {
+            "type": "object",
+            "properties": {
+              "userId": { "type": "string", "format": "uuid" },
+              "displayName": { "type": "string" }
+            }
+          }
+        }
+      },
+
+      "DecisionCreateRequest": {
+        "type": "object",
+        "required": ["action", "detail"],
+        "properties": {
+          "cornerId": { "type": "string", "format": "uuid" },
+          "cornerName": { "type": "string", "maxLength": 200 },
+          "action": { "type": "string", "maxLength": 200 },
+          "detail": { "type": "string", "maxLength": 20000 },
+          "at": { "type": "string", "format": "date-time", "description": "Optional; server will set if omitted." }
+        }
+      },
+
+      "TraverseStart": {
+        "type": "object",
+        "required": ["N", "E"],
+        "properties": {
+          "N": { "type": "number" },
+          "E": { "type": "number" }
+        }
+      },
+
+      "TraverseBasis": {
+        "type": "object",
+        "required": ["label", "rotationDeg"],
+        "properties": {
+          "label": { "type": "string", "maxLength": 200 },
+          "rotationDeg": { "type": "number" }
+        }
+      },
+
+      "TraverseConfig": {
+        "type": "object",
+        "required": ["start", "basis", "callIds"],
+        "properties": {
+          "start": { "$ref": "#/components/schemas/TraverseStart" },
+          "basis": { "$ref": "#/components/schemas/TraverseBasis" },
+          "callIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" },
+            "description": "Extraction IDs in intended order."
+          }
+        }
+      },
+
+      "TraversePoint": {
+        "type": "object",
+        "required": ["pt", "N", "E"],
+        "properties": {
+          "pt": { "type": "integer", "minimum": 1 },
+          "N": { "type": "number" },
+          "E": { "type": "number" }
+        }
+      },
+
+      "TraverseSegment": {
+        "type": "object",
+        "required": ["ok", "label"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "label": { "type": "string" },
+          "bearing": { "type": "string" },
+          "azimuthDeg": { "type": "number" },
+          "distance": { "type": "number" },
+          "dN": { "type": "number" },
+          "dE": { "type": "number" },
+          "from": { "$ref": "#/components/schemas/TraverseStart" },
+          "to": { "$ref": "#/components/schemas/TraverseStart" },
+          "err": { "type": "string" }
+        }
+      },
+
+      "TraverseClosure": {
+        "type": "object",
+        "required": ["dN", "dE", "misclose"],
+        "properties": {
+          "dN": { "type": "number" },
+          "dE": { "type": "number" },
+          "misclose": { "type": "number" }
+        }
+      },
+
+      "TraverseResult": {
+        "type": "object",
+        "required": ["start", "rotationDeg", "points", "segments", "closure", "totalDist", "precision"],
+        "properties": {
+          "start": { "$ref": "#/components/schemas/TraverseStart" },
+          "rotationDeg": { "type": "number" },
+          "points": { "type": "array", "items": { "$ref": "#/components/schemas/TraversePoint" } },
+          "segments": { "type": "array", "items": { "$ref": "#/components/schemas/TraverseSegment" } },
+          "closure": { "$ref": "#/components/schemas/TraverseClosure" },
+          "totalDist": { "type": "number" },
+          "precision": { "type": "number", "description": "Relative precision: totalDist/misclose (Infinity when misclose=0)" }
+        }
+      },
+
+      "TraverseState": {
+        "type": "object",
+        "required": ["config"],
+        "properties": {
+          "config": { "$ref": "#/components/schemas/TraverseConfig" },
+          "lastRun": {
+            "anyOf": [
+              { "type": "string", "format": "date-time" },
+              { "type": "null" }
+            ]
+          },
+          "results": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/TraverseResult" },
+              { "type": "null" }
+            ]
+          }
+        }
+      },
+
+      "TraverseRunRequest": {
+        "type": "object",
+        "required": ["mode"],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["preview", "persist"],
+            "description": "preview returns results only; persist saves to casefile.traverse.results + lastRun"
+          },
+          "configOverride": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/TraverseConfig" },
+              { "type": "null" }
+            ],
+            "description": "Optional: compute using this config instead of stored traverse.config"
+          }
+        }
+      },
+
+      "TraverseRunResponse": {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": { "$ref": "#/components/schemas/TraverseResult" },
+          "persisted": { "type": "boolean" },
+          "lastRun": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "Casefile": {
+        "type": "object",
+        "required": ["id", "meta", "evidence", "extractions", "corners", "traverse", "decisions"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "meta": { "$ref": "#/components/schemas/CasefileMeta" },
+          "evidence": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceItem" } },
+          "extractions": { "type": "array", "items": { "$ref": "#/components/schemas/ExtractionCall" } },
+          "corners": { "type": "array", "items": { "$ref": "#/components/schemas/Corner" } },
+          "traverse": { "$ref": "#/components/schemas/TraverseState" },
+          "decisions": { "type": "array", "items": { "$ref": "#/components/schemas/DecisionLogEntry" } }
+        }
+      },
+
+      "CasefileSummary": {
+        "type": "object",
+        "required": ["id", "name", "updatedAt"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/ID" },
+          "name": { "type": "string" },
+          "jurisdiction": { "type": "string" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "evidence": { "type": "integer" },
+              "extractions": { "type": "integer" },
+              "corners": { "type": "integer" }
+            }
+          }
+        }
+      },
+
+      "PagedCasefileSummary": {
+        "type": "object",
+        "required": ["items", "limit", "offset", "total"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/CasefileSummary" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+
+      "PagedEvidence": {
+        "type": "object",
+        "required": ["items", "limit", "offset", "total"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceItem" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+
+      "PagedExtractions": {
+        "type": "object",
+        "required": ["items", "limit", "offset", "total"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ExtractionCall" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+
+      "PagedCorners": {
+        "type": "object",
+        "required": ["items", "limit", "offset", "total"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Corner" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+
+      "PagedDecisions": {
+        "type": "object",
+        "required": ["items", "limit", "offset", "total"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/DecisionLogEntry" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer" }
+        }
+      },
+
+      "CasefileCreateRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 140 },
+          "jurisdiction": { "type": "string", "maxLength": 140, "default": "" },
+          "notes": { "type": "string", "maxLength": 20000, "default": "" }
+        }
+      },
+
+      "CasefileExport": {
+        "type": "object",
+        "required": ["casefile", "exportedAt", "tool"],
+        "properties": {
+          "casefile": { "$ref": "#/components/schemas/Casefile" },
+          "exportedAt": { "type": "string", "format": "date-time" },
+          "tool": { "type": "string" }
+        }
+      },
+
+      "CasefileImportRequest": {
+        "type": "object",
+        "required": ["casefile"],
+        "properties": {
+          "casefile": { "$ref": "#/components/schemas/Casefile" },
+          "mode": {
+            "type": "string",
+            "enum": ["new", "dedupeById"],
+            "default": "new",
+            "description": "new always creates a new casefileId; dedupeById may overwrite if you extend policy (not recommended without ETags)."
+          }
+        }
+      },
+
+      "UploadInitRequest": {
+        "type": "object",
+        "required": ["purpose", "fileName", "mime", "size"],
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": ["evidence_attachment"]
+          },
+          "casefileId": { "type": "string", "format": "uuid" },
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "fileName": { "type": "string" },
+          "mime": { "type": "string" },
+          "size": { "type": "integer", "minimum": 1 }
+        }
+      },
+
+      "UploadInitResponse": {
+        "type": "object",
+        "required": ["uploadId", "method", "uploadUrl", "expiresAt"],
+        "properties": {
+          "uploadId": { "type": "string", "format": "uuid" },
+          "method": { "type": "string", "enum": ["PUT"] },
+          "uploadUrl": { "type": "string", "format": "uri" },
+          "requiredHeaders": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        }
+      },
+
+      "UploadCompleteRequest": {
+        "type": "object",
+        "required": ["casefileId", "evidenceId"],
+        "properties": {
+          "casefileId": { "type": "string", "format": "uuid" },
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "sha256": { "type": "string", "description": "Optional checksum for integrity." }
+        }
+      },
+
+      "Error": {
+        "type": "object",
+        "required": ["error", "message"],
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" },
+          "details": { "type": "object" },
+          "requestId": { "type": "string" }
+        }
+      }
+    }
+  }
+}
