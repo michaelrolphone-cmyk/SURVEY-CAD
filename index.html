@@ -756,6 +756,68 @@ header {
   }
 }
 
+/* --- Collapsible header on mobile when app is open --- */
+
+/* Smooth transitions for header-row collapse */
+.header-row {
+  transition: max-height 0.3s ease, opacity 0.25s ease, margin 0.3s ease, padding 0.3s ease;
+  max-height: 120px; /* generous default */
+  overflow: hidden;
+}
+
+.marks-row {
+  transition: margin-top 0.3s ease;
+}
+
+header {
+  transition: padding 0.25s ease;
+}
+
+/* Inline back button — hidden by default, shown only in collapsed state */
+.marks-row-back {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid rgba(230, 190, 132, 0.35);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  flex: 0 0 auto;
+  box-shadow: none;
+}
+
+.marks-row-back:hover {
+  border-color: rgba(255, 214, 155, 0.62);
+  background: rgba(255, 214, 155, 0.08);
+}
+
+@media (max-width: 860px) {
+  /* When header is collapsed: hide header-row, show inline back btn */
+  header.header-app-collapsed .header-row {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
+  }
+
+  header.header-app-collapsed .marks-row {
+    margin-top: 0;
+  }
+
+  header.header-app-collapsed {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+
+  header.header-app-collapsed .marks-row-back {
+    display: inline-flex;
+  }
+}
+
     /* Crew member picker */
     .crew-picker {
       display: flex;
@@ -919,6 +981,7 @@ header {
   </div>
 
   <div class="marks-row">
+    <button id="marksRowBackBtn" class="marks-row-back" type="button" aria-label="Back to launcher" title="Back to launcher">&#8249;</button>
     <form id="marksQuickQa" class="marks-qa" autocomplete="off">
       <div class="marks-pill" title="Ask Marks (opens MarksLLM in the viewer)">
         <img src="/assets/icons/MarksAI.png" alt="Marks" />
@@ -1142,6 +1205,95 @@ header {
 
     document.addEventListener('fullscreenchange', updateFullscreenIcon);
     document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+
+    /* --- Mobile collapsible header when app is open --- */
+    const headerEl = document.querySelector('header');
+    const marksRowBackBtn = document.getElementById('marksRowBackBtn');
+    const MOBILE_BREAKPOINT = 860;
+    let _iframeScrollY = 0;
+    let _iframeScrollCleanup = null;
+
+    function isMobileViewport() {
+      return window.innerWidth <= MOBILE_BREAKPOINT;
+    }
+
+    function collapseHeader() {
+      headerEl.classList.add('header-app-collapsed');
+    }
+
+    function expandHeader() {
+      headerEl.classList.remove('header-app-collapsed');
+    }
+
+    /** Attach scroll listener inside the iframe to detect scroll direction */
+    function attachIframeScrollListener() {
+      detachIframeScrollListener();
+      if (!isMobileViewport() || !currentApp) return;
+
+      try {
+        const iframeWin = appFrame.contentWindow;
+        const iframeDoc = appFrame.contentDocument || iframeWin.document;
+        let lastY = 0;
+        const THRESHOLD = 30; // px before triggering collapse
+
+        function onScroll() {
+          // Try multiple scroll sources (window vs scrollable element)
+          const y = iframeWin.scrollY
+            ?? iframeDoc.documentElement.scrollTop
+            ?? iframeDoc.body.scrollTop
+            ?? 0;
+          const delta = y - lastY;
+          if (delta > 0 && y > THRESHOLD) {
+            collapseHeader();
+          } else if (delta < 0) {
+            expandHeader();
+          }
+          lastY = y;
+        }
+
+        // Listen on both window and document (capture) to catch all scroll containers
+        iframeWin.addEventListener('scroll', onScroll, { passive: true });
+        iframeDoc.addEventListener('scroll', onScroll, { passive: true, capture: true });
+
+        _iframeScrollCleanup = () => {
+          try {
+            iframeWin.removeEventListener('scroll', onScroll);
+            iframeDoc.removeEventListener('scroll', onScroll, { capture: true });
+          } catch (_) {}
+        };
+      } catch (_) {
+        // Cross-origin or not yet loaded — silently ignore
+      }
+    }
+
+    function detachIframeScrollListener() {
+      if (_iframeScrollCleanup) {
+        _iframeScrollCleanup();
+        _iframeScrollCleanup = null;
+      }
+    }
+
+    // Re-attach scroll listener each time an iframe finishes loading
+    appFrame.addEventListener('load', () => {
+      attachIframeScrollListener();
+    });
+
+    // On viewport resize, expand header if leaving mobile breakpoint
+    window.addEventListener('resize', () => {
+      if (!isMobileViewport()) {
+        expandHeader();
+        detachIframeScrollListener();
+      } else if (currentApp) {
+        attachIframeScrollListener();
+      }
+    });
+
+    // Back button in collapsed marks row → go home
+    marksRowBackBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      expandHeader();
+      showHome();
+    });
 
     const LAUNCHER_HOME_ICON = '/assets/icons/SurveyFoundry.png';
     const LAUNCHER_HOME_ICON_ALT = 'SurveyFoundry app icon';
@@ -1980,6 +2132,8 @@ header {
       launcherHeaderTitle.textContent = LAUNCHER_HOME_TITLE;
       writeHistoryState(buildHomeHistoryState(), historyMode);
       unlockKeyboard();
+      expandHeader();
+      detachIframeScrollListener();
     }
 
     function getAppByEntryFile(file) {
