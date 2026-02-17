@@ -1,0 +1,1766 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SURVEY-CAD Server API",
+    "version": "1.0.0",
+    "description": "OpenAPI spec generated from the provided SURVEY-CAD Server API Reference.\n\nBase URL default: http://0.0.0.0:3000\n\nConventions:\n- JSON responses: application/json; charset=utf-8\n- Errors: { \"error\": \"<message>\" }\n- Mutations typically return 201; reads return 200\n- Unsupported methods return 405"
+  },
+  "servers": [
+    {
+      "url": "http://0.0.0.0:3000",
+      "description": "Default dev server"
+    },
+    {
+      "url": "http://{host}:{port}",
+      "description": "Configurable server",
+      "variables": {
+        "host": { "default": "0.0.0.0" },
+        "port": { "default": "3000" }
+      }
+    }
+  ],
+  "tags": [
+    { "name": "Health", "description": "Health checks" },
+    { "name": "Apps", "description": "Application catalog" },
+    { "name": "GIS", "description": "Geographic lookup and GIS operations" },
+    { "name": "Project Files", "description": "Project file manifest and uploads" },
+    { "name": "Crew", "description": "Crew management" },
+    { "name": "Equipment", "description": "Equipment inventory" },
+    { "name": "Equipment Logs", "description": "Equipment logs" },
+    { "name": "LocalStorage Sync", "description": "Synchronized state snapshot (REST)" },
+    { "name": "PointForge", "description": "PointForge exports" },
+    { "name": "FLD", "description": "FLD configuration parsing" },
+    { "name": "Worker", "description": "Distributed worker task management" },
+    { "name": "ROS OCR", "description": "Record of Survey OCR extraction" },
+    { "name": "Static Map", "description": "Static map tile proxy/fallback" },
+    { "name": "ROS PDF Proxy", "description": "PDF proxy to avoid CORS" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/apps": {
+      "get": {
+        "tags": ["Apps"],
+        "summary": "Get public application catalog",
+        "operationId": "getApps",
+        "responses": {
+          "200": {
+            "description": "Catalog",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AppCatalogResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lookup": {
+      "get": {
+        "tags": ["GIS"],
+        "summary": "Comprehensive address lookup",
+        "description": "Geocodes the address and queries parcels, sections, subdivisions, and Records of Survey in the vicinity.\n\nResponse is the full result object from SurveyCadClient.lookupByAddress().",
+        "operationId": "lookupByAddress",
+        "parameters": [
+          { "$ref": "#/components/parameters/addressRequired" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lookup result (implementation-defined payload)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LookupResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/geocode": {
+      "get": {
+        "tags": ["GIS"],
+        "summary": "Geocode an address",
+        "description": "Tries Nominatim first, falls back to ArcGIS.",
+        "operationId": "geocodeAddress",
+        "parameters": [
+          { "$ref": "#/components/parameters/addressRequired" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geocode result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GeocodeResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/parcel": {
+      "get": {
+        "tags": ["GIS"],
+        "summary": "Find nearest parcel to a point",
+        "operationId": "getNearestParcel",
+        "parameters": [
+          { "$ref": "#/components/parameters/lonRequired" },
+          { "$ref": "#/components/parameters/latRequired" },
+          { "$ref": "#/components/parameters/outSR4326" },
+          { "$ref": "#/components/parameters/searchMeters40" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nearest parcel feature",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ParcelResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/section": {
+      "get": {
+        "tags": ["GIS"],
+        "summary": "Load PLSS section at a point",
+        "operationId": "getSectionAtPoint",
+        "parameters": [
+          { "$ref": "#/components/parameters/lonRequired" },
+          { "$ref": "#/components/parameters/latRequired" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Section feature or null",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SectionResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/aliquots": {
+      "get": {
+        "tags": ["GIS"],
+        "summary": "Load PLSS aliquots within the containing section",
+        "operationId": "getAliquotsAtPoint",
+        "parameters": [
+          { "$ref": "#/components/parameters/lonRequired" },
+          { "$ref": "#/components/parameters/latRequired" },
+          { "$ref": "#/components/parameters/outSR4326" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aliquots in the section",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AliquotsResponse" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/subdivision": {
+      "get": {
+        "tags": ["GIS"],
+        "summary": "Load subdivision data at a point",
+        "operationId": "getSubdivisionAtPoint",
+        "parameters": [
+          { "$ref": "#/components/parameters/lonRequired" },
+          { "$ref": "#/components/parameters/latRequired" },
+          { "$ref": "#/components/parameters/outSR4326" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subdivision feature (or null, implementation-defined)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SubdivisionResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/utilities": {
+      "get": {
+        "tags": ["GIS"],
+        "summary": "Look up utility records near an address",
+        "operationId": "getUtilitiesNearAddress",
+        "parameters": [
+          { "$ref": "#/components/parameters/addressRequired" },
+          { "$ref": "#/components/parameters/outSR2243" },
+          { "$ref": "#/components/parameters/sourcesPower" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Utility records",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UtilitiesResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/project-file/template": {
+      "get": {
+        "tags": ["Project Files"],
+        "summary": "Generate a project file manifest template",
+        "operationId": "getProjectFileTemplate",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectIdOptional" },
+          { "$ref": "#/components/parameters/projectNameOptional" },
+          { "$ref": "#/components/parameters/clientOptional" },
+          { "$ref": "#/components/parameters/addressOptional" },
+          { "$ref": "#/components/parameters/resourcesJsonOptional" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template manifest",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProjectFileTemplateResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/project-file/compile": {
+      "post": {
+        "tags": ["Project Files"],
+        "summary": "Compile a project file into an archive plan",
+        "operationId": "compileProjectFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompileProjectFileRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Compiled archive plan",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CompileProjectFileResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/project-files/upload": {
+      "post": {
+        "tags": ["Project Files"],
+        "summary": "Upload a file to a project folder on the server",
+        "operationId": "uploadProjectFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "folderKey", "file"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "folderKey": { "$ref": "#/components/schemas/FolderKey" },
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded resource record",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UploadProjectFileResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" },
+          "403": { "$ref": "#/components/responses/Error403" }
+        }
+      }
+    },
+    "/api/project-files/download": {
+      "get": {
+        "tags": ["Project Files"],
+        "summary": "Download a previously uploaded file",
+        "operationId": "downloadProjectFile",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectIdRequired" },
+          { "$ref": "#/components/parameters/folderKeyRequired" },
+          { "$ref": "#/components/parameters/fileNameRequired" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Raw file content (content-type varies)",
+            "content": {
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/project-files/list": {
+      "get": {
+        "tags": ["Project Files"],
+        "summary": "List all uploaded files for a project",
+        "operationId": "listProjectFiles",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectIdRequired" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of stored file entries",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProjectFilesListResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/crew": {
+      "get": {
+        "tags": ["Crew"],
+        "summary": "List all crew members or retrieve one by ID",
+        "operationId": "getCrew",
+        "parameters": [
+          { "$ref": "#/components/parameters/idOptional" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crew list or single member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/CrewListResponse" },
+                    { "$ref": "#/components/schemas/CrewMemberResponse" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      },
+      "post": {
+        "tags": ["Crew"],
+        "summary": "Create or update a crew member",
+        "description": "Automatically broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "upsertCrewMember",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CrewMemberUpsert" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upserted crew member",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CrewMemberResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/crew-presence": {
+      "get": {
+        "tags": ["Crew"],
+        "summary": "Get currently online crew member IDs",
+        "operationId": "getCrewPresence",
+        "responses": {
+          "200": {
+            "description": "Online IDs",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CrewPresenceResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/equipment": {
+      "get": {
+        "tags": ["Equipment"],
+        "summary": "List all equipment or retrieve one by ID",
+        "operationId": "getEquipment",
+        "parameters": [
+          { "$ref": "#/components/parameters/idOptional" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Equipment list or single equipment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/EquipmentListResponse" },
+                    { "$ref": "#/components/schemas/EquipmentResponse" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      },
+      "post": {
+        "tags": ["Equipment"],
+        "summary": "Create or update an equipment item",
+        "operationId": "upsertEquipment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EquipmentUpsert" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upserted equipment item",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EquipmentResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/equipment-logs": {
+      "get": {
+        "tags": ["Equipment Logs"],
+        "summary": "List all equipment logs or retrieve one by ID",
+        "operationId": "getEquipmentLogs",
+        "parameters": [
+          { "$ref": "#/components/parameters/idOptional" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log list or single log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/EquipmentLogListResponse" },
+                    { "$ref": "#/components/schemas/EquipmentLogResponse" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      },
+      "post": {
+        "tags": ["Equipment Logs"],
+        "summary": "Create or update an equipment log entry",
+        "operationId": "upsertEquipmentLog",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EquipmentLogUpsert" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upserted equipment log",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EquipmentLogResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/localstorage-sync": {
+      "get": {
+        "tags": ["LocalStorage Sync"],
+        "summary": "Get current synchronized state snapshot",
+        "operationId": "getLocalStorageSyncState",
+        "responses": {
+          "200": {
+            "description": "State snapshot",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SyncState" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["LocalStorage Sync"],
+        "summary": "Push full state snapshot (full sync)",
+        "operationId": "postLocalStorageSyncState",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SyncStatePushRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync status and authoritative server state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SyncStatePushResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/pointforge-exports": {
+      "get": {
+        "tags": ["PointForge"],
+        "summary": "List PointForge exports or retrieve one by ID",
+        "operationId": "getPointForgeExports",
+        "parameters": [
+          { "$ref": "#/components/parameters/idOptional" },
+          { "$ref": "#/components/parameters/roomDefault" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Export list or single export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/PointForgeExportListResponse" },
+                    { "$ref": "#/components/schemas/PointForgeExportResponse" }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error404" },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      },
+      "post": {
+        "tags": ["PointForge"],
+        "summary": "Create a PointForge export and broadcast to LineForge room",
+        "description": "Side effect: broadcasts a `pointforge-import` event to the LineForge collaboration room.",
+        "operationId": "createPointForgeExport",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PointForgeExportCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created export",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PointForgeExportResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/fld-config": {
+      "get": {
+        "tags": ["FLD"],
+        "summary": "Load and parse a .fld configuration file",
+        "operationId": "getFldConfig",
+        "parameters": [
+          { "$ref": "#/components/parameters/fileDefaultFld" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parsed FLD config",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FldConfig" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" },
+          "404": { "$ref": "#/components/responses/Error404" }
+        }
+      }
+    },
+    "/api/worker/submit": {
+      "post": {
+        "tags": ["Worker"],
+        "summary": "Submit a task to the worker pool (blocking)",
+        "operationId": "submitWorkerTask",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WorkerSubmitRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task completed successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WorkerSubmitSuccessResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Task failed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WorkerSubmitFailureResponse" }
+              }
+            }
+          },
+          "503": {
+            "description": "No online workers in pool",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NoWorkersResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/worker/workers": {
+      "get": {
+        "tags": ["Worker"],
+        "summary": "List registered workers and status",
+        "operationId": "listWorkers",
+        "parameters": [
+          { "$ref": "#/components/parameters/poolDefault" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workers",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WorkerWorkersResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extract": {
+      "post": {
+        "tags": ["ROS OCR"],
+        "summary": "Extract basis-of-bearing candidates from a RoS PDF via OCR",
+        "operationId": "extractRosBasisCandidates",
+        "parameters": [
+          { "$ref": "#/components/parameters/maxPages1" },
+          { "$ref": "#/components/parameters/dpi220" },
+          { "$ref": "#/components/parameters/async01" },
+          { "$ref": "#/components/parameters/allowSlow01" },
+          { "$ref": "#/components/parameters/debug01" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["pdf"],
+                "properties": {
+                  "pdf": { "type": "string", "format": "binary", "description": "PDF file to process (max 35 MB)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Synchronous extraction result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ExtractSyncResponse" }
+              }
+            }
+          },
+          "202": {
+            "description": "Async job queued",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ExtractAsyncResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/extract/jobs/{jobId}": {
+      "get": {
+        "tags": ["ROS OCR"],
+        "summary": "Poll an async extraction job status",
+        "operationId": "getExtractJobStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status (running or completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/ExtractJobRunningResponse" },
+                    { "$ref": "#/components/schemas/ExtractJobCompletedResponse" }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Job failed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ExtractJobFailedResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/static-map": {
+      "get": {
+        "tags": ["Static Map"],
+        "summary": "Fetch a satellite/street map tile centered on coordinates",
+        "description": "Attempts ArcGIS World Imagery first, falls back to OpenStreetMap, then to a generated SVG placeholder.",
+        "operationId": "getStaticMapTile",
+        "parameters": [
+          { "$ref": "#/components/parameters/lonRequired" },
+          { "$ref": "#/components/parameters/latRequired" },
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Address label used for SVG fallback"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map tile image (png) or fallback SVG",
+            "content": {
+              "image/png": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/svg+xml": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    },
+    "/api/ros-pdf": {
+      "get": {
+        "tags": ["ROS PDF Proxy"],
+        "summary": "Proxy a remote Record of Survey PDF (avoid CORS)",
+        "operationId": "proxyRosPdf",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "uri" },
+            "description": "Absolute HTTP/HTTPS URL to the PDF"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Raw PDF content with upstream headers",
+            "content": {
+              "application/pdf": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "502": { "$ref": "#/components/responses/Error502" },
+          "400": { "$ref": "#/components/responses/Error400" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "addressRequired": {
+        "name": "address",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1 },
+        "description": "Street address"
+      },
+      "lonRequired": {
+        "name": "lon",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "number" },
+        "description": "Longitude (WGS 84)"
+      },
+      "latRequired": {
+        "name": "lat",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "number" },
+        "description": "Latitude (WGS 84)"
+      },
+      "outSR4326": {
+        "name": "outSR",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "number", "default": 4326 },
+        "description": "Output spatial reference WKID"
+      },
+      "outSR2243": {
+        "name": "outSR",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "number", "default": 2243 },
+        "description": "Output spatial reference WKID (default Idaho State Plane West, US Feet)"
+      },
+      "searchMeters40": {
+        "name": "searchMeters",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "number", "default": 40 },
+        "description": "Search radius in meters"
+      },
+      "sourcesPower": {
+        "name": "sources",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "default": "power" },
+        "description": "Comma-separated source types to query"
+      },
+      "projectIdOptional": {
+        "name": "projectId",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Project ID (auto-generated if omitted)"
+      },
+      "projectIdRequired": {
+        "name": "projectId",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1 },
+        "description": "Project ID"
+      },
+      "projectNameOptional": {
+        "name": "projectName",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Project display name"
+      },
+      "clientOptional": {
+        "name": "client",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Client name"
+      },
+      "addressOptional": {
+        "name": "address",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Project address"
+      },
+      "resourcesJsonOptional": {
+        "name": "resources",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "JSON-encoded array of resource objects"
+      },
+      "folderKeyRequired": {
+        "name": "folderKey",
+        "in": "query",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/FolderKey" },
+        "description": "Folder key"
+      },
+      "fileNameRequired": {
+        "name": "fileName",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1 },
+        "description": "Stored filename (from upload response)"
+      },
+      "idOptional": {
+        "name": "id",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Optional entity ID filter"
+      },
+      "roomDefault": {
+        "name": "room",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "default": "default" },
+        "description": "Room filter"
+      },
+      "fileDefaultFld": {
+        "name": "file",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "default": "config/MLS.fld" },
+        "description": "Relative path to the FLD config file"
+      },
+      "poolDefault": {
+        "name": "pool",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "default": "default" },
+        "description": "Worker pool to query"
+      },
+      "maxPages1": {
+        "name": "maxPages",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "default": 1, "minimum": 1 },
+        "description": "Max pages to process"
+      },
+      "dpi220": {
+        "name": "dpi",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "default": 220, "minimum": 50 },
+        "description": "OCR resolution"
+      },
+      "async01": {
+        "name": "async",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "enum": ["0", "1"], "default": "0" },
+        "description": "Run asynchronously (\"1\") or synchronously (\"0\")"
+      },
+      "allowSlow01": {
+        "name": "allowSlow",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "enum": ["0", "1"], "default": "0" },
+        "description": "Allow higher limits for maxPages and dpi"
+      },
+      "debug01": {
+        "name": "debug",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "enum": ["0", "1"], "default": "0" },
+        "description": "Include debug output"
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Bad request / validation error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Forbidden (e.g., path traversal attempt)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Error502": {
+        "description": "Upstream server error (proxied requests)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": ["ok"],
+        "properties": {
+          "ok": { "type": "boolean", "const": true }
+        },
+        "additionalProperties": false
+      },
+      "AppCatalogResponse": {
+        "type": "object",
+        "required": ["apps"],
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AppEntry" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AppEntry": {
+        "type": "object",
+        "required": ["name", "entryHtml", "iconPath"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique app identifier" },
+          "name": { "type": "string", "description": "Display name" },
+          "description": { "type": "string", "description": "Human-readable description" },
+          "entryHtml": { "type": "string", "description": "HTML entry point filename" },
+          "iconPath": { "type": "string", "description": "Path to the app icon" },
+          "section": { "type": ["string", "null"], "description": "Category grouping" },
+          "experimental": { "type": "boolean", "description": "True if experimental" },
+          "iconHeight": { "type": "number" }
+        },
+        "additionalProperties": true
+      },
+      "LookupResult": {
+        "type": "object",
+        "description": "Implementation-defined payload from SurveyCadClient.lookupByAddress().",
+        "additionalProperties": true
+      },
+      "GeocodeResult": {
+        "type": "object",
+        "description": "Geocode result with coordinates and metadata (implementation-defined).",
+        "additionalProperties": true
+      },
+      "ArcGisFeature": {
+        "type": "object",
+        "description": "Generic ArcGIS feature (attributes + geometry).",
+        "properties": {
+          "attributes": { "type": "object", "additionalProperties": true },
+          "geometry": { "type": ["object", "null"], "additionalProperties": true }
+        },
+        "additionalProperties": true
+      },
+      "ParcelResponse": {
+        "type": "object",
+        "required": ["parcel"],
+        "properties": {
+          "parcel": { "$ref": "#/components/schemas/ArcGisFeature" }
+        },
+        "additionalProperties": false
+      },
+      "SectionResponse": {
+        "type": "object",
+        "required": ["section"],
+        "properties": {
+          "section": { "anyOf": [{ "$ref": "#/components/schemas/ArcGisFeature" }, { "type": "null" }] }
+        },
+        "additionalProperties": false
+      },
+      "AliquotsResponse": {
+        "type": "object",
+        "required": ["section", "aliquots"],
+        "properties": {
+          "section": { "$ref": "#/components/schemas/ArcGisFeature" },
+          "aliquots": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ArcGisFeature" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubdivisionResponse": {
+        "type": "object",
+        "required": ["subdivision"],
+        "properties": {
+          "subdivision": { "anyOf": [{ "$ref": "#/components/schemas/ArcGisFeature" }, { "type": "null" }] }
+        },
+        "additionalProperties": false
+      },
+      "UtilitiesResponse": {
+        "type": "object",
+        "required": ["utilities", "sources"],
+        "properties": {
+          "utilities": { "type": "array", "items": { "$ref": "#/components/schemas/ArcGisFeature" } },
+          "sources": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      },
+      "FolderKey": {
+        "type": "string",
+        "enum": ["drawings", "ros", "cpfs", "point-files", "deeds", "plats", "invoices", "other"]
+      },
+      "ProjectFileTemplateResponse": {
+        "type": "object",
+        "required": ["projectFile"],
+        "properties": {
+          "projectFile": { "$ref": "#/components/schemas/ProjectFile" }
+        },
+        "additionalProperties": false
+      },
+      "ProjectFile": {
+        "type": "object",
+        "required": ["schemaVersion", "generatedAt", "project", "archive", "folders"],
+        "properties": {
+          "schemaVersion": { "type": "string", "description": "Schema version, e.g. 1.0.0" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "project": { "$ref": "#/components/schemas/Project" },
+          "archive": { "$ref": "#/components/schemas/Archive" },
+          "folders": { "type": "array", "items": { "$ref": "#/components/schemas/Folder" } }
+        },
+        "additionalProperties": true
+      },
+      "Project": {
+        "type": "object",
+        "required": ["id", "name", "client", "address"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "client": { "type": "string" },
+          "address": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "Archive": {
+        "type": "object",
+        "required": ["type", "rootFolderName"],
+        "properties": {
+          "type": { "type": "string", "description": "e.g. zip" },
+          "rootFolderName": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "Folder": {
+        "type": "object",
+        "required": ["key", "label", "description", "index"],
+        "properties": {
+          "key": { "$ref": "#/components/schemas/FolderKey" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "index": { "type": "array", "items": { "$ref": "#/components/schemas/Resource" } }
+        },
+        "additionalProperties": true
+      },
+      "Resource": {
+        "type": "object",
+        "required": ["id", "folder", "title", "exportFormat", "reference"],
+        "properties": {
+          "id": { "type": "string" },
+          "folder": { "$ref": "#/components/schemas/FolderKey" },
+          "title": { "type": "string" },
+          "exportFormat": { "type": "string", "description": "File extension (dxf, pdf, csv, bin, etc.)" },
+          "reference": { "$ref": "#/components/schemas/Reference" }
+        },
+        "additionalProperties": true
+      },
+      "Reference": {
+        "type": "object",
+        "required": ["type", "value"],
+        "properties": {
+          "type": { "type": "string", "description": "external | server-upload | custom" },
+          "value": { "type": "string", "description": "URL or reference path" },
+          "resolverHint": { "type": ["string", "null"] },
+          "metadata": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      },
+      "CompileProjectFileRequest": {
+        "type": "object",
+        "required": ["project"],
+        "properties": {
+          "projectFile": { "anyOf": [{ "$ref": "#/components/schemas/ProjectFile" }, { "type": "null" }] },
+          "project": {
+            "type": "object",
+            "required": ["projectId", "projectName", "client", "address"],
+            "properties": {
+              "projectId": { "type": "string" },
+              "projectName": { "type": "string" },
+              "client": { "type": "string" },
+              "address": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompileProjectFileResponse": {
+        "type": "object",
+        "required": ["projectFile", "archivePlan"],
+        "properties": {
+          "projectFile": { "$ref": "#/components/schemas/ProjectFile" },
+          "archivePlan": { "$ref": "#/components/schemas/ArchivePlan" }
+        },
+        "additionalProperties": false
+      },
+      "ArchivePlan": {
+        "type": "object",
+        "required": ["archiveName", "rootFolderName", "entries", "unresolved"],
+        "properties": {
+          "archiveName": { "type": "string" },
+          "rootFolderName": { "type": "string" },
+          "entries": { "type": "array", "items": { "$ref": "#/components/schemas/ArchiveEntry" } },
+          "unresolved": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+        },
+        "additionalProperties": true
+      },
+      "ArchiveEntry": {
+        "type": "object",
+        "required": ["path", "source"],
+        "properties": {
+          "path": { "type": "string" },
+          "source": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
+      },
+      "UploadProjectFileResponse": {
+        "type": "object",
+        "required": ["resource"],
+        "properties": {
+          "resource": { "$ref": "#/components/schemas/Resource" }
+        },
+        "additionalProperties": false
+      },
+      "ProjectFilesListResponse": {
+        "type": "object",
+        "required": ["files"],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["folderKey", "fileName"],
+              "properties": {
+                "folderKey": { "$ref": "#/components/schemas/FolderKey" },
+                "fileName": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CrewMember": {
+        "type": "object",
+        "required": ["id", "firstName", "lastName", "jobTitle", "phone", "email", "certifications", "notes", "roles", "photo", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "jobTitle": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "certifications": { "type": "string" },
+          "notes": { "type": "string" },
+          "roles": { "type": "array", "items": { "type": "string" } },
+          "photo": { "type": ["object", "array", "string", "number", "boolean", "null"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "CrewMemberUpsert": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "Optional UUID; auto-generated if omitted" },
+              "firstName": { "type": "string", "default": "" },
+              "lastName": { "type": "string", "default": "" },
+              "jobTitle": { "type": "string", "default": "" },
+              "phone": { "type": "string", "default": "" },
+              "email": { "type": "string", "default": "" },
+              "certifications": { "type": "string", "default": "" },
+              "notes": { "type": "string", "default": "" },
+              "roles": { "type": "array", "items": { "type": "string" }, "default": [] },
+              "photo": { "type": ["object", "array", "string", "number", "boolean", "null"], "default": null },
+              "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp; defaults to now if omitted" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "oneOf": [
+              { "required": ["firstName"] },
+              { "required": ["lastName"] }
+            ]
+          }
+        ]
+      },
+      "CrewListResponse": {
+        "type": "object",
+        "required": ["crew"],
+        "properties": {
+          "crew": { "type": "array", "items": { "$ref": "#/components/schemas/CrewMember" } }
+        },
+        "additionalProperties": false
+      },
+      "CrewMemberResponse": {
+        "type": "object",
+        "required": ["member"],
+        "properties": {
+          "member": { "$ref": "#/components/schemas/CrewMember" }
+        },
+        "additionalProperties": false
+      },
+      "CrewPresenceResponse": {
+        "type": "object",
+        "required": ["online"],
+        "properties": {
+          "online": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      },
+      "Equipment": {
+        "type": "object",
+        "required": ["id", "make", "model", "equipmentType", "serialNumber", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "make": { "type": "string" },
+          "model": { "type": "string" },
+          "equipmentType": { "type": "string" },
+          "serialNumber": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "EquipmentUpsert": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "Optional UUID; auto-generated if omitted" },
+              "make": { "type": "string", "default": "" },
+              "model": { "type": "string", "default": "" },
+              "equipmentType": { "type": "string", "default": "" },
+              "serialNumber": { "type": "string", "default": "" },
+              "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp; defaults to now if omitted" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "oneOf": [
+              { "required": ["make"] },
+              { "required": ["model"] }
+            ]
+          }
+        ]
+      },
+      "EquipmentListResponse": {
+        "type": "object",
+        "required": ["equipment"],
+        "properties": {
+          "equipment": { "type": "array", "items": { "$ref": "#/components/schemas/Equipment" } }
+        },
+        "additionalProperties": false
+      },
+      "EquipmentResponse": {
+        "type": "object",
+        "required": ["equipment"],
+        "properties": {
+          "equipment": { "$ref": "#/components/schemas/Equipment" }
+        },
+        "additionalProperties": false
+      },
+      "EquipmentLog": {
+        "type": "object",
+        "required": ["id", "rodman", "equipmentHeight", "referencePoint", "setupTime", "teardownTime", "jobFileName", "equipmentType", "notes", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "rodman": { "type": "string" },
+          "equipmentHeight": { "type": "string" },
+          "referencePoint": { "type": "string" },
+          "setupTime": { "type": "string" },
+          "teardownTime": { "type": "string" },
+          "jobFileName": { "type": "string" },
+          "equipmentType": { "type": "string" },
+          "notes": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "EquipmentLogUpsert": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "Optional UUID; auto-generated if omitted" },
+              "rodman": { "type": "string", "default": "" },
+              "equipmentHeight": { "type": "string", "default": "" },
+              "referencePoint": { "type": "string", "default": "" },
+              "setupTime": { "type": "string", "default": "" },
+              "teardownTime": { "type": "string", "default": "" },
+              "jobFileName": { "type": "string", "default": "" },
+              "equipmentType": { "type": "string", "default": "" },
+              "notes": { "type": "string", "default": "" },
+              "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp; defaults to now if omitted" }
+            },
+            "additionalProperties": true
+          },
+          {
+            "oneOf": [
+              { "required": ["rodman"] },
+              { "required": ["jobFileName"] }
+            ]
+          }
+        ]
+      },
+      "EquipmentLogListResponse": {
+        "type": "object",
+        "required": ["logs"],
+        "properties": {
+          "logs": { "type": "array", "items": { "$ref": "#/components/schemas/EquipmentLog" } }
+        },
+        "additionalProperties": false
+      },
+      "EquipmentLogResponse": {
+        "type": "object",
+        "required": ["log"],
+        "properties": {
+          "log": { "$ref": "#/components/schemas/EquipmentLog" }
+        },
+        "additionalProperties": false
+      },
+      "SyncState": {
+        "type": "object",
+        "required": ["version", "snapshot", "checksum", "updatedAt"],
+        "properties": {
+          "version": { "type": "integer", "description": "Monotonically increasing version counter" },
+          "snapshot": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Key-value map (values are JSON-encoded strings)"
+          },
+          "checksum": { "type": "string", "description": "FNV-1a 32-bit checksum, format fnv1a-<hex>" },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "SyncStatePushRequest": {
+        "type": "object",
+        "required": ["version", "snapshot"],
+        "properties": {
+          "version": { "type": "integer" },
+          "snapshot": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncStatePushResponse": {
+        "type": "object",
+        "required": ["status", "state"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["server-updated", "client-stale", "checksum-conflict", "in-sync"]
+          },
+          "state": { "$ref": "#/components/schemas/SyncState" }
+        },
+        "additionalProperties": false
+      },
+      "PointForgeExport": {
+        "type": "object",
+        "required": ["id", "roomId", "modifiedCsv", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "description": "pf-export-{timestamp}-{uuid8}" },
+          "roomId": { "type": "string" },
+          "originalCsv": { "type": "string" },
+          "modifiedCsv": { "type": "string" },
+          "georeference": { "anyOf": [{ "type": "object", "additionalProperties": true }, { "type": "null" }] },
+          "metadata": { "type": "object", "additionalProperties": true },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      },
+      "PointForgeExportListResponse": {
+        "type": "object",
+        "required": ["exports"],
+        "properties": {
+          "exports": { "type": "array", "items": { "$ref": "#/components/schemas/PointForgeExport" } }
+        },
+        "additionalProperties": false
+      },
+      "PointForgeExportResponse": {
+        "type": "object",
+        "required": ["export"],
+        "properties": {
+          "export": { "$ref": "#/components/schemas/PointForgeExport" }
+        },
+        "additionalProperties": false
+      },
+      "PointForgeExportCreateRequest": {
+        "type": "object",
+        "required": ["modifiedCsv"],
+        "properties": {
+          "modifiedCsv": { "type": "string" },
+          "originalCsv": { "type": "string" },
+          "georeference": { "anyOf": [{ "type": "object", "additionalProperties": true }, { "type": "null" }] },
+          "metadata": { "type": "object", "additionalProperties": true },
+          "roomId": { "type": "string", "default": "default" }
+        },
+        "additionalProperties": false
+      },
+      "FldConfig": {
+        "type": "object",
+        "required": ["columns", "rules", "rulesByCode"],
+        "properties": {
+          "versionTag": { "type": ["string", "null"] },
+          "columns": { "type": "array", "items": { "$ref": "#/components/schemas/FldColumn" } },
+          "rules": { "type": "array", "items": { "$ref": "#/components/schemas/FldRule" } },
+          "rulesByCode": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/components/schemas/FldRule" }
+          }
+        },
+        "additionalProperties": true
+      },
+      "FldColumn": {
+        "type": "object",
+        "required": ["index", "name", "key"],
+        "properties": {
+          "index": { "type": "integer" },
+          "name": { "type": "string" },
+          "key": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "FldRule": {
+        "type": "object",
+        "required": ["rowNumber", "code", "description", "fullName", "layer", "entityType", "lineType", "symbol", "symbolSize", "symbolMapFile", "processingOn", "codeSequence", "companionCodes", "raw"],
+        "properties": {
+          "rowNumber": { "type": "integer" },
+          "code": { "type": "string" },
+          "description": { "type": "string" },
+          "fullName": { "type": "string" },
+          "layer": { "type": "string" },
+          "entityType": { "type": "string" },
+          "lineType": { "type": "string" },
+          "symbol": { "type": "string" },
+          "symbolSize": { "type": "string" },
+          "symbolMapFile": { "type": "string" },
+          "processingOn": { "type": "boolean" },
+          "codeSequence": { "type": "array", "items": { "type": "string" } },
+          "companionCodes": { "type": "array", "items": { "type": "string" } },
+          "raw": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      },
+      "WorkerSubmitRequest": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "poolId": { "type": "string", "default": "default" },
+          "kind": { "type": "string", "description": "Task type identifier" },
+          "payload": { "type": ["object", "array", "string", "number", "boolean", "null"], "default": null }
+        },
+        "additionalProperties": false
+      },
+      "WorkerSubmitSuccessResponse": {
+        "type": "object",
+        "required": ["ok", "taskId", "result"],
+        "properties": {
+          "ok": { "type": "boolean", "const": true },
+          "taskId": { "type": "string" },
+          "result": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      },
+      "WorkerSubmitFailureResponse": {
+        "type": "object",
+        "required": ["ok", "taskId", "error"],
+        "properties": {
+          "ok": { "type": "boolean", "const": false },
+          "taskId": { "type": "string" },
+          "error": { "type": "string" },
+          "details": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      },
+      "NoWorkersResponse": {
+        "type": "object",
+        "required": ["error", "workers"],
+        "properties": {
+          "error": { "type": "string", "const": "No online workers in pool." },
+          "workers": { "type": "array", "items": { "$ref": "#/components/schemas/WorkerInfo" } }
+        },
+        "additionalProperties": true
+      },
+      "WorkerWorkersResponse": {
+        "type": "object",
+        "required": ["workers"],
+        "properties": {
+          "workers": { "type": "array", "items": { "$ref": "#/components/schemas/WorkerInfo" } }
+        },
+        "additionalProperties": false
+      },
+      "WorkerInfo": {
+        "type": "object",
+        "required": ["workerId", "poolId", "concurrency", "inFlight", "online", "lastSeen"],
+        "properties": {
+          "workerId": { "type": "string" },
+          "poolId": { "type": "string" },
+          "name": { "type": ["string", "null"] },
+          "concurrency": { "type": "integer" },
+          "inFlight": { "type": "integer" },
+          "online": { "type": "boolean" },
+          "lastSeen": { "type": "integer", "description": "Unix timestamp (ms)" },
+          "capabilities": { "anyOf": [{ "type": "object", "additionalProperties": true }, { "type": "null" }] }
+        },
+        "additionalProperties": true
+      },
+      "ExtractRequestEcho": {
+        "type": "object",
+        "properties": {
+          "allowSlow": { "type": "boolean" },
+          "requestedMaxPages": { "type": "integer" },
+          "requestedDpi": { "type": "integer" },
+          "maxPages": { "type": "integer" },
+          "dpi": { "type": "integer" }
+        },
+        "additionalProperties": true
+      },
+      "ExtractSyncResponse": {
+        "type": "object",
+        "required": ["basis", "request"],
+        "properties": {
+          "basis": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "request": { "$ref": "#/components/schemas/ExtractRequestEcho" }
+        },
+        "additionalProperties": true
+      },
+      "ExtractAsyncResponse": {
+        "type": "object",
+        "required": ["jobId", "status", "statusUrl", "pollAfterMs", "request"],
+        "properties": {
+          "jobId": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued"] },
+          "statusUrl": { "type": "string" },
+          "pollAfterMs": { "type": "integer" },
+          "request": { "$ref": "#/components/schemas/ExtractRequestEcho" }
+        },
+        "additionalProperties": true
+      },
+      "ExtractJobRunningResponse": {
+        "type": "object",
+        "required": ["jobId", "status", "request", "pollAfterMs"],
+        "properties": {
+          "jobId": { "type": "string" },
+          "status": { "type": "string", "enum": ["running"] },
+          "request": { "$ref": "#/components/schemas/ExtractRequestEcho" },
+          "pollAfterMs": { "type": "integer" }
+        },
+        "additionalProperties": true
+      },
+      "ExtractJobCompletedResponse": {
+        "type": "object",
+        "required": ["jobId", "status", "request", "basis"],
+        "properties": {
+          "jobId": { "type": "string" },
+          "status": { "type": "string", "enum": ["completed"] },
+          "request": { "$ref": "#/components/schemas/ExtractRequestEcho" },
+          "basis": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+        },
+        "additionalProperties": true
+      },
+      "ExtractJobFailedResponse": {
+        "type": "object",
+        "required": ["jobId", "status", "request", "error"],
+        "properties": {
+          "jobId": { "type": "string" },
+          "status": { "type": "string", "enum": ["failed"] },
+          "request": { "$ref": "#/components/schemas/ExtractRequestEcho" },
+          "error": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}
