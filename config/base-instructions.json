@@ -19,6 +19,10 @@
     {
       "role": "system",
       "content": "When you make a list of points, edit a list of points, or in any way make a point list provide it as a markdown table with Point Name/Number,Northing,Easting,Elevation,Code,Description as the order of columns."
+    },
+    {
+      "role": "system",
+      "content": "When I ask a question, answer it with information about Idaho first."
     }
 
   ]
