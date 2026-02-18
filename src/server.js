@@ -28,11 +28,6 @@ import {
   saveEquipmentLog,
 } from './crew-equipment-api.js';
 
-// --- BEW (Boundary Evidence Workbench) routes + Redis store (do not redefine; just mount) ---
-import { createRedisClient as createBewRedisClient } from './bew-redis.js';
-import { createBewStore } from './bew-store.js';
-import { registerBewRoutes } from './bew-routes.js';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_STATIC_DIR = path.resolve(__dirname, '..');
@@ -178,7 +173,6 @@ async function parseMultipartUpload(req) {
   while (start !== -1) {
     start += delimiter.length;
     if (body[start] === 0x2d && body[start + 1] === 0x2d) break; // --boundary-- end marker
-    // Skip CRLF after delimiter
     if (body[start] === 0x0d && body[start + 1] === 0x0a) start += 2;
 
     const headerEnd = body.indexOf('\r\n\r\n', start);
@@ -187,7 +181,7 @@ async function parseMultipartUpload(req) {
     const bodyStart = headerEnd + 4;
 
     const nextDelimiter = body.indexOf(delimiter, bodyStart);
-    const bodyEnd = nextDelimiter !== -1 ? nextDelimiter - 2 : body.length; // -2 for preceding CRLF
+    const bodyEnd = nextDelimiter !== -1 ? nextDelimiter - 2 : body.length;
     const partBody = body.slice(bodyStart, bodyEnd);
 
     const nameMatch = headerBlock.match(/name="([^"]+)"/);
@@ -311,6 +305,22 @@ async function resolveStaticPath(staticDir, safePath) {
   return currentDir;
 }
 
+function pickFirstFunction(mod, names) {
+  for (const name of names) {
+    const v = mod?.[name];
+    if (typeof v === 'function') return v;
+  }
+  return null;
+}
+
+function pickFirstObject(mod, names) {
+  for (const name of names) {
+    const v = mod?.[name];
+    if (v && typeof v === 'object') return v;
+  }
+  return null;
+}
+
 export function createSurveyServer({
   client = new SurveyCadClient(),
   staticDir = DEFAULT_STATIC_DIR,
@@ -320,31 +330,115 @@ export function createSurveyServer({
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
-  // --- BEW init is lazy (ensures Redis + store are created once, on-demand) ---
+  // --- BEW init is lazy (prevents boot-time failures due to export mismatches) ---
   let bewPromise = null;
+
   const ensureBew = async () => {
     if (bewPromise) return bewPromise;
+
     bewPromise = (async () => {
-      const redis = createBewRedisClient();
-      const store = await createBewStore({
-        redis,
-        redisUrl: process.env.BEW_REDIS_URL || process.env.REDIS_URL || process.env.REDIS_TLS_URL || '',
-      });
+      const redisUrl =
+        process.env.BEW_REDIS_URL
+        || process.env.REDIS_TLS_URL
+        || process.env.REDIS_URL
+        || '';
 
-      const routes = registerBewRoutes({ store });
+      const [redisMod, storeMod, routesMod] = await Promise.all([
+        import('./bew-redis.js'),
+        import('./bew-store.js'),
+        import('./bew-routes.js'),
+      ]);
 
-      // Support either: function(req,res,urlObj,ctx) OR object.handleHttp(...)
-      const handler =
-        (routes && typeof routes.handleHttp === 'function' && routes.handleHttp.bind(routes))
-        || (routes && typeof routes.handleRequest === 'function' && routes.handleRequest.bind(routes))
-        || (typeof routes === 'function' ? routes : null);
+      const createRedisClient = pickFirstFunction(redisMod, [
+        'createBewRedisClient',
+        'createRedisClient',
+        'createClient',
+        'default',
+      ]);
+
+      if (!createRedisClient) {
+        throw new Error('BEW redis module did not export a redis client factory (expected createRedisClient/createClient/default).');
+      }
+
+      let redis;
+      try {
+        redis = createRedisClient({ url: redisUrl });
+      } catch {
+        try {
+          redis = createRedisClient(redisUrl);
+        } catch {
+          redis = createRedisClient();
+        }
+      }
+      if (redis && typeof redis.then === 'function') {
+        redis = await redis;
+      }
+
+      const createStore = pickFirstFunction(storeMod, [
+        'createBewStore',
+        'createStore',
+        'default',
+      ]);
+
+      if (!createStore) {
+        throw new Error('BEW store module did not export a store factory (expected createBewStore/createStore/default).');
+      }
+
+      let store;
+      try {
+        store = await createStore({ redis, redisUrl });
+      } catch {
+        try {
+          store = await createStore(redis);
+        } catch {
+          store = await createStore();
+        }
+      }
+
+      // Routes can be:
+      // - default export function (create routes OR request handler)
+      // - createRoutes(...)
+      // - exported object with handleHttp/handleRequest
+      const createRoutes = pickFirstFunction(routesMod, [
+        'createBewRoutes',
+        'createRoutes',
+        'default',
+      ]);
+
+      let routes = null;
+      if (createRoutes) {
+        try {
+          routes = await createRoutes({ store });
+        } catch {
+          try {
+            routes = await createRoutes(store);
+          } catch {
+            routes = await createRoutes();
+          }
+        }
+      } else {
+        // Maybe module exports an object like { routes: {...} } or { bewRoutes: {...} }
+        routes = pickFirstObject(routesMod, ['bewRoutes', 'routes', 'router', 'default']) || routesMod;
+      }
+
+      // Handler derivation (supports function or object handlers)
+      let handler = null;
+      if (typeof routes === 'function') {
+        handler = routes;
+      } else {
+        handler = pickFirstFunction(routes, [
+          'handleHttp',
+          'handleRequest',
+          'handle',
+          'handler',
+        ]);
+      }
 
       if (!handler) {
-        throw new Error('BEW routes module did not provide a callable handler.');
+        throw new Error('BEW routes module did not provide a callable handler (expected function or handleHttp/handleRequest).');
       }
 
       const close = async () => {
-        // Close routes/store first (they may flush), then Redis.
         try { if (routes && typeof routes.close === 'function') await routes.close(); } catch {}
         try { if (store && typeof store.close === 'function') await store.close(); } catch {}
         try { if (redis && typeof redis.quit === 'function') await redis.quit(); } catch {}
@@ -353,6 +447,7 @@ export function createSurveyServer({
 
       return { handler, close };
     })();
+
     return bewPromise;
   };
 
@@ -362,7 +457,7 @@ export function createSurveyServer({
   const crewPresence = createCrewPresenceWsService();
   const lmProxy = createLmProxyHubWsService({
     path: "/ws/lmproxy",
-    token: process.env.CONTROL_TOKEN || "",   // optional
+    token: process.env.CONTROL_TOKEN || "",
     requestTimeoutMs: 120_000
   });
 
@@ -394,11 +489,21 @@ export function createSurveyServer({
       }
 
       // --- BEW HTTP routes (must be before the "Only GET is supported" gate) ---
-      // OpenAPI paths include:
-      //   /casefiles, /casefiles:import, /casefiles/{id}, /casefiles/{id}/evidence, etc.
-      if (/^\/casefiles(?=\/|:|$)/.test(urlObj.pathname)) {
+      // Accept both /casefiles... and /api/casefiles... (Heroku clients often prefix /api)
+      if (
+        /^\/casefiles(?=\/|:|$)/.test(urlObj.pathname) ||
+        /^\/api\/casefiles(?=\/|:|$)/.test(urlObj.pathname)
+      ) {
         const { handler } = await ensureBew();
-        const handled = await handler(req, res, urlObj, {
+
+        // If request comes in as /api/casefiles..., strip /api for the BEW router
+        let bewUrlObj = urlObj;
+        if (bewUrlObj.pathname.startsWith('/api/')) {
+          bewUrlObj = new URL(urlObj.toString());
+          bewUrlObj.pathname = bewUrlObj.pathname.replace(/^\/api/, '');
+        }
+
+        const handled = await handler(req, res, bewUrlObj, {
           sendJson,
           readJsonBody,
           parseMultipartUpload,
@@ -406,6 +511,7 @@ export function createSurveyServer({
           MIME_TYPES,
           MAX_UPLOAD_FILE_BYTES,
         });
+
         if (handled === true || res.writableEnded) return;
       }
 
@@ -427,7 +533,6 @@ export function createSurveyServer({
           return;
         }
 
-        // optional: check workers
         const workers = workerSocket.listWorkers(poolId);
         if (!workers.some(w => w.online)) {
           sendJson(res, 503, { error: 'No online workers in pool.', workers });
@@ -451,7 +556,6 @@ export function createSurveyServer({
         return;
       }
 
-      // optional: list workers
       if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worker/workers/') {
         const poolId = String(urlObj.searchParams.get('pool') || 'default');
         sendJson(res, 200, { workers: workerSocket.listWorkers(poolId) });
@@ -498,7 +602,6 @@ export function createSurveyServer({
             createdAt: new Date().toISOString(),
           };
           pointforgeExportStore.set(id, record);
-          // Notify LineSmith clients in the room via lineforge collab
           lineforgeCollab.broadcastToRoom(record.roomId, {
             type: 'pointforge-import',
             exportId: id,
@@ -732,7 +835,6 @@ export function createSurveyServer({
         await writeFile(filePath, fileBuffer);
 
         const ext = path.extname(sanitized).replace(/^\./, '').toLowerCase() || 'bin';
-        const folderDef = PROJECT_FILE_FOLDERS.find((f) => f.key === folderKey);
         const resourceId = `upload-${sanitized.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '-')}-${timestamp}`;
 
         const resource = {
@@ -1035,7 +1137,6 @@ export function createSurveyServer({
   });
 
   server.on('upgrade', (req, socket, head) => {
-    // Detect if ANY handler wrote a 101 to this socket
     let wrote101 = false;
     const rawWrite = socket.write.bind(socket);
 
@@ -1052,17 +1153,17 @@ export function createSurveyServer({
     let handled = false;
     try {
       const url = new URL(req.url || '/', 'http://localhost');
-      const path = url.pathname.replace(/\/+$/, '');
+      const p = url.pathname.replace(/\/+$/, '');
 
-      if (path === '/ws/lmproxy') {
+      if (p === '/ws/lmproxy') {
         handled = !!lmProxy.handleUpgrade(req, socket, head);
-      } else if (path === '/ws/worker') {
+      } else if (p === '/ws/worker') {
         handled = !!workerSocket.handleUpgrade(req, socket, head);
-      } else if (path === '/ws/lineforge') {
+      } else if (p === '/ws/lineforge') {
         handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
-      } else if (path === '/ws/crew-presence') {
+      } else if (p === '/ws/crew-presence') {
         handled = !!crewPresence.handleUpgrade(req, socket, head);
-      } else if (path === '/ws/localstorage-sync') {
+      } else if (p === '/ws/localstorage-sync') {
         handled = !!localStorageSyncWsService.handleUpgrade(req, socket, head);
       } else {
         handled = false;
@@ -1071,11 +1172,9 @@ export function createSurveyServer({
       console.error(e);
       handled = false;
     } finally {
-      // restore original write so WS handler can keep using it normally
       socket.write = rawWrite;
     }
 
-    // If a 101 was written, DO NOT write any HTTP fallback onto the socket.
     if (!handled) {
       if (wrote101 || socket.__wsUpgraded) {
         if (!socket.destroyed) socket.destroy();
