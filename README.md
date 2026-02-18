@@ -29,6 +29,17 @@ npm start
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
+## API and CLI notes for Marks LLM long-running chat streaming
+
+Marks chat websocket proxy requests (`GET /ws/lmproxy`) now default to **no server-side per-request timeout**, so long-running streamed LLM responses can continue for extended durations without the hub force-cancelling at 120 seconds.
+
+- API/WebSocket endpoint (unchanged): `GET /ws/lmproxy` (upgrade).
+- New optional server environment variable: `LM_PROXY_REQUEST_TIMEOUT_MS`
+  - Set to a positive number to re-enable timeout/cancel behavior for chat/models requests.
+  - Set to `0` (default) to disable hub request timeouts and allow long-running streams.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+
 
 
 
