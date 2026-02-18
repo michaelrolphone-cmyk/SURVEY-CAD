@@ -28,6 +28,11 @@ import {
   saveEquipmentLog,
 } from './crew-equipment-api.js';
 
+/* ------------------------------ BEW integration ------------------------------ */
+/* IMPORTANT: namespace imports so missing named exports do not crash on Heroku */
+import * as BewRoutes from './bew-routes.js';
+import * as BewStore from './bew-store.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_STATIC_DIR = path.resolve(__dirname, '..');
@@ -56,29 +61,21 @@ function sendJson(res, statusCode, payload) {
 
 function getErrorStatusCode(err) {
   const message = err?.message || '';
-  if (/^HTTP\s+\d{3}:/i.test(message)) {
-    return 502;
-  }
+  if (/^HTTP\s+\d{3}:/i.test(message)) return 502;
   return 400;
 }
 
 function parseRemotePdfUrl(urlObj) {
   const rawUrl = urlObj.searchParams.get('url');
-  if (!rawUrl) {
-    throw new Error('url query parameter is required.');
-  }
+  if (!rawUrl) throw new Error('url query parameter is required.');
 
   let parsed;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    throw new Error('url query parameter must be a valid absolute URL.');
-  }
+  try { parsed = new URL(rawUrl); }
+  catch { throw new Error('url query parameter must be a valid absolute URL.'); }
 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     throw new Error('Only http/https URLs are supported for ROS PDF loading.');
   }
-
   return parsed.toString();
 }
 
@@ -127,11 +124,7 @@ function lonLatToTile(lat, lon, zoom = 17) {
   const x = Math.floor(((lon + 180) / 360) * n);
   const latRad = (clampedLat * Math.PI) / 180;
   const y = Math.floor(((1 - Math.log(Math.tan(latRad) + (1 / Math.cos(latRad))) / Math.PI) / 2) * n);
-  return {
-    x: Math.min(Math.max(x, 0), n - 1),
-    y: Math.min(Math.max(y, 0), n - 1),
-    zoom,
-  };
+  return { x: Math.min(Math.max(x, 0), n - 1), y: Math.min(Math.max(y, 0), n - 1), zoom };
 }
 
 const MAX_JSON_BODY_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -172,7 +165,7 @@ async function parseMultipartUpload(req) {
   let start = body.indexOf(delimiter);
   while (start !== -1) {
     start += delimiter.length;
-    if (body[start] === 0x2d && body[start + 1] === 0x2d) break; // --boundary-- end marker
+    if (body[start] === 0x2d && body[start + 1] === 0x2d) break;
     if (body[start] === 0x0d && body[start + 1] === 0x0a) start += 2;
 
     const headerEnd = body.indexOf('\r\n\r\n', start);
@@ -215,11 +208,8 @@ async function readJsonBody(req) {
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
   if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error('Request body must be valid JSON.');
-  }
+  try { return JSON.parse(raw); }
+  catch { throw new Error('Request body must be valid JSON.'); }
 }
 
 async function serveStaticFile(urlPath, staticDir, res) {
@@ -250,22 +240,15 @@ function isSmallStaticAsset(absPath) {
 }
 
 function resolveStaticCacheControl(absPath) {
-  if (isSmallStaticAsset(absPath)) {
-    return 'public, max-age=31536000, immutable';
-  }
-
+  if (isSmallStaticAsset(absPath)) return 'public, max-age=31536000, immutable';
   const ext = path.extname(absPath).toLowerCase();
-  if (ext === '.html') {
-    return 'no-cache';
-  }
+  if (ext === '.html') return 'no-cache';
   return 'public, max-age=300';
 }
 
 async function readStaticAsset(absPath) {
   const cached = smallStaticAssetCache.get(absPath);
-  if (cached) {
-    return cached;
-  }
+  if (cached) return cached;
 
   const body = await readFile(absPath);
   if (isSmallStaticAsset(absPath) && body.byteLength <= SMALL_ASSET_CACHE_MAX_BYTES) {
@@ -282,9 +265,7 @@ async function resolveStaticPath(staticDir, safePath) {
     try {
       await access(initialPath);
       return initialPath;
-    } catch {
-      // Fall through and attempt case-insensitive matching.
-    }
+    } catch { /* fall through */ }
   }
 
   const segments = safePath.split('/').filter(Boolean);
@@ -295,31 +276,276 @@ async function resolveStaticPath(staticDir, safePath) {
     const matched = entries.find((entry) => entry.name === segment)
       || entries.find((entry) => entry.name.toLowerCase() === segment.toLowerCase());
 
-    if (!matched) {
-      return initialPath;
-    }
-
+    if (!matched) return initialPath;
     currentDir = path.resolve(currentDir, matched.name);
   }
 
   return currentDir;
 }
 
+/* ------------------------------ BEW router adapter ------------------------------ */
+
+const BEW_PREFIXES = [
+  '/casefiles',
+  '/casefile',
+  '/evidence',
+  '/extractions',
+  '/corners',
+  '/decisions',
+  '/traverse',
+  '/package',
+  '/packages',
+  '/bew',
+  '/api/bew',
+];
+
+function isBewPath(pathname) {
+  const p = String(pathname || '/').replace(/\/+$/, '') || '/';
+  return BEW_PREFIXES.some((pref) => p === pref || p.startsWith(pref + '/'));
+}
+
 function pickFirstFunction(mod, names) {
-  for (const name of names) {
-    const v = mod?.[name];
+  for (const n of names) {
+    const v = mod?.[n];
     if (typeof v === 'function') return v;
   }
   return null;
 }
 
 function pickFirstObject(mod, names) {
-  for (const name of names) {
-    const v = mod?.[name];
+  for (const n of names) {
+    const v = mod?.[n];
     if (v && typeof v === 'object') return v;
   }
   return null;
 }
+
+async function writeFetchResponse(res, response) {
+  res.statusCode = Number(response.status) || 200;
+  for (const [k, v] of response.headers.entries()) res.setHeader(k, v);
+  const ab = await response.arrayBuffer();
+  res.end(Buffer.from(ab));
+}
+
+function looksLikeFetchResponse(x) {
+  return typeof Response !== 'undefined' && x instanceof Response;
+}
+
+function normalizeBewHandler(product) {
+  if (!product) return null;
+
+  // function handler
+  if (typeof product === 'function') {
+    return async (req, res, urlObj, ctx) => {
+      const beforeEnded = res.writableEnded;
+      const out = await product(req, res, urlObj, ctx);
+      if (res.writableEnded && !beforeEnded) return true;
+      if (out === true) return true;
+      if (out === false || out == null) return false;
+      if (looksLikeFetchResponse(out)) {
+        await writeFetchResponse(res, out);
+        return true;
+      }
+      if (typeof out === 'object' && out?.handled === true) return true;
+      return Boolean(res.writableEnded);
+    };
+  }
+
+  // object with handler
+  if (typeof product === 'object') {
+    const fn =
+      (typeof product.handle === 'function' && product.handle) ||
+      (typeof product.handler === 'function' && product.handler) ||
+      (typeof product.dispatch === 'function' && product.dispatch) ||
+      null;
+
+    if (fn) return normalizeBewHandler(fn);
+
+    // routes array
+    const routes = Array.isArray(product.routes) ? product.routes : (Array.isArray(product) ? product : null);
+    if (routes) {
+      return async (req, res, urlObj, ctx) => {
+        const method = String(req.method || 'GET').toUpperCase();
+        const pathname = urlObj.pathname.replace(/\/+$/, '') || '/';
+        for (const r of routes) {
+          const rm = String(r?.method || r?.verb || 'GET').toUpperCase();
+          const rp = String(r?.path || r?.pathname || r?.pattern || '');
+          const handler = r?.handler || r?.handle || r?.fn;
+          if (!rp || typeof handler !== 'function') continue;
+          if (rm !== method) continue;
+
+          const match = matchRoute(pathname, rp);
+          if (!match.ok) continue;
+
+          const out = await handler({ req, res, url: urlObj, params: match.params, ctx });
+          if (res.writableEnded) return true;
+          if (out === true) return true;
+          if (looksLikeFetchResponse(out)) {
+            await writeFetchResponse(res, out);
+            return true;
+          }
+          // if handler returned nothing but wrote to res, handled.
+          if (res.writableEnded) return true;
+        }
+        return false;
+      };
+    }
+  }
+
+  return null;
+}
+
+function matchRoute(pathname, pattern) {
+  const p = String(pattern || '').trim();
+  if (!p) return { ok: false, params: {} };
+
+  // exact
+  if (!p.includes(':') && !p.includes('*')) {
+    const ok = (pathname === p) || (pathname === p.replace(/\/+$/, ''));
+    return { ok, params: {} };
+  }
+
+  const a = pathname.split('/').filter(Boolean);
+  const b = p.split('/').filter(Boolean);
+
+  const params = {};
+  for (let i = 0, j = 0; i < a.length && j < b.length; i += 1, j += 1) {
+    const token = b[j];
+    if (token === '*') return { ok: true, params };
+    if (token.startsWith(':')) {
+      params[token.slice(1)] = a[i];
+      continue;
+    }
+    if (token !== a[i]) return { ok: false, params: {} };
+  }
+
+  if (a.length === b.length) return { ok: true, params };
+  if (b[b.length - 1] === '*') return { ok: true, params };
+  return { ok: false, params: {} };
+}
+
+// singleton BEW runtime
+let _bewPromise = null;
+let _bewRuntime = null;
+
+function findHerokuRedisUrl() {
+  const direct =
+    process.env.BEW_REDIS_URL ||
+    process.env.REDIS_URL ||
+    process.env.REDIS_TLS_URL ||
+    process.env.REDISCLOUD_URL;
+
+  if (direct) return direct;
+
+  // scan env for anything that looks like a Heroku redis URL
+  for (const [k, v] of Object.entries(process.env)) {
+    if (!v) continue;
+    if (!/URL$/i.test(k)) continue;
+    if (!/REDIS/i.test(k)) continue;
+    if (String(v).startsWith('redis://') || String(v).startsWith('rediss://')) return String(v);
+  }
+  return null;
+}
+
+async function ensureBew({ existingRedis = null } = {}) {
+  if (_bewRuntime) return _bewRuntime;
+  if (_bewPromise) return _bewPromise;
+
+  _bewPromise = (async () => {
+    const redisUrl = findHerokuRedisUrl();
+    const redis = existingRedis || (await (async () => {
+      if (!redisUrl) throw new Error('Missing Heroku Redis URL env (REDIS_URL / REDIS_TLS_URL / REDISCLOUD_URL).');
+      const mod = await import('ioredis');
+      const IORedis = mod?.default || mod;
+      // ioredis supports redis:// and rediss:// URLs directly
+      return new IORedis(redisUrl, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: true,
+        lazyConnect: false,
+      });
+    })());
+
+    const StoreCtor =
+      BewStore.RedisBewStore ||
+      BewStore.BewStore ||
+      BewStore.Store ||
+      (typeof BewStore.default === 'function' ? BewStore.default : null);
+
+    if (!StoreCtor) {
+      throw new Error(
+        `BEW store module missing RedisBewStore export. Exports: ${Object.keys(BewStore || {}).join(', ') || '(none)'}`
+      );
+    }
+
+    // Your bew-store.js expects ioredis-style client methods (zrevrange, smembers, multi().exec()).
+    const store = new StoreCtor(redis, {
+      prefix: process.env.BEW_REDIS_PREFIX || 'bew',
+      attachmentMaxBytes: process.env.BEW_ATTACHMENT_MAX_BYTES ? Number(process.env.BEW_ATTACHMENT_MAX_BYTES) : undefined,
+    });
+
+    // routes module may export a factory or a handler
+    const createRoutes = pickFirstFunction(BewRoutes, [
+      'createBewRoutes',
+      'createBewRouter',
+      'createRoutes',
+      'createRouter',
+      'default',
+    ]);
+
+    let routesProduct = null;
+    if (createRoutes) {
+      routesProduct = await createRoutes({ store, redis, redisUrl });
+    } else {
+      routesProduct =
+        pickFirstFunction(BewRoutes, ['handle', 'handler', 'dispatch']) ||
+        pickFirstObject(BewRoutes, ['routes', 'router', 'api', 'service', 'default']) ||
+        null;
+
+      // if default export is function, normalizeBewHandler will handle it
+      if (!routesProduct && typeof BewRoutes.default === 'function') routesProduct = BewRoutes.default;
+    }
+
+    const handler = normalizeBewHandler(routesProduct);
+    if (!handler) {
+      throw new Error(
+        `BEW routes module did not provide a usable handler/factory. Exports: ${Object.keys(BewRoutes || {}).join(', ') || '(none)'}`
+      );
+    }
+
+    const HttpError = BewStore.HttpError || null;
+
+    _bewRuntime = {
+      redisUrl,
+      redis,
+      store,
+      HttpError,
+      handler,
+      close: async () => {
+        // only quit if we created the client (not reusing existingRedis)
+        if (!existingRedis && redis && typeof redis.quit === 'function') {
+          try { await redis.quit(); } catch {}
+        }
+      },
+    };
+
+    return _bewRuntime;
+  })();
+
+  return _bewPromise;
+}
+
+function sendBewError(res, err) {
+  const status = Number(err?.status);
+  const statusCode = Number.isFinite(status) ? status : 500;
+  const payload = {
+    error: err?.message || 'BEW request failed.',
+    code: err?.code || 'error',
+    details: err?.details ?? undefined,
+  };
+  sendJson(res, statusCode, payload);
+}
+
+/* ------------------------------ server ------------------------------ */
 
 export function createSurveyServer({
   client = new SurveyCadClient(),
@@ -329,127 +555,6 @@ export function createSurveyServer({
   localStorageSyncStore = new LocalStorageSyncStore(),
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
-
-  // --- BEW init is lazy (prevents boot-time failures due to export mismatches) ---
-  let bewPromise = null;
-
-  const ensureBew = async () => {
-    if (bewPromise) return bewPromise;
-
-    bewPromise = (async () => {
-      const redisUrl =
-        process.env.BEW_REDIS_URL
-        || process.env.REDIS_TLS_URL
-        || process.env.REDIS_URL
-        || '';
-
-      const [redisMod, storeMod, routesMod] = await Promise.all([
-        import('./bew-redis.js'),
-        import('./bew-store.js'),
-        import('./bew-routes.js'),
-      ]);
-
-      const createRedisClient = pickFirstFunction(redisMod, [
-        'createBewRedisClient',
-        'createRedisClient',
-        'createClient',
-        'default',
-      ]);
-
-      if (!createRedisClient) {
-        throw new Error('BEW redis module did not export a redis client factory (expected createRedisClient/createClient/default).');
-      }
-
-      let redis;
-      try {
-        redis = createRedisClient({ url: redisUrl });
-      } catch {
-        try {
-          redis = createRedisClient(redisUrl);
-        } catch {
-          redis = createRedisClient();
-        }
-      }
-      if (redis && typeof redis.then === 'function') {
-        redis = await redis;
-      }
-
-      const createStore = pickFirstFunction(storeMod, [
-        'createBewStore',
-        'createStore',
-        'default',
-      ]);
-
-      if (!createStore) {
-        throw new Error('BEW store module did not export a store factory (expected createBewStore/createStore/default).');
-      }
-
-      let store;
-      try {
-        store = await createStore({ redis, redisUrl });
-      } catch {
-        try {
-          store = await createStore(redis);
-        } catch {
-          store = await createStore();
-        }
-      }
-
-      // Routes can be:
-      // - default export function (create routes OR request handler)
-      // - createRoutes(...)
-      // - exported object with handleHttp/handleRequest
-      const createRoutes = pickFirstFunction(routesMod, [
-        'createBewRoutes',
-        'createRoutes',
-        'default',
-      ]);
-
-      let routes = null;
-      if (createRoutes) {
-        try {
-          routes = await createRoutes({ store });
-        } catch {
-          try {
-            routes = await createRoutes(store);
-          } catch {
-            routes = await createRoutes();
-          }
-        }
-      } else {
-        // Maybe module exports an object like { routes: {...} } or { bewRoutes: {...} }
-        routes = pickFirstObject(routesMod, ['bewRoutes', 'routes', 'router', 'default']) || routesMod;
-      }
-
-      // Handler derivation (supports function or object handlers)
-      let handler = null;
-      if (typeof routes === 'function') {
-        handler = routes;
-      } else {
-        handler = pickFirstFunction(routes, [
-          'handleHttp',
-          'handleRequest',
-          'handle',
-          'handler',
-        ]);
-      }
-
-      if (!handler) {
-        throw new Error('BEW routes module did not provide a callable handler (expected function or handleHttp/handleRequest).');
-      }
-
-      const close = async () => {
-        try { if (routes && typeof routes.close === 'function') await routes.close(); } catch {}
-        try { if (store && typeof store.close === 'function') await store.close(); } catch {}
-        try { if (redis && typeof redis.quit === 'function') await redis.quit(); } catch {}
-        try { if (redis && typeof redis.disconnect === 'function') redis.disconnect(); } catch {}
-      };
-
-      return { handler, close };
-    })();
-
-    return bewPromise;
-  };
 
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
@@ -466,6 +571,12 @@ export function createSurveyServer({
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
 
+  // optional reuse: if your localStorage sync store exposes the ioredis client, BEW will share it
+  const existingRedis = localStorageSyncStore?.redis || localStorageSyncStore?.client || null;
+
+  // ensure BEW redis closes on server close (only if we created it)
+  let bewCloseHookInstalled = false;
+
   const server = createServer(async (req, res) => {
     if (!req.url) {
       sendJson(res, 400, { error: 'Missing request URL.' });
@@ -480,39 +591,50 @@ export function createSurveyServer({
           sendJson(res, 405, { error: 'Only POST is supported.' });
           return;
         }
-        if (!rosOcrHandlerPromise) {
-          rosOcrHandlerPromise = createRosOcrApp();
-        }
+        if (!rosOcrHandlerPromise) rosOcrHandlerPromise = createRosOcrApp();
         const app = await rosOcrHandlerPromise;
         app(req, res);
         return;
       }
 
-      // --- BEW HTTP routes (must be before the "Only GET is supported" gate) ---
-      // Accept both /casefiles... and /api/casefiles... (Heroku clients often prefix /api)
-      if (
-        /^\/casefiles(?=\/|:|$)/.test(urlObj.pathname) ||
-        /^\/api\/casefiles(?=\/|:|$)/.test(urlObj.pathname)
-      ) {
-        const { handler } = await ensureBew();
-
-        // If request comes in as /api/casefiles..., strip /api for the BEW router
-        let bewUrlObj = urlObj;
-        if (bewUrlObj.pathname.startsWith('/api/')) {
-          bewUrlObj = new URL(urlObj.toString());
-          bewUrlObj.pathname = bewUrlObj.pathname.replace(/^\/api/, '');
+      // --- BEW routes (casefiles, evidence, extractions, corners, decisions, traverse, package) ---
+      if (isBewPath(urlObj.pathname)) {
+        let bew;
+        try {
+          bew = await ensureBew({ existingRedis });
+          if (!bewCloseHookInstalled) {
+            bewCloseHookInstalled = true;
+            server.on('close', () => { Promise.resolve(bew.close()).catch(() => {}); });
+          }
+        } catch (e) {
+          // BEW is required for these paths; fail explicitly
+          sendJson(res, 503, {
+            error: 'BEW unavailable (Redis/routes init failed).',
+            details: e?.message || String(e),
+          });
+          return;
         }
 
-        const handled = await handler(req, res, bewUrlObj, {
-          sendJson,
-          readJsonBody,
-          parseMultipartUpload,
-          sanitizeFileName,
-          MIME_TYPES,
-          MAX_UPLOAD_FILE_BYTES,
-        });
+        try {
+          const handled = await bew.handler(req, res, urlObj, { store: bew.store, redis: bew.redis, redisUrl: bew.redisUrl });
+          if (handled || res.writableEnded) return;
 
-        if (handled === true || res.writableEnded) return;
+          // If a BEW path reaches here, treat as not found rather than falling into static assets.
+          sendJson(res, 404, { error: 'BEW endpoint not found.' });
+          return;
+        } catch (err) {
+          // Prefer BEW HttpError shape (status/code/details)
+          if (bew?.HttpError && err instanceof bew.HttpError) {
+            sendBewError(res, err);
+            return;
+          }
+          if (Number.isFinite(Number(err?.status)) && err?.message) {
+            sendBewError(res, err);
+            return;
+          }
+          sendJson(res, 500, { error: err?.message || String(err) });
+          return;
+        }
       }
 
       // --- Worker task submit (MUST be before the "Only GET is supported" gate) ---
@@ -556,6 +678,7 @@ export function createSurveyServer({
         return;
       }
 
+      // optional: list workers
       if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worker/workers/') {
         const poolId = String(urlObj.searchParams.get('pool') || 'default');
         sendJson(res, 200, { workers: workerSocket.listWorkers(poolId) });
@@ -602,11 +725,7 @@ export function createSurveyServer({
             createdAt: new Date().toISOString(),
           };
           pointforgeExportStore.set(id, record);
-          lineforgeCollab.broadcastToRoom(record.roomId, {
-            type: 'pointforge-import',
-            exportId: id,
-            at: Date.now(),
-          });
+          lineforgeCollab.broadcastToRoom(record.roomId, { type: 'pointforge-import', exportId: id, at: Date.now() });
           sendJson(res, 201, { export: record });
           return;
         }
@@ -639,17 +758,12 @@ export function createSurveyServer({
           sendJson(res, 200, await resolveStoreState());
           return;
         }
-
         if (req.method === 'POST') {
           const body = await readJsonBody(req);
-          const result = await syncIncomingState({
-            version: body.version,
-            snapshot: body.snapshot,
-          });
+          const result = await syncIncomingState({ version: body.version, snapshot: body.snapshot });
           sendJson(res, 200, result);
           return;
         }
-
         sendJson(res, 405, { error: 'Only GET and POST are supported.' });
         return;
       }
@@ -881,9 +995,8 @@ export function createSurveyServer({
           sendJson(res, 403, { error: 'Forbidden path.' });
           return;
         }
-        try {
-          await access(filePath);
-        } catch {
+        try { await access(filePath); }
+        catch {
           sendJson(res, 404, { error: 'File not found.' });
           return;
         }
@@ -914,13 +1027,9 @@ export function createSurveyServer({
           for (const folder of folders) {
             if (!folder.isDirectory() || !VALID_FOLDER_KEYS.has(folder.name)) continue;
             const folderFiles = await readdir(path.join(projectDir, folder.name));
-            for (const f of folderFiles) {
-              files.push({ folderKey: folder.name, fileName: f });
-            }
+            for (const f of folderFiles) files.push({ folderKey: folder.name, fileName: f });
           }
-        } catch {
-          // Directory doesn't exist yet, return empty list
-        }
+        } catch { /* empty */ }
         sendJson(res, 200, { files });
         return;
       }
@@ -1010,7 +1119,6 @@ export function createSurveyServer({
         const tile = lonLatToTile(lat, lon, 17);
         const satelliteTileUrl = `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${tile.zoom}/${tile.y}/${tile.x}`;
         const tileUrl = `https://tile.openstreetmap.org/${tile.zoom}/${tile.x}/${tile.y}.png`;
-
         const candidates = [satelliteTileUrl, tileUrl];
 
         try {
@@ -1023,13 +1131,9 @@ export function createSurveyServer({
                   'User-Agent': 'survey-cad/1.0 static-map-proxy',
                 },
               });
-            } catch {
-              continue;
-            }
+            } catch { continue; }
 
-            if (!upstream.ok) {
-              continue;
-            }
+            if (!upstream.ok) continue;
 
             const imageBuffer = Buffer.from(await upstream.arrayBuffer());
             res.statusCode = 200;
@@ -1086,11 +1190,8 @@ export function createSurveyServer({
         try {
           subdivision = await client.loadSubdivisionAtPoint(lon, lat, outSR);
         } catch (err) {
-          if (outSR !== 4326) {
-            subdivision = await client.loadSubdivisionAtPoint(lon, lat, 4326);
-          } else {
-            throw err;
-          }
+          if (outSR !== 4326) subdivision = await client.loadSubdivisionAtPoint(lon, lat, 4326);
+          else throw err;
         }
         sendJson(res, 200, { subdivision });
         return;
@@ -1105,9 +1206,7 @@ export function createSurveyServer({
           },
         });
 
-        if (!pdfResponse.ok) {
-          throw new Error(`HTTP ${pdfResponse.status}: ${remoteUrl}`);
-        }
+        if (!pdfResponse.ok) throw new Error(`HTTP ${pdfResponse.status}: ${remoteUrl}`);
 
         const contentType = pdfResponse.headers.get('content-type') || 'application/pdf';
         const contentDisposition = pdfResponse.headers.get('content-disposition');
@@ -1115,9 +1214,7 @@ export function createSurveyServer({
 
         res.statusCode = 200;
         res.setHeader('Content-Type', contentType);
-        if (contentDisposition) {
-          res.setHeader('Content-Disposition', contentDisposition);
-        }
+        if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.end(body);
         return;
@@ -1129,22 +1226,13 @@ export function createSurveyServer({
     }
   });
 
-  // Ensure BEW resources can be closed if the server is stopped programmatically
-  server.on('close', () => {
-    if (bewPromise) {
-      bewPromise.then(({ close }) => close()).catch(() => {});
-    }
-  });
-
   server.on('upgrade', (req, socket, head) => {
     let wrote101 = false;
     const rawWrite = socket.write.bind(socket);
 
     socket.write = (chunk, ...args) => {
       try {
-        const s = Buffer.isBuffer(chunk)
-          ? chunk.toString('utf8', 0, 16)
-          : String(chunk).slice(0, 16);
+        const s = Buffer.isBuffer(chunk) ? chunk.toString('utf8', 0, 16) : String(chunk).slice(0, 16);
         if (s.startsWith('HTTP/1.1 101')) wrote101 = true;
       } catch {}
       return rawWrite(chunk, ...args);
@@ -1155,19 +1243,12 @@ export function createSurveyServer({
       const url = new URL(req.url || '/', 'http://localhost');
       const p = url.pathname.replace(/\/+$/, '');
 
-      if (p === '/ws/lmproxy') {
-        handled = !!lmProxy.handleUpgrade(req, socket, head);
-      } else if (p === '/ws/worker') {
-        handled = !!workerSocket.handleUpgrade(req, socket, head);
-      } else if (p === '/ws/lineforge') {
-        handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
-      } else if (p === '/ws/crew-presence') {
-        handled = !!crewPresence.handleUpgrade(req, socket, head);
-      } else if (p === '/ws/localstorage-sync') {
-        handled = !!localStorageSyncWsService.handleUpgrade(req, socket, head);
-      } else {
-        handled = false;
-      }
+      if (p === '/ws/lmproxy') handled = !!lmProxy.handleUpgrade(req, socket, head);
+      else if (p === '/ws/worker') handled = !!workerSocket.handleUpgrade(req, socket, head);
+      else if (p === '/ws/lineforge') handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
+      else if (p === '/ws/crew-presence') handled = !!crewPresence.handleUpgrade(req, socket, head);
+      else if (p === '/ws/localstorage-sync') handled = !!localStorageSyncWsService.handleUpgrade(req, socket, head);
+      else handled = false;
     } catch (e) {
       console.error(e);
       handled = false;
