@@ -743,3 +743,21 @@ BoundaryLab now treats very small linear residuals (≤ `0.01` units) as closed,
 
 - API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for PointForge → LineSmith coordinate-order fix
+
+PointForge now exports LineSmith handoff payloads with canonical survey coordinate order:
+
+- `X` always equals **easting**
+- `Y` always equals **northing**
+
+This applies to both:
+
+- the `number,x,y,z,code,notes` CSV rows in the PointForge handoff payload
+- the handoff `georeference.points[]` objects (`{ x, y, lat, lng }`)
+
+This prevents PointForge-to-LineSmith imports from transposing easting/northing.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `POST /api/pointforge-exports`, `GET /api/pointforge-exports`.
+- WebSocket endpoints (unchanged): `GET /ws/lineforge?room=<roomId>`, `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.

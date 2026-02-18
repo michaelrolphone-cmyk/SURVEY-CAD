@@ -1512,7 +1512,7 @@
       const georeferencePoints = [];
       const zone = elZone.value || "west";
       const def = PROJ_DEFS_USFT[zone];
-      const swapXY = true;
+      const swapXY = false;
 
       for (const record of recordsSorted || []){
         if (!Array.isArray(record?.fields) || record.fields.length < 4) continue;
@@ -1529,8 +1529,8 @@
 
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
-        const handoffX = swapXY ? y : x;
-        const handoffY = swapXY ? x : y;
+        const handoffX = x;
+        const handoffY = y;
 
         rows.push([number, handoffX, handoffY, z, code, notes]);
 
@@ -1597,7 +1597,6 @@
 
       const zone = elZone.value || "west";
       const def = PROJ_DEFS_USFT[zone];
-      const swapXY = true;
       const projectedAnchor = proj4("WGS84", def, [settings.lon, settings.lat]);
       const anchorEast = Number(projectedAnchor?.[0]);
       const anchorNorth = Number(projectedAnchor?.[1]);
@@ -1615,8 +1614,8 @@
         throw new Error(`Anchor point #${settings.anchorPointNumber} was not found in the processed point set.`);
       }
 
-      const anchorLocalHandoffX = swapXY ? anchorRecord.y : anchorRecord.x;
-      const anchorLocalHandoffY = swapXY ? anchorRecord.x : anchorRecord.y;
+      const anchorLocalHandoffX = anchorRecord.x;
+      const anchorLocalHandoffY = anchorRecord.y;
       const eastOffset = anchorEast - anchorLocalHandoffX;
       const northOffset = anchorNorth - anchorLocalHandoffY;
 
@@ -1627,14 +1626,14 @@
           throw new Error(`Point ${i + 1} is missing numeric X/Y coordinates and cannot be localized.`);
         }
 
-        const localHandoffX = swapXY ? record.y : record.x;
-        const localHandoffY = swapXY ? record.x : record.y;
+        const localHandoffX = record.x;
+        const localHandoffY = record.y;
         const localizedHandoffX = localHandoffX + eastOffset;
         const localizedHandoffY = localHandoffY + northOffset;
 
         const localizedRecord = cloneRecordWithFields(record);
-        localizedRecord.x = swapXY ? localizedHandoffY : localizedHandoffX;
-        localizedRecord.y = swapXY ? localizedHandoffX : localizedHandoffY;
+        localizedRecord.x = localizedHandoffX;
+        localizedRecord.y = localizedHandoffY;
         localizedRecord.fields[1] = String(localizedRecord.x);
         localizedRecord.fields[2] = String(localizedRecord.y);
         localized.push(localizedRecord);

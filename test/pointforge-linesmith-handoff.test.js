@@ -16,6 +16,10 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.doesNotMatch(html, /id="anchorLocalY"/, 'PointForge should not require manual local Y anchor entry in localization UI');
   assert.match(html, /function\s+localizeRecords\(recordsSorted\)/, 'PointForge should define a localization routine that applies anchor offsets before output');
   assert.match(html, /const\s+projectedAnchor\s*=\s*proj4\("WGS84",\s*def,\s*\[settings\.lon,\s*settings\.lat\]\)/, 'PointForge localization should project anchor lat\/lon into active state-plane zone');
+  assert.match(html, /const\s+anchorLocalHandoffX\s*=\s*anchorRecord\.x\s*;/, 'PointForge localization should treat local X as easting');
+  assert.match(html, /const\s+anchorLocalHandoffY\s*=\s*anchorRecord\.y\s*;/, 'PointForge localization should treat local Y as northing');
+  assert.match(html, /localizedRecord\.x\s*=\s*localizedHandoffX\s*;/, 'PointForge localization should write localized easting to X');
+  assert.match(html, /localizedRecord\.y\s*=\s*localizedHandoffY\s*;/, 'PointForge localization should write localized northing to Y');
   assert.match(html, /settings\.anchorPointNumber/, 'PointForge localization should resolve the anchor from a point number in the processed set');
   assert.match(html, /Anchor point #\$\{settings\.anchorPointNumber\} was not found/, 'PointForge should show a clear error when the requested anchor point number does not exist');
   assert.match(html, /recordsForOutput\s*=\s*localized\.recordsSorted;/, 'PointForge processing should substitute localized records when localization is enabled');
@@ -36,8 +40,9 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate LineSmith using launcher-aware helper');
   assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into LineSmith code field');
   assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into LineSmith notes field');
-  assert.match(html, /const\s+handoffX\s*=\s*swapXY\s*\?\s*y\s*:\s*x\s*;/, 'PointForge should map handoff X to the state-plane easting used by LineSmith');
-  assert.match(html, /const\s+handoffY\s*=\s*swapXY\s*\?\s*x\s*:\s*y\s*;/, 'PointForge should map handoff Y to the state-plane northing used by LineSmith');
+  assert.match(html, /const\s+handoffX\s*=\s*x\s*;/, 'PointForge should always export handoff X as easting');
+  assert.match(html, /const\s+handoffY\s*=\s*y\s*;/, 'PointForge should always export handoff Y as northing');
+  assert.match(html, /const\s+swapXY\s*=\s*false\s*;/, 'PointForge handoff metadata should declare unswapped X/Y coordinates');
   assert.match(html, /rows\.push\(\[number, handoffX, handoffY, z, code, notes\]\)/, 'PointForge should preserve handoff coordinates and metadata without additional normalization');
   assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for LineSmith map alignment');
   assert.match(html, /georeference:\s*\{[\s\S]*type:\s*"idaho-state-plane-usft"[\s\S]*zone,[\s\S]*swapXY,[\s\S]*points:\s*georeferencePoints/, 'PointForge handoff payload should include georeference metadata and sample points');
@@ -51,6 +56,8 @@ test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
   assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'LineSmith should define PointForge import bootstrap logic');
   assert.match(html, /launchSource\s*!==\s*"pointforge"/, 'LineSmith import bootstrap should be gated by query param');
   assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'LineSmith should reuse CSV import pipeline for PointForge payloads');
+  assert.match(html, /idx\.x\s*=\s*pick\("x","e","east","easting"\)\s*\?\?\s*1;/, 'LineSmith CSV import should map X columns to easting fields');
+  assert.match(html, /idx\.y\s*=\s*pick\("y","n","north","northing"\)\s*\?\?\s*2;/, 'LineSmith CSV import should map Y columns to northing fields');
   assert.match(html, /syncViewToGeoreference\(payload\)/, 'LineSmith should apply georeference alignment when PointForge provides it');
   assert.match(html, /if \(aligned && mapLayerState\.enabled\) \{[\s\S]*syncMapToView\(true\);/, 'LineSmith should refresh map view after georeference alignment when map layer is enabled');
 });
