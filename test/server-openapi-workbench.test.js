@@ -30,7 +30,18 @@ test('server OpenAPI spec documents project workbench endpoints', async () => {
   assert.ok(syncPath, 'spec should include project workbench sync path');
   assert.ok(syncPath.post, 'spec should include POST on workbench sync path');
 
+  const traversesPath = spec?.paths?.['/api/projects/{projectId}/workbench/traverses'];
+  assert.ok(traversesPath, 'spec should include project workbench traverses path');
+  assert.ok(traversesPath.get, 'spec should include GET on project traverses path');
+  assert.ok(traversesPath.post, 'spec should include POST on project traverses path');
+
+  const traversePath = spec?.paths?.['/api/projects/{projectId}/workbench/traverses/{traverseId}'];
+  assert.ok(traversePath, 'spec should include project traverse detail path');
+  assert.ok(traversePath.get, 'spec should include GET on project traverse detail path');
+
   assert.ok(spec?.components?.schemas?.ProjectWorkbenchLink, 'spec should include ProjectWorkbenchLink schema');
   assert.ok(spec?.components?.schemas?.ProjectWorkbenchSyncResponse, 'spec should include ProjectWorkbenchSyncResponse schema');
   assert.ok(spec?.components?.schemas?.ProjectWorkbenchSourcesResponse, 'spec should include ProjectWorkbenchSourcesResponse schema');
+  assert.ok(spec?.components?.schemas?.ProjectWorkbenchTraverseRecord, 'spec should include ProjectWorkbenchTraverseRecord schema');
+  assert.ok(spec?.components?.schemas?.ProjectWorkbenchTraverseResponse, 'spec should include ProjectWorkbenchTraverseResponse schema');
 });

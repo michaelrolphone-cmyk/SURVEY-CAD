@@ -9,6 +9,8 @@ import {
   clearProjectWorkbenchLink,
   collectProjectWorkbenchSources,
   syncProjectSourcesToCasefile,
+  listProjectTraverses,
+  upsertProjectTraverseRecord,
 } from '../src/project-workbench.js';
 
 function createMockStore(initialSnapshot = {}) {
@@ -147,3 +149,33 @@ test('syncProjectSourcesToCasefile creates, updates, and removes project-derived
   assert.deepEqual(deleted, ['ev-remove']);
 });
 
+
+
+test('project traverse registry lists and upserts named traverses per project', async () => {
+  const store = createMockStore();
+
+  const first = await upsertProjectTraverseRecord(store, 'proj-1', {
+    traverseId: 'trav-1',
+    casefileId: 'cf-1',
+    name: 'Boundary Loop A',
+  });
+  assert.equal(first.traverse?.name, 'Boundary Loop A');
+
+  const updated = await upsertProjectTraverseRecord(store, 'proj-1', {
+    traverseId: 'trav-1',
+    casefileId: 'cf-1',
+    name: 'Boundary Loop A Updated',
+  });
+  assert.equal(updated.traverse?.name, 'Boundary Loop A Updated');
+
+  await upsertProjectTraverseRecord(store, 'proj-1', {
+    traverseId: 'trav-2',
+    casefileId: 'cf-2',
+    name: 'Boundary Loop B',
+  });
+
+  const traverses = await listProjectTraverses(store, 'proj-1');
+  assert.equal(traverses.length, 2);
+  assert.ok(traverses.some((entry) => entry.traverseId === 'trav-1' && entry.name === 'Boundary Loop A Updated'));
+  assert.ok(traverses.some((entry) => entry.traverseId === 'trav-2' && entry.name === 'Boundary Loop B'));
+});
