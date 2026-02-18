@@ -204,7 +204,12 @@ Request body for create/update:
 - `npm run cli -- --help` – survey CLI entrypoint and subcommands.
 - `npm run ros:cli -- --help` – ROS basis extraction CLI.
 
-No new CLI commands were added for this LineSmith multi-drawing/channel update.
+### Surface Weaver project point-file loading
+
+Surface Weaver (`/SURFACE.html`) now reads project-scoped point files directly when launched with `activeProjectId` (or `projectId`) query params.
+
+- `GET /api/projects/:projectId/point-files` – populates the Surface Weaver point-file picker.
+- `GET /api/projects/:projectId/point-files/:pointFileId` – loads the selected project point file into the Surface Weaver CSV editor.
 
 ## BoundaryLab
 

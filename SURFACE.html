@@ -135,6 +135,15 @@
       <label>Load CSV file</label>
       <input id="file" type="file" accept=".csv,text/csv" />
 
+      <label>…or load a project point file</label>
+      <div class="row">
+        <select id="projectPointFile" disabled>
+          <option value="">No project point files loaded</option>
+        </select>
+        <button id="btnLoadProjectPointFile" disabled>Load Project File</button>
+      </div>
+      <div class="tiny" id="projectPointFileHint" style="margin-top:6px;">Launch Surface Weaver with <span class="mono">?activeProjectId=…</span> to load point files from your active project.</div>
+
       <label>…or paste CSV text (P,N,E,Z,D; header optional)</label>
       <textarea id="csv" spellcheck="false" placeholder="Example:
 1,666102.348,2406162.791,2597.647,Corner
@@ -334,6 +343,9 @@
 
   const csvTA = el("csv");
   const fileIn = el("file");
+  const projectPointFileSel = el("projectPointFile");
+  const btnLoadProjectPointFile = el("btnLoadProjectPointFile");
+  const projectPointFileHint = el("projectPointFileHint");
   const btnRender = el("btnRender");
   const btnFit = el("btnFit");
   const btnSample = el("btnSample");
@@ -381,6 +393,10 @@
   const kvTrisRef = el("kvTrisRef");
   const kvSegs = el("kvSegs");
   const kvOffset = el("kvOffset");
+
+  const pageParams = new URLSearchParams(window.location.search);
+  const activeProjectId = String(pageParams.get("activeProjectId") || pageParams.get("projectId") || "").trim();
+  let projectPointFileOptions = [];
 
   // Three.js setup
   const canvas = el("c");
@@ -476,6 +492,89 @@
     return String(s).replace(/[&<>"']/g, m => ({
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
     }[m]));
+  }
+
+  function buildProjectPointFileApiUrl(projectId = "", pointFileId = "") {
+    if (!projectId) return "";
+    const base = `/api/projects/${encodeURIComponent(projectId)}/point-files`;
+    return pointFileId ? `${base}/${encodeURIComponent(pointFileId)}` : base;
+  }
+
+  function renderProjectPointFileChoices(list = []) {
+    const normalized = Array.isArray(list) ? list.filter(Boolean) : [];
+    projectPointFileOptions = normalized;
+    projectPointFileSel.innerHTML = "";
+
+    if (!activeProjectId) {
+      projectPointFileSel.disabled = true;
+      btnLoadProjectPointFile.disabled = true;
+      projectPointFileSel.innerHTML = '<option value="">No active project selected</option>';
+      projectPointFileHint.textContent = 'Launch Surface Weaver with ?activeProjectId=… to load point files from your active project.';
+      return;
+    }
+
+    if (!normalized.length) {
+      projectPointFileSel.disabled = true;
+      btnLoadProjectPointFile.disabled = true;
+      projectPointFileSel.innerHTML = '<option value="">No point files found for this project</option>';
+      projectPointFileHint.textContent = `No point files were found for project ${activeProjectId}.`;
+      return;
+    }
+
+    projectPointFileSel.disabled = false;
+    btnLoadProjectPointFile.disabled = true;
+    projectPointFileHint.textContent = `Loaded ${normalized.length} point file${normalized.length === 1 ? "" : "s"} from project ${activeProjectId}.`;
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select a project point file";
+    projectPointFileSel.appendChild(placeholder);
+
+    for (const option of normalized) {
+      const row = document.createElement("option");
+      row.value = option.pointFileId;
+      row.textContent = option.pointFileName || option.pointFileId || "Point File";
+      projectPointFileSel.appendChild(row);
+    }
+  }
+
+  async function syncProjectPointFilesFromApi() {
+    if (!activeProjectId) {
+      renderProjectPointFileChoices([]);
+      return;
+    }
+
+    const response = await fetch(buildProjectPointFileApiUrl(activeProjectId));
+    if (!response.ok) throw new Error(`Unable to list project point files (${response.status}).`);
+    const payload = await response.json();
+    const list = Array.isArray(payload?.pointFiles) ? payload.pointFiles : [];
+
+    const options = list.map((entry = {}) => ({
+      pointFileId: String(entry.pointFileId || "").trim(),
+      pointFileName: String(entry.pointFileName || entry.pointFileId || "Point File").trim(),
+    })).filter((entry) => entry.pointFileId);
+
+    renderProjectPointFileChoices(options);
+  }
+
+  async function loadProjectPointFileIntoCsv() {
+    const pointFileId = String(projectPointFileSel.value || "").trim();
+    if (!activeProjectId) {
+      throw new Error("Surface Weaver is missing an active project id.");
+    }
+    if (!pointFileId) {
+      throw new Error("Pick a project point file first.");
+    }
+
+    const response = await fetch(buildProjectPointFileApiUrl(activeProjectId, pointFileId));
+    if (!response.ok) throw new Error(`Unable to load selected point file (${response.status}).`);
+    const payload = await response.json();
+    const text = String(payload?.pointFile?.currentState?.text || "");
+    if (!text.trim()) throw new Error("Selected point file is empty.");
+
+    csvTA.value = text;
+    const selected = projectPointFileOptions.find((entry) => entry.pointFileId === pointFileId);
+    setStatus(true, `Loaded project point file: ${selected?.pointFileName || pointFileId}`);
   }
 
   function setStatus(ok, msg){
@@ -1493,6 +1592,18 @@
     }
   });
 
+  btnLoadProjectPointFile.addEventListener("click", async () => {
+    try {
+      await loadProjectPointFileIntoCsv();
+    } catch (err) {
+      setStatus(false, err?.message || String(err));
+    }
+  });
+
+  projectPointFileSel.addEventListener("change", () => {
+    btnLoadProjectPointFile.disabled = !projectPointFileSel.value;
+  });
+
   // Animation loop
   let lastT = performance.now();
 
@@ -1528,6 +1639,11 @@
     renderer.render(scene, camera);
   }
   animate();
+
+  syncProjectPointFilesFromApi().catch((err) => {
+    renderProjectPointFileChoices([]);
+    projectPointFileHint.textContent = `Unable to load project point files for ${activeProjectId}: ${err?.message || err}`;
+  });
 
   setStatus(true, "Render a surface. Map tiles: pick a provider (Esri/USGS) and they’ll drape at 30% opacity.");
 </script>
