@@ -497,12 +497,23 @@
     fillProjectSelect();
   }
 
+  function resolveCasefileId(payload){
+    return payload?.id || payload?.casefile?.id || payload?.link?.casefileId || "";
+  }
+
   function fillProjectSelect(){}
 
   async function setActiveCasefile(id){
+    if (!id) return false;
     state.activeId = id;
     localStorage.setItem(ACTIVE_KEY, id);
-    state.active = await api.getCasefile(id);
+    try{
+      state.active = await api.getCasefile(id);
+    }catch(err){
+      state.activeId = null;
+      state.active = null;
+      throw err;
+    }
 
     // reset caches (tab loads lazily)
     state.evidence = null;
@@ -513,6 +524,20 @@
     state.traverseResults = null;
     state.printable = null;
     state.lastWarnings = [];
+    return true;
+  }
+
+  async function ensureActiveCasefile(candidateIds = []){
+    for (const id of candidateIds){
+      if (!id) continue;
+      try{
+        await setActiveCasefile(id);
+        return true;
+      }catch(err){
+        console.warn("[WORKBENCH] setActiveCasefile failed", id, err);
+      }
+    }
+    return false;
   }
 
   async function refreshActiveCasefile(){
@@ -2121,7 +2146,7 @@ N 00°00'27&quot; W 267.69
     if (activeProjectId){
       try{
         const linked = await api.syncProjectWorkbench(activeProjectId, {});
-        pinnedCasefileId = linked?.link?.casefileId || linked?.casefile?.id || "";
+        pinnedCasefileId = resolveCasefileId(linked);
       }catch(err){
         toast("Warning", "Project sync unavailable. Falling back to local casefile bootstrap.", "warn");
         console.warn("[WORKBENCH] project sync bootstrap failed", err);
@@ -2135,7 +2160,7 @@ N 00°00'27&quot; W 267.69
       if (!linkedExists){
         try{
           const created = await api.createProjectCasefile(activeProjectId, {});
-          pinnedCasefileId = created?.id || created?.casefile?.id || pinnedCasefileId;
+          pinnedCasefileId = resolveCasefileId(created) || pinnedCasefileId;
           await refreshCasefiles();
         }catch(err){
           toast("Warning", "Could not create project-linked casefile. Creating a local casefile instead.", "warn");
@@ -2144,29 +2169,43 @@ N 00°00'27&quot; W 267.69
       }
     }
 
-    if (!state.casefiles.length){
+    async function createAndActivateFallbackCasefile(){
       let cf = null;
       if (activeProjectId){
         try{
           cf = await api.createProjectCasefile(activeProjectId, {});
         }catch(err){
-          console.warn("[WORKBENCH] project-linked casefile create failed, using local fallback", err);
+          console.warn("[WORKBENCH] project-linked casefile create failed, retrying via sync", err);
         }
+        if (!resolveCasefileId(cf)){
+          const synced = await api.syncProjectWorkbench(activeProjectId, { forceNewCasefile: true });
+          cf = resolveCasefileId(synced) ? synced : cf;
+        }
+        const createdId = resolveCasefileId(cf);
+        await refreshCasefiles();
+        const activated = await ensureActiveCasefile([createdId, pinnedCasefileId, state.casefiles?.[0]?.id || ""]);
+        if (!activated){
+          throw new Error("Unable to create or activate a project-linked casefile.");
+        }
+        return true;
       }
-      if (!cf){
-        cf = await api.createCasefile("New Boundary Casefile", "Idaho", "", true);
-      }
-      const createdId = cf?.id || cf?.casefile?.id;
+
+      cf = await api.createCasefile("New Boundary Casefile", "Idaho", "", true);
+      const createdId = resolveCasefileId(cf);
       await refreshCasefiles();
-      const fallbackId = createdId || state.casefiles?.[0]?.id || "";
-      if (fallbackId){
-        await setActiveCasefile(fallbackId);
-      }
+      return await ensureActiveCasefile([createdId, state.casefiles?.[0]?.id || ""]);
+    }
+
+    if (!state.casefiles.length){
+      await createAndActivateFallbackCasefile();
     } else {
       const saved = localStorage.getItem(ACTIVE_KEY);
       const pickDefault = (saved && state.casefiles.some(x=>x.id===saved)) ? saved : state.casefiles[0].id;
-      const pick = (activeProjectId && pinnedCasefileId && state.casefiles.some(x=>x.id===pinnedCasefileId)) ? pinnedCasefileId : pickDefault;
-      await setActiveCasefile(pick);
+      const pick = (activeProjectId && pinnedCasefileId) ? pinnedCasefileId : pickDefault;
+      const activated = await ensureActiveCasefile([pick, pickDefault, state.casefiles[0]?.id || ""]);
+      if (!activated){
+        await createAndActivateFallbackCasefile();
+      }
     }
     await ensureTabData(state.tab);
     render();

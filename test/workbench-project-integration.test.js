@@ -11,20 +11,32 @@ test('WORKBENCH bootstraps active project casefile linkage via API', async () =>
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
   assert.match(html, /const activeProjectId = pageParams\.get\("activeProjectId"\) \|\| pageParams\.get\("projectId"\) \|\| "";/);
   assert.match(html, /syncProjectWorkbench: \(projectId, body=\{\}\) => apiRequest\("POST",`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/workbench\/sync`/);
-  assert.match(html, /if \(activeProjectId\)\{[\s\S]*try\{[\s\S]*const linked = await api\.syncProjectWorkbench\(activeProjectId, \{\}\);[\s\S]*pinnedCasefileId = linked\?\.link\?\.casefileId \|\| linked\?\.casefile\?\.id \|\| "";[\s\S]*\}catch\(err\)\{[\s\S]*project sync bootstrap failed[\s\S]*\}[\s\S]*\}/);
+  assert.match(html, /function resolveCasefileId\(payload\)\{[\s\S]*payload\?\.id \|\| payload\?\.casefile\?\.id \|\| payload\?\.link\?\.casefileId \|\| "";[\s\S]*\}/);
+  assert.match(html, /async function ensureActiveCasefile\(candidateIds = \[]\)\{[\s\S]*await setActiveCasefile\(id\);[\s\S]*return true;[\s\S]*\}/);
+  assert.match(html, /async function createAndActivateFallbackCasefile\(\)\{[\s\S]*if \(activeProjectId\)\{[\s\S]*cf = await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*const synced = await api\.syncProjectWorkbench\(activeProjectId, \{ forceNewCasefile: true \}\);[\s\S]*if \(!activated\)\{[\s\S]*Unable to create or activate a project-linked casefile\.[\s\S]*\}[\s\S]*\}[\s\S]*cf = await api\.createCasefile\("New Boundary Casefile", "Idaho", "", true\);[\s\S]*\}/);
+  assert.match(html, /if \(activeProjectId\)\{[\s\S]*try\{[\s\S]*const linked = await api\.syncProjectWorkbench\(activeProjectId, \{\}\);[\s\S]*pinnedCasefileId = resolveCasefileId\(linked\);[\s\S]*\}catch\(err\)\{[\s\S]*project sync bootstrap failed[\s\S]*\}[\s\S]*\}/);
 });
 
 test('WORKBENCH creates linked casefile for active project when missing', async () => {
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
-  assert.match(html, /if \(activeProjectId\)\{[\s\S]*if \(!linkedExists\)\{[\s\S]*try\{[\s\S]*await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*\}catch\(err\)\{[\s\S]*project-linked casefile bootstrap failed[\s\S]*\}[\s\S]*\}[\s\S]*\}/);
-  assert.match(html, /if \(!state\.casefiles\.length\)\{[\s\S]*let cf = null;[\s\S]*if \(activeProjectId\)\{[\s\S]*cf = await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*\}[\s\S]*if \(!cf\)\{[\s\S]*api\.createCasefile\("New Boundary Casefile", "Idaho", "", true\);[\s\S]*\}[\s\S]*\}/);
+  assert.match(html, /if \(activeProjectId\)\{[\s\S]*if \(!linkedExists\)\{[\s\S]*try\{[\s\S]*const created = await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*pinnedCasefileId = resolveCasefileId\(created\) \|\| pinnedCasefileId;[\s\S]*\}catch\(err\)\{[\s\S]*project-linked casefile bootstrap failed[\s\S]*\}[\s\S]*\}[\s\S]*\}/);
+  assert.match(html, /if \(!state\.casefiles\.length\)\{[\s\S]*await createAndActivateFallbackCasefile\(\);[\s\S]*\}/);
 });
 
-test('WORKBENCH chooses a fallback casefile id when bootstrap responses omit id', async () => {
+test('WORKBENCH fallback helper activates created casefile ids', async () => {
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
-  assert.match(html, /const fallbackId = createdId \|\| state\.casefiles\?\.\[0\]\?\.id \|\| "";/);
-  assert.match(html, /if \(fallbackId\)\{[\s\S]*await setActiveCasefile\(fallbackId\);[\s\S]*\}/);
+  assert.match(html, /const createdId = resolveCasefileId\(cf\);/);
+  assert.match(html, /const activated = await ensureActiveCasefile\(\[createdId, pinnedCasefileId, state\.casefiles\?\.\[0\]\?\.id \|\| ""\]\);/);
 });
+
+
+
+test('WORKBENCH creates fallback casefile when activation fails', async () => {
+  const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
+  assert.match(html, /const activated = await ensureActiveCasefile\(\[pick, pickDefault, state\.casefiles\[0\]\?\.id \|\| ""\]\);/);
+  assert.match(html, /if \(!activated\)\{[\s\S]*await createAndActivateFallbackCasefile\(\);[\s\S]*\}/);
+});
+
 
 test('WORKBENCH no longer exposes API base or project picker controls', async () => {
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
