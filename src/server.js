@@ -384,6 +384,36 @@ function normalizeBewHandler(product) {
 
   // function handler
   if (typeof product === 'function') {
+    const looksLikeExpressMiddleware =
+      typeof product.handle === 'function' ||
+      Array.isArray(product.stack);
+
+    if (looksLikeExpressMiddleware) {
+      return async (req, res) => {
+        let nextCalled = false;
+        await new Promise((resolve, reject) => {
+          const next = (err) => {
+            if (err) reject(err);
+            else {
+              nextCalled = true;
+              resolve();
+            }
+          };
+
+          try {
+            product(req, res, next);
+          } catch (err) {
+            reject(err);
+          }
+
+          if (res.writableEnded) resolve();
+        });
+
+        if (res.writableEnded) return true;
+        return !nextCalled;
+      };
+    }
+
     return async (req, res, urlObj, ctx) => {
       const beforeEnded = res.writableEnded;
       const out = await product(req, res, urlObj, ctx);
@@ -535,6 +565,7 @@ async function ensureBew({ existingRedis = null } = {}) {
     });
 
     const createRoutes = pickFirstFunction(BewRoutes, [
+      "registerBewRoutes",
       "createBewRoutes",
       "createBewRouter",
       "createRoutes",
@@ -544,7 +575,19 @@ async function ensureBew({ existingRedis = null } = {}) {
 
     let routesProduct = null;
     if (createRoutes) {
-      routesProduct = await createRoutes({ store, redis, redisUrl });
+      if (createRoutes === BewRoutes.registerBewRoutes) {
+        const mounted = [];
+        const pseudoApp = {
+          use(handler) {
+            mounted.push(handler);
+            return this;
+          },
+        };
+        const registered = await createRoutes(pseudoApp, store, { redis, redisUrl });
+        routesProduct = registered || mounted[mounted.length - 1] || null;
+      } else {
+        routesProduct = await createRoutes({ store, redis, redisUrl });
+      }
     } else {
       routesProduct =
         pickFirstFunction(BewRoutes, ["handle", "handler", "dispatch"]) ||
