@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Boundary Evidence Workbench — Concept Prototype (Standalone)</title>
+  <title>Boundary Evidence Workbench — API-Driven Demo</title>
   <style>
     :root{
       --bg:#0b0f14;
@@ -13,2276 +13,2155 @@
       --text:#e9eef6;
       --muted:#9aa7ba;
       --accent:#ffd54a;
-      --good:#43d17a;
-      --warn:#ffb020;
-      --bad:#ff4d4f;
-      --link:#7cc7ff;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      --radius:14px;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --good:#43d08a;
+      --warn:#ffca5c;
+      --bad:#ff6b6b;
+      --shadow: 0 12px 35px rgba(0,0,0,.45);
+      color-scheme: dark;
     }
-    *{ box-sizing:border-box; }
-    body{
-      margin:0; background:linear-gradient(180deg, #070a10 0%, var(--bg) 60%);
-      color:var(--text); font-family:var(--sans);
-    }
-    a{ color:var(--link); text-decoration:none; }
-    a:hover{ text-decoration:underline; }
-    .app{
-      display:grid;
-      grid-template-rows: 62px 1fr;
-      min-height:100vh;
-    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif}
+    a{color:inherit}
+    .app{display:flex;flex-direction:column;min-height:100vh}
     .topbar{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:10px 14px;
-      border-bottom:1px solid var(--line);
-      background:rgba(10,14,20,.75);
+      position:sticky;top:0;z-index:50;
+      background:linear-gradient(180deg, rgba(15,22,33,.92), rgba(11,15,20,.92));
       backdrop-filter: blur(10px);
-      position:sticky; top:0; z-index:50;
+      border-bottom:1px solid var(--line);
     }
-    .brand{
-      display:flex; gap:12px; align-items:center;
-      font-weight:700; letter-spacing:.2px;
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .row-between{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .pad{padding:14px 16px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .badge{font-size:.75rem;color:var(--muted);border:1px solid var(--line);padding:4px 8px;border-radius:999px}
+    .pill{font-size:.75rem;color:var(--muted);border:1px solid var(--line);padding:4px 8px;border-radius:999px;display:inline-flex;gap:6px;align-items:center}
+    .pill.warn{border-color:rgba(255,202,92,.35);color:var(--warn)}
+    .pill.bad{border-color:rgba(255,107,107,.35);color:var(--bad)}
+    .pill.good{border-color:rgba(67,208,138,.35);color:var(--good)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .small{font-size:.85rem}
+    .muted{color:var(--muted)}
+    .nav{
+      display:flex;gap:10px;align-items:center;
+      padding:10px 16px;border-top:1px solid rgba(255,255,255,.03);
     }
-    .badge{
-      font: 12px var(--mono);
-      padding:4px 8px; border:1px solid var(--line);
-      border-radius:999px; color:var(--muted);
-      background:rgba(255,255,255,.03);
-    }
-    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    select, input, textarea, button{
-      font-family:inherit;
-      color:var(--text);
-    }
-    select, input[type="text"], input[type="number"], textarea{
-      background:rgba(255,255,255,.03);
-      border:1px solid var(--line);
-      border-radius:12px;
-      padding:10px 10px;
-      outline:none;
-    }
-    textarea{ width:100%; min-height:140px; resize:vertical; }
-    input[type="number"]{ width:110px; }
-    .btn{
-      background:rgba(255,255,255,.04);
-      border:1px solid var(--line);
-      border-radius:12px;
-      padding:10px 12px;
+    .tab{
       cursor:pointer;
-      transition:.15s transform, .15s background;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      padding:8px 10px;border-radius:12px;
+      color:var(--muted);
       user-select:none;
     }
-    .btn:hover{ background:rgba(255,255,255,.07); transform: translateY(-1px); }
-    .btn:active{ transform: translateY(0px); }
-    .btn.primary{
-      border-color: rgba(255,213,74,.45);
-      box-shadow: 0 0 0 1px rgba(255,213,74,.12) inset;
-      background: rgba(255,213,74,.08);
-    }
-    .btn.danger{
-      border-color: rgba(255,77,79,.45);
-      background: rgba(255,77,79,.07);
-    }
-    .btn.good{
-      border-color: rgba(67,209,122,.45);
-      background: rgba(67,209,122,.07);
-    }
-    .layout{
-      display:grid;
-      grid-template-columns: 280px 1fr;
-      min-height: calc(100vh - 62px);
-    }
-    .nav{
-      border-right:1px solid var(--line);
-      background: rgba(10,14,20,.55);
-      padding:14px;
-    }
-    .nav .section-title{
-      font-size:12px; color:var(--muted); letter-spacing:.18em;
-      text-transform:uppercase; margin:10px 8px 8px;
-    }
-    .nav .tab{
-      display:flex; align-items:center; gap:10px;
-      padding:10px 10px;
-      border-radius:12px;
-      border:1px solid transparent;
-      cursor:pointer;
-      color:var(--text);
-    }
-    .nav .tab:hover{ background:rgba(255,255,255,.03); }
-    .nav .tab.active{
-      background: rgba(255,213,74,.09);
-      border-color: rgba(255,213,74,.22);
-    }
-    .nav .tab .dot{
-      width:10px; height:10px; border-radius:50%;
-      background:rgba(255,255,255,.15);
-    }
-    .nav .tab.active .dot{ background: var(--accent); }
-    .main{
-      padding:16px;
-      overflow:auto;
-    }
-    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
-    .grid3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:14px; }
+    .tab.active{color:var(--text);border-color:rgba(255,213,74,.35);box-shadow:0 0 0 2px rgba(255,213,74,.10) inset}
+    .content{flex:1;min-height:0}
+    .grid2{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
+    @media (max-width: 980px){ .grid2{grid-template-columns: 1fr} }
     .card{
-      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      background:linear-gradient(180deg, rgba(18,28,42,.98), rgba(15,22,33,.98));
       border:1px solid var(--line);
-      border-radius: var(--radius);
+      border-radius:16px;
       box-shadow: var(--shadow);
       overflow:hidden;
     }
-    .card .hd{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:12px 14px;
-      border-bottom:1px solid var(--line);
-      background: rgba(0,0,0,.10);
-    }
-    .card .hd h3{ margin:0; font-size:14px; letter-spacing:.2px; }
-    .card .bd{ padding:14px; }
-    .muted{ color:var(--muted); }
-    .mono{ font-family:var(--mono); }
-    .small{ font-size:12px; }
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.03);
-      font-size:12px;
-      color:var(--muted);
-      user-select:none;
-    }
-    .pill.good{ border-color: rgba(67,209,122,.25); color: rgba(67,209,122,.95); background: rgba(67,209,122,.06); }
-    .pill.warn{ border-color: rgba(255,176,32,.25); color: rgba(255,176,32,.95); background: rgba(255,176,32,.06); }
-    .pill.bad{ border-color: rgba(255,77,79,.25); color: rgba(255,77,79,.95); background: rgba(255,77,79,.06); }
-    .table{
+    .hd{padding:12px 14px;border-bottom:1px solid var(--line);font-weight:650;display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .bd{padding:12px 14px}
+    .hr{height:1px;background:var(--line);margin:12px 0}
+    input,select,textarea{
       width:100%;
-      border-collapse:collapse;
-      font-size:13px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.25);
+      color:var(--text);
+      outline:none;
     }
-    .table th, .table td{
-      border-bottom:1px solid rgba(34,48,70,.55);
-      padding:8px 6px;
+    input:focus,select:focus,textarea:focus{
+      border-color:rgba(255,213,74,.35);
+      box-shadow:0 0 0 3px rgba(255,213,74,.12);
+    }
+    textarea{resize:vertical}
+    .btn{
+      cursor:pointer;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      padding:9px 11px;
+      border-radius:12px;
+      font-weight:600;
+      user-select:none;
+      text-decoration:none;
+      display:inline-flex;align-items:center;justify-content:center;
+    }
+    .btn:hover{background:rgba(255,255,255,.06)}
+    .btn.primary{
+      border-color:rgba(255,213,74,.35);
+      background:rgba(255,213,74,.10);
+      color:var(--accent);
+    }
+    .btn.good{
+      border-color:rgba(67,208,138,.35);
+      background:rgba(67,208,138,.10);
+      color:var(--good);
+    }
+    .btn.danger{
+      border-color:rgba(255,107,107,.35);
+      background:rgba(255,107,107,.10);
+      color:var(--bad);
+    }
+    .tbl{width:100%;border-collapse:collapse}
+    .tbl th,.tbl td{
+      border-bottom:1px solid rgba(255,255,255,.08);
+      padding:10px 8px;
       vertical-align:top;
     }
-    .table th{
-      text-align:left;
-      color:var(--muted);
-      font-weight:600;
-      font-size:12px;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-    }
-    .kpi{
-      display:flex; gap:10px; flex-wrap:wrap;
-    }
-    .kpi .box{
-      flex:1;
-      min-width:160px;
-      background:rgba(0,0,0,.14);
-      border:1px solid var(--line);
-      border-radius:14px;
-      padding:10px 12px;
-    }
-    .kpi .box .v{ font-size:20px; font-weight:800; }
-    .kpi .box .l{ color:var(--muted); font-size:12px; margin-top:2px; }
-    .dropzone{
-      border:1px dashed rgba(255,255,255,.25);
-      border-radius:14px;
-      padding:14px;
-      background: rgba(255,255,255,.02);
-    }
-    .dropzone.drag{
-      border-color: rgba(255,213,74,.65);
-      background: rgba(255,213,74,.06);
-    }
-    .split{
-      display:grid;
-      grid-template-columns: 1.1fr .9fr;
-      gap:14px;
-    }
-    .hr{ height:1px; background:var(--line); margin:12px 0; }
-    .right{ text-align:right; }
-    .nowrap{ white-space:nowrap; }
-    .w100{ width:100%; }
+    .tbl th{color:var(--muted);font-size:.85rem;text-align:left;font-weight:650}
     .toast{
-      position:fixed; bottom:16px; right:16px;
-      background:rgba(0,0,0,.55);
+      position:fixed;right:16px;bottom:16px;
+      width:min(420px, calc(100vw - 32px));
+      background:rgba(15,22,33,.96);
       border:1px solid var(--line);
-      border-radius:14px;
-      padding:10px 12px;
-      color:var(--text);
+      border-radius:16px;
       box-shadow: var(--shadow);
-      max-width: 420px;
-      display:none;
-      z-index:9999;
+      padding:12px 12px;
+      opacity:0;transform: translateY(12px);
+      pointer-events:none;
+      transition: all .18s ease;
+      z-index:150;
     }
-    .toast.show{ display:block; }
-    .toast .t{ font-weight:700; }
-    .toast .m{ color:var(--muted); font-size:12px; margin-top:2px; }
-    .rowline{
-      display:flex; gap:10px; align-items:center;
-    }
-    .rowline > *{ flex:1; }
-    .rowline .fit{ flex:0 0 auto; }
-
-    /* Print output styling */
-    @media print{
-      body{ background:#fff; color:#000; }
-      .topbar, .nav, .no-print, .toast{ display:none !important; }
-      .layout{ grid-template-columns: 1fr; }
-      .main{ padding:0; }
-      .card{ box-shadow:none; border:1px solid #ccc; }
-      a{ color:#000; text-decoration:underline; }
-    }
+    .toast.show{opacity:1;transform:none}
+    .toast.good{border-color:rgba(67,208,138,.35)}
+    .toast.warn{border-color:rgba(255,202,92,.35)}
+    .toast.bad{border-color:rgba(255,107,107,.35)}
   </style>
 </head>
 <body>
-<div class="app">
-  <div class="topbar no-print">
-    <div class="brand">
-      <div style="width:36px;height:36px;border-radius:12px;background:rgba(255,213,74,.12);border:1px solid rgba(255,213,74,.25);display:flex;align-items:center;justify-content:center;">
-        <span class="mono" style="font-weight:900;color:var(--accent);">BEW</span>
-      </div>
-      <div>
-        <div style="display:flex;gap:10px;align-items:baseline;">
-          <div>Boundary Evidence Workbench</div>
-          <span class="badge">concept prototype — standalone</span>
+  <div class="app">
+    <div class="topbar">
+      <div class="pad row-between">
+        <div class="brand">
+          <div style="width:34px;height:34px;border-radius:12px;background:rgba(255,213,74,.14);border:1px solid rgba(255,213,74,.28);display:flex;align-items:center;justify-content:center;">
+            <span class="mono" style="color:var(--accent);font-weight:800;">BEW</span>
+          </div>
+          <div>
+            <div style="font-weight:800;">Boundary Evidence Workbench</div>
+            <div class="small muted">Evidence-first boundary analysis • demo client</div>
+          </div>
+          <span class="badge">concept prototype — api-driven</span>
         </div>
-        <div class="muted small">Evidence-first casefile → extraction → matrix → decision log → computations → printable outputs</div>
-      </div>
-    </div>
 
-    <div class="row">
-      <span class="pill" id="autosavePill">Autosave: <b class="mono" id="autosaveState">OK</b></span>
-      <select id="projectSelect" title="Project"></select>
-      <button class="btn" id="newProjectBtn">New</button>
-      <button class="btn" id="duplicateProjectBtn">Duplicate</button>
-      <button class="btn danger" id="deleteProjectBtn">Delete</button>
-      <button class="btn" id="importBtn">Import</button>
-      <button class="btn primary" id="exportBtn">Export</button>
-      <button class="btn good" id="printBtn">Print Outputs</button>
-    </div>
-  </div>
+        <div class="row">
+          <span class="pill" id="autosavePill">Sync: <b class="mono" id="autosaveState">OK</b></span>
+          <span class="pill" id="apiHealthPill">API: <b class="mono" id="apiHealth">…</b></span>
+          <input id="apiBaseInput" type="text" placeholder="API Base (blank = same origin)" style="min-width:260px" />
 
-  <div class="layout">
-    <div class="nav no-print">
-      <div class="section-title">Workspace</div>
-      <div class="tab active" data-tab="dashboard"><div class="dot"></div> Dashboard</div>
-      <div class="tab" data-tab="evidence"><div class="dot"></div> Evidence Library</div>
-      <div class="tab" data-tab="extract"><div class="dot"></div> Extract Calls</div>
-      <div class="tab" data-tab="matrix"><div class="dot"></div> Evidence Matrix</div>
-      <div class="tab" data-tab="traverse"><div class="dot"></div> Traverse</div>
-      <div class="tab" data-tab="outputs"><div class="dot"></div> Outputs</div>
-
-      <div class="hr"></div>
-
-      <div class="section-title">Principles (hard-coded)</div>
-      <div class="card" style="box-shadow:none;">
-        <div class="bd small muted">
-          <div><b>Coordinates don’t define boundaries.</b> This demo forces you to link decisions to evidence.</div>
-          <div style="margin-top:8px;"><b>No silent overrides.</b> If you choose a weaker candidate, justification is required.</div>
-          <div style="margin-top:8px;"><b>This prototype does not “decide” a boundary.</b> It captures your defensible workflow.</div>
+          <select id="projectSelect" style="min-width:260px;"></select>
+          <button class="btn" id="newProjectBtn">New</button>
+          <button class="btn" id="duplicateProjectBtn">Duplicate</button>
+          <button class="btn danger" id="deleteProjectBtn">Delete</button>
+          <button class="btn" id="importBtn">Import</button>
+          <button class="btn" id="exportBtn">Export</button>
+          <button class="btn primary" id="printBtn">Print Outputs</button>
+          <button class="btn" id="loadSampleBtn">Seed Sample Casefile (API)</button>
+          <input id="hiddenImport" type="file" accept="application/json" style="display:none" />
         </div>
       </div>
 
-      <div class="hr"></div>
-
-      <button class="btn w100" id="loadSampleBtn">Load Sample Casefile</button>
-      <div class="small muted" style="margin-top:8px;">Tip: start in <b>Evidence Library</b> → add items → run <b>Extract Calls</b> → build <b>Matrix</b> → compute <b>Traverse</b> → print <b>Outputs</b>.</div>
+      <div class="nav">
+        <div class="tab active" data-tab="dashboard">Dashboard</div>
+        <div class="tab" data-tab="evidence">Evidence</div>
+        <div class="tab" data-tab="extract">Extract</div>
+        <div class="tab" data-tab="matrix">Corner Matrix</div>
+        <div class="tab" data-tab="traverse">Traverse</div>
+        <div class="tab" data-tab="outputs">Outputs</div>
+      </div>
     </div>
 
-    <div class="main" id="main"></div>
+    <div class="content" id="main"></div>
   </div>
-</div>
 
-<div class="toast" id="toast">
-  <div class="t" id="toastTitle">Saved</div>
-  <div class="m" id="toastMsg">Casefile updated.</div>
-</div>
-
-<input type="file" id="hiddenImport" accept="application/json" style="display:none"/>
+  <div class="toast" id="toast">
+    <div style="font-weight:800" id="toastTitle">Saved</div>
+    <div class="small muted" style="margin-top:4px" id="toastMsg">OK</div>
+  </div>
 
 <script>
 (() => {
   "use strict";
 
-  /**********************
-   * Storage + Casefile
-   **********************/
-  const STORAGE_KEY = "bew_casefiles_v1";
-  const ACTIVE_KEY = "bew_active_project_id_v1";
-  const MAX_ATTACHMENT_BYTES = 900_000; // demo constraint to avoid localStorage blowups
+  /***********************************************************
+   * Boundary Evidence Workbench — API-driven client
+   *
+   * This file replaces the prototype's localStorage persistence
+   * with the BEW backend OpenAPI spec (apispec.json).
+   ***********************************************************/
 
+  /* ----------------------------- DOM ----------------------------- */
+  const $  = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  const elMain   = $("#main");
+  const elToast  = $("#toast");
+  const elToastT = $("#toastTitle");
+  const elToastM = $("#toastMsg");
+
+  const elProjectSelect = $("#projectSelect");
+  const elNewProjectBtn = $("#newProjectBtn");
+  const elDupProjectBtn = $("#duplicateProjectBtn");
+  const elDelProjectBtn = $("#deleteProjectBtn");
+  const elImportBtn     = $("#importBtn");
+  const elExportBtn     = $("#exportBtn");
+  const elPrintBtn      = $("#printBtn");
+  const elHiddenImport  = $("#hiddenImport");
+
+  const elAutosaveState = $("#autosaveState");
+  const elApiHealth     = $("#apiHealth");
+  const elApiBaseInput  = $("#apiBaseInput");
+  const elLoadSampleBtn = $("#loadSampleBtn");
+
+  /* ---------------------------- Helpers --------------------------- */
   const nowISO = () => new Date().toISOString();
-  const uid = () => crypto.randomUUID ? crypto.randomUUID() : ("id_" + Math.random().toString(16).slice(2) + Date.now());
+  const esc = (s) => (s ?? "").toString()
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 
-  const deepClone = (o) => JSON.parse(JSON.stringify(o));
+  const fmtDate = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toISOString().slice(0,10);
+  };
+  const fmtDateTime = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+  };
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
-  function defaultProject(name="New Boundary Casefile"){
-    return {
-      id: uid(),
-      meta: {
-        name,
-        createdAt: nowISO(),
-        updatedAt: nowISO(),
-        jurisdiction: "Idaho (demo label only)",
-        notes: ""
-      },
-      evidence: [],       // evidence items
-      extractions: [],    // extracted calls (bearing/dist)
-      corners: [],        // corner objects + candidates + decisions
-      traverse: {
-        start: { N: 10000, E: 10000 },
-        basis: { label: "Assumed/Grid North (demo)", rotationDeg: 0 },
-        calls: [], // references to extraction ids (or inline)
-        lastRun: null,
-        results: null
-      },
-      decisions: []       // global decision log entries
-    };
+  function toast(title, msg, kind=""){
+    elToastT.textContent = title;
+    elToastM.textContent = msg;
+    elToast.classList.remove("good","warn","bad");
+    if (kind) elToast.classList.add(kind);
+    elToast.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=> elToast.classList.remove("show"), 2600);
   }
 
-  function loadAll(){
+  function downloadJson(obj, filename){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  /* -------------------------- Sync pill --------------------------- */
+  let syncTimer = null;
+  function setSyncState(state){ // OK | SYNCING | ERR
+    elAutosaveState.textContent = state;
+    elAutosaveState.style.color =
+      state === "OK" ? "var(--good)" :
+      state === "SYNCING" ? "var(--warn)" :
+      "var(--bad)";
+    if (state === "SYNCING"){
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(()=> {
+        // don't auto-flip; next request decides
+      }, 15000);
+    }
+  }
+  function setApiHealthState(state){ // OK | ERR | …
+    elApiHealth.textContent = state;
+    elApiHealth.style.color =
+      state === "OK" ? "var(--good)" :
+      state === "ERR" ? "var(--bad)" :
+      "var(--muted)";
+  }
+
+  /* ----------------------------- Modal ---------------------------- */
+  const modalHost = (() => {
+    const d = document.createElement("div");
+    d.id = "modalHost";
+    d.style.position = "fixed";
+    d.style.inset = "0";
+    d.style.zIndex = "200";
+    d.style.display = "none";
+    document.body.appendChild(d);
+    return d;
+  })();
+
+  function openModal(innerHtml){
+    modalHost.innerHTML = `
+      <div class="modal-backdrop" data-act="closeModal" style="position:absolute;inset:0;background:rgba(0,0,0,.55);"></div>
+      <div class="modal" style="position:relative;max-width:980px;margin:6vh auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 70px rgba(0,0,0,.55);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);">
+          <div class="mono small muted">BEW • detail</div>
+          <button class="btn" data-act="closeModal">Close</button>
+        </div>
+        <div style="padding:16px;max-height:80vh;overflow:auto;">
+          ${innerHtml}
+        </div>
+      </div>`;
+    modalHost.style.display = "block";
+  }
+  function closeModal(){
+    modalHost.style.display = "none";
+    modalHost.innerHTML = "";
+  }
+
+  /* ----------------------------- API ------------------------------ */
+  const API_BASE_KEY = "bew_api_base_v1";
+  const ACTIVE_KEY   = "bew_active_casefile_id_v1";
+
+  function normalizeBase(s){
+    s = (s ?? "").trim();
+    if (!s) return "";
+    return s.replace(/\/+$/,"");
+  }
+
+  let apiBase = normalizeBase(localStorage.getItem(API_BASE_KEY) || "");
+  elApiBaseInput.value = apiBase;
+
+  function urlFor(path){
+    return apiBase ? (apiBase + path) : path;
+  }
+
+  async function apiRequest(method, path, { query=null, json=null, formData=null, responseType="json" } = {}){
+    const u = new URL(urlFor(path), window.location.origin);
+    if (query){
+      for (const [k,v] of Object.entries(query)){
+        if (v === undefined || v === null || v === "") continue;
+        u.searchParams.set(k, String(v));
+      }
+    }
+    const opt = { method, headers: {} };
+    if (method !== "GET") setSyncState("SYNCING");
+    if (json !== null){
+      opt.headers["Content-Type"] = "application/json";
+      opt.body = JSON.stringify(json);
+    } else if (formData){
+      opt.body = formData;
+    }
+
+    let res;
     try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return [];
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
-    }catch{ return []; }
-  }
-  function saveAll(projects){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  }
-  function getActiveId(){
-    return localStorage.getItem(ACTIVE_KEY) || "";
-  }
-  function setActiveId(id){
-    localStorage.setItem(ACTIVE_KEY, id);
-  }
-
-  let projects = loadAll();
-  if(projects.length === 0){
-    const p = defaultProject("BEW Demo Casefile");
-    projects = [p];
-    saveAll(projects);
-    setActiveId(p.id);
-  }
-  let activeProject = null;
-
-  function getProjectById(id){
-    return projects.find(p => p.id === id) || null;
-  }
-  function setActiveProject(id){
-    const p = getProjectById(id) || projects[0];
-    activeProject = p;
-    setActiveId(p.id);
-    refreshProjectSelect();
-    render();
-  }
-
-  /**********************
-   * UI Elements
-   **********************/
-  const $ = (sel, el=document) => el.querySelector(sel);
-  const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
-
-  const main = $("#main");
-  const projectSelect = $("#projectSelect");
-  const autosaveState = $("#autosaveState");
-  const autosavePill = $("#autosavePill");
-
-  const toast = $("#toast");
-  const toastTitle = $("#toastTitle");
-  const toastMsg = $("#toastMsg");
-  let toastTimer = null;
-  function showToast(title, msg){
-    toastTitle.textContent = title;
-    toastMsg.textContent = msg;
-    toast.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(()=>toast.classList.remove("show"), 2200);
-  }
-
-  function refreshProjectSelect(){
-    projectSelect.innerHTML = "";
-    projects.forEach(p => {
-      const opt = document.createElement("option");
-      opt.value = p.id;
-      opt.textContent = p.meta?.name || "(unnamed)";
-      projectSelect.appendChild(opt);
-    });
-    if(activeProject) projectSelect.value = activeProject.id;
-  }
-
-  function commit(reason="Autosaved"){
-    try{
-      if(!activeProject) return;
-      activeProject.meta.updatedAt = nowISO();
-      saveAll(projects);
-      autosaveState.textContent = "OK";
-      autosavePill.style.opacity = "1";
-      showToast("Saved", reason);
+      res = await fetch(u.toString(), opt);
     }catch(err){
-      autosaveState.textContent = "ERR";
-      autosavePill.style.opacity = "0.9";
-      showToast("Save failed", String(err));
+      setApiHealthState("ERR");
+      if (method !== "GET") setSyncState("ERR");
+      throw new Error(`Network error: ${err?.message || err}`);
+    }
+
+    // update health indicator
+    setApiHealthState(res.ok ? "OK" : "ERR");
+
+    if (!res.ok){
+      let detail = `${res.status} ${res.statusText}`;
+      try{
+        const j = await res.json();
+        detail = j?.error || j?.message || detail;
+      }catch(_){}
+      if (method !== "GET") setSyncState("ERR");
+      throw new Error(detail);
+    }
+
+    if (method !== "GET") setSyncState("OK");
+
+    if (res.status === 204) return null;
+    if (responseType === "blob") return await res.blob();
+    if (responseType === "text") return await res.text();
+    return await res.json();
+  }
+
+  const api = {
+    health: () => apiRequest("GET","/health"),
+    // Casefiles
+    listCasefiles: (limit=200, offset=0) => apiRequest("GET","/casefiles",{ query:{limit,offset} }),
+    getCasefile: (id) => apiRequest("GET",`/casefiles/${id}`),
+    createCasefile: (name, jurisdiction="Idaho", notes="", initializeDefaults=true) =>
+      apiRequest("POST","/casefiles",{ json:{ name, jurisdiction, notes, initializeDefaults } }),
+    patchCasefile: (id, meta) => apiRequest("PATCH",`/casefiles/${id}`,{ json:{ meta } }),
+    deleteCasefile: (id) => apiRequest("DELETE",`/casefiles/${id}`),
+    duplicateCasefile: (id, name=null) => apiRequest("POST",`/casefiles/${id}:duplicate`,{ json: name?{name}:{}}),
+    exportCasefile: (id) => apiRequest("GET",`/casefiles/${id}:export`),
+    importCasefile: (bundle, rewriteIds=true) => apiRequest("POST","/casefiles:import",{ json:{ bundle, rewriteIds } }),
+
+    // Evidence
+    listEvidence: (casefileId, limit=200, offset=0) =>
+      apiRequest("GET",`/casefiles/${casefileId}/evidence`,{ query:{limit,offset} }),
+    createEvidence: (casefileId, body) =>
+      apiRequest("POST",`/casefiles/${casefileId}/evidence`,{ json: body }),
+    patchEvidence: (casefileId, evidenceId, body) =>
+      apiRequest("PATCH",`/casefiles/${casefileId}/evidence/${evidenceId}`,{ json: body }),
+    deleteEvidence: (casefileId, evidenceId) =>
+      apiRequest("DELETE",`/casefiles/${casefileId}/evidence/${evidenceId}`),
+    uploadEvidenceAttachment: (casefileId, evidenceId, file) => {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      return apiRequest("POST",`/casefiles/${casefileId}/evidence/${evidenceId}/attachment`,{ formData: fd });
+    },
+    deleteEvidenceAttachment: (casefileId, evidenceId) =>
+      apiRequest("DELETE",`/casefiles/${casefileId}/evidence/${evidenceId}/attachment`),
+
+    // Extractions
+    listExtractions: (casefileId, limit=1000, offset=0) =>
+      apiRequest("GET",`/casefiles/${casefileId}/extractions`,{ query:{limit,offset} }),
+    createExtraction: (casefileId, body) =>
+      apiRequest("POST",`/casefiles/${casefileId}/extractions`,{ json: body }),
+    patchExtraction: (casefileId, extractionId, body) =>
+      apiRequest("PATCH",`/casefiles/${casefileId}/extractions/${extractionId}`,{ json: body }),
+    deleteExtraction: (casefileId, extractionId) =>
+      apiRequest("DELETE",`/casefiles/${casefileId}/extractions/${extractionId}`),
+    reorderExtractions: (casefileId, ids) =>
+      apiRequest("POST",`/casefiles/${casefileId}/extractions:reorder`,{ json:{ ids } }),
+    extractFromText: (casefileId, body) =>
+      apiRequest("POST",`/casefiles/${casefileId}/extractions:extractFromText`,{ json: body }),
+
+    // Corners + candidates
+    listCorners: (casefileId, limit=500, offset=0) =>
+      apiRequest("GET",`/casefiles/${casefileId}/corners`,{ query:{limit,offset} }),
+    createCorner: (casefileId, body) =>
+      apiRequest("POST",`/casefiles/${casefileId}/corners`,{ json: body }),
+    patchCorner: (casefileId, cornerId, body) =>
+      apiRequest("PATCH",`/casefiles/${casefileId}/corners/${cornerId}`,{ json: body }),
+    deleteCorner: (casefileId, cornerId) =>
+      apiRequest("DELETE",`/casefiles/${casefileId}/corners/${cornerId}`),
+
+    listDecisions: (casefileId, limit=50, offset=0, cornerId=null) =>
+      apiRequest("GET",`/casefiles/${casefileId}/decisions`,{ query:{limit,offset,cornerId} }),
+
+    createCandidate: (casefileId, cornerId, body) =>
+      apiRequest("POST",`/casefiles/${casefileId}/corners/${cornerId}/candidates`,{ json: body }),
+    patchCandidate: (casefileId, cornerId, candidateId, body) =>
+      apiRequest("PATCH",`/casefiles/${casefileId}/corners/${cornerId}/candidates/${candidateId}`,{ json: body }),
+    deleteCandidate: (casefileId, cornerId, candidateId) =>
+      apiRequest("DELETE",`/casefiles/${casefileId}/corners/${cornerId}/candidates/${candidateId}`),
+    chooseCandidate: (casefileId, cornerId, candidateId) =>
+      apiRequest("POST",`/casefiles/${casefileId}/corners/${cornerId}/candidates/${candidateId}:choose`),
+    unchooseCandidate: (casefileId, cornerId, candidateId) =>
+      apiRequest("POST",`/casefiles/${casefileId}/corners/${cornerId}/candidates/${candidateId}:unchoose`),
+    saveCornerDecision: (casefileId, cornerId, justification) =>
+      apiRequest("POST",`/casefiles/${casefileId}/corners/${cornerId}:saveDecision`,{ json:{ justification } }),
+
+    // Traverse
+    getTraverse: (casefileId) => apiRequest("GET",`/casefiles/${casefileId}/traverse`),
+    patchTraverse: (casefileId, body) => apiRequest("PATCH",`/casefiles/${casefileId}/traverse`,{ json: body }),
+    syncIncludedCalls: (casefileId) => apiRequest("POST",`/casefiles/${casefileId}/traverse:syncIncludedCalls`),
+    runTraverse: (casefileId, body=null) => apiRequest("POST",`/casefiles/${casefileId}/traverse:run`,{ json: body || {} }),
+    getTraverseResults: (casefileId) => apiRequest("GET",`/casefiles/${casefileId}/traverse/results`),
+
+    // Outputs
+    getPrintablePackage: (casefileId) => apiRequest("GET",`/casefiles/${casefileId}/outputs/package`)
+  };
+
+  /* ------------------------------ State ---------------------------- */
+  const state = {
+    tab: "dashboard",
+    casefiles: [],
+    activeId: null,
+    active: null,        // Casefile
+    evidence: null,      // EvidenceItem[]
+    extractions: null,   // ExtractionCall[]
+    corners: null,       // Corner[]
+    decisions: null,     // DecisionLogEntry[]
+    traverse: null,      // TraverseConfig
+    traverseResults: null, // {lastRun, results}
+    printable: null,     // PrintablePackage
+    lastWarnings: [],
+    renderSeq: 0
+  };
+
+  function haveActive(){ return !!state.active; }
+
+  function sortExtractions(items){
+    return [...items].sort((a,b) => {
+      const ai = (a.orderIndex ?? 1e9);
+      const bi = (b.orderIndex ?? 1e9);
+      if (ai !== bi) return ai - bi;
+      return (a.createdAt || "").localeCompare(b.createdAt || "");
+    });
+  }
+
+  function evById(id){
+    return (state.evidence || []).find(x => x.id === id) || null;
+  }
+  function exById(id){
+    return (state.extractions || []).find(x => x.id === id) || null;
+  }
+  function cornerById(id){
+    return (state.corners || []).find(x => x.id === id) || null;
+  }
+
+  /* --------------------------- Data loading ------------------------ */
+  async function refreshCasefiles(){
+    const r = await api.listCasefiles(500, 0);
+    state.casefiles = r.items || [];
+    fillProjectSelect();
+  }
+
+  function fillProjectSelect(){
+    const cur = state.activeId;
+    elProjectSelect.innerHTML = state.casefiles.map(cf =>
+      `<option value="${esc(cf.id)}">${esc(cf.meta?.name || "Untitled")}</option>`
+    ).join("");
+    if (cur && state.casefiles.some(x => x.id === cur)){
+      elProjectSelect.value = cur;
+    } else if (state.casefiles.length){
+      elProjectSelect.value = state.casefiles[0].id;
     }
   }
 
-  /**********************
-   * Tabs
-   **********************/
-  let activeTab = "dashboard";
+  async function setActiveCasefile(id){
+    state.activeId = id;
+    localStorage.setItem(ACTIVE_KEY, id);
+    state.active = await api.getCasefile(id);
+
+    // reset caches (tab loads lazily)
+    state.evidence = null;
+    state.extractions = null;
+    state.corners = null;
+    state.decisions = null;
+    state.traverse = null;
+    state.traverseResults = null;
+    state.printable = null;
+    state.lastWarnings = [];
+  }
+
+  async function refreshActiveCasefile(){
+    if (!state.activeId) return;
+    state.active = await api.getCasefile(state.activeId);
+  }
+
+  async function ensureEvidence(force=false){
+    if (!state.activeId) return;
+    if (!force && state.evidence) return;
+    const r = await api.listEvidence(state.activeId, 500, 0);
+    state.evidence = r.items || [];
+  }
+
+  async function ensureExtractions(force=false){
+    if (!state.activeId) return;
+    if (!force && state.extractions) return;
+    const r = await api.listExtractions(state.activeId, 2000, 0);
+    state.extractions = sortExtractions(r.items || []);
+  }
+
+  async function ensureCorners(force=false){
+    if (!state.activeId) return;
+    if (!force && state.corners) return;
+    const r = await api.listCorners(state.activeId, 500, 0);
+    state.corners = r.items || [];
+  }
+
+  async function ensureDecisions(force=false){
+    if (!state.activeId) return;
+    if (!force && state.decisions) return;
+    const r = await api.listDecisions(state.activeId, 100, 0, null);
+    state.decisions = r.items || [];
+  }
+
+  async function ensureTraverse(force=false){
+    if (!state.activeId) return;
+    if (!force && state.traverse) return;
+    state.traverse = await api.getTraverse(state.activeId);
+  }
+
+  async function ensureTraverseResults(force=false){
+    if (!state.activeId) return;
+    if (!force && state.traverseResults) return;
+    state.traverseResults = await api.getTraverseResults(state.activeId);
+  }
+
+  async function ensurePrintable(force=false){
+    if (!state.activeId) return;
+    if (!force && state.printable) return;
+    state.printable = await api.getPrintablePackage(state.activeId);
+  }
+
+  async function ensureTabData(tab){
+    if (!haveActive()) return;
+    if (tab === "dashboard"){
+      await Promise.all([ensureDecisions(), ensureTraverseResults()]);
+      return;
+    }
+    if (tab === "evidence"){
+      await ensureEvidence();
+      return;
+    }
+    if (tab === "extract"){
+      await Promise.all([ensureEvidence(), ensureExtractions()]);
+      return;
+    }
+    if (tab === "matrix"){
+      await Promise.all([ensureEvidence(), ensureCorners(), ensureDecisions()]);
+      return;
+    }
+    if (tab === "traverse"){
+      await Promise.all([ensureExtractions(), ensureTraverse(), ensureTraverseResults()]);
+      return;
+    }
+    if (tab === "outputs"){
+      await ensurePrintable();
+      return;
+    }
+  }
+
+  /* ---------------------------- Rendering -------------------------- */
   function setTab(tab){
-    activeTab = tab;
+    state.tab = tab;
     $$(".nav .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
     render();
   }
 
-  $$(".nav .tab").forEach(t => t.addEventListener("click", () => setTab(t.dataset.tab)));
-
-  /**********************
-   * Actions: Project CRUD
-   **********************/
-  projectSelect.addEventListener("change", () => setActiveProject(projectSelect.value));
-
-  $("#newProjectBtn").addEventListener("click", () => {
-    const name = prompt("Project name:", "New Boundary Casefile");
-    if(name === null) return;
-    const p = defaultProject(name.trim() || "New Boundary Casefile");
-    projects.unshift(p);
-    saveAll(projects);
-    setActiveProject(p.id);
-    commit("Created new casefile");
-  });
-
-  $("#duplicateProjectBtn").addEventListener("click", () => {
-    if(!activeProject) return;
-    const copy = deepClone(activeProject);
-    copy.id = uid();
-    copy.meta.name = (activeProject.meta.name || "Casefile") + " (Copy)";
-    copy.meta.createdAt = nowISO();
-    copy.meta.updatedAt = nowISO();
-    projects.unshift(copy);
-    saveAll(projects);
-    setActiveProject(copy.id);
-    commit("Duplicated casefile");
-  });
-
-  $("#deleteProjectBtn").addEventListener("click", () => {
-    if(!activeProject) return;
-    const ok = confirm(`Delete "${activeProject.meta.name}"?\nThis removes it from localStorage.`);
-    if(!ok) return;
-    projects = projects.filter(p => p.id !== activeProject.id);
-    if(projects.length === 0){
-      projects = [defaultProject("BEW Demo Casefile")];
-    }
-    saveAll(projects);
-    setActiveProject(projects[0].id);
-    commit("Deleted casefile");
-  });
-
-  /**********************
-   * Import / Export / Print
-   **********************/
-  function downloadText(filename, text, mime="application/json"){
-    const blob = new Blob([text], {type:mime});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
-  }
-
-  $("#exportBtn").addEventListener("click", () => {
-    if(!activeProject) return;
-    const payload = deepClone(activeProject);
-    payload.__exportedAt = nowISO();
-    payload.__tool = "Boundary Evidence Workbench (concept prototype)";
-    downloadText(
-      (activeProject.meta.name || "casefile").replace(/[^\w\-]+/g,"_") + ".bew.json",
-      JSON.stringify(payload, null, 2)
-    );
-  });
-
-  $("#importBtn").addEventListener("click", () => $("#hiddenImport").click());
-  $("#hiddenImport").addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if(!file) return;
-    try{
-      const text = await file.text();
-      const obj = JSON.parse(text);
-      if(!obj || typeof obj !== "object") throw new Error("Invalid JSON");
-      const p = obj.id && getProjectById(obj.id) ? {...obj, id: uid()} : obj;
-      if(!p.meta) p.meta = {name:"Imported casefile", createdAt: nowISO(), updatedAt: nowISO()};
-      p.meta.name = p.meta.name || ("Imported " + (file.name || "Casefile"));
-      p.meta.updatedAt = nowISO();
-      p.id = p.id || uid();
-      projects.unshift(p);
-      saveAll(projects);
-      setActiveProject(p.id);
-      commit("Imported casefile");
-    }catch(err){
-      alert("Import failed: " + err);
-    }
-  });
-
-  $("#printBtn").addEventListener("click", () => {
-    setTab("outputs");
-    setTimeout(()=>window.print(), 50);
-  });
-
-  /**********************
-   * Sample Loader
-   **********************/
-  $("#loadSampleBtn").addEventListener("click", () => {
-    if(!activeProject) return;
-    const ok = confirm("Load sample data into the current casefile? This will overwrite current contents.");
-    if(!ok) return;
-
-    const p = activeProject;
-    p.evidence = [
-      { id: uid(), type:"Deed", title:"Warranty Deed (Demo)", date:"2022-05-14", source:"Ada County Recorder (demo)", tags:["legal","calls"], notes:"Demo text; replace with your own.", attachment:null },
-      { id: uid(), type:"ROS", title:"Record of Survey 95051440 (Demo)", date:"1995-05-14", source:"Ada County ROS (demo)", tags:["ros","basis"], notes:"Demo: includes basis-of-bearing statement.", attachment:null },
-      { id: uid(), type:"Photo", title:"Found 5/8\" RB w/ cap (Demo)", date:"2026-02-13", source:"Field photo (demo)", tags:["monument"], notes:"Demo placeholder photo slot.", attachment:null }
-    ];
-    const deedId = p.evidence[0].id;
-    const rosId  = p.evidence[1].id;
-
-    p.extractions = [];
-    const calls = [
-      {bearing:"S 89°58'00\" W", distance:315.27, unit:"ft"},
-      {bearing:"N 00°00'27\" W", distance:267.69, unit:"ft"},
-      {bearing:"N 89°57'43\" E", distance:315.13, unit:"ft"},
-      {bearing:"S 00°02'17\" E", distance:267.72, unit:"ft"},
-    ];
-    calls.forEach((c, i) => {
-      p.extractions.push({
-        id: uid(),
-        createdAt: nowISO(),
-        evidenceId: deedId,
-        page: 1,
-        snippet: "…(demo) boundary call…",
-        label: `Call ${i+1}`,
-        bearingText: c.bearing,
-        distance: c.distance,
-        distanceUnit: c.unit,
-        include: true,
-        confidence: 0.85
-      });
-    });
-
-    p.corners = [
-      {
-        id: uid(),
-        name: "NW COR (Parcel)",
-        plss: "Within Sec/T/R (demo)",
-        status: "Existent",
-        candidates: [
-          { id: uid(), kind:"Monument", refEvidenceId: p.evidence[2].id, summary:"Found 5/8\" rebar w/cap", weight:5, chosen:true, justification:"" },
-          { id: uid(), kind:"Record Call", refEvidenceId: rosId, summary:"ROS shows set 1/2\" RB", weight:3, chosen:false, justification:"" }
-        ],
-        decisions: []
-      },
-      {
-        id: uid(),
-        name: "NE COR (Parcel)",
-        plss: "Within Sec/T/R (demo)",
-        status: "Obliterated",
-        candidates: [
-          { id: uid(), kind:"Occupation", refEvidenceId: deedId, summary:"Fence corner long-standing", weight:3, chosen:true, justification:"Occupation consistent w/ record dimensions; no monument recovered." },
-          { id: uid(), kind:"Record Call", refEvidenceId: deedId, summary:"Deed call corner", weight:2, chosen:false, justification:"" }
-        ],
-        decisions: []
-      }
-    ];
-
-    p.traverse.start = {N:10000, E:10000};
-    p.traverse.basis = {label:"Assumed/Grid North (demo)", rotationDeg:0};
-    p.traverse.calls = p.extractions.map(x => x.id);
-    p.traverse.results = null;
-    p.traverse.lastRun = null;
-
-    p.decisions = [];
-    commit("Loaded sample data");
-    render();
-  });
-
-  /**********************
-   * Bearing / Distance Parsing
-   **********************/
-  function dmsToDeg(d,m,s){
-    return (d||0) + (m||0)/60 + (s||0)/3600;
-  }
-
-  function parseBearingText(text){
-    // Supports forms like:
-    // N 45°01'07" E
-    // N45 01 07E
-    // S 12-34-56 W
-    // N 0°00'27" W
-    if(!text) return null;
-    const t = text.toUpperCase().replace(/[\u00B0º]/g,"°").replace(/[′’]/g,"'").replace(/[″“”]/g,'"').trim();
-
-    // Attempt to capture quadrant-bearing
-    // groups: 1=NS, 2=deg, 3=min, 4=sec, 5=EW
-    const re = /([NS])\s*([0-9]{1,3})\s*(?:°|\s)\s*([0-9]{1,2})?\s*(?:'|\s|-)?\s*([0-9]{1,2}(?:\.[0-9]+)?)?\s*(?:"|\s|-)?\s*([EW])/i;
-    const m = t.match(re);
-    if(!m) return null;
-
-    const NS = m[1];
-    const deg = Number(m[2] || 0);
-    const min = Number(m[3] || 0);
-    const sec = Number(m[4] || 0);
-    const EW = m[5];
-
-    const theta = dmsToDeg(deg, min, sec);
-    if(theta < 0 || theta > 90.0000001) return null;
-
-    // Convert quadrant bearing to azimuth degrees (0=N,90=E,180=S,270=W)
-    let az;
-    if(NS === "N" && EW === "E") az = theta;
-    else if(NS === "N" && EW === "W") az = 360 - theta;
-    else if(NS === "S" && EW === "E") az = 180 - theta;
-    else if(NS === "S" && EW === "W") az = 180 + theta;
-
-    return { NS, EW, deg, min, sec, theta, azimuthDeg: az };
-  }
-
-  function parseCallsFromText(raw){
-    // Extracts pairs of (bearing, distance) from pasted text.
-    // Looks for quadrant bearing and a nearby distance number.
-    // Example matches:
-    // N 45°01'07" E, 123.45
-    // S 89 58 00 W 315.27
-    const text = (raw || "").replace(/\t/g," ").replace(/\u00A0/g," ");
-    const lines = text.split(/\r?\n/);
-
-    const results = [];
-    const bearingRe = /([NS])\s*([0-9]{1,3})\s*(?:°|\s)\s*([0-9]{1,2})?\s*(?:'|\s|-)?\s*([0-9]{1,2}(?:\.[0-9]+)?)?\s*(?:"|\s|-)?\s*([EW])/ig;
-
-    for(const line of lines){
-      let match;
-      while((match = bearingRe.exec(line)) !== null){
-        const bText = match[0].trim();
-        // Find a distance after the bearing in the same line
-        const after = line.slice(match.index + match[0].length);
-        const distMatch = after.match(/([0-9]+(?:\.[0-9]+)?)\s*(FT|FEET|FOOT|')?/i);
-        if(!distMatch) continue;
-        const dist = Number(distMatch[1]);
-        if(!isFinite(dist)) continue;
-
-        results.push({
-          bearingText: normalizeBearingDisplay(bText),
-          distance: dist,
-          distanceUnit: "ft",
-          snippet: line.trim().slice(0, 220),
-          confidence: 0.75
-        });
-      }
-    }
-    return results;
-  }
-
-  function normalizeBearingDisplay(bearing){
-    // Best-effort normalize into: N 45°01'07" E
-    const pb = parseBearingText(bearing);
-    if(!pb) return bearing.trim();
-    const pad2 = (n)=> String(Math.floor(Math.abs(n))).padStart(2,"0");
-    const d = String(pb.deg);
-    const m = pad2(pb.min || 0);
-    const s = pad2(pb.sec || 0);
-    return `${pb.NS} ${d}°${m}'${s}" ${pb.EW}`;
-  }
-
-  function computeTraverseFromExtractions(project){
-    const startN = Number(project.traverse.start?.N ?? 0);
-    const startE = Number(project.traverse.start?.E ?? 0);
-    const rotationDeg = Number(project.traverse.basis?.rotationDeg ?? 0);
-
-    const calls = [];
-    for(const id of (project.traverse.calls || [])){
-      const ex = project.extractions.find(x => x.id === id);
-      if(ex && ex.include){
-        calls.push(ex);
-      }
-    }
-
-    let N = startN, E = startE;
-    const points = [{pt:1, N, E}];
-
-    const segments = [];
-    let pt = 1;
-
-    for(const c of calls){
-      const pb = parseBearingText(c.bearingText);
-      if(!pb) {
-        segments.push({ ok:false, label:c.label, bearing:c.bearingText, distance:c.distance, err:"Bearing parse failed" });
-        continue;
-      }
-      const az = (pb.azimuthDeg + rotationDeg) % 360;
-      const rad = az * Math.PI / 180;
-
-      const d = Number(c.distance);
-      const dN = Math.cos(rad) * d;
-      const dE = Math.sin(rad) * d;
-
-      const N2 = N + dN;
-      const E2 = E + dE;
-
-      segments.push({
-        ok:true,
-        label: c.label || "",
-        bearing: c.bearingText,
-        azimuthDeg: az,
-        distance: d,
-        dN, dE,
-        from: {N, E},
-        to: {N:N2, E:E2}
-      });
-
-      N = N2; E = E2;
-      pt += 1;
-      points.push({pt, N, E});
-    }
-
-    const closeDN = startN - N;
-    const closeDE = startE - E;
-    const misclose = Math.hypot(closeDN, closeDE);
-
-    const totalDist = segments.filter(s=>s.ok).reduce((a,s)=>a + s.distance, 0);
-    const precision = misclose > 0 ? (totalDist / misclose) : Infinity;
-
-    return {
-      start: {N:startN, E:startE},
-      rotationDeg,
-      points,
-      segments,
-      closure: {dN: closeDN, dE: closeDE, misclose},
-      totalDist,
-      precision
-    };
-  }
-
-  /**********************
-   * Evidence helpers
-   **********************/
-  function evidenceTitle(e){
-    return `${e.type || "Evidence"} — ${e.title || "(untitled)"}`;
-  }
-  function findEvidenceById(id){
-    return activeProject?.evidence?.find(e => e.id === id) || null;
-  }
-
-  function addDecisionLog(entry){
-    if(!activeProject) return;
-    activeProject.decisions.unshift(entry);
-    // keep bounded
-    if(activeProject.decisions.length > 500) activeProject.decisions.length = 500;
-  }
-
-  function cornerChosenCandidate(corner){
-    return (corner.candidates || []).find(c => c.chosen) || null;
-  }
-
-  function maxCandidateWeight(corner){
-    const ws = (corner.candidates || []).map(c => Number(c.weight||0));
-    return ws.length ? Math.max(...ws) : 0;
-  }
-
-  function requiresJustification(corner, chosen){
-    if(!corner || !chosen) return false;
-    const maxW = maxCandidateWeight(corner);
-    const chosenW = Number(chosen.weight || 0);
-    if(chosenW < maxW) return true; // selected weaker candidate than strongest available
-    if(chosen.kind === "Computed"){
-      const hasMon = (corner.candidates || []).some(c => c.kind === "Monument");
-      if(hasMon) return true; // computed chosen while monument exists
-    }
-    return false;
-  }
-
-  /**********************
-   * Render: Dashboard
-   **********************/
   function viewDashboard(){
-    const p = activeProject;
-    const ev = p.evidence.length;
-    const ex = p.extractions.length;
-    const corners = p.corners.length;
-    const chosen = p.corners.filter(c => !!cornerChosenCandidate(c)).length;
+    const cf = state.active;
+    const meta = cf.meta || {};
+    const counts = cf.counts || {evidence:0, extractions:0, corners:0, decisions:0};
 
-    const lastRun = p.traverse?.lastRun ? new Date(p.traverse.lastRun).toLocaleString() : "—";
-    const travRes = p.traverse?.results;
-
-    const closurePill = travRes
-      ? (travRes.closure.misclose <= 0.05 ? `<span class="pill good">Closure: ${travRes.closure.misclose.toFixed(3)} ft</span>`
-         : travRes.closure.misclose <= 0.50 ? `<span class="pill warn">Closure: ${travRes.closure.misclose.toFixed(3)} ft</span>`
-         : `<span class="pill bad">Closure: ${travRes.closure.misclose.toFixed(3)} ft</span>`)
-      : `<span class="pill">Closure: —</span>`;
+    const lastDecision = (state.decisions || [])[0];
+    const tr = state.traverseResults?.results || null;
 
     return `
-      <div class="grid2">
-        <div class="card">
-          <div class="hd">
-            <h3>Casefile</h3>
-            <span class="pill mono">ID: ${p.id.slice(0,8)}</span>
-          </div>
-          <div class="bd">
-            <div class="rowline">
-              <div>
-                <div class="muted small">Project Name</div>
-                <input class="w100" type="text" id="projName" value="${escapeHtml(p.meta.name || "")}"/>
-              </div>
-              <div class="fit">
-                <div class="muted small">Jurisdiction</div>
-                <input class="w100" type="text" id="projJur" value="${escapeHtml(p.meta.jurisdiction || "")}"/>
-              </div>
-            </div>
-            <div style="margin-top:10px;">
-              <div class="muted small">Notes</div>
-              <textarea id="projNotes" style="min-height:90px;">${escapeHtml(p.meta.notes || "")}</textarea>
-            </div>
-            <div class="hr"></div>
-            <div class="kpi">
-              <div class="box"><div class="v mono">${ev}</div><div class="l">Evidence Items</div></div>
-              <div class="box"><div class="v mono">${ex}</div><div class="l">Extracted Calls</div></div>
-              <div class="box"><div class="v mono">${corners}</div><div class="l">Corners Tracked</div></div>
-              <div class="box"><div class="v mono">${chosen}/${corners}</div><div class="l">Corners with a Chosen Candidate</div></div>
-            </div>
-            <div class="hr"></div>
-            <div class="small muted">
-              <b>Concept demo focus:</b> capture evidence → extract calls → assign weights → record choices with justification → compute traverse → print defensible package.
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="hd">
-            <h3>Traverse Snapshot</h3>
-            <div class="row">
-              ${closurePill}
-              <span class="pill">Last run: <b class="mono">${escapeHtml(lastRun)}</b></span>
-            </div>
-          </div>
-          <div class="bd">
-            <div class="grid2">
-              <div>
-                <div class="muted small">Start (N,E)</div>
-                <div class="row" style="margin-top:6px;">
-                  <input type="number" id="startN" step="0.001" value="${Number(p.traverse.start?.N ?? 10000)}"/>
-                  <input type="number" id="startE" step="0.001" value="${Number(p.traverse.start?.E ?? 10000)}"/>
-                </div>
-              </div>
-              <div>
-                <div class="muted small">Basis rotation (deg)</div>
-                <div class="row" style="margin-top:6px;">
-                  <input type="number" id="rotDeg" step="0.0001" value="${Number(p.traverse.basis?.rotationDeg ?? 0)}"/>
-                  <button class="btn good" id="runTraverseBtn">Run Traverse</button>
-                </div>
-              </div>
-            </div>
-            <div class="hr"></div>
-            <div class="small muted">
-              This uses quadrant bearings → azimuth conversion and computes points from extracted calls you include.
-              Rotation is applied as a simple azimuth offset (demo basis-of-bearing behavior).
-            </div>
-            <div style="margin-top:10px;">
-              <button class="btn" id="gotoTraverse">Open Traverse Workspace</button>
-              <button class="btn" id="gotoExtract">Open Extract Calls</button>
-              <button class="btn" id="gotoMatrix">Open Evidence Matrix</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**********************
-   * Render: Evidence Library
-   **********************/
-  function viewEvidence(){
-    const p = activeProject;
-
-    const evidenceRows = p.evidence.map(e => {
-      const hasAtt = e.attachment && e.attachment.dataUrl ? "• attachment" : "";
-      return `
-        <tr>
-          <td class="nowrap">${escapeHtml(e.type || "")}</td>
-          <td><b>${escapeHtml(e.title || "")}</b><div class="small muted">${escapeHtml(e.source || "")} ${hasAtt ? `<span class="pill">${hasAtt}</span>`:""}</div></td>
-          <td class="nowrap">${escapeHtml(e.date || "")}</td>
-          <td>${escapeHtml((e.tags||[]).join(", "))}</td>
-          <td class="right nowrap">
-            <button class="btn" data-act="editEvidence" data-id="${e.id}">Edit</button>
-            <button class="btn danger" data-act="delEvidence" data-id="${e.id}">Delete</button>
-          </td>
-        </tr>
-      `;
-    }).join("");
-
-    return `
-      <div class="split">
-        <div class="card">
-          <div class="hd">
-            <h3>Evidence Library</h3>
-            <span class="pill">Stored in localStorage (demo)</span>
-          </div>
-          <div class="bd">
-            <div class="dropzone" id="dropzone">
-              <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
-                <div>
-                  <div><b>Drag & drop</b> a small file (PDF/image/text) or use the picker.</div>
-                  <div class="small muted">Demo stores attachments only if &lt; ${Math.round(MAX_ATTACHMENT_BYTES/1000)} KB to avoid localStorage overflow.</div>
-                </div>
-                <div class="row">
-                  <input type="file" id="filePick" />
-                  <button class="btn primary" id="addEvidenceBtn">Add Metadata Only</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="hr"></div>
-
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Title / Source</th>
-                  <th>Date</th>
-                  <th>Tags</th>
-                  <th class="right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${evidenceRows || `<tr><td colspan="5" class="muted">No evidence yet. Add a deed/plat/ROS/photo and move to “Extract Calls”.</td></tr>`}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="hd">
-            <h3>Quick Add</h3>
-            <span class="pill">Evidence object</span>
-          </div>
-          <div class="bd">
-            <div class="grid2">
-              <div>
-                <div class="muted small">Type</div>
-                <select id="evType" class="w100">
-                  <option>Deed</option>
-                  <option>Plat</option>
-                  <option>ROS</option>
-                  <option>Corner Record</option>
-                  <option>Field Notes</option>
-                  <option>Photo</option>
-                  <option>Other</option>
-                </select>
-              </div>
-              <div>
-                <div class="muted small">Date</div>
-                <input id="evDate" class="w100" type="text" placeholder="YYYY-MM-DD" />
-              </div>
-            </div>
-
-            <div style="margin-top:10px;">
-              <div class="muted small">Title</div>
-              <input id="evTitle" class="w100" type="text" placeholder="e.g., Warranty Deed 2022-05-14" />
-            </div>
-
-            <div style="margin-top:10px;">
-              <div class="muted small">Source</div>
-              <input id="evSource" class="w100" type="text" placeholder="e.g., Ada County Recorder / ROS #..." />
-            </div>
-
-            <div style="margin-top:10px;">
-              <div class="muted small">Tags (comma separated)</div>
-              <input id="evTags" class="w100" type="text" placeholder="legal, calls, basis, monument" />
-            </div>
-
-            <div style="margin-top:10px;">
-              <div class="muted small">Notes</div>
-              <textarea id="evNotes" style="min-height:110px;" placeholder="Monument descriptions, basis-of-bearing text, research notes…"></textarea>
-            </div>
-
-            <div class="row" style="margin-top:10px;">
-              <button class="btn primary" id="saveEvBtn">Save Evidence</button>
-              <button class="btn" id="goExtractBtn">Go to Extract Calls</button>
-            </div>
-
-            <div class="hr"></div>
-            <div class="small muted">
-              The app doesn’t “read PDFs” in this prototype. The core concept is: every extracted call keeps a trace back to evidence + page/snippet.
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**********************
-   * Render: Extract Calls
-   **********************/
-  function viewExtract(){
-    const p = activeProject;
-
-    const evOpts = p.evidence.map(e => `<option value="${e.id}">${escapeHtml(evidenceTitle(e))}</option>`).join("");
-
-    const extractedRows = p.extractions.map((x, i) => {
-      const ev = findEvidenceById(x.evidenceId);
-      const pb = parseBearingText(x.bearingText);
-      const ok = !!pb;
-      const pill = ok ? `<span class="pill good">OK</span>` : `<span class="pill bad">BAD</span>`;
-      return `
-        <tr>
-          <td class="nowrap">${pill}</td>
-          <td class="nowrap"><input type="checkbox" data-act="toggleInclude" data-id="${x.id}" ${x.include ? "checked":""}/></td>
-          <td class="mono">${escapeHtml(x.label || ("Call "+(i+1)))}</td>
-          <td class="mono">${escapeHtml(x.bearingText || "")}</td>
-          <td class="mono">${Number(x.distance||0).toFixed(2)} ${escapeHtml(x.distanceUnit||"")}</td>
-          <td>
-            <div class="small"><b>${escapeHtml(ev ? ev.title : "—")}</b></div>
-            <div class="small muted">p.${escapeHtml(String(x.page ?? "—"))} • conf ${(Number(x.confidence||0)*100).toFixed(0)}%</div>
-          </td>
-          <td class="right nowrap">
-            <button class="btn" data-act="editExtraction" data-id="${x.id}">Edit</button>
-            <button class="btn danger" data-act="delExtraction" data-id="${x.id}">Delete</button>
-          </td>
-        </tr>
-      `;
-    }).join("");
-
-    return `
-      <div class="grid2">
-        <div class="card">
-          <div class="hd">
-            <h3>Extract Bearings & Distances</h3>
-            <span class="pill">Paste text → regex extraction (demo)</span>
-          </div>
-          <div class="bd">
-            <div class="grid2">
-              <div>
-                <div class="muted small">Evidence item</div>
-                <select id="exEvidence" class="w100">${evOpts || `<option value="">(add evidence first)</option>`}</select>
-              </div>
-              <div>
-                <div class="muted small">Page (for traceability)</div>
-                <input id="exPage" class="w100" type="number" min="1" step="1" value="1"/>
-              </div>
-            </div>
-            <div style="margin-top:10px;">
-              <div class="muted small">Paste deed/plat/ROS call text</div>
-              <textarea id="exText" placeholder='Example:
-S 89°58&apos;00&quot; W 315.27
-N 00°00&apos;27&quot; W 267.69
-N 89°57&apos;43&quot; E 315.13
-S 00°02&apos;17&quot; E 267.72'></textarea>
-            </div>
-
-            <div class="row" style="margin-top:10px;">
-              <button class="btn primary" id="runExtractBtn">Extract Calls</button>
-              <button class="btn" id="addManualBtn">Add Manual Call</button>
-              <button class="btn good" id="pushToTraverseBtn">Use Included Calls in Traverse</button>
-            </div>
-
-            <div class="hr"></div>
-            <div class="small muted">
-              Extraction keeps: evidence link + page + snippet. In production, OCR/PDF anchoring would replace this textarea.
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="hd">
-            <h3>Extracted Calls</h3>
-            <span class="pill">Include → Traverse</span>
-          </div>
-          <div class="bd">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Use</th>
-                  <th>Label</th>
-                  <th>Bearing</th>
-                  <th>Distance</th>
-                  <th>Trace</th>
-                  <th class="right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${extractedRows || `<tr><td colspan="7" class="muted">No calls extracted yet.</td></tr>`}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**********************
-   * Render: Evidence Matrix
-   **********************/
-  function viewMatrix(){
-    const p = activeProject;
-
-    const cornerList = p.corners.map(c => {
-      const chosen = cornerChosenCandidate(c);
-      const needsJ = chosen && requiresJustification(c, chosen);
-      const statusPill = chosen
-        ? (needsJ ? `<span class="pill warn">Chosen • justification required</span>` : `<span class="pill good">Chosen</span>`)
-        : `<span class="pill bad">No selection</span>`;
-
-      return `
-        <tr>
-          <td><b>${escapeHtml(c.name || "(unnamed corner)")}</b><div class="small muted">${escapeHtml(c.plss || "")}</div></td>
-          <td class="nowrap">${escapeHtml(c.status || "")}</td>
-          <td>${statusPill}</td>
-          <td class="right nowrap">
-            <button class="btn" data-act="openCorner" data-id="${c.id}">Open</button>
-            <button class="btn danger" data-act="delCorner" data-id="${c.id}">Delete</button>
-          </td>
-        </tr>
-      `;
-    }).join("");
-
-    const globalLog = (p.decisions || []).slice(0, 20).map(d => {
-      return `
-        <tr>
-          <td class="nowrap mono">${escapeHtml(new Date(d.at).toLocaleString())}</td>
-          <td><b>${escapeHtml(d.cornerName || "")}</b><div class="small muted">${escapeHtml(d.action || "")}</div></td>
-          <td>${escapeHtml(d.detail || "")}</td>
-        </tr>
-      `;
-    }).join("");
-
-    return `
-      <div class="grid2">
-        <div class="card">
-          <div class="hd">
-            <h3>Corners</h3>
-            <span class="pill">Evidence Matrix (weights + selection)</span>
-          </div>
-          <div class="bd">
-            <div class="row">
-              <button class="btn primary" id="addCornerBtn">Add Corner</button>
-              <button class="btn" id="bulkFromTraverseBtn">Add 4 Corners (demo)</button>
-            </div>
-            <div class="hr"></div>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Corner</th>
-                  <th>Status</th>
-                  <th>Selection</th>
-                  <th class="right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${cornerList || `<tr><td colspan="4" class="muted">No corners yet. Add a corner, then add candidates and select one with defensible justification.</td></tr>`}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="hd">
-            <h3>Decision Log (latest)</h3>
-            <span class="pill">Audit trail</span>
-          </div>
-          <div class="bd">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Corner</th>
-                  <th>Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${globalLog || `<tr><td colspan="3" class="muted">No decisions logged yet.</td></tr>`}
-              </tbody>
-            </table>
-            <div class="hr"></div>
-            <div class="small muted">
-              Rule enforced here: selecting a weaker candidate (lower weight) requires a justification note. (Demo of “no silent overrides”.)
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div id="cornerModalHost"></div>
-    `;
-  }
-
-  function renderCornerModal(cornerId){
-    const p = activeProject;
-    const c = p.corners.find(x => x.id === cornerId);
-    if(!c) return "";
-
-    const evOpts = p.evidence.map(e => `<option value="${e.id}">${escapeHtml(evidenceTitle(e))}</option>`).join("");
-
-    const rows = (c.candidates || []).map((cand, idx) => {
-      const ev = findEvidenceById(cand.refEvidenceId);
-      const chosen = !!cand.chosen;
-      const w = Number(cand.weight || 0);
-      const maxW = maxCandidateWeight(c);
-      const needsJ = chosen && requiresJustification(c, cand);
-      const pill = chosen ? (needsJ ? `<span class="pill warn">Chosen • justify</span>` : `<span class="pill good">Chosen</span>`) : `<span class="pill">—</span>`;
-      const weaker = chosen && w < maxW;
-
-      return `
-        <tr>
-          <td class="nowrap">${pill}</td>
-          <td class="nowrap">${escapeHtml(cand.kind || "")}</td>
-          <td>
-            <div><b>${escapeHtml(ev ? ev.title : "—")}</b></div>
-            <div class="small muted">${escapeHtml(cand.summary || "")}</div>
-          </td>
-          <td class="nowrap mono">${w}</td>
-          <td class="right nowrap">
-            <button class="btn ${chosen ? "danger":""}" data-act="chooseCandidate" data-corner="${c.id}" data-cand="${cand.id}">
-              ${chosen ? "Unchoose" : "Choose"}
-            </button>
-            <button class="btn" data-act="editCandidate" data-corner="${c.id}" data-cand="${cand.id}">Edit</button>
-            <button class="btn danger" data-act="delCandidate" data-corner="${c.id}" data-cand="${cand.id}">Delete</button>
-          </td>
-        </tr>
-        ${weaker ? `
-          <tr>
-            <td></td>
-            <td colspan="4">
-              <div class="small ${needsJ ? "":"muted"}">
-                ${needsJ ? `<b style="color:var(--warn);">Justification required:</b> chosen weight ${w} &lt; max ${maxW}.` : ""}
-              </div>
-            </td>
-          </tr>` : ``}
-      `;
-    }).join("");
-
-    const chosen = cornerChosenCandidate(c);
-    const needJ = chosen && requiresJustification(c, chosen);
-
-    return `
-      <div class="card" style="margin-top:14px;">
-        <div class="hd">
-          <h3>Corner Detail</h3>
-          <div class="row">
-            <span class="pill mono">Corner ID: ${c.id.slice(0,8)}</span>
-            <button class="btn" data-act="closeCorner">Close</button>
-          </div>
-        </div>
-        <div class="bd">
-          <div class="grid2">
-            <div>
-              <div class="muted small">Name</div>
-              <input class="w100" type="text" id="cornerName" value="${escapeHtml(c.name || "")}" />
-            </div>
-            <div>
-              <div class="muted small">Status</div>
-              <select id="cornerStatus" class="w100">
-                ${["Existent","Obliterated","Lost","Unknown"].map(s => `<option ${c.status===s?"selected":""}>${s}</option>`).join("")}
-              </select>
-            </div>
-          </div>
-          <div style="margin-top:10px;">
-            <div class="muted small">PLSS / Reference</div>
-            <input class="w100" type="text" id="cornerPlss" value="${escapeHtml(c.plss || "")}" placeholder="e.g., NE 1/4 COR Sec 12 T3N R2E BM (demo)"/>
-          </div>
-
-          <div class="hr"></div>
-
-          <div class="card" style="box-shadow:none;">
-            <div class="hd"><h3 style="font-size:13px;">Candidates</h3>
-              <div class="row">
-                <button class="btn primary" data-act="addCandidate" data-corner="${c.id}">Add Candidate</button>
-              </div>
-            </div>
+      <div class="pad">
+        <div class="grid2">
+          <div class="card">
+            <div class="hd">Casefile Meta</div>
             <div class="bd">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Chosen</th>
-                    <th>Kind</th>
-                    <th>Evidence / Summary</th>
-                    <th>Weight</th>
-                    <th class="right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rows || `<tr><td colspan="5" class="muted">No candidates. Add monument/record/occupation/computed as candidate evidence and weight it.</td></tr>`}
-                </tbody>
-              </table>
+              <div class="grid2">
+                <div>
+                  <div class="small muted">Name</div>
+                  <input id="projName" type="text" value="${esc(meta.name||"")}" placeholder="Casefile name"/>
+                </div>
+                <div>
+                  <div class="small muted">Jurisdiction</div>
+                  <input id="projJur" type="text" value="${esc(meta.jurisdiction||"")}" placeholder="e.g., Idaho"/>
+                </div>
+              </div>
+              <div style="margin-top:10px;">
+                <div class="small muted">Notes</div>
+                <textarea id="projNotes" rows="4" placeholder="Project notes...">${esc(meta.notes||"")}</textarea>
+              </div>
+              <div class="hr"></div>
+              <div class="row">
+                <span class="pill">Evidence: <b class="mono">${counts.evidence}</b></span>
+                <span class="pill">Extractions: <b class="mono">${counts.extractions}</b></span>
+                <span class="pill">Corners: <b class="mono">${counts.corners}</b></span>
+                <span class="pill">Decisions: <b class="mono">${counts.decisions}</b></span>
+              </div>
+              <div class="small muted" style="margin-top:10px;">
+                Created: ${fmtDateTime(meta.createdAt)} · Updated: ${fmtDateTime(meta.updatedAt)}
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="hd">Status</div>
+            <div class="bd">
+              <div class="row">
+                <span class="pill">API Base: <b class="mono">${esc(apiBase || "(same origin)")}</b></span>
+                <span class="pill">Traverse last run: <b class="mono">${state.traverseResults?.lastRun ? fmtDateTime(state.traverseResults.lastRun) : "—"}</b></span>
+              </div>
 
               <div class="hr"></div>
 
-              <div>
-                <div class="muted small">Corner decision note (required if justification is flagged)</div>
-                <textarea id="cornerDecisionNote" style="min-height:90px;" placeholder="Explain why the chosen candidate controls (or why a weaker candidate was selected).">${escapeHtml(chosen?.justification || "")}</textarea>
-                <div class="row" style="margin-top:10px;">
-                  <button class="btn good" data-act="saveCornerDecision" data-corner="${c.id}">
-                    Save Decision
-                  </button>
-                  <span class="small ${needJ ? "" : "muted"}">
-                    ${needJ ? `<b style="color:var(--warn)">Justification required</b> because selection overrides stronger evidence.` : `Justification optional unless an override rule triggers.`}
-                  </span>
+              <div class="grid2">
+                <div class="card" style="box-shadow:none;">
+                  <div class="bd">
+                    <div class="small muted">Latest decision</div>
+                    <div style="margin-top:6px;">
+                      ${lastDecision ? `
+                        <div><b>${esc(lastDecision.action)}</b> · ${fmtDateTime(lastDecision.at)}</div>
+                        <div class="muted small" style="margin-top:6px;">${esc(lastDecision.summary || "")}</div>
+                      ` : `<div class="muted">No decisions yet.</div>`}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card" style="box-shadow:none;">
+                  <div class="bd">
+                    <div class="small muted">Traverse closure</div>
+                    <div style="margin-top:6px;">
+                      ${tr ? `
+                        <div><b class="mono">${tr.closure?.distance?.toFixed?.(3) ?? "—"}</b> ${esc(tr.closure?.unit || "")}</div>
+                        <div class="muted small">Precision: ${tr.closure?.precisionText || "—"}</div>
+                      ` : `<div class="muted">No results yet. Run traverse.</div>`}
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              <div class="hr"></div>
+              <div class="row">
+                <button class="btn" data-act="goto" data-tab="evidence">Open Evidence Library</button>
+                <button class="btn" data-act="goto" data-tab="extract">Extract Calls</button>
+                <button class="btn" data-act="goto" data-tab="matrix">Evidence Matrix</button>
+                <button class="btn" data-act="goto" data-tab="traverse">Traverse</button>
+                <button class="btn primary" data-act="goto" data-tab="outputs">Outputs</button>
+              </div>
             </div>
           </div>
-
-          <div class="hr"></div>
-          <div class="small muted">
-            This is the core “defensibility engine” concept: candidates + weights + explicit selection + required justification on override.
-          </div>
         </div>
-      </div>
-    `;
+      </div>`;
   }
 
-  /**********************
-   * Render: Traverse
-   **********************/
-  function viewTraverse(){
-    const p = activeProject;
-    const calls = p.extractions.map(x => {
-      const pb = parseBearingText(x.bearingText);
-      const ok = !!pb;
-      const pill = ok ? `<span class="pill good">OK</span>` : `<span class="pill bad">BAD</span>`;
+  function viewEvidence(){
+    const items = state.evidence || [];
+    const rows = items.map(ev => {
+      const att = ev.attachment;
+      const attLabel = att ? `${esc(att.name)} · ${(att.size||0).toLocaleString()} bytes` : "—";
+      const downloadUrl = att?.url || urlFor(`/casefiles/${state.activeId}/evidence/${ev.id}/attachment`);
       return `
         <tr>
-          <td>${pill}</td>
-          <td class="nowrap"><input type="checkbox" data-act="toggleInclude" data-id="${x.id}" ${x.include ? "checked":""}/></td>
-          <td class="mono">${escapeHtml(x.label || "")}</td>
-          <td class="mono">${escapeHtml(x.bearingText || "")}</td>
-          <td class="mono">${Number(x.distance||0).toFixed(2)} ft</td>
-          <td class="right">
-            <button class="btn" data-act="moveCallUp" data-id="${x.id}">↑</button>
-            <button class="btn" data-act="moveCallDown" data-id="${x.id}">↓</button>
+          <td><div class="mono small">${esc(ev.type)}</div></td>
+          <td>
+            <div><b>${esc(ev.title)}</b></div>
+            <div class="small muted">${esc(ev.source||"")} ${ev.date?("· "+esc(ev.date)):""}</div>
+            <div class="small muted">${(ev.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join(" ")}</div>
           </td>
-        </tr>
-      `;
+          <td class="small">${esc(attLabel)}</td>
+          <td style="text-align:right;">
+            <button class="btn" data-act="editEvidence" data-id="${esc(ev.id)}">Edit</button>
+            <button class="btn" data-act="uploadEvidence" data-id="${esc(ev.id)}">Upload</button>
+            ${att ? `<a class="btn" href="${esc(downloadUrl)}" target="_blank" rel="noopener">Download</a>
+                    <button class="btn danger" data-act="deleteAttachment" data-id="${esc(ev.id)}">Remove</button>` : `<span class="muted small">No file</span>`}
+            <button class="btn danger" data-act="deleteEvidence" data-id="${esc(ev.id)}">Delete</button>
+          </td>
+        </tr>`;
     }).join("");
 
-    const res = p.traverse.results;
-    const summary = res ? `
-      <div class="kpi" style="margin-top:10px;">
-        <div class="box"><div class="v mono">${res.totalDist.toFixed(2)}</div><div class="l">Total distance (ft)</div></div>
-        <div class="box"><div class="v mono">${res.closure.misclose.toFixed(3)}</div><div class="l">Misclosure (ft)</div></div>
-        <div class="box"><div class="v mono">${(isFinite(res.precision) ? ("1:" + Math.round(res.precision).toLocaleString()) : "∞")}</div><div class="l">Relative precision</div></div>
-        <div class="box"><div class="v mono">${res.points.length}</div><div class="l">Points computed</div></div>
-      </div>
-    ` : `<div class="muted small">Not run yet.</div>`;
-
-    const segTable = res ? res.segments.map((s, i) => {
-      if(!s.ok){
-        return `<tr><td colspan="8" class="pill bad">Segment ${i+1} error: ${escapeHtml(s.err || "Unknown")}</td></tr>`;
-      }
-      return `
-        <tr>
-          <td class="mono">${escapeHtml(s.label || ("Seg "+(i+1)))}</td>
-          <td class="mono">${escapeHtml(s.bearing)}</td>
-          <td class="mono">${s.distance.toFixed(2)}</td>
-          <td class="mono">${s.dN.toFixed(3)}</td>
-          <td class="mono">${s.dE.toFixed(3)}</td>
-          <td class="mono">${s.to.N.toFixed(3)}</td>
-          <td class="mono">${s.to.E.toFixed(3)}</td>
-          <td class="mono">${s.azimuthDeg.toFixed(6)}</td>
-        </tr>
-      `;
-    }).join("") : "";
-
     return `
-      <div class="grid2">
-        <div class="card">
-          <div class="hd">
-            <h3>Traverse Setup</h3>
-            <span class="pill">Uses included extracted calls</span>
+      <div class="pad">
+        <div class="grid2">
+          <div class="card">
+            <div class="hd">Add Evidence</div>
+            <div class="bd">
+              <div class="grid2">
+                <div>
+                  <div class="small muted">Type</div>
+                  <select id="evType">
+                    ${["Deed","ROS","Plat","Field Notes","Photo","Email","GIS","Other"].map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}
+                  </select>
+                </div>
+                <div>
+                  <div class="small muted">Title</div>
+                  <input id="evTitle" type="text" placeholder="e.g., Warranty Deed 2022-05-14"/>
+                </div>
+              </div>
+
+              <div class="grid2" style="margin-top:10px;">
+                <div>
+                  <div class="small muted">Date (optional)</div>
+                  <input id="evDate" type="text" placeholder="YYYY-MM-DD or freeform"/>
+                </div>
+                <div>
+                  <div class="small muted">Source (optional)</div>
+                  <input id="evSource" type="text" placeholder="Ada County Recorder, field photo, etc."/>
+                </div>
+              </div>
+
+              <div style="margin-top:10px;">
+                <div class="small muted">Tags (comma-separated)</div>
+                <input id="evTags" type="text" placeholder="e.g., legal, basis, monument"/>
+              </div>
+
+              <div style="margin-top:10px;">
+                <div class="small muted">Notes</div>
+                <textarea id="evNotes" rows="4" placeholder="What does this evidence prove?"></textarea>
+              </div>
+
+              <div class="row" style="margin-top:10px;justify-content:space-between;">
+                <div>
+                  <div class="small muted">Attachment (optional)</div>
+                  <input id="evFile" type="file"/>
+                  <div class="small muted">Uploads to: <span class="mono">${esc(apiBase || "(same origin)")}</span></div>
+                </div>
+                <button class="btn primary" id="saveEvBtn">Save Evidence</button>
+              </div>
+            </div>
           </div>
-          <div class="bd">
-            <div class="grid2">
-              <div>
-                <div class="muted small">Start Northing</div>
-                <input type="number" id="travStartN" step="0.001" value="${Number(p.traverse.start?.N ?? 10000)}"/>
-              </div>
-              <div>
-                <div class="muted small">Start Easting</div>
-                <input type="number" id="travStartE" step="0.001" value="${Number(p.traverse.start?.E ?? 10000)}"/>
-              </div>
-            </div>
 
-            <div class="grid2" style="margin-top:10px;">
-              <div>
-                <div class="muted small">Basis label</div>
-                <input class="w100" type="text" id="basisLabel" value="${escapeHtml(p.traverse.basis?.label ?? "")}"/>
-              </div>
-              <div>
-                <div class="muted small">Rotation (deg)</div>
-                <input type="number" id="basisRot" step="0.0001" value="${Number(p.traverse.basis?.rotationDeg ?? 0)}"/>
-              </div>
+          <div class="card">
+            <div class="hd">Evidence Library <span class="pill">${items.length} items</span></div>
+            <div class="bd">
+              ${items.length ? `
+                <table class="tbl">
+                  <thead><tr>
+                    <th style="width:120px;">Type</th>
+                    <th>Evidence</th>
+                    <th style="width:220px;">Attachment</th>
+                    <th style="width:320px;text-align:right;">Actions</th>
+                  </tr></thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              ` : `<div class="muted">No evidence yet. Add your first deed/ROS/photo.</div>`}
             </div>
-
-            <div class="row" style="margin-top:10px;">
-              <button class="btn good" id="runTraverseBtn2">Run Traverse</button>
-              <button class="btn" id="syncTraverseCallsBtn">Sync Included Calls</button>
-              <button class="btn primary" id="pushTraverseToOutputsBtn">Refresh Outputs</button>
-            </div>
-
-            <div class="hr"></div>
-            <div class="small muted">
-              Demo computation: quadrant bearing → azimuth (+ rotation) → ΔN/ΔE → coordinate chain.
-              This does not replace least-squares adjustment or a full boundary resolution.
-            </div>
-
-            ${summary}
           </div>
         </div>
-
-        <div class="card">
-          <div class="hd">
-            <h3>Call Order & Inclusion</h3>
-            <span class="pill">Reorder & include</span>
-          </div>
-          <div class="bd">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Use</th>
-                  <th>Label</th>
-                  <th>Bearing</th>
-                  <th>Dist (ft)</th>
-                  <th class="right">Order</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${calls || `<tr><td colspan="6" class="muted">No extracted calls. Go to Extract Calls.</td></tr>`}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:14px;">
-        <div class="hd">
-          <h3>Traverse Results</h3>
-          <span class="pill">Segments + computed coordinates</span>
-        </div>
-        <div class="bd">
-          ${res ? `
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Segment</th>
-                  <th>Bearing</th>
-                  <th>Dist</th>
-                  <th>ΔN</th>
-                  <th>ΔE</th>
-                  <th>N (to)</th>
-                  <th>E (to)</th>
-                  <th>Az (deg)</th>
-                </tr>
-              </thead>
-              <tbody>${segTable}</tbody>
-            </table>
-            <div class="hr"></div>
-            <div class="small muted mono">
-              Closure vector: dN=${res.closure.dN.toFixed(3)} ft, dE=${res.closure.dE.toFixed(3)} ft (misclose=${res.closure.misclose.toFixed(3)} ft)
-            </div>
-          ` : `<div class="muted">Run traverse to compute coordinates.</div>`}
-        </div>
-      </div>
-    `;
+      </div>`;
   }
 
-  /**********************
-   * Render: Outputs
-   **********************/
-  function viewOutputs(){
-    const p = activeProject;
-    const ev = p.evidence || [];
-    const ex = p.extractions || [];
-    const corners = p.corners || [];
-    const res = p.traverse?.results;
+  function viewExtract(){
+    const items = state.extractions || [];
+    const evidenceOpts = (state.evidence || []).map(ev => `<option value="${esc(ev.id)}">${esc(ev.title)}</option>`).join("");
+    const warnings = (state.lastWarnings || []).map(w => `<div class="pill warn">${esc(w)}</div>`).join("");
 
-    const evList = ev.map(e => `
+    const rows = items.map((c, idx) => {
+      const ev = evById(c.evidenceId);
+      return `
+        <tr>
+          <td class="mono small">${idx+1}</td>
+          <td>
+            <div><b class="mono">${esc(c.bearingText)}</b></div>
+            <div class="small muted">${esc(c.label || "")} · ${esc(c.snippet || "")}</div>
+          </td>
+          <td class="mono">${Number(c.distance).toFixed(2)} ${esc(c.distanceUnit || "")}</td>
+          <td><input type="checkbox" data-act="toggleInclude" data-id="${esc(c.id)}" ${c.include ? "checked":""}/></td>
+          <td class="mono small">${Math.round((c.confidence||0)*100)}%</td>
+          <td class="small muted">${esc(ev?.title || "")}</td>
+          <td style="text-align:right;">
+            <button class="btn" data-act="moveCallUp" data-id="${esc(c.id)}">↑</button>
+            <button class="btn" data-act="moveCallDown" data-id="${esc(c.id)}">↓</button>
+            <button class="btn" data-act="editCall" data-id="${esc(c.id)}">Edit</button>
+            <button class="btn danger" data-act="deleteCall" data-id="${esc(c.id)}">Delete</button>
+          </td>
+        </tr>`;
+    }).join("");
+
+    return `
+      <div class="pad">
+        <div class="grid2">
+          <div class="card">
+            <div class="hd">Extract Calls from Text</div>
+            <div class="bd">
+              <div class="small muted">Evidence source</div>
+              <select id="extractEvidenceId">${evidenceOpts}</select>
+              <div style="margin-top:10px;" class="small muted">Paste deed/ROS call text (bearing + distance per line)</div>
+              <textarea id="extractText" rows="10" placeholder="Example:
+S 89°58'00&quot; W 315.27
+N 00°00'27&quot; W 267.69
+..."></textarea>
+
+              <div class="row" style="margin-top:10px;justify-content:space-between;">
+                <div class="row">
+                  <div class="small muted">Unit</div>
+                  <select id="extractUnit"><option value="ft">ft</option><option value="m">m</option></select>
+                  <div class="small muted">Include by default</div>
+                  <input id="extractInclude" type="checkbox" checked/>
+                  <div class="small muted">Confidence</div>
+                  <input id="extractConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:90px"/>
+                </div>
+                <button class="btn primary" id="runExtractBtn">Extract</button>
+              </div>
+
+              ${warnings ? `<div style="margin-top:10px;">${warnings}</div>` : ``}
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="bd">
+              <div class="hd" style="padding:0;margin-bottom:8px;">Manual Call</div>
+              <div class="grid2">
+                <div>
+                  <div class="small muted">Bearing text</div>
+                  <input id="manualBearing" type="text" placeholder='N 45°01&apos;07&quot; E'/>
+                </div>
+                <div>
+                  <div class="small muted">Distance</div>
+                  <input id="manualDist" type="number" step="0.01" placeholder="0.00"/>
+                </div>
+              </div>
+              <div class="row" style="margin-top:10px;justify-content:space-between;">
+                <div class="row">
+                  <div class="small muted">Evidence</div>
+                  <select id="manualEvidenceId">${evidenceOpts}</select>
+                  <div class="small muted">Unit</div>
+                  <select id="manualUnit"><option value="ft">ft</option><option value="m">m</option></select>
+                </div>
+                <button class="btn" id="addManualBtn">Add Call</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="hd">Calls <span class="pill">${items.length} total</span></div>
+            <div class="bd">
+              ${items.length ? `
+                <table class="tbl">
+                  <thead><tr>
+                    <th style="width:60px;">#</th>
+                    <th>Call</th>
+                    <th style="width:150px;">Distance</th>
+                    <th style="width:80px;">Use</th>
+                    <th style="width:90px;">Conf</th>
+                    <th>Evidence</th>
+                    <th style="width:260px;text-align:right;">Actions</th>
+                  </tr></thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              ` : `<div class="muted">No calls yet. Paste text and Extract.</div>`}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function chosenCandidate(corner){
+    return (corner.candidates || []).find(c => c.chosen) || null;
+  }
+
+  function viewMatrix(){
+    const corners = state.corners || [];
+    const rows = corners.map(c => {
+      const chosen = chosenCandidate(c);
+      return `
+        <tr>
+          <td><b>${esc(c.name)}</b><div class="small muted">${esc(c.plss||"")}</div></td>
+          <td class="mono small">${esc(c.status)}</td>
+          <td>${chosen ? esc(chosen.summary) : `<span class="muted">—</span>`}</td>
+          <td class="mono">${chosen ? esc(chosen.weight) : ""}</td>
+          <td style="text-align:right;">
+            <button class="btn" data-act="openCorner" data-id="${esc(c.id)}">Open</button>
+            <button class="btn danger" data-act="deleteCorner" data-id="${esc(c.id)}">Delete</button>
+          </td>
+        </tr>`;
+    }).join("");
+
+    const decRows = (state.decisions || []).slice(0,20).map(d => `
       <tr>
-        <td class="nowrap">${escapeHtml(e.type || "")}</td>
-        <td><b>${escapeHtml(e.title || "")}</b><div class="small muted">${escapeHtml(e.source || "")}</div></td>
-        <td class="nowrap">${escapeHtml(e.date || "")}</td>
-        <td>${escapeHtml((e.tags||[]).join(", "))}</td>
+        <td class="small mono">${fmtDateTime(d.at)}</td>
+        <td class="small mono">${esc(d.action)}</td>
+        <td class="small">${esc(d.summary || "")}</td>
       </tr>
     `).join("");
 
-    const callList = ex.filter(x=>x.include).map((x, i) => {
-      const ev = findEvidenceById(x.evidenceId);
+    return `
+      <div class="pad">
+        <div class="grid2">
+          <div class="card">
+            <div class="hd">Corners</div>
+            <div class="bd">
+              <div class="grid2">
+                <div>
+                  <div class="small muted">Corner name</div>
+                  <input id="newCornerName" type="text" placeholder="e.g., NW COR (Parcel)"/>
+                </div>
+                <div>
+                  <div class="small muted">Status</div>
+                  <select id="newCornerStatus">
+                    ${["Existent","Obliterated","Lost","Unknown"].map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+              <div style="margin-top:10px;">
+                <div class="small muted">PLSS / description</div>
+                <input id="newCornerPlss" type="text" placeholder="Sec/T/R, corner tie, etc."/>
+              </div>
+              <div class="row" style="margin-top:10px;justify-content:flex-end;">
+                <button class="btn primary" id="addCornerBtn">Add Corner</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="bd">
+              ${corners.length ? `
+                <table class="tbl">
+                  <thead><tr>
+                    <th>Corner</th>
+                    <th style="width:130px;">Status</th>
+                    <th>Chosen candidate</th>
+                    <th style="width:70px;">W</th>
+                    <th style="width:180px;text-align:right;">Actions</th>
+                  </tr></thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              ` : `<div class="muted">No corners yet. Add one and start building candidates.</div>`}
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="hd">Decision Log <span class="pill">latest 20</span></div>
+            <div class="bd">
+              ${(state.decisions && state.decisions.length) ? `
+                <table class="tbl">
+                  <thead><tr><th style="width:180px;">Time</th><th style="width:180px;">Action</th><th>Summary</th></tr></thead>
+                  <tbody>${decRows}</tbody>
+                </table>
+              ` : `<div class="muted">No decisions yet.</div>`}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function viewTraverse(){
+    const tr = state.traverse || state.active.traverse || { start:{N:10000,E:10000}, basis:{label:"",rotationDeg:0}, calls:[], lastRun:null };
+    const results = state.traverseResults?.results || null;
+
+    const calls = tr.calls || [];
+    const callRows = calls.map((id, i) => {
+      const ex = exById(id);
       return `
         <tr>
-          <td class="mono nowrap">${i+1}</td>
-          <td class="mono">${escapeHtml(x.bearingText || "")}</td>
-          <td class="mono nowrap">${Number(x.distance||0).toFixed(2)} ft</td>
-          <td class="small">
-            <b>${escapeHtml(ev?.title || "—")}</b>
-            <div class="muted small">p.${escapeHtml(String(x.page ?? "—"))}</div>
+          <td class="mono small">${i+1}</td>
+          <td class="mono">${esc(ex?.bearingText || "(missing)")}</td>
+          <td class="mono">${ex ? `${Number(ex.distance).toFixed(2)} ${esc(ex.distanceUnit)}` : "—"}</td>
+          <td class="small muted">${esc(evById(ex?.evidenceId)?.title || "")}</td>
+          <td style="text-align:right;">
+            <button class="btn" data-act="moveTraverseUp" data-idx="${i}">↑</button>
+            <button class="btn" data-act="moveTraverseDown" data-idx="${i}">↓</button>
           </td>
-          <td class="small muted">${escapeHtml(x.snippet || "")}</td>
-        </tr>
-      `;
+        </tr>`;
     }).join("");
 
-    const cornerList = corners.map(c => {
-      const chosen = cornerChosenCandidate(c);
-      const needsJ = chosen && requiresJustification(c, chosen);
-      const maxW = maxCandidateWeight(c);
-
-      return `
-        <tr>
-          <td><b>${escapeHtml(c.name || "")}</b><div class="small muted">${escapeHtml(c.plss || "")}</div></td>
-          <td class="nowrap">${escapeHtml(c.status || "")}</td>
-          <td>
-            ${chosen ? `
-              <div><b>${escapeHtml(chosen.kind || "")}</b> <span class="pill ${needsJ ? "warn" : "good"}">${needsJ ? "Justified override" : "Selected"}</span></div>
-              <div class="small muted">Weight ${Number(chosen.weight||0)} / max ${maxW}</div>
-              <div class="small">${escapeHtml(chosen.summary || "")}</div>
-            ` : `<span class="pill bad">No selection</span>`}
-          </td>
-          <td class="small">${escapeHtml(chosen?.justification || "")}</td>
-        </tr>
-      `;
-    }).join("");
-
-    const travSummary = res ? `
-      <div class="kpi">
-        <div class="box"><div class="v mono">${res.totalDist.toFixed(2)}</div><div class="l">Total distance (ft)</div></div>
-        <div class="box"><div class="v mono">${res.closure.misclose.toFixed(3)}</div><div class="l">Misclosure (ft)</div></div>
-        <div class="box"><div class="v mono">${(isFinite(res.precision) ? ("1:" + Math.round(res.precision).toLocaleString()) : "∞")}</div><div class="l">Relative precision</div></div>
-      </div>
-      <div class="small muted" style="margin-top:10px;">
-        Basis: <b>${escapeHtml(p.traverse.basis?.label || "")}</b> • rotation ${Number(p.traverse.basis?.rotationDeg||0).toFixed(6)}°
-        • start N=${Number(p.traverse.start?.N||0).toFixed(3)} E=${Number(p.traverse.start?.E||0).toFixed(3)}
-      </div>
-    ` : `<div class="muted">Traverse not run yet.</div>`;
+    const pts = results?.points || [];
+    const ptRows = pts.map(p => `
+      <tr>
+        <td class="mono small">${esc(p.name)}</td>
+        <td class="mono">${Number(p.N).toFixed(3)}</td>
+        <td class="mono">${Number(p.E).toFixed(3)}</td>
+        <td class="small muted">${esc(p.note || "")}</td>
+      </tr>
+    `).join("");
 
     return `
-      <div class="card">
-        <div class="hd">
-          <h3>Printable Casefile Package (Concept)</h3>
-          <span class="pill">Use Print → Save as PDF</span>
-        </div>
-        <div class="bd">
-          <div class="grid2">
-            <div>
-              <div class="muted small">Project</div>
-              <div style="font-size:18px;font-weight:800;">${escapeHtml(p.meta.name || "")}</div>
-              <div class="small muted">Created: ${escapeHtml(new Date(p.meta.createdAt).toLocaleString())} • Updated: ${escapeHtml(new Date(p.meta.updatedAt).toLocaleString())}</div>
-              <div class="small muted">Jurisdiction: ${escapeHtml(p.meta.jurisdiction || "")}</div>
+      <div class="pad">
+        <div class="grid2">
+          <div class="card">
+            <div class="hd">Traverse Configuration</div>
+            <div class="bd">
+              <div class="grid2">
+                <div>
+                  <div class="small muted">Start Northing</div>
+                  <input id="trStartN" type="number" step="0.001" value="${esc(tr.start?.N ?? 10000)}"/>
+                </div>
+                <div>
+                  <div class="small muted">Start Easting</div>
+                  <input id="trStartE" type="number" step="0.001" value="${esc(tr.start?.E ?? 10000)}"/>
+                </div>
+              </div>
+              <div class="grid2" style="margin-top:10px;">
+                <div>
+                  <div class="small muted">Basis label</div>
+                  <input id="trBasisLabel" type="text" value="${esc(tr.basis?.label || "")}" placeholder="Assumed / Grid / True / Record..."/>
+                </div>
+                <div>
+                  <div class="small muted">Rotation (deg)</div>
+                  <input id="trRotation" type="number" step="0.0001" value="${esc(tr.basis?.rotationDeg ?? 0)}"/>
+                </div>
+              </div>
+              <div class="row" style="margin-top:10px;justify-content:space-between;">
+                <div class="row">
+                  <span class="pill">Calls configured: <b class="mono">${calls.length}</b></span>
+                  <span class="pill">Last run: <b class="mono">${state.traverseResults?.lastRun ? fmtDateTime(state.traverseResults.lastRun) : "—"}</b></span>
+                </div>
+                <button class="btn primary" id="saveTraverseBtn">Save Config</button>
+              </div>
+
+              <div class="hr"></div>
+
+              <div class="row" style="justify-content:space-between;">
+                <div class="row">
+                  <button class="btn" id="syncIncludedBtn">Sync from Included Calls</button>
+                  <button class="btn good" id="runTraverseBtn">Run Traverse</button>
+                </div>
+                <button class="btn" data-act="goto" data-tab="extract">Edit Calls</button>
+              </div>
             </div>
-            <div>
-              <div class="muted small">Notes</div>
-              <div class="small">${escapeHtml(p.meta.notes || "—")}</div>
+
+            <div class="hr"></div>
+
+            <div class="bd">
+              <div class="hd" style="padding:0;margin-bottom:8px;">Configured Calls (order matters)</div>
+              ${calls.length ? `
+                <table class="tbl">
+                  <thead><tr><th style="width:60px;">#</th><th>Bearing</th><th style="width:160px;">Distance</th><th>Evidence</th><th style="width:140px;text-align:right;">Order</th></tr></thead>
+                  <tbody>${callRows}</tbody>
+                </table>
+              ` : `<div class="muted">No traverse call list. Click “Sync from Included Calls”.</div>`}
             </div>
           </div>
 
-          <div class="hr"></div>
-
-          <h3 style="margin:0 0 8px;">1) Evidence Register</h3>
-          <table class="table">
-            <thead><tr><th>Type</th><th>Title / Source</th><th>Date</th><th>Tags</th></tr></thead>
-            <tbody>${evList || `<tr><td colspan="4" class="muted">No evidence.</td></tr>`}</tbody>
-          </table>
-
-          <div class="hr"></div>
-
-          <h3 style="margin:0 0 8px;">2) Extracted Calls (with Traceability)</h3>
-          <table class="table">
-            <thead><tr><th>#</th><th>Bearing</th><th>Distance</th><th>Source</th><th>Snippet</th></tr></thead>
-            <tbody>${callList || `<tr><td colspan="5" class="muted">No included calls.</td></tr>`}</tbody>
-          </table>
-
-          <div class="hr"></div>
-
-          <h3 style="margin:0 0 8px;">3) Evidence Matrix — Corner Selections & Justifications</h3>
-          <table class="table">
-            <thead><tr><th>Corner</th><th>Status</th><th>Chosen Candidate</th><th>Justification</th></tr></thead>
-            <tbody>${cornerList || `<tr><td colspan="4" class="muted">No corners.</td></tr>`}</tbody>
-          </table>
-
-          <div class="hr"></div>
-
-          <h3 style="margin:0 0 8px;">4) Computations Summary (Traverse)</h3>
-          ${travSummary}
-
-          <div class="hr"></div>
-
-          <div class="small muted">
-            <b>Important:</b> This is a concept prototype. It is not a substitute for professional judgment, standards, record research,
-            monument recovery/restoration rules, or state filing compliance. It demonstrates the workflow structure that prevents rework
-            and preserves defensibility.
+          <div class="card">
+            <div class="hd">Results</div>
+            <div class="bd">
+              ${results ? `
+                <div class="row">
+                  <span class="pill">Closure: <b class="mono">${results.closure?.distance?.toFixed?.(3) ?? "—"}</b> ${esc(results.closure?.unit || "")}</span>
+                  <span class="pill">Precision: <b class="mono">${esc(results.closure?.precisionText || "—")}</b></span>
+                  <span class="pill">Total dist: <b class="mono">${results.totalDistance?.toFixed?.(2) ?? "—"}</b> ${esc(results.distanceUnit || "")}</span>
+                </div>
+                <div class="hr"></div>
+                <table class="tbl">
+                  <thead><tr><th style="width:120px;">Point</th><th style="width:160px;">Northing</th><th style="width:160px;">Easting</th><th>Note</th></tr></thead>
+                  <tbody>${ptRows}</tbody>
+                </table>
+              ` : `<div class="muted">No results. Click “Run Traverse”.</div>`}
+            </div>
           </div>
         </div>
-      </div>
-    `;
+      </div>`;
   }
 
-  /**********************
-   * Rendering router
-   **********************/
-  function render(){
-    if(!activeProject){
-      const id = getActiveId();
-      setActiveProject(id || (projects[0]?.id));
-      return;
+  function viewOutputs(){
+    const pkg = state.printable;
+    if (!pkg){
+      return `<div class="pad"><div class="card"><div class="bd">Loading outputs...</div></div></div>`;
     }
 
-    let html = "";
-    if(activeTab === "dashboard") html = viewDashboard();
-    if(activeTab === "evidence") html = viewEvidence();
-    if(activeTab === "extract") html = viewExtract();
-    if(activeTab === "matrix") html = viewMatrix();
-    if(activeTab === "traverse") html = viewTraverse();
-    if(activeTab === "outputs") html = viewOutputs();
+    const evRows = (pkg.evidenceRegister || []).map(ev => `
+      <tr>
+        <td class="mono small">${esc(ev.type)}</td>
+        <td><b>${esc(ev.title)}</b><div class="small muted">${esc(ev.source||"")} ${ev.date?("· "+esc(ev.date)):""}</div></td>
+        <td class="small muted">${(ev.tags||[]).join(", ")}</td>
+      </tr>
+    `).join("");
 
-    main.innerHTML = html;
+    const callRows = (pkg.includedCalls || []).map((c,i) => `
+      <tr>
+        <td class="mono small">${i+1}</td>
+        <td class="mono">${esc(c.bearingText)}</td>
+        <td class="mono">${Number(c.distance).toFixed(2)} ${esc(c.distanceUnit)}</td>
+        <td class="small muted">${esc(evById(c.evidenceId)?.title || "")}</td>
+      </tr>
+    `).join("");
 
-    wireTabEvents();
+    const cornerRows = (pkg.cornerSelections || []).map(s => {
+      const chosen = s.chosenCandidate;
+      return `
+        <tr>
+          <td><b>${esc(s.corner.name)}</b><div class="small muted">${esc(s.corner.plss || "")}</div></td>
+          <td class="mono small">${esc(s.corner.status)}</td>
+          <td>${chosen ? esc(chosen.summary) : `<span class="muted">—</span>`}</td>
+          <td class="mono">${chosen ? esc(chosen.weight) : ""}</td>
+          <td class="small muted">${chosen ? esc(chosen.justification || "") : ""}</td>
+        </tr>`;
+    }).join("");
+
+    const tr = pkg.traverse?.results || null;
+
+    return `
+      <div class="pad">
+        <div class="card">
+          <div class="hd">Printable Package</div>
+          <div class="bd">
+            <div class="row">
+              <span class="pill">Generated: <b class="mono">${fmtDateTime(pkg.generatedAt)}</b></span>
+              <span class="pill">Casefile: <b class="mono">${esc(pkg.casefile?.meta?.name || "")}</b></span>
+              <button class="btn" id="refreshOutputsBtn">Refresh</button>
+              <button class="btn good" id="printNowBtn">Print</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:12px;">
+          <div class="card">
+            <div class="hd">Evidence Register</div>
+            <div class="bd">
+              <table class="tbl">
+                <thead><tr><th style="width:120px;">Type</th><th>Evidence</th><th style="width:220px;">Tags</th></tr></thead>
+                <tbody>${evRows}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="hd">Included Calls</div>
+            <div class="bd">
+              <table class="tbl">
+                <thead><tr><th style="width:60px;">#</th><th>Bearing</th><th style="width:160px;">Distance</th><th>Evidence</th></tr></thead>
+                <tbody>${callRows}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <div class="hd">Corner Selections</div>
+          <div class="bd">
+            <table class="tbl">
+              <thead><tr><th>Corner</th><th style="width:130px;">Status</th><th>Chosen</th><th style="width:60px;">W</th><th>Justification</th></tr></thead>
+              <tbody>${cornerRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <div class="hd">Traverse Summary</div>
+          <div class="bd">
+            ${tr ? `
+              <div class="row">
+                <span class="pill">Closure: <b class="mono">${tr.closure?.distance?.toFixed?.(3) ?? "—"}</b> ${esc(tr.closure?.unit||"")}</span>
+                <span class="pill">Precision: <b class="mono">${esc(tr.closure?.precisionText||"—")}</b></span>
+                <span class="pill">Calls: <b class="mono">${(tr.segments||[]).length}</b></span>
+              </div>
+            ` : `<div class="muted">No traverse results included in package.</div>`}
+          </div>
+        </div>
+      </div>`;
   }
 
-  /**********************
-   * Wire events per tab
-   **********************/
-  function wireTabEvents(){
-    const p = activeProject;
+  async function render(){
+    const seq = ++state.renderSeq;
+    elMain.innerHTML = `<div class="pad"><div class="card"><div class="bd muted">Loading…</div></div></div>`;
 
-    // Dashboard events
-    if(activeTab === "dashboard"){
-      $("#projName")?.addEventListener("input", (e)=>{ p.meta.name = e.target.value; refreshProjectSelect(); commit("Updated project name"); });
-      $("#projJur")?.addEventListener("input", (e)=>{ p.meta.jurisdiction = e.target.value; commit("Updated jurisdiction"); });
-      $("#projNotes")?.addEventListener("input", (e)=>{ p.meta.notes = e.target.value; commit("Updated notes"); });
-
-      $("#startN")?.addEventListener("change", (e)=>{ p.traverse.start.N = Number(e.target.value); commit("Updated traverse start"); });
-      $("#startE")?.addEventListener("change", (e)=>{ p.traverse.start.E = Number(e.target.value); commit("Updated traverse start"); });
-      $("#rotDeg")?.addEventListener("change", (e)=>{ p.traverse.basis.rotationDeg = Number(e.target.value); commit("Updated rotation"); });
-
-      $("#runTraverseBtn")?.addEventListener("click", ()=>{
-        // Sync calls
-        p.traverse.calls = p.extractions.filter(x=>x.include).map(x=>x.id);
-        p.traverse.results = computeTraverseFromExtractions(p);
-        p.traverse.lastRun = nowISO();
-        commit("Traverse computed");
-        render();
-      });
-
-      $("#gotoTraverse")?.addEventListener("click", ()=> setTab("traverse"));
-      $("#gotoExtract")?.addEventListener("click", ()=> setTab("extract"));
-      $("#gotoMatrix")?.addEventListener("click", ()=> setTab("matrix"));
-    }
-
-    // Evidence tab
-    if(activeTab === "evidence"){
-      $("#goExtractBtn")?.addEventListener("click", ()=> setTab("extract"));
-
-      $("#saveEvBtn")?.addEventListener("click", ()=>{
-        const e = {
-          id: uid(),
-          type: $("#evType").value,
-          title: ($("#evTitle").value || "").trim(),
-          date: ($("#evDate").value || "").trim(),
-          source: ($("#evSource").value || "").trim(),
-          tags: ($("#evTags").value || "").split(",").map(s=>s.trim()).filter(Boolean),
-          notes: ($("#evNotes").value || "").trim(),
-          attachment: null
-        };
-        if(!e.title) e.title = e.type + " (untitled)";
-        p.evidence.unshift(e);
-        commit("Added evidence");
-        render();
-      });
-
-      $("#addEvidenceBtn")?.addEventListener("click", ()=>{
-        const title = prompt("Evidence title:", "Evidence Item");
-        if(title === null) return;
-        const type = prompt("Type (Deed/Plat/ROS/Photo/etc):", "Other") || "Other";
-        p.evidence.unshift({
-          id: uid(),
-          type: type.trim() || "Other",
-          title: title.trim() || "Evidence Item",
-          date: "",
-          source: "",
-          tags: [],
-          notes: "",
-          attachment: null
-        });
-        commit("Added evidence (metadata only)");
-        render();
-      });
-
-      // drag/drop + file picker
-      const dz = $("#dropzone");
-      const pick = $("#filePick");
-      if(dz){
-        ["dragenter","dragover"].forEach(evt => dz.addEventListener(evt, (e)=>{
-          e.preventDefault(); e.stopPropagation();
-          dz.classList.add("drag");
-        }));
-        ["dragleave","drop"].forEach(evt => dz.addEventListener(evt, (e)=>{
-          e.preventDefault(); e.stopPropagation();
-          dz.classList.remove("drag");
-        }));
-        dz.addEventListener("drop", async (e)=>{
-          const file = e.dataTransfer.files?.[0];
-          if(file) await ingestFileAsEvidence(file);
-        });
+    try{
+      if (!state.activeId){
+        const saved = localStorage.getItem(ACTIVE_KEY);
+        if (saved) state.activeId = saved;
       }
-      pick?.addEventListener("change", async (e)=>{
-        const file = e.target.files?.[0];
-        e.target.value = "";
-        if(file) await ingestFileAsEvidence(file);
-      });
 
-      main.addEventListener("click", (e)=>{
-        const btn = e.target.closest("button");
-        if(!btn) return;
-        const act = btn.dataset.act;
-        const id = btn.dataset.id;
-        if(act === "delEvidence"){
-          const ok = confirm("Delete evidence item?");
-          if(!ok) return;
-          p.evidence = p.evidence.filter(x => x.id !== id);
-          // cascade: extractions referencing it remain but show missing evidence
-          commit("Deleted evidence");
-          render();
-        }
-        if(act === "editEvidence"){
-          const ev = p.evidence.find(x=>x.id===id);
-          if(!ev) return;
-          const title = prompt("Title:", ev.title || "") ?? ev.title;
-          if(title === null) return;
-          ev.title = title.trim();
-          ev.type = (prompt("Type:", ev.type || "") ?? ev.type).trim();
-          ev.date = (prompt("Date (YYYY-MM-DD):", ev.date || "") ?? ev.date).trim();
-          ev.source = (prompt("Source:", ev.source || "") ?? ev.source).trim();
-          ev.tags = (prompt("Tags (comma separated):", (ev.tags||[]).join(", ")) ?? (ev.tags||[]).join(", ")).split(",").map(s=>s.trim()).filter(Boolean);
-          ev.notes = (prompt("Notes:", ev.notes || "") ?? ev.notes);
-          commit("Updated evidence");
-          render();
-        }
-      }, {once:true}); // avoid piling multiple listeners per render
+      await ensureTabData(state.tab);
+      if (seq !== state.renderSeq) return;
+
+      if (state.tab === "dashboard") elMain.innerHTML = viewDashboard();
+      else if (state.tab === "evidence") elMain.innerHTML = viewEvidence();
+      else if (state.tab === "extract") elMain.innerHTML = viewExtract();
+      else if (state.tab === "matrix") elMain.innerHTML = viewMatrix();
+      else if (state.tab === "traverse") elMain.innerHTML = viewTraverse();
+      else if (state.tab === "outputs") elMain.innerHTML = viewOutputs();
+
+      wirePerRenderHandlers();
+    }catch(err){
+      elMain.innerHTML = `<div class="pad"><div class="card"><div class="bd">
+        <div class="pill bad">Error</div>
+        <div style="margin-top:10px;"><b>${esc(err.message || err)}</b></div>
+        <div class="small muted" style="margin-top:10px;">Check API Base + server status.</div>
+      </div></div></div>`;
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  /* ---------------------- Per-render handlers ---------------------- */
+  const debounceMap = new Map();
+  function debounce(key, ms, fn){
+    clearTimeout(debounceMap.get(key));
+    debounceMap.set(key, setTimeout(fn, ms));
+  }
+
+  function wirePerRenderHandlers(){
+    // Dashboard meta autosave
+    if (state.tab === "dashboard"){
+      const name = $("#projName");
+      const jur  = $("#projJur");
+      const notes = $("#projNotes");
+      if (name) name.addEventListener("input", () => debounce("meta", 350, saveMetaFromDashboard));
+      if (jur)  jur.addEventListener("input",  () => debounce("meta", 350, saveMetaFromDashboard));
+      if (notes) notes.addEventListener("input",() => debounce("meta", 450, saveMetaFromDashboard));
+    }
+
+    // Evidence add
+    if (state.tab === "evidence"){
+      const btn = $("#saveEvBtn");
+      if (btn) btn.addEventListener("click", saveEvidenceFromForm);
     }
 
     // Extract tab
-    if(activeTab === "extract"){
-      $("#runExtractBtn")?.addEventListener("click", ()=>{
-        const evidenceId = $("#exEvidence").value;
-        if(!evidenceId){
-          alert("Add evidence first, then select it here.");
-          return;
-        }
-        const page = Number($("#exPage").value || 1);
-        const text = $("#exText").value || "";
-        const found = parseCallsFromText(text);
-        if(found.length === 0){
-          alert("No calls found. Check bearing format: N 45°01'07\" E 123.45");
-          return;
-        }
-        found.forEach((f, idx) => {
-          p.extractions.push({
-            id: uid(),
-            createdAt: nowISO(),
-            evidenceId,
-            page,
-            snippet: f.snippet,
-            label: `Call ${p.extractions.length + 1}`,
-            bearingText: f.bearingText,
-            distance: f.distance,
-            distanceUnit: f.distanceUnit,
-            include: true,
-            confidence: f.confidence
-          });
-        });
-        commit(`Extracted ${found.length} calls`);
-        render();
-      });
-
-      $("#addManualBtn")?.addEventListener("click", ()=>{
-        const evidenceId = $("#exEvidence").value;
-        if(!evidenceId){
-          alert("Select an evidence item first.");
-          return;
-        }
-        const bearing = prompt("Bearing (e.g., N 45°01'07\" E):", "N 00°00'00\" E");
-        if(bearing === null) return;
-        const dist = prompt("Distance (ft):", "100.00");
-        if(dist === null) return;
-        const pb = parseBearingText(bearing);
-        if(!pb){
-          alert("Bearing parse failed. Use quadrant format like: N 45°01'07\" E");
-          return;
-        }
-        p.extractions.push({
-          id: uid(),
-          createdAt: nowISO(),
-          evidenceId,
-          page: Number($("#exPage").value || 1),
-          snippet: "(manual entry)",
-          label: `Call ${p.extractions.length + 1}`,
-          bearingText: normalizeBearingDisplay(bearing),
-          distance: Number(dist),
-          distanceUnit: "ft",
-          include: true,
-          confidence: 0.9
-        });
-        commit("Added manual call");
-        render();
-      });
-
-      $("#pushToTraverseBtn")?.addEventListener("click", ()=>{
-        p.traverse.calls = p.extractions.filter(x=>x.include).map(x=>x.id);
-        commit("Synced included calls to traverse");
-        showToast("Traverse updated", "Included calls are now used by the traverse workspace.");
-      });
-
-      main.addEventListener("change", (e)=>{
-        const cb = e.target.closest("input[type='checkbox'][data-act='toggleInclude']");
-        if(!cb) return;
-        const id = cb.dataset.id;
-        const ex = p.extractions.find(x=>x.id===id);
-        if(!ex) return;
-        ex.include = cb.checked;
-        commit("Updated call inclusion");
-      });
-
-      main.addEventListener("click", (e)=>{
-        const btn = e.target.closest("button");
-        if(!btn) return;
-        const act = btn.dataset.act;
-        const id = btn.dataset.id;
-        if(act === "delExtraction"){
-          const ok = confirm("Delete extracted call?");
-          if(!ok) return;
-          p.extractions = p.extractions.filter(x=>x.id!==id);
-          p.traverse.calls = p.traverse.calls.filter(x=>x!==id);
-          commit("Deleted extracted call");
-          render();
-        }
-        if(act === "editExtraction"){
-          const ex = p.extractions.find(x=>x.id===id);
-          if(!ex) return;
-          const label = prompt("Label:", ex.label || "") ?? ex.label;
-          if(label === null) return;
-          const bearing = prompt("Bearing:", ex.bearingText || "") ?? ex.bearingText;
-          if(bearing === null) return;
-          const dist = prompt("Distance (ft):", String(ex.distance||0)) ?? String(ex.distance||0);
-          if(dist === null) return;
-          const page = prompt("Page:", String(ex.page ?? "")) ?? String(ex.page ?? "");
-          if(page === null) return;
-          const conf = prompt("Confidence (0-1):", String(ex.confidence ?? 0.75)) ?? String(ex.confidence ?? 0.75);
-
-          const pb = parseBearingText(bearing);
-          if(!pb){
-            alert("Bearing parse failed. Keep quadrant format like: N 45°01'07\" E");
-            return;
-          }
-          ex.label = (label||"").trim();
-          ex.bearingText = normalizeBearingDisplay(bearing);
-          ex.distance = Number(dist);
-          ex.page = Number(page);
-          ex.confidence = Math.max(0, Math.min(1, Number(conf)));
-          commit("Edited extracted call");
-          render();
-        }
-      }, {once:true});
+    if (state.tab === "extract"){
+      const btn = $("#runExtractBtn");
+      if (btn) btn.addEventListener("click", runExtractionFromText);
+      const add = $("#addManualBtn");
+      if (add) add.addEventListener("click", addManualCall);
     }
 
     // Matrix tab
-    if(activeTab === "matrix"){
-      $("#addCornerBtn")?.addEventListener("click", ()=>{
-        const name = prompt("Corner name:", "NW COR (Parcel)");
-        if(name === null) return;
-        p.corners.unshift({
-          id: uid(),
-          name: name.trim() || "Corner",
-          plss: "",
-          status: "Unknown",
-          candidates: [],
-          decisions: []
-        });
-        commit("Added corner");
-        render();
-      });
-
-      $("#bulkFromTraverseBtn")?.addEventListener("click", ()=>{
-        const ok = confirm("Add 4 corners (NW/NE/SE/SW) as placeholders?");
-        if(!ok) return;
-        const names = ["NW COR (Parcel)","NE COR (Parcel)","SE COR (Parcel)","SW COR (Parcel)"];
-        names.forEach(n => p.corners.unshift({ id: uid(), name:n, plss:"", status:"Unknown", candidates:[], decisions:[] }));
-        commit("Added 4 placeholder corners");
-        render();
-      });
-
-      main.addEventListener("click", (e)=>{
-        const btn = e.target.closest("button");
-        if(!btn) return;
-        const act = btn.dataset.act;
-
-        if(act === "openCorner"){
-          const id = btn.dataset.id;
-          $("#cornerModalHost").innerHTML = renderCornerModal(id);
-          // wire modal handlers by reusing wire function
-          wireCornerModalHandlers();
-        }
-        if(act === "closeCorner"){
-          $("#cornerModalHost").innerHTML = "";
-        }
-        if(act === "delCorner"){
-          const id = btn.dataset.id;
-          const ok = confirm("Delete corner?");
-          if(!ok) return;
-          p.corners = p.corners.filter(x=>x.id!==id);
-          commit("Deleted corner");
-          render();
-        }
-      }, {once:true});
+    if (state.tab === "matrix"){
+      const add = $("#addCornerBtn");
+      if (add) add.addEventListener("click", addCornerFromForm);
     }
 
     // Traverse tab
-    if(activeTab === "traverse"){
-      $("#travStartN")?.addEventListener("change",(e)=>{ p.traverse.start.N = Number(e.target.value); commit("Updated traverse start"); });
-      $("#travStartE")?.addEventListener("change",(e)=>{ p.traverse.start.E = Number(e.target.value); commit("Updated traverse start"); });
-      $("#basisLabel")?.addEventListener("input",(e)=>{ p.traverse.basis.label = e.target.value; commit("Updated basis label"); });
-      $("#basisRot")?.addEventListener("change",(e)=>{ p.traverse.basis.rotationDeg = Number(e.target.value); commit("Updated rotation"); });
+    if (state.tab === "traverse"){
+      const save = $("#saveTraverseBtn");
+      if (save) save.addEventListener("click", saveTraverseConfig);
+      const sync = $("#syncIncludedBtn");
+      if (sync) sync.addEventListener("click", syncIncludedCalls);
+      const run = $("#runTraverseBtn");
+      if (run) run.addEventListener("click", runTraverse);
+    }
 
-      $("#syncTraverseCallsBtn")?.addEventListener("click", ()=>{
-        p.traverse.calls = p.extractions.filter(x=>x.include).map(x=>x.id);
-        commit("Synced included calls");
-        render();
-      });
-
-      $("#runTraverseBtn2")?.addEventListener("click", ()=>{
-        // Ensure call list has all extractions in their current order
-        if(!Array.isArray(p.traverse.calls) || p.traverse.calls.length === 0){
-          p.traverse.calls = p.extractions.map(x=>x.id);
-        }
-        p.traverse.results = computeTraverseFromExtractions(p);
-        p.traverse.lastRun = nowISO();
-        commit("Traverse computed");
-        render();
-      });
-
-      $("#pushTraverseToOutputsBtn")?.addEventListener("click", ()=>{
-        commit("Outputs refreshed");
-        showToast("Outputs ready", "Open Outputs tab and Print → Save as PDF.");
-      });
-
-      main.addEventListener("change", (e)=>{
-        const cb = e.target.closest("input[type='checkbox'][data-act='toggleInclude']");
-        if(!cb) return;
-        const id = cb.dataset.id;
-        const ex = p.extractions.find(x=>x.id===id);
-        if(!ex) return;
-        ex.include = cb.checked;
-        commit("Updated call inclusion");
-      });
-
-      main.addEventListener("click", (e)=>{
-        const btn = e.target.closest("button");
-        if(!btn) return;
-        const act = btn.dataset.act;
-        const id = btn.dataset.id;
-
-        if(act === "moveCallUp" || act === "moveCallDown"){
-          const idx = p.extractions.findIndex(x=>x.id===id);
-          if(idx < 0) return;
-          const swapWith = act === "moveCallUp" ? idx-1 : idx+1;
-          if(swapWith < 0 || swapWith >= p.extractions.length) return;
-          const tmp = p.extractions[idx];
-          p.extractions[idx] = p.extractions[swapWith];
-          p.extractions[swapWith] = tmp;
-          // keep traverse.calls aligned with extraction order for demo
-          p.traverse.calls = p.extractions.map(x=>x.id);
-          commit("Reordered calls");
-          render();
-        }
-      }, {once:true});
+    // Outputs tab
+    if (state.tab === "outputs"){
+      const r = $("#refreshOutputsBtn");
+      if (r) r.addEventListener("click", async () => { await ensurePrintable(true); render(); });
+      const p = $("#printNowBtn");
+      if (p) p.addEventListener("click", () => setTimeout(()=>window.print(), 50));
     }
   }
 
-  function wireCornerModalHandlers(){
-    const host = $("#cornerModalHost");
-    if(!host) return;
-
-    const p = activeProject;
-
-    // save simple fields on change
-    $("#cornerName")?.addEventListener("input",(e)=>{
-      const c = currentCorner();
-      if(!c) return;
-      c.name = e.target.value;
-      commit("Updated corner name");
-    });
-    $("#cornerStatus")?.addEventListener("change",(e)=>{
-      const c = currentCorner();
-      if(!c) return;
-      c.status = e.target.value;
-      commit("Updated corner status");
-    });
-    $("#cornerPlss")?.addEventListener("input",(e)=>{
-      const c = currentCorner();
-      if(!c) return;
-      c.plss = e.target.value;
-      commit("Updated corner reference");
-    });
-
-    host.addEventListener("click", (e)=>{
-      const btn = e.target.closest("button");
-      if(!btn) return;
-      const act = btn.dataset.act;
-
-      if(act === "closeCorner"){
-        $("#cornerModalHost").innerHTML = "";
-        return;
-      }
-
-      const cornerId = btn.dataset.corner || $("#cornerModalHost .card .pill.mono")?.textContent; // fallback not needed
-      const c = currentCorner();
-      if(!c) return;
-
-      if(act === "addCandidate"){
-        if(p.evidence.length === 0){
-          alert("Add evidence first so candidates can cite something.");
-          return;
-        }
-        const kind = prompt("Candidate kind (Monument/Record Call/Occupation/Computed/Other):", "Monument");
-        if(kind === null) return;
-        const evTitle = p.evidence.map((ev, idx) => `${idx+1}) ${ev.type} — ${ev.title}`).join("\n");
-        const idxStr = prompt("Select evidence # for this candidate:\n" + evTitle, "1");
-        if(idxStr === null) return;
-        const idx = Number(idxStr) - 1;
-        const ev = p.evidence[idx];
-        if(!ev){ alert("Invalid evidence selection."); return; }
-
-        const summary = prompt("Candidate summary (monument/occupation/record description):", "Found monument ...");
-        if(summary === null) return;
-        const weight = prompt("Weight (1-5):", "3");
-        if(weight === null) return;
-
-        c.candidates.push({
-          id: uid(),
-          kind: (kind||"Other").trim() || "Other",
-          refEvidenceId: ev.id,
-          summary: (summary||"").trim(),
-          weight: Math.max(1, Math.min(5, Number(weight)||3)),
-          chosen: false,
-          justification: ""
-        });
-        commit("Added candidate");
-        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
-        wireCornerModalHandlers();
-        return;
-      }
-
-      if(act === "delCandidate"){
-        const candId = btn.dataset.cand;
-        const ok = confirm("Delete candidate?");
-        if(!ok) return;
-        c.candidates = c.candidates.filter(x=>x.id!==candId);
-        commit("Deleted candidate");
-        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
-        wireCornerModalHandlers();
-        return;
-      }
-
-      if(act === "editCandidate"){
-        const candId = btn.dataset.cand;
-        const cand = (c.candidates||[]).find(x=>x.id===candId);
-        if(!cand) return;
-
-        const kind = prompt("Kind:", cand.kind || "") ?? cand.kind;
-        if(kind === null) return;
-        const summary = prompt("Summary:", cand.summary || "") ?? cand.summary;
-        if(summary === null) return;
-        const weight = prompt("Weight (1-5):", String(cand.weight||3)) ?? String(cand.weight||3);
-        if(weight === null) return;
-
-        cand.kind = (kind||"").trim();
-        cand.summary = (summary||"").trim();
-        cand.weight = Math.max(1, Math.min(5, Number(weight)||3));
-
-        commit("Edited candidate");
-        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
-        wireCornerModalHandlers();
-        return;
-      }
-
-      if(act === "chooseCandidate"){
-        const candId = btn.dataset.cand;
-        const cand = (c.candidates||[]).find(x=>x.id===candId);
-        if(!cand) return;
-
-        // toggle
-        if(cand.chosen){
-          cand.chosen = false;
-          cand.justification = "";
-          addDecisionLog({
-            at: nowISO(),
-            cornerId: c.id,
-            cornerName: c.name,
-            action: "Un-chose candidate",
-            detail: `${cand.kind}: ${cand.summary}`
-          });
-          commit("Updated selection");
-          $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
-          wireCornerModalHandlers();
-          render(); // update global matrix list pills
-          return;
-        }
-
-        // choose this one; unchoose others
-        (c.candidates||[]).forEach(x => x.chosen = (x.id === candId));
-        addDecisionLog({
-          at: nowISO(),
-          cornerId: c.id,
-          cornerName: c.name,
-          action: "Chose candidate",
-          detail: `${cand.kind}: ${cand.summary} (weight ${cand.weight})`
-        });
-        commit("Candidate chosen");
-        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
-        wireCornerModalHandlers();
-        render();
-        return;
-      }
-
-      if(act === "saveCornerDecision"){
-        const chosen = cornerChosenCandidate(c);
-        if(!chosen){
-          alert("Choose a candidate first.");
-          return;
-        }
-        const note = ($("#cornerDecisionNote")?.value || "").trim();
-        chosen.justification = note;
-
-        const needJ = requiresJustification(c, chosen);
-        if(needJ && !note){
-          alert("Justification is required for this selection (override rule triggered).");
-          return;
-        }
-
-        addDecisionLog({
-          at: nowISO(),
-          cornerId: c.id,
-          cornerName: c.name,
-          action: "Saved corner justification",
-          detail: note ? note.slice(0, 160) + (note.length>160 ? "…" : "") : "(none)"
-        });
-
-        commit("Saved corner decision");
-        $("#cornerModalHost").innerHTML = renderCornerModal(c.id);
-        wireCornerModalHandlers();
-        render();
-        return;
-      }
-    });
-
-    function currentCorner(){
-      // infer the only open modal corner by reading the rendered content:
-      // we keep it simple: grab the corner name field and match against corners list.
-      const name = $("#cornerName")?.value;
-      // better: store active corner id in dataset
-      // We'll store it on host:
-      let cornerId = host.dataset.cornerId;
-      if(!cornerId){
-        // derive from close button's data?
-        const anyChooseBtn = host.querySelector("button[data-act='chooseCandidate']");
-        cornerId = anyChooseBtn?.dataset.corner;
-      }
-      if(!cornerId) return null;
-      host.dataset.cornerId = cornerId;
-      return p.corners.find(x=>x.id===cornerId) || null;
+  /* --------------------------- Actions ----------------------------- */
+  async function saveMetaFromDashboard(){
+    if (!state.activeId) return;
+    const meta = {
+      name: $("#projName")?.value?.trim() || (state.active?.meta?.name || "Untitled"),
+      jurisdiction: $("#projJur")?.value ?? "",
+      notes: $("#projNotes")?.value ?? ""
+    };
+    try{
+      await api.patchCasefile(state.activeId, meta);
+      await refreshCasefiles();
+      await refreshActiveCasefile();
+      toast("Saved", "Casefile meta updated.", "good");
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
     }
   }
 
-  async function ingestFileAsEvidence(file){
-    const p = activeProject;
-    const typeGuess = guessEvidenceType(file);
-    const title = file.name || (typeGuess + " file");
+  function parseTags(str){
+    return (str || "").split(",").map(s=>s.trim()).filter(Boolean).slice(0, 30);
+  }
 
-    let attachment = null;
-    if(file.size <= MAX_ATTACHMENT_BYTES){
-      const dataUrl = await readFileAsDataURL(file);
-      attachment = { name:file.name, mime:file.type || "application/octet-stream", size:file.size, dataUrl };
-    }else{
-      attachment = { name:file.name, mime:file.type || "application/octet-stream", size:file.size, dataUrl:null, tooLarge:true };
+  async function saveEvidenceFromForm(){
+    if (!state.activeId) return;
+    const type = $("#evType")?.value || "Other";
+    const title = ($("#evTitle")?.value || "").trim();
+    if (!title){
+      toast("Missing", "Evidence title is required.", "warn");
+      return;
     }
+    const date = ($("#evDate")?.value || "").trim() || null;
+    const source = ($("#evSource")?.value || "").trim();
+    const tags = parseTags($("#evTags")?.value || "");
+    const notes = ($("#evNotes")?.value || "").trim();
+    const file = $("#evFile")?.files?.[0] || null;
 
-    p.evidence.unshift({
-      id: uid(),
-      type: typeGuess,
-      title,
-      date: "",
-      source: "",
-      tags: [],
-      notes: file.size <= MAX_ATTACHMENT_BYTES
-        ? `Attachment stored in casefile (demo).`
-        : `File too large for demo localStorage attachment; stored metadata only.`,
-      attachment
+    try{
+      const ev = await api.createEvidence(state.activeId, { type, title, date, source, tags, notes });
+      if (file){
+        await api.uploadEvidenceAttachment(state.activeId, ev.id, file);
+      }
+      await Promise.all([ensureEvidence(true), refreshActiveCasefile(), refreshCasefiles()]);
+      toast("Saved", "Evidence added.", "good");
+
+      // reset form
+      $("#evTitle").value = "";
+      $("#evDate").value = "";
+      $("#evSource").value = "";
+      $("#evTags").value = "";
+      $("#evNotes").value = "";
+      $("#evFile").value = "";
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function editEvidence(evidenceId){
+    await ensureEvidence();
+    const ev = evById(evidenceId);
+    if (!ev) return;
+
+    openModal(`
+      <div class="grid2">
+        <div>
+          <div class="small muted">Type</div>
+          <select id="mEvType">
+            ${["Deed","ROS","Plat","Field Notes","Photo","Email","GIS","Other"].map(t=>`<option value="${esc(t)}" ${t===ev.type?"selected":""}>${esc(t)}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <div class="small muted">Title</div>
+          <input id="mEvTitle" type="text" value="${esc(ev.title)}"/>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <div class="small muted">Date</div>
+          <input id="mEvDate" type="text" value="${esc(ev.date||"")}"/>
+        </div>
+        <div>
+          <div class="small muted">Source</div>
+          <input id="mEvSource" type="text" value="${esc(ev.source||"")}"/>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="small muted">Tags</div>
+        <input id="mEvTags" type="text" value="${esc((ev.tags||[]).join(", "))}"/>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="small muted">Notes</div>
+        <textarea id="mEvNotes" rows="5">${esc(ev.notes||"")}</textarea>
+      </div>
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button class="btn primary" id="mEvSave">Save</button>
+      </div>
+    `);
+
+    $("#mEvSave").addEventListener("click", async () => {
+      try{
+        await api.patchEvidence(state.activeId, evidenceId, {
+          type: $("#mEvType").value,
+          title: $("#mEvTitle").value.trim(),
+          date: ($("#mEvDate").value.trim() || null),
+          source: $("#mEvSource").value.trim(),
+          tags: parseTags($("#mEvTags").value),
+          notes: $("#mEvNotes").value
+        });
+        closeModal();
+        await ensureEvidence(true);
+        await Promise.all([refreshActiveCasefile(), refreshCasefiles()]);
+        toast("Saved","Evidence updated.","good");
+        render();
+      }catch(err){
+        toast("Error", err.message || String(err), "bad");
+      }
+    });
+  }
+
+  const hiddenUpload = (() => {
+    const i = document.createElement("input");
+    i.type = "file";
+    i.style.display = "none";
+    document.body.appendChild(i);
+    return i;
+  })();
+
+  async function uploadEvidenceFile(evidenceId){
+    hiddenUpload.value = "";
+    hiddenUpload.onchange = async () => {
+      const f = hiddenUpload.files?.[0];
+      if (!f) return;
+      try{
+        await api.uploadEvidenceAttachment(state.activeId, evidenceId, f);
+        await ensureEvidence(true);
+        await Promise.all([refreshActiveCasefile(), refreshCasefiles()]);
+        toast("Uploaded","Attachment saved.","good");
+        render();
+      }catch(err){
+        toast("Error", err.message || String(err), "bad");
+      }
+    };
+    hiddenUpload.click();
+  }
+
+  async function deleteEvidence(evidenceId){
+    const ok = confirm("Delete this evidence item? This will also delete its attachment and any linked extractions remain but will reference a missing evidence.");
+    if (!ok) return;
+    try{
+      await api.deleteEvidence(state.activeId, evidenceId);
+      await ensureEvidence(true);
+      await Promise.all([refreshActiveCasefile(), refreshCasefiles()]);
+      toast("Deleted","Evidence removed.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function deleteAttachment(evidenceId){
+    const ok = confirm("Remove the attachment file from this evidence item?");
+    if (!ok) return;
+    try{
+      await api.deleteEvidenceAttachment(state.activeId, evidenceId);
+      await ensureEvidence(true);
+      toast("Removed","Attachment removed.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function runExtractionFromText(){
+    const evidenceId = $("#extractEvidenceId")?.value;
+    const text = $("#extractText")?.value || "";
+    if (!evidenceId || !text.trim()){
+      toast("Missing", "Select evidence and paste text to extract.", "warn");
+      return;
+    }
+    const defaultUnit = $("#extractUnit")?.value || "ft";
+    const includeByDefault = !!$("#extractInclude")?.checked;
+    const defaultConfidence = clamp(Number($("#extractConf")?.value ?? 0.75), 0, 1);
+    try{
+      const r = await api.extractFromText(state.activeId, { evidenceId, page: 1, text, defaultUnit, includeByDefault, defaultConfidence });
+      state.lastWarnings = r.warnings || [];
+      await ensureExtractions(true);
+      await refreshActiveCasefile();
+      toast("Extracted", `Created ${r.created?.length || 0} calls.`, "good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function addManualCall(){
+    const bearingText = ($("#manualBearing")?.value || "").trim();
+    const distance = Number($("#manualDist")?.value);
+    const evidenceId = $("#manualEvidenceId")?.value;
+    const unit = $("#manualUnit")?.value || "ft";
+
+    if (!bearingText || !Number.isFinite(distance)){
+      toast("Missing", "Bearing and distance are required.", "warn");
+      return;
+    }
+    if (!evidenceId){
+      toast("Missing","Choose evidence for this call.","warn");
+      return;
+    }
+    try{
+      await api.createExtraction(state.activeId, { evidenceId, page:1, snippet:"(manual entry)", label:"", bearingText, distance, distanceUnit: unit, include:true, confidence: 0.9 });
+      await ensureExtractions(true);
+      await refreshActiveCasefile();
+      toast("Saved","Call added.","good");
+      $("#manualBearing").value = "";
+      $("#manualDist").value = "";
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function toggleInclude(extractionId, include){
+    try{
+      await api.patchExtraction(state.activeId, extractionId, { include });
+      await ensureExtractions(true);
+      await refreshActiveCasefile();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function deleteCall(extractionId){
+    const ok = confirm("Delete this extracted call?");
+    if (!ok) return;
+    try{
+      await api.deleteExtraction(state.activeId, extractionId);
+      await Promise.all([ensureExtractions(true), ensureTraverse(true), ensureTraverseResults(true), refreshActiveCasefile()]);
+      toast("Deleted","Call removed.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function moveCall(extractionId, dir){
+    await ensureExtractions();
+    const ids = state.extractions.map(x => x.id);
+    const i = ids.indexOf(extractionId);
+    if (i < 0) return;
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try{
+      await api.reorderExtractions(state.activeId, ids);
+      await ensureExtractions(true);
+      toast("Saved","Order updated.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function editCall(extractionId){
+    await ensureExtractions();
+    const c = exById(extractionId);
+    if (!c) return;
+
+    openModal(`
+      <div class="grid2">
+        <div>
+          <div class="small muted">Bearing</div>
+          <input id="mCallBearing" type="text" value="${esc(c.bearingText)}"/>
+        </div>
+        <div>
+          <div class="small muted">Distance</div>
+          <input id="mCallDist" type="number" step="0.01" value="${esc(c.distance)}"/>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <div class="small muted">Unit</div>
+          <select id="mCallUnit">
+            ${["ft","m","ch"].map(u=>`<option value="${esc(u)}" ${u===(c.distanceUnit||"ft")?"selected":""}>${esc(u)}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <div class="small muted">Confidence</div>
+          <input id="mCallConf" type="number" min="0" max="1" step="0.05" value="${esc(c.confidence ?? 0.75)}"/>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="small muted">Label</div>
+        <input id="mCallLabel" type="text" value="${esc(c.label||"")}"/>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="small muted">Snippet</div>
+        <textarea id="mCallSnippet" rows="4">${esc(c.snippet||"")}</textarea>
+      </div>
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button class="btn primary" id="mCallSave">Save</button>
+      </div>
+    `);
+
+    $("#mCallSave").addEventListener("click", async () => {
+      try{
+        await api.patchExtraction(state.activeId, extractionId, {
+          bearingText: $("#mCallBearing").value.trim(),
+          distance: Number($("#mCallDist").value),
+          distanceUnit: $("#mCallUnit").value,
+          confidence: clamp(Number($("#mCallConf").value), 0, 1),
+          label: $("#mCallLabel").value.trim(),
+          snippet: $("#mCallSnippet").value
+        });
+        closeModal();
+        await ensureExtractions(true);
+        toast("Saved","Call updated.","good");
+        render();
+      }catch(err){
+        toast("Error", err.message || String(err), "bad");
+      }
+    });
+  }
+
+  async function addCornerFromForm(){
+    const name = ($("#newCornerName")?.value || "").trim();
+    if (!name){
+      toast("Missing","Corner name required.","warn");
+      return;
+    }
+    const status = $("#newCornerStatus")?.value || "Unknown";
+    const plss = ($("#newCornerPlss")?.value || "").trim();
+    try{
+      await api.createCorner(state.activeId, { name, status, plss });
+      await Promise.all([ensureCorners(true), ensureDecisions(true), refreshActiveCasefile()]);
+      toast("Saved","Corner added.","good");
+      $("#newCornerName").value = "";
+      $("#newCornerPlss").value = "";
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function deleteCorner(cornerId){
+    const ok = confirm("Delete this corner and all its candidates?");
+    if (!ok) return;
+    try{
+      await api.deleteCorner(state.activeId, cornerId);
+      await Promise.all([ensureCorners(true), ensureDecisions(true), refreshActiveCasefile()]);
+      toast("Deleted","Corner removed.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function openCorner(cornerId){
+    await ensureCorners();
+    const c = cornerById(cornerId);
+    if (!c) return;
+
+    const evOpts = (state.evidence || []).map(ev => `<option value="${esc(ev.id)}">${esc(ev.title)}</option>`).join("");
+    const candRows = (c.candidates || []).map(cd => `
+      <tr>
+        <td class="mono small">${esc(cd.kind)}</td>
+        <td>${esc(cd.summary)}</td>
+        <td class="mono">${esc(cd.weight)}</td>
+        <td class="mono">${cd.chosen ? "✓" : ""}</td>
+        <td style="text-align:right;">
+          ${cd.chosen ? `<button class="btn" data-act="unchooseCandidate" data-corner="${esc(c.id)}" data-id="${esc(cd.id)}">Unchoose</button>`
+                      : `<button class="btn primary" data-act="chooseCandidate" data-corner="${esc(c.id)}" data-id="${esc(cd.id)}">Choose</button>`}
+          <button class="btn danger" data-act="deleteCandidate" data-corner="${esc(c.id)}" data-id="${esc(cd.id)}">Delete</button>
+        </td>
+      </tr>
+    `).join("");
+
+    const chosen = chosenCandidate(c);
+    openModal(`
+      <div class="grid2">
+        <div>
+          <div class="small muted">Corner name</div>
+          <input id="mCornerName" type="text" value="${esc(c.name)}"/>
+        </div>
+        <div>
+          <div class="small muted">Status</div>
+          <select id="mCornerStatus">
+            ${["Existent","Obliterated","Lost","Unknown"].map(s=>`<option value="${esc(s)}" ${s===c.status?"selected":""}>${esc(s)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="small muted">PLSS / description</div>
+        <input id="mCornerPlss" type="text" value="${esc(c.plss||"")}"/>
+      </div>
+
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button class="btn primary" id="mCornerSave">Save Corner</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="hd" style="padding:0;margin-bottom:8px;">Candidates</div>
+      ${(c.candidates||[]).length ? `
+        <table class="tbl">
+          <thead><tr><th style="width:140px;">Kind</th><th>Summary</th><th style="width:60px;">W</th><th style="width:60px;">Chosen</th><th style="width:240px;text-align:right;">Actions</th></tr></thead>
+          <tbody>${candRows}</tbody>
+        </table>
+      ` : `<div class="muted">No candidates yet.</div>`}
+
+      <div class="hr"></div>
+
+      <div class="hd" style="padding:0;margin-bottom:8px;">Add Candidate</div>
+      <div class="grid2">
+        <div>
+          <div class="small muted">Kind</div>
+          <select id="mCandKind">${["Monument","Occupation","Record Call","Parol","Other"].map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join("")}</select>
+        </div>
+        <div>
+          <div class="small muted">Weight (1-5)</div>
+          <input id="mCandWeight" type="number" min="1" max="5" step="1" value="3"/>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="small muted">Evidence ref (optional)</div>
+        <select id="mCandEvidence">
+          <option value="">(none)</option>
+          ${evOpts}
+        </select>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="small muted">Summary</div>
+        <input id="mCandSummary" type="text" placeholder='Found 5/8" RB w/cap, etc.'/>
+      </div>
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button class="btn" id="mCandAdd">Add</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="hd" style="padding:0;margin-bottom:8px;">Justification for chosen (if required)</div>
+      <textarea id="mJustification" rows="4" placeholder="Explain why a weaker candidate was chosen over stronger alternatives.">${esc(chosen?.justification||"")}</textarea>
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button class="btn good" id="mSaveDecision">Save Decision</button>
+      </div>
+    `);
+
+    $("#mCornerSave").addEventListener("click", async () => {
+      try{
+        await api.patchCorner(state.activeId, c.id, {
+          name: $("#mCornerName").value.trim(),
+          status: $("#mCornerStatus").value,
+          plss: $("#mCornerPlss").value.trim()
+        });
+        await ensureCorners(true);
+        toast("Saved","Corner updated.","good");
+        closeModal();
+        render();
+      }catch(err){
+        toast("Error", err.message || String(err), "bad");
+      }
     });
 
-    commit(file.size <= MAX_ATTACHMENT_BYTES ? "Added evidence with attachment" : "Added evidence (metadata; attachment too large)");
+    $("#mCandAdd").addEventListener("click", async () => {
+      const summary = ($("#mCandSummary").value || "").trim();
+      if (!summary){
+        toast("Missing","Candidate summary required.","warn");
+        return;
+      }
+      try{
+        await api.createCandidate(state.activeId, c.id, {
+          kind: $("#mCandKind").value,
+          summary,
+          weight: clamp(Number($("#mCandWeight").value || 3), 1, 5),
+          refEvidenceId: ($("#mCandEvidence").value || null) || null
+        });
+        await Promise.all([ensureCorners(true), ensureDecisions(true)]);
+        toast("Saved","Candidate added.","good");
+        closeModal();
+        openCorner(c.id); // reopen with refreshed data
+      }catch(err){
+        toast("Error", err.message || String(err), "bad");
+      }
+    });
+
+    $("#mSaveDecision").addEventListener("click", async () => {
+      try{
+        await api.saveCornerDecision(state.activeId, c.id, $("#mJustification").value || "");
+        await Promise.all([ensureCorners(true), ensureDecisions(true)]);
+        toast("Saved","Decision saved.","good");
+        closeModal();
+        render();
+      }catch(err){
+        toast("Error", err.message || String(err), "bad");
+      }
+    });
+  }
+
+  async function chooseCandidate(cornerId, candidateId){
+    try{
+      await api.chooseCandidate(state.activeId, cornerId, candidateId);
+      await Promise.all([ensureCorners(true), ensureDecisions(true), refreshActiveCasefile()]);
+      toast("Saved","Candidate chosen.","good");
+      closeModal();
+      openCorner(cornerId);
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function unchooseCandidate(cornerId, candidateId){
+    try{
+      await api.unchooseCandidate(state.activeId, cornerId, candidateId);
+      await Promise.all([ensureCorners(true), ensureDecisions(true), refreshActiveCasefile()]);
+      toast("Saved","Candidate unchosen.","good");
+      closeModal();
+      openCorner(cornerId);
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function deleteCandidate(cornerId, candidateId){
+    const ok = confirm("Delete this candidate?");
+    if (!ok) return;
+    try{
+      await api.deleteCandidate(state.activeId, cornerId, candidateId);
+      await Promise.all([ensureCorners(true), ensureDecisions(true), refreshActiveCasefile()]);
+      toast("Deleted","Candidate removed.","good");
+      closeModal();
+      openCorner(cornerId);
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function saveTraverseConfig(){
+    const startN = Number($("#trStartN")?.value);
+    const startE = Number($("#trStartE")?.value);
+    const basisLabel = $("#trBasisLabel")?.value || "";
+    const rotationDeg = Number($("#trRotation")?.value || 0);
+    if (!Number.isFinite(startN) || !Number.isFinite(startE)){
+      toast("Missing","Valid start N/E required.","warn");
+      return;
+    }
+    try{
+      await api.patchTraverse(state.activeId, { start:{N:startN,E:startE}, basis:{label:basisLabel, rotationDeg} });
+      await Promise.all([ensureTraverse(true), refreshActiveCasefile()]);
+      toast("Saved","Traverse config updated.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function syncIncludedCalls(){
+    try{
+      await api.syncIncludedCalls(state.activeId);
+      await Promise.all([ensureTraverse(true), ensureTraverseResults(true), refreshActiveCasefile()]);
+      toast("Synced","Traverse call list synced from included calls.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function runTraverse(){
+    try{
+      await api.runTraverse(state.activeId, {});
+      await ensureTraverseResults(true);
+      toast("Computed","Traverse results updated.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function moveTraverseCall(idx, dir){
+    await ensureTraverse();
+    const calls = [...(state.traverse.calls || [])];
+    const j = idx + dir;
+    if (j < 0 || j >= calls.length) return;
+    [calls[idx], calls[j]] = [calls[j], calls[idx]];
+    try{
+      await api.patchTraverse(state.activeId, { calls });
+      await ensureTraverse(true);
+      toast("Saved","Traverse call order updated.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  /* ---------------------------- Topbar ---------------------------- */
+  async function doNewProject(){
+    const name = prompt("New casefile name:", "New Boundary Casefile");
+    if (!name) return;
+    try{
+      const cf = await api.createCasefile(name, "Idaho", "", true);
+      await refreshCasefiles();
+      await setActiveCasefile(cf.id);
+      fillProjectSelect();
+      elProjectSelect.value = cf.id;
+      toast("Created","Casefile created.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function doDuplicateProject(){
+    if (!state.activeId) return;
+    const name = prompt("Name for duplicate casefile (optional):", "");
+    try{
+      const cf = await api.duplicateCasefile(state.activeId, name.trim() ? name.trim() : null);
+      await refreshCasefiles();
+      await setActiveCasefile(cf.id);
+      fillProjectSelect();
+      elProjectSelect.value = cf.id;
+      toast("Duplicated","Casefile duplicated.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function doDeleteProject(){
+    if (!state.activeId) return;
+    const nm = state.active?.meta?.name || "this casefile";
+    const ok = confirm(`Delete "${nm}"? This cannot be undone.`);
+    if (!ok) return;
+    try{
+      await api.deleteCasefile(state.activeId);
+      state.activeId = null;
+      state.active = null;
+      localStorage.removeItem(ACTIVE_KEY);
+      await refreshCasefiles();
+      if (state.casefiles.length){
+        await setActiveCasefile(state.casefiles[0].id);
+        elProjectSelect.value = state.activeId;
+      }
+      toast("Deleted","Casefile deleted.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function doExportProject(){
+    if (!state.activeId) return;
+    try{
+      const bundle = await api.exportCasefile(state.activeId);
+      const safeName = (state.active?.meta?.name || "casefile").replace(/[^\w\-]+/g,"_").slice(0,60);
+      downloadJson(bundle, `${safeName}.bew.json`);
+      toast("Exported","Downloaded .bew.json bundle.","good");
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function doImportProject(file){
+    try{
+      const text = await file.text();
+      const bundle = JSON.parse(text);
+      const created = await api.importCasefile(bundle, true);
+      await refreshCasefiles();
+      await setActiveCasefile(created.id);
+      fillProjectSelect();
+      elProjectSelect.value = created.id;
+      toast("Imported","Casefile imported (IDs rewritten).","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
+  async function doPrintOutputs(){
+    setTab("outputs");
+    // ensure outputs loaded then print
+    await ensurePrintable(true);
     render();
+    setTimeout(()=>window.print(), 80);
   }
 
-  function guessEvidenceType(file){
-    const n = (file.name || "").toLowerCase();
-    const t = (file.type || "").toLowerCase();
-    if(t.includes("pdf") || n.endsWith(".pdf")) return "PDF";
-    if(t.startsWith("image/") || /\.(png|jpg|jpeg|webp|gif)$/i.test(n)) return "Photo";
-    if(t.includes("text") || /\.(txt|csv|md)$/i.test(n)) return "Field Notes";
-    return "Other";
-  }
-  function readFileAsDataURL(file){
-    return new Promise((resolve, reject)=>{
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(file);
-    });
+  async function seedSampleCasefile(){
+    try{
+      const cf = await api.createCasefile("Sample Casefile (API)", "Idaho", "Seeded demo data created by the client.", true);
+
+      // Evidence
+      const deed = await api.createEvidence(cf.id, { type:"Deed", title:"Warranty Deed (Demo)", date:"2022-05-14", source:"Ada County Recorder (demo)", tags:["legal","calls"], notes:"Demo placeholder. Replace with actual deed text." });
+      const ros  = await api.createEvidence(cf.id, { type:"ROS", title:"Record of Survey 95051440 (Demo)", date:"1995-05-14", source:"Ada County ROS (demo)", tags:["ros","basis"], notes:"Demo placeholder for ROS notes." });
+      const photo= await api.createEvidence(cf.id, { type:"Photo", title:'Found 5/8" RB w/ cap (Demo)', date:fmtDate(nowISO()), source:"Field photo (demo)", tags:["monument"], notes:"Demo placeholder photo slot (no binary uploaded)." });
+
+      // Calls
+      const calls = [
+        {bearing:"S 89°58'00\" W", distance:315.27, unit:"ft"},
+        {bearing:"N 00°00'27\" W", distance:267.69, unit:"ft"},
+        {bearing:"N 89°57'43\" E", distance:315.13, unit:"ft"},
+        {bearing:"S 00°02'17\" E", distance:267.72, unit:"ft"},
+      ];
+      const createdCallIds = [];
+      for (let i=0;i<calls.length;i++){
+        const c = calls[i];
+        const ex = await api.createExtraction(cf.id, {
+          evidenceId: deed.id, page:1, snippet:"…(demo) boundary call…", label:`Call ${i+1}`,
+          bearingText: c.bearing, distance: c.distance, distanceUnit: c.unit, include:true, confidence:0.85
+        });
+        createdCallIds.push(ex.id);
+      }
+      // Traverse: set calls list to created call ids
+      await api.patchTraverse(cf.id, { start:{N:10000,E:10000}, basis:{label:"Assumed/Grid North (demo)", rotationDeg:0}, calls: createdCallIds });
+
+      // Corners + candidates
+      const nw = await api.createCorner(cf.id, { name:"NW COR (Parcel)", plss:"Within Sec/T/R (demo)", status:"Existent" });
+      await api.createCandidate(cf.id, nw.id, { kind:"Monument", refEvidenceId: photo.id, summary:'Found 5/8" rebar w/cap', weight:5 });
+      await api.createCandidate(cf.id, nw.id, { kind:"Record Call", refEvidenceId: ros.id, summary:'ROS shows set 1/2" RB', weight:3 });
+      // choose first candidate (need id; list corners returns with candidates; easiest: reload corners)
+      let corners = (await api.listCorners(cf.id, 200, 0)).items;
+      let nwFresh = corners.find(x=>x.id===nw.id);
+      let first = nwFresh?.candidates?.[0];
+      if (first) await api.chooseCandidate(cf.id, nw.id, first.id);
+
+      const ne = await api.createCorner(cf.id, { name:"NE COR (Parcel)", plss:"Within Sec/T/R (demo)", status:"Obliterated" });
+      await api.createCandidate(cf.id, ne.id, { kind:"Occupation", refEvidenceId: deed.id, summary:"Fence corner long-standing", weight:3 });
+      await api.createCandidate(cf.id, ne.id, { kind:"Record Call", refEvidenceId: deed.id, summary:"Deed call corner", weight:2 });
+      corners = (await api.listCorners(cf.id, 200, 0)).items;
+      let neFresh = corners.find(x=>x.id===ne.id);
+      let occ = neFresh?.candidates?.find(x=>x.kind==="Occupation") || neFresh?.candidates?.[0];
+      if (occ) {
+        await api.chooseCandidate(cf.id, ne.id, occ.id);
+        await api.saveCornerDecision(cf.id, ne.id, "Occupation consistent w/ record dimensions; no monument recovered.");
+      }
+
+      // Select new casefile
+      await refreshCasefiles();
+      await setActiveCasefile(cf.id);
+      fillProjectSelect();
+      elProjectSelect.value = cf.id;
+      toast("Seeded","Sample casefile created via API.","good");
+      setTab("dashboard");
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
   }
 
-  /**********************
-   * Utilities
-   **********************/
-  function escapeHtml(s){
-    return String(s ?? "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
+  /* ------------------------ Event delegation ----------------------- */
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-act]");
+    if (!t) return;
 
-  /**********************
-   * Global delegated behavior (small)
-   **********************/
-  document.addEventListener("keydown",(e)=>{
-    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s"){
-      e.preventDefault();
-      commit("Saved (manual)");
+    const act = t.dataset.act;
+    const id = t.dataset.id;
+    const tab = t.dataset.tab;
+
+    if (act === "goto"){ setTab(tab); return; }
+    if (act === "closeModal"){ closeModal(); return; }
+
+    if (act === "editEvidence"){ editEvidence(id); return; }
+    if (act === "uploadEvidence"){ uploadEvidenceFile(id); return; }
+    if (act === "deleteEvidence"){ deleteEvidence(id); return; }
+    if (act === "deleteAttachment"){ deleteAttachment(id); return; }
+
+    if (act === "moveCallUp"){ moveCall(id, -1); return; }
+    if (act === "moveCallDown"){ moveCall(id, +1); return; }
+    if (act === "editCall"){ editCall(id); return; }
+    if (act === "deleteCall"){ deleteCall(id); return; }
+
+    if (act === "openCorner"){ openCorner(id); return; }
+    if (act === "deleteCorner"){ deleteCorner(id); return; }
+
+    if (act === "chooseCandidate"){ chooseCandidate(t.dataset.corner, id); return; }
+    if (act === "unchooseCandidate"){ unchooseCandidate(t.dataset.corner, id); return; }
+    if (act === "deleteCandidate"){ deleteCandidate(t.dataset.corner, id); return; }
+
+    if (act === "moveTraverseUp"){ moveTraverseCall(Number(t.dataset.idx), -1); return; }
+    if (act === "moveTraverseDown"){ moveTraverseCall(Number(t.dataset.idx), +1); return; }
+  });
+
+  document.addEventListener("change", (e) => {
+    const t = e.target.closest("[data-act]");
+    if (!t) return;
+    const act = t.dataset.act;
+    if (act === "toggleInclude"){
+      toggleInclude(t.dataset.id, !!t.checked).then(()=>{ if(state.tab==="extract") render(); });
     }
   });
 
-  /**********************
-   * Boot
-   **********************/
-  setActiveProject(getActiveId() || projects[0].id);
-  setTab("dashboard");
+  /* ------------------------------ Boot ----------------------------- */
+  async function boot(){
+    setApiHealthState("…");
+    setSyncState("OK");
+
+    // API base input
+    elApiBaseInput.addEventListener("change", async () => {
+      apiBase = normalizeBase(elApiBaseInput.value);
+      localStorage.setItem(API_BASE_KEY, apiBase);
+      toast("API Base", apiBase ? apiBase : "Using same origin", "good");
+      // refresh everything
+      state.activeId = null;
+      state.active = null;
+      await initData();
+    });
+
+    // nav tabs
+    $$(".nav .tab").forEach(t => t.addEventListener("click", () => setTab(t.dataset.tab)));
+
+    // topbar
+    elProjectSelect.addEventListener("change", async () => {
+      const id = elProjectSelect.value;
+      if (!id) return;
+      try{
+        await setActiveCasefile(id);
+        render();
+      }catch(err){
+        toast("Error", err.message || String(err), "bad");
+      }
+    });
+    elNewProjectBtn.addEventListener("click", doNewProject);
+    elDupProjectBtn.addEventListener("click", doDuplicateProject);
+    elDelProjectBtn.addEventListener("click", doDeleteProject);
+    elExportBtn.addEventListener("click", doExportProject);
+    elImportBtn.addEventListener("click", () => elHiddenImport.click());
+    elHiddenImport.addEventListener("change", () => {
+      const f = elHiddenImport.files?.[0];
+      if (!f) return;
+      doImportProject(f);
+      elHiddenImport.value = "";
+    });
+    elPrintBtn.addEventListener("click", doPrintOutputs);
+
+    elLoadSampleBtn.addEventListener("click", () => {
+      const ok = confirm("Create a NEW sample casefile via API? (Does not overwrite existing.)");
+      if (!ok) return;
+      seedSampleCasefile();
+    });
+
+    await initData();
+  }
+
+  async function initData(){
+    try{
+      await api.health();
+      setApiHealthState("OK");
+    }catch(_){
+      setApiHealthState("ERR");
+    }
+
+    await refreshCasefiles();
+
+    if (!state.casefiles.length){
+      const cf = await api.createCasefile("New Boundary Casefile", "Idaho", "", true);
+      await refreshCasefiles();
+      await setActiveCasefile(cf.id);
+      fillProjectSelect();
+      elProjectSelect.value = cf.id;
+    } else {
+      const saved = localStorage.getItem(ACTIVE_KEY);
+      const pick = (saved && state.casefiles.some(x=>x.id===saved)) ? saved : state.casefiles[0].id;
+      await setActiveCasefile(pick);
+      elProjectSelect.value = pick;
+    }
+    await ensureTabData(state.tab);
+    render();
+  }
+
+  // Kick off
+  boot();
 
 })();
 </script>
