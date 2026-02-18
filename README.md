@@ -158,6 +158,7 @@ Request body for create/update:
 }
 ```
 
+EvidenceDesk now hydrates its **Drawings** folder from the drawing CRUD API (`GET /api/projects/:projectId/drawings`) and fetches selected drawing history records from `GET /api/projects/:projectId/drawings/:drawingId` before launching LineSmith, so project browser drawing lists stay API-backed rather than relying only on legacy local-storage indexes.
 
 
 ### API endpoints (project point file CRUD)
