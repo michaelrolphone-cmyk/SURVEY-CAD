@@ -1,0 +1,1917 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Boundary Evidence Workbench Backend API",
+    "version": "1.0.0",
+    "description": "REST API for the Boundary Evidence Workbench concept prototype. Models: Casefile (project) → Evidence → Extractions (calls) → Corners → Candidates → Decisions → Traverse compute → Outputs package."
+  },
+  "servers": [
+    { "url": "http://localhost:3000" },
+    { "url": "https://example.com" }
+  ],
+  "tags": [
+    { "name": "Health" },
+    { "name": "Casefiles" },
+    { "name": "Evidence" },
+    { "name": "Extractions" },
+    { "name": "Corners" },
+    { "name": "Traverse" },
+    { "name": "Outputs" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "operationId": "healthCheck",
+        "summary": "Liveness check",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/casefiles": {
+      "get": {
+        "tags": ["Casefiles"],
+        "operationId": "listCasefiles",
+        "summary": "List casefiles (projects)",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search by name/jurisdiction/notes (implementation-defined).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort key (implementation-defined). Common: updatedAt desc.",
+            "schema": {
+              "type": "string",
+              "enum": ["updatedAt_desc", "updatedAt_asc", "createdAt_desc", "createdAt_asc", "name_asc", "name_desc"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Casefile list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CasefileListResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Casefiles"],
+        "operationId": "createCasefile",
+        "summary": "Create a new casefile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CasefileCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created casefile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Casefile" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}": {
+      "get": {
+        "tags": ["Casefiles"],
+        "operationId": "getCasefile",
+        "summary": "Get a casefile (metadata + traverse config summary)",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "responses": {
+          "200": {
+            "description": "Casefile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Casefile" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Casefiles"],
+        "operationId": "updateCasefile",
+        "summary": "Patch casefile metadata",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CasefileUpdateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated casefile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Casefile" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Casefiles"],
+        "operationId": "deleteCasefile",
+        "summary": "Delete a casefile",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}:duplicate": {
+      "post": {
+        "tags": ["Casefiles"],
+        "operationId": "duplicateCasefile",
+        "summary": "Duplicate a casefile (deep copy)",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CasefileDuplicateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Duplicated casefile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Casefile" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles:import": {
+      "post": {
+        "tags": ["Casefiles"],
+        "operationId": "importCasefileBundle",
+        "summary": "Import a full casefile bundle (like .bew.json export)",
+        "description": "Creates a new casefile from an exported bundle. Server may rewrite IDs to avoid collisions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CasefileBundleImportRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Imported as a new casefile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CasefileBundle" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}:export": {
+      "get": {
+        "tags": ["Casefiles"],
+        "operationId": "exportCasefileBundle",
+        "summary": "Export full casefile bundle",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "responses": {
+          "200": {
+            "description": "Casefile bundle export",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CasefileBundle" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/evidence": {
+      "get": {
+        "tags": ["Evidence"],
+        "operationId": "listEvidence",
+        "summary": "List evidence items",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by evidence type.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "description": "Filter by tag (matches any).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evidence list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EvidenceListResponse" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Evidence"],
+        "operationId": "createEvidence",
+        "summary": "Create evidence item (metadata-only or with attachment reference)",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created evidence",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/evidence/{evidenceId}": {
+      "get": {
+        "tags": ["Evidence"],
+        "operationId": "getEvidence",
+        "summary": "Get evidence item",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/EvidenceId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evidence",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Evidence"],
+        "operationId": "updateEvidence",
+        "summary": "Patch evidence item",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/EvidenceId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceUpdateRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated evidence",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Evidence"],
+        "operationId": "deleteEvidence",
+        "summary": "Delete evidence item",
+        "description": "Extractions/candidates referencing the evidence are not automatically deleted; they may become dangling references (client should show missing evidence).",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/EvidenceId" }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/evidence/{evidenceId}/attachment": {
+      "post": {
+        "tags": ["Evidence"],
+        "operationId": "uploadEvidenceAttachment",
+        "summary": "Upload/replace evidence attachment",
+        "description": "Uploads a file as the evidence attachment. Server stores it and returns updated attachment metadata.",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/EvidenceId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Attachment uploaded; evidence updated",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceItem" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      },
+      "get": {
+        "tags": ["Evidence"],
+        "operationId": "downloadEvidenceAttachment",
+        "summary": "Download evidence attachment",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/EvidenceId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attachment binary",
+            "content": {
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Evidence"],
+        "operationId": "deleteEvidenceAttachment",
+        "summary": "Delete evidence attachment (keep evidence metadata)",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/EvidenceId" }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/extractions": {
+      "get": {
+        "tags": ["Extractions"],
+        "operationId": "listExtractions",
+        "summary": "List extracted calls",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "include",
+            "in": "query",
+            "description": "Filter by include flag.",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "evidenceId",
+            "in": "query",
+            "description": "Filter by evidenceId.",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Extraction list",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionListResponse" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Extractions"],
+        "operationId": "createExtraction",
+        "summary": "Create extracted call (manual entry)",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created extracted call",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCall" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/extractions:extractFromText": {
+      "post": {
+        "tags": ["Extractions"],
+        "operationId": "extractCallsFromText",
+        "summary": "Parse pasted text into extracted calls",
+        "description": "Server-side implementation should mimic the demo regex: quadrant bearings + nearby distance. Returns created extraction objects in order found.",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionFromTextRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created extracted calls",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionFromTextResponse" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/extractions:reorder": {
+      "post": {
+        "tags": ["Extractions"],
+        "operationId": "reorderExtractions",
+        "summary": "Reorder extracted calls",
+        "description": "Client provides the full ordered list of extraction IDs. Server persists the ordering for later traverse runs and UI.",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ReorderIdsRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated ordering",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionListResponse" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/extractions/{extractionId}": {
+      "get": {
+        "tags": ["Extractions"],
+        "operationId": "getExtraction",
+        "summary": "Get extracted call",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/ExtractionId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Extraction",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCall" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Extractions"],
+        "operationId": "updateExtraction",
+        "summary": "Patch extracted call",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/ExtractionId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionUpdateRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated extraction",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionCall" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Extractions"],
+        "operationId": "deleteExtraction",
+        "summary": "Delete extracted call",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/ExtractionId" }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners": {
+      "get": {
+        "tags": ["Corners"],
+        "operationId": "listCorners",
+        "summary": "List corners",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by corner status.",
+            "schema": { "$ref": "#/components/schemas/CornerStatus" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Corner list",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CornerListResponse" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Corners"],
+        "operationId": "createCorner",
+        "summary": "Create corner",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CornerCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created corner",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}": {
+      "get": {
+        "tags": ["Corners"],
+        "operationId": "getCorner",
+        "summary": "Get corner detail (including candidates)",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Corner detail",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Corners"],
+        "operationId": "updateCorner",
+        "summary": "Patch corner fields",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CornerUpdateRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated corner",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Corners"],
+        "operationId": "deleteCorner",
+        "summary": "Delete corner",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/candidates": {
+      "get": {
+        "tags": ["Corners"],
+        "operationId": "listCandidates",
+        "summary": "List corner candidates",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candidate list",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CandidateListResponse" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Corners"],
+        "operationId": "createCandidate",
+        "summary": "Add a candidate to a corner",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CandidateCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created candidate",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CornerCandidate" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/candidates/{candidateId}": {
+      "get": {
+        "tags": ["Corners"],
+        "operationId": "getCandidate",
+        "summary": "Get candidate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" },
+          { "$ref": "#/components/parameters/CandidateId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candidate",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CornerCandidate" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Corners"],
+        "operationId": "updateCandidate",
+        "summary": "Patch candidate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" },
+          { "$ref": "#/components/parameters/CandidateId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CandidateUpdateRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated candidate",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CornerCandidate" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Corners"],
+        "operationId": "deleteCandidate",
+        "summary": "Delete candidate",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" },
+          { "$ref": "#/components/parameters/CandidateId" }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/candidates/{candidateId}:choose": {
+      "post": {
+        "tags": ["Corners"],
+        "operationId": "chooseCandidate",
+        "summary": "Choose a candidate (unchooses others)",
+        "description": "Sets chosen=true for the candidate and chosen=false for all other candidates in the corner. Also appends a decision log entry.",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" },
+          { "$ref": "#/components/parameters/CandidateId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated corner detail",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}/candidates/{candidateId}:unchoose": {
+      "post": {
+        "tags": ["Corners"],
+        "operationId": "unchooseCandidate",
+        "summary": "Unchoose a candidate",
+        "description": "Sets chosen=false and clears justification for that candidate. Appends a decision log entry.",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" },
+          { "$ref": "#/components/parameters/CandidateId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated corner detail",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/corners/{cornerId}:saveDecision": {
+      "post": {
+        "tags": ["Corners"],
+        "operationId": "saveCornerDecision",
+        "summary": "Save justification for the currently chosen candidate",
+        "description": "Sets the chosen candidate's justification. If server enforces override rules, it may reject empty justification when required.",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/CornerId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CornerDecisionSaveRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated corner",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Corner" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/decisions": {
+      "get": {
+        "tags": ["Corners"],
+        "operationId": "listDecisions",
+        "summary": "List decision log entries",
+        "parameters": [
+          { "$ref": "#/components/parameters/CasefileId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "cornerId",
+            "in": "query",
+            "description": "Filter by cornerId.",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Decision list",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DecisionListResponse" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Corners"],
+        "operationId": "appendDecision",
+        "summary": "Append a decision log entry (manual/audit)",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/DecisionCreateRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created decision",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DecisionLogEntry" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/traverse": {
+      "get": {
+        "tags": ["Traverse"],
+        "operationId": "getTraverseConfig",
+        "summary": "Get traverse config",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "responses": {
+          "200": {
+            "description": "Traverse config",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TraverseConfig" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Traverse"],
+        "operationId": "updateTraverseConfig",
+        "summary": "Patch traverse config",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TraverseUpdateRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated traverse config",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TraverseConfig" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/traverse:syncIncludedCalls": {
+      "post": {
+        "tags": ["Traverse"],
+        "operationId": "syncTraverseCallsFromIncludedExtractions",
+        "summary": "Set traverse.calls to included extraction IDs (in current extraction order)",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "responses": {
+          "200": {
+            "description": "Updated traverse config",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TraverseConfig" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/traverse:run": {
+      "post": {
+        "tags": ["Traverse"],
+        "operationId": "runTraverse",
+        "summary": "Compute traverse results from configured calls",
+        "description": "Implements: quadrant bearing → azimuth (+ rotation) → dN/dE → coordinate chain; returns points, segments, closure, totalDist, precision. Server also persists results + lastRun timestamp.",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TraverseRunRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Traverse results",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TraverseRunResult" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/traverse/results": {
+      "get": {
+        "tags": ["Traverse"],
+        "operationId": "getTraverseResults",
+        "summary": "Get last computed traverse results",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "responses": {
+          "200": {
+            "description": "Traverse results (may be null if never run)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TraverseResultsEnvelope" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/casefiles/{casefileId}/outputs/package": {
+      "get": {
+        "tags": ["Outputs"],
+        "operationId": "getPrintablePackage",
+        "summary": "Get a printable casefile package (evidence register + included calls + corner selections + traverse summary)",
+        "parameters": [{ "$ref": "#/components/parameters/CasefileId" }],
+        "responses": {
+          "200": {
+            "description": "Printable package",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PrintablePackage" } }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Optional. If you add auth later, apply security requirements per-operation or globally."
+      }
+    },
+
+    "parameters": {
+      "CasefileId": {
+        "name": "casefileId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "EvidenceId": {
+        "name": "evidenceId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ExtractionId": {
+        "name": "extractionId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "CornerId": {
+        "name": "cornerId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "CandidateId": {
+        "name": "candidateId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 0, "default": 0 }
+      }
+    },
+
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "Unprocessable entity (semantic/validation failure)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "Payload too large",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    },
+
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ok": { "type": "boolean" },
+          "time": { "type": "string", "format": "date-time" }
+        },
+        "required": ["ok"]
+      },
+
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": { "type": "string" },
+          "code": { "type": "string" },
+          "details": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["error"]
+      },
+
+      "UUID": {
+        "type": "string",
+        "format": "uuid"
+      },
+
+      "ISODateTime": {
+        "type": "string",
+        "format": "date-time"
+      },
+
+      "ISODate": {
+        "type": "string",
+        "format": "date",
+        "description": "YYYY-MM-DD"
+      },
+
+      "CasefileMeta": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "createdAt": { "$ref": "#/components/schemas/ISODateTime" },
+          "updatedAt": { "$ref": "#/components/schemas/ISODateTime" },
+          "jurisdiction": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "required": ["name", "createdAt", "updatedAt"]
+      },
+
+      "Casefile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/components/schemas/UUID" },
+          "meta": { "$ref": "#/components/schemas/CasefileMeta" },
+          "counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "evidence": { "type": "integer", "minimum": 0 },
+              "extractions": { "type": "integer", "minimum": 0 },
+              "corners": { "type": "integer", "minimum": 0 },
+              "decisions": { "type": "integer", "minimum": 0 }
+            },
+            "required": ["evidence", "extractions", "corners", "decisions"]
+          },
+          "traverse": { "$ref": "#/components/schemas/TraverseConfig" }
+        },
+        "required": ["id", "meta", "counts", "traverse"]
+      },
+
+      "CasefileCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "jurisdiction": { "type": "string", "default": "Idaho" },
+          "notes": { "type": "string", "default": "" },
+          "initializeDefaults": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, initializes traverse start/basis like the demo (10000/10000, rotation 0)."
+          }
+        },
+        "required": ["name"]
+      },
+
+      "CasefileUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "jurisdiction": { "type": "string" },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      },
+
+      "CasefileDuplicateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "description": "Optional name override for the copy." }
+        }
+      },
+
+      "CasefileListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Casefile" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["items", "limit", "offset", "total"]
+      },
+
+      "Attachment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "mime": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Optional. If your storage uses signed URLs, server may return a time-limited download URL."
+          },
+          "stored": {
+            "type": "boolean",
+            "description": "True if binary is stored server-side.",
+            "default": true
+          }
+        },
+        "required": ["name", "mime", "size"]
+      },
+
+      "EvidenceItemType": {
+        "type": "string",
+        "description": "Freeform string, but these are common in the demo.",
+        "enum": ["Deed", "Plat", "ROS", "Corner Record", "Field Notes", "Photo", "PDF", "Other"]
+      },
+
+      "EvidenceItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/components/schemas/UUID" },
+          "casefileId": { "$ref": "#/components/schemas/UUID" },
+          "type": { "$ref": "#/components/schemas/EvidenceItemType" },
+          "title": { "type": "string" },
+          "date": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/ISODate" },
+              { "type": "string", "description": "If unknown/partial, allow freeform. Prefer YYYY-MM-DD." },
+              { "type": "null" }
+            ]
+          },
+          "source": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": "string" },
+          "attachment": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/Attachment" },
+              { "type": "null" }
+            ]
+          },
+          "createdAt": { "$ref": "#/components/schemas/ISODateTime" },
+          "updatedAt": { "$ref": "#/components/schemas/ISODateTime" }
+        },
+        "required": ["id", "casefileId", "type", "title", "tags", "notes", "attachment", "createdAt", "updatedAt"]
+      },
+
+      "EvidenceCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "$ref": "#/components/schemas/EvidenceItemType" },
+          "title": { "type": "string", "minLength": 1 },
+          "date": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/ISODate" },
+              { "type": "string" },
+              { "type": "null" }
+            ]
+          },
+          "source": { "type": "string", "default": "" },
+          "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+          "notes": { "type": "string", "default": "" }
+        },
+        "required": ["type", "title"]
+      },
+
+      "EvidenceUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "$ref": "#/components/schemas/EvidenceItemType" },
+          "title": { "type": "string", "minLength": 1 },
+          "date": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/ISODate" },
+              { "type": "string" },
+              { "type": "null" }
+            ]
+          },
+          "source": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": "string" }
+        }
+      },
+
+      "EvidenceListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceItem" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["items", "limit", "offset", "total"]
+      },
+
+      "ExtractionCall": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/components/schemas/UUID" },
+          "casefileId": { "$ref": "#/components/schemas/UUID" },
+          "createdAt": { "$ref": "#/components/schemas/ISODateTime" },
+          "evidenceId": { "$ref": "#/components/schemas/UUID" },
+          "page": { "type": "integer", "minimum": 1 },
+          "snippet": { "type": "string" },
+          "label": { "type": "string" },
+          "bearingText": {
+            "type": "string",
+            "description": "Quadrant bearing display form, e.g., N 45°01'07\" E."
+          },
+          "distance": { "type": "number" },
+          "distanceUnit": { "type": "string", "default": "ft" },
+          "include": { "type": "boolean", "default": true },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.75 },
+          "orderIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional persisted ordering for UI/traverse. If omitted, server ordering is list order."
+          }
+        },
+        "required": ["id", "casefileId", "createdAt", "evidenceId", "page", "snippet", "label", "bearingText", "distance", "distanceUnit", "include", "confidence"]
+      },
+
+      "ExtractionCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "evidenceId": { "$ref": "#/components/schemas/UUID" },
+          "page": { "type": "integer", "minimum": 1, "default": 1 },
+          "snippet": { "type": "string", "default": "(manual entry)" },
+          "label": { "type": "string" },
+          "bearingText": { "type": "string" },
+          "distance": { "type": "number" },
+          "distanceUnit": { "type": "string", "default": "ft" },
+          "include": { "type": "boolean", "default": true },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.9 }
+        },
+        "required": ["evidenceId", "bearingText", "distance"]
+      },
+
+      "ExtractionUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "evidenceId": { "$ref": "#/components/schemas/UUID" },
+          "page": { "type": "integer", "minimum": 1 },
+          "snippet": { "type": "string" },
+          "label": { "type": "string" },
+          "bearingText": { "type": "string" },
+          "distance": { "type": "number" },
+          "distanceUnit": { "type": "string" },
+          "include": { "type": "boolean" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "orderIndex": { "type": "integer", "minimum": 0 }
+        }
+      },
+
+      "ExtractionListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ExtractionCall" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["items", "limit", "offset", "total"]
+      },
+
+      "ExtractionFromTextRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "evidenceId": { "$ref": "#/components/schemas/UUID" },
+          "page": { "type": "integer", "minimum": 1, "default": 1 },
+          "text": { "type": "string", "minLength": 1 },
+          "defaultUnit": { "type": "string", "default": "ft" },
+          "defaultConfidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.75 },
+          "includeByDefault": { "type": "boolean", "default": true }
+        },
+        "required": ["evidenceId", "text"]
+      },
+
+      "ExtractionFromTextResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "created": { "type": "array", "items": { "$ref": "#/components/schemas/ExtractionCall" } },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["created", "warnings"]
+      },
+
+      "ReorderIdsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/UUID" },
+            "minItems": 0,
+            "description": "Full ordered list of resource IDs."
+          }
+        },
+        "required": ["ids"]
+      },
+
+      "CornerStatus": {
+        "type": "string",
+        "enum": ["Existent", "Obliterated", "Lost", "Unknown"]
+      },
+
+      "CandidateKind": {
+        "type": "string",
+        "description": "Freeform allowed, but these map to the demo UI.",
+        "enum": ["Monument", "Record Call", "Occupation", "Computed", "Other"]
+      },
+
+      "CornerCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/components/schemas/UUID" },
+          "cornerId": { "$ref": "#/components/schemas/UUID" },
+          "kind": { "$ref": "#/components/schemas/CandidateKind" },
+          "refEvidenceId": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/UUID" },
+              { "type": "null" }
+            ],
+            "description": "Evidence reference. May be null for purely computed candidate."
+          },
+          "summary": { "type": "string" },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "chosen": { "type": "boolean" },
+          "justification": { "type": "string" }
+        },
+        "required": ["id", "cornerId", "kind", "refEvidenceId", "summary", "weight", "chosen", "justification"]
+      },
+
+      "Corner": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/components/schemas/UUID" },
+          "casefileId": { "$ref": "#/components/schemas/UUID" },
+          "name": { "type": "string" },
+          "plss": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/CornerStatus" },
+          "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/CornerCandidate" } },
+          "createdAt": { "$ref": "#/components/schemas/ISODateTime" },
+          "updatedAt": { "$ref": "#/components/schemas/ISODateTime" }
+        },
+        "required": ["id", "casefileId", "name", "plss", "status", "candidates", "createdAt", "updatedAt"]
+      },
+
+      "CornerCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "plss": { "type": "string", "default": "" },
+          "status": { "$ref": "#/components/schemas/CornerStatus" }
+        },
+        "required": ["name"]
+      },
+
+      "CornerUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "plss": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/CornerStatus" }
+        }
+      },
+
+      "CornerListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Corner" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["items", "limit", "offset", "total"]
+      },
+
+      "CandidateCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "$ref": "#/components/schemas/CandidateKind" },
+          "refEvidenceId": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/UUID" },
+              { "type": "null" }
+            ]
+          },
+          "summary": { "type": "string", "minLength": 1 },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5, "default": 3 }
+        },
+        "required": ["kind", "summary"]
+      },
+
+      "CandidateUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "$ref": "#/components/schemas/CandidateKind" },
+          "refEvidenceId": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/UUID" },
+              { "type": "null" }
+            ]
+          },
+          "summary": { "type": "string", "minLength": 1 },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5 }
+        }
+      },
+
+      "CandidateListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/CornerCandidate" } }
+        },
+        "required": ["items"]
+      },
+
+      "CornerDecisionSaveRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "justification": { "type": "string", "description": "Justification note text. If required and empty, server may reject." }
+        },
+        "required": ["justification"]
+      },
+
+      "DecisionLogEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/components/schemas/UUID" },
+          "casefileId": { "$ref": "#/components/schemas/UUID" },
+          "at": { "$ref": "#/components/schemas/ISODateTime" },
+          "cornerId": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/UUID" },
+              { "type": "null" }
+            ]
+          },
+          "cornerName": { "type": "string" },
+          "action": { "type": "string" },
+          "detail": { "type": "string" }
+        },
+        "required": ["id", "casefileId", "at", "cornerId", "cornerName", "action", "detail"]
+      },
+
+      "DecisionCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cornerId": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/UUID" },
+              { "type": "null" }
+            ]
+          },
+          "cornerName": { "type": "string", "default": "" },
+          "action": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string", "default": "" },
+          "at": { "$ref": "#/components/schemas/ISODateTime", "description": "Optional override; if omitted server uses now()." }
+        },
+        "required": ["action"]
+      },
+
+      "DecisionListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/DecisionLogEntry" } },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "total": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["items", "limit", "offset", "total"]
+      },
+
+      "TraverseStart": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "N": { "type": "number" },
+          "E": { "type": "number" }
+        },
+        "required": ["N", "E"]
+      },
+
+      "TraverseBasis": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string" },
+          "rotationDeg": { "type": "number", "default": 0 }
+        },
+        "required": ["label", "rotationDeg"]
+      },
+
+      "TraverseConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": { "$ref": "#/components/schemas/TraverseStart" },
+          "basis": { "$ref": "#/components/schemas/TraverseBasis" },
+          "calls": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/UUID" },
+            "description": "Ordered extraction IDs used for traverse. Typically synced from included calls."
+          },
+          "lastRun": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/ISODateTime" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["start", "basis", "calls", "lastRun"]
+      },
+
+      "TraverseUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": { "$ref": "#/components/schemas/TraverseStart" },
+          "basis": { "$ref": "#/components/schemas/TraverseBasis" },
+          "calls": { "type": "array", "items": { "$ref": "#/components/schemas/UUID" } }
+        }
+      },
+
+      "TraverseRunRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "overrideCalls": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/UUID" },
+            "description": "If provided, server computes using this list instead of stored traverse.calls (does not necessarily persist unless server chooses to)."
+          },
+          "overrideRotationDeg": {
+            "type": "number",
+            "description": "If provided, server computes using this rotation instead of stored basis.rotationDeg."
+          }
+        }
+      },
+
+      "TraversePoint": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pt": { "type": "integer", "minimum": 1 },
+          "N": { "type": "number" },
+          "E": { "type": "number" }
+        },
+        "required": ["pt", "N", "E"]
+      },
+
+      "TraverseSegment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ok": { "type": "boolean" },
+          "label": { "type": "string" },
+          "bearing": { "type": "string" },
+          "azimuthDeg": { "type": "number" },
+          "distance": { "type": "number" },
+          "dN": { "type": "number" },
+          "dE": { "type": "number" },
+          "from": { "$ref": "#/components/schemas/TraverseStart" },
+          "to": { "$ref": "#/components/schemas/TraverseStart" },
+          "err": { "type": "string" },
+          "extractionId": { "$ref": "#/components/schemas/UUID" }
+        },
+        "required": ["ok", "label", "bearing", "distance"]
+      },
+
+      "TraverseClosure": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dN": { "type": "number" },
+          "dE": { "type": "number" },
+          "misclose": { "type": "number" }
+        },
+        "required": ["dN", "dE", "misclose"]
+      },
+
+      "TraverseRunResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "casefileId": { "$ref": "#/components/schemas/UUID" },
+          "computedAt": { "$ref": "#/components/schemas/ISODateTime" },
+          "start": { "$ref": "#/components/schemas/TraverseStart" },
+          "rotationDeg": { "type": "number" },
+          "points": { "type": "array", "items": { "$ref": "#/components/schemas/TraversePoint" } },
+          "segments": { "type": "array", "items": { "$ref": "#/components/schemas/TraverseSegment" } },
+          "closure": { "$ref": "#/components/schemas/TraverseClosure" },
+          "totalDist": { "type": "number" },
+          "precision": { "type": "number", "description": "Relative precision (totalDist / misclose). Infinity if misclose=0." },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["casefileId", "computedAt", "start", "rotationDeg", "points", "segments", "closure", "totalDist", "precision", "warnings"]
+      },
+
+      "TraverseResultsEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lastRun": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/ISODateTime" },
+              { "type": "null" }
+            ]
+          },
+          "results": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/TraverseRunResult" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["lastRun", "results"]
+      },
+
+      "PrintablePackage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "casefile": { "$ref": "#/components/schemas/Casefile" },
+          "evidenceRegister": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceItem" } },
+          "includedCalls": { "type": "array", "items": { "$ref": "#/components/schemas/ExtractionCall" } },
+          "cornerSelections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "corner": { "$ref": "#/components/schemas/Corner" },
+                "chosenCandidate": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/CornerCandidate" },
+                    { "type": "null" }
+                  ]
+                },
+                "maxWeight": { "type": "integer", "minimum": 0 },
+                "requiresJustification": { "type": "boolean" }
+              },
+              "required": ["corner", "chosenCandidate", "maxWeight", "requiresJustification"]
+            }
+          },
+          "traverse": { "$ref": "#/components/schemas/TraverseResultsEnvelope" },
+          "generatedAt": { "$ref": "#/components/schemas/ISODateTime" }
+        },
+        "required": ["casefile", "evidenceRegister", "includedCalls", "cornerSelections", "traverse", "generatedAt"]
+      },
+
+      "CasefileBundle": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/components/schemas/UUID" },
+          "meta": { "$ref": "#/components/schemas/CasefileMeta" },
+
+          "evidence": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceItem" } },
+          "extractions": { "type": "array", "items": { "$ref": "#/components/schemas/ExtractionCall" } },
+          "corners": { "type": "array", "items": { "$ref": "#/components/schemas/Corner" } },
+
+          "traverse": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "start": { "$ref": "#/components/schemas/TraverseStart" },
+              "basis": { "$ref": "#/components/schemas/TraverseBasis" },
+              "calls": { "type": "array", "items": { "$ref": "#/components/schemas/UUID" } },
+              "lastRun": {
+                "anyOf": [
+                  { "$ref": "#/components/schemas/ISODateTime" },
+                  { "type": "null" }
+                ]
+              },
+              "results": {
+                "anyOf": [
+                  { "$ref": "#/components/schemas/TraverseRunResult" },
+                  { "type": "null" }
+                ]
+              }
+            },
+            "required": ["start", "basis", "calls", "lastRun", "results"]
+          },
+
+          "decisions": { "type": "array", "items": { "$ref": "#/components/schemas/DecisionLogEntry" } },
+
+          "__exportedAt": { "$ref": "#/components/schemas/ISODateTime" },
+          "__tool": { "type": "string" }
+        },
+        "required": ["id", "meta", "evidence", "extractions", "corners", "traverse", "decisions"]
+      },
+
+      "CasefileBundleImportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "bundle": { "$ref": "#/components/schemas/CasefileBundle" },
+          "rewriteIds": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, server generates new IDs for the casefile and all nested resources, updating internal references."
+          }
+        },
+        "required": ["bundle"]
+      }
+    }
+  }
+}
