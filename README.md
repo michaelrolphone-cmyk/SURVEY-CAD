@@ -819,3 +819,18 @@ This prevents PointForge-to-LineSmith imports from transposing easting/northing.
 - API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `POST /api/pointforge-exports`, `GET /api/pointforge-exports`.
 - WebSocket endpoints (unchanged): `GET /ws/lineforge?room=<roomId>`, `GET /ws/localstorage-sync`.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for project-linked Workbench persistence
+
+Workbench can now be launched from a SurveyFoundry project (`activeProjectId`) and bootstrap a linked casefile automatically. The server persists project↔casefile links in the sync snapshot and can derive/sync Workbench evidence from project sources (LineSmith drawings, PointForge point-files, and uploaded project files).
+
+- New project Workbench API endpoints:
+  - `GET /api/projects/{projectId}/workbench` — fetch linked casefile (if present).
+  - `PUT /api/projects/{projectId}/workbench/link` — link an existing casefile id to a project.
+  - `DELETE /api/projects/{projectId}/workbench/link` — remove the project↔casefile link.
+  - `POST /api/projects/{projectId}/workbench/casefile` — create a linked casefile for the project.
+  - `DELETE /api/projects/{projectId}/workbench/casefile` — delete the linked casefile and unlink it.
+  - `GET /api/projects/{projectId}/workbench/sources` — list project-derived evidence sources used by Workbench sync.
+  - `POST /api/projects/{projectId}/workbench/sync` — upsert/remove project-derived evidence in the linked casefile.
+- Existing BEW casefile APIs remain available (`/casefiles/*`) for direct operations.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.

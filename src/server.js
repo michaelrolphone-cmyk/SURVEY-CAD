@@ -27,6 +27,14 @@ import {
   createOrUpdateProjectPointFile,
   deleteProjectPointFile,
 } from './project-point-file-store.js';
+import {
+  getProjectWorkbenchLink,
+  setProjectWorkbenchLink,
+  clearProjectWorkbenchLink,
+  getProjectMetadata,
+  collectProjectWorkbenchSources,
+  syncProjectSourcesToCasefile,
+} from './project-workbench.js';
 
 import { loadFldConfig } from './fld-config.js';
 import {
@@ -87,6 +95,15 @@ function parseProjectPointFileRoute(pathname = '') {
   return {
     projectId: decodeURIComponent(match[1]),
     pointFileId: match[2] ? decodeURIComponent(match[2]) : '',
+  };
+}
+
+function parseProjectWorkbenchRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/workbench(?:\/(link|casefile|sources|sync))?\/?$/);
+  if (!match) return null;
+  return {
+    projectId: decodeURIComponent(match[1]),
+    action: match[2] ? decodeURIComponent(match[2]) : '',
   };
 }
 
@@ -866,6 +883,144 @@ export function createSurveyServer({
         }
 
         sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
+        return;
+      }
+
+
+      const projectWorkbenchRoute = parseProjectWorkbenchRoute(urlObj.pathname);
+      if (projectWorkbenchRoute) {
+        const { projectId, action } = projectWorkbenchRoute;
+
+        if (req.method === 'GET' && (!action || action === 'link')) {
+          const link = await getProjectWorkbenchLink(localStorageSyncStore, projectId);
+          if (!link) {
+            sendJson(res, 200, { projectId, link: null, casefile: null });
+            return;
+          }
+          const bew = await ensureBew({ existingRedis });
+          const casefile = await bew.store.getCasefile(link.casefileId);
+          sendJson(res, 200, { projectId, link, casefile });
+          return;
+        }
+
+        if (req.method === 'PUT' && action === 'link') {
+          const body = await readJsonBody(req);
+          const casefileId = String(body?.casefileId || '').trim();
+          if (!casefileId) {
+            sendJson(res, 400, { error: 'casefileId is required.' });
+            return;
+          }
+          const bew = await ensureBew({ existingRedis });
+          await bew.store.getCasefile(casefileId);
+          const result = await setProjectWorkbenchLink(localStorageSyncStore, projectId, casefileId);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { projectId, link: result.link });
+          return;
+        }
+
+        if (req.method === 'DELETE' && action === 'link') {
+          const result = await clearProjectWorkbenchLink(localStorageSyncStore, projectId);
+          if (result.sync) {
+            localStorageSyncWsService.broadcast({
+              type: 'sync-differential-applied',
+              operations: result?.sync?.allOperations || [],
+              state: {
+                version: result?.sync?.state?.version,
+                checksum: result?.sync?.state?.checksum,
+              },
+              originClientId: null,
+              requestId: null,
+            });
+          }
+          sendJson(res, 200, { projectId, deleted: result.deleted });
+          return;
+        }
+
+        if (req.method === 'POST' && (action === 'casefile' || action === 'sync' || action === '')) {
+          const body = await readJsonBody(req);
+          const bew = await ensureBew({ existingRedis });
+          let link = await getProjectWorkbenchLink(localStorageSyncStore, projectId);
+          let casefile = null;
+
+          if (action === 'casefile' || !link || body?.forceNewCasefile === true) {
+            const projectMeta = await getProjectMetadata(localStorageSyncStore, projectId);
+            const created = await bew.store.createCasefile({
+              name: String(body?.name || `${projectMeta.name} Workbench`).trim(),
+              jurisdiction: [projectMeta.county, projectMeta.state].filter(Boolean).join(', ') || 'Idaho',
+              notes: projectMeta.address || projectMeta.notes || '',
+              initializeDefaults: body?.initializeDefaults !== false,
+            });
+            const linked = await setProjectWorkbenchLink(localStorageSyncStore, projectId, created.id);
+            link = linked.link;
+            localStorageSyncWsService.broadcast({
+              type: 'sync-differential-applied',
+              operations: linked?.sync?.allOperations || [],
+              state: {
+                version: linked?.sync?.state?.version,
+                checksum: linked?.sync?.state?.checksum,
+              },
+              originClientId: null,
+              requestId: null,
+            });
+            casefile = created;
+          } else {
+            casefile = await bew.store.getCasefile(link.casefileId);
+          }
+
+          const sources = await collectProjectWorkbenchSources(localStorageSyncStore, projectId, {
+            uploadsDir: UPLOADS_DIR,
+            validFolderKeys: VALID_FOLDER_KEYS,
+          });
+          const sync = await syncProjectSourcesToCasefile(bew.store, link.casefileId, projectId, sources);
+          casefile = await bew.store.getCasefile(link.casefileId);
+          sendJson(res, 200, { projectId, link, casefile, sync, sources });
+          return;
+        }
+
+        if (req.method === 'DELETE' && action === 'casefile') {
+          const bew = await ensureBew({ existingRedis });
+          const link = await getProjectWorkbenchLink(localStorageSyncStore, projectId);
+          if (!link?.casefileId) {
+            sendJson(res, 404, { error: 'No linked casefile found for project.' });
+            return;
+          }
+          await bew.store.deleteCasefile(link.casefileId);
+          const unlinked = await clearProjectWorkbenchLink(localStorageSyncStore, projectId);
+          if (unlinked.sync) {
+            localStorageSyncWsService.broadcast({
+              type: 'sync-differential-applied',
+              operations: unlinked?.sync?.allOperations || [],
+              state: {
+                version: unlinked?.sync?.state?.version,
+                checksum: unlinked?.sync?.state?.checksum,
+              },
+              originClientId: null,
+              requestId: null,
+            });
+          }
+          sendJson(res, 200, { projectId, deleted: true });
+          return;
+        }
+
+        if (req.method === 'GET' && action === 'sources') {
+          const sources = await collectProjectWorkbenchSources(localStorageSyncStore, projectId, {
+            uploadsDir: UPLOADS_DIR,
+            validFolderKeys: VALID_FOLDER_KEYS,
+          });
+          sendJson(res, 200, { projectId, sources });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, DELETE.' });
         return;
       }
 

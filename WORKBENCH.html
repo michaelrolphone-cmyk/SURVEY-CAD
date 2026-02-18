@@ -319,6 +319,8 @@
   /* ----------------------------- API ------------------------------ */
   const API_BASE_KEY = "bew_api_base_v1";
   const ACTIVE_KEY   = "bew_active_casefile_id_v1";
+  const pageParams = new URLSearchParams(window.location.search);
+  const activeProjectId = pageParams.get("activeProjectId") || pageParams.get("projectId") || "";
 
   function normalizeBase(s){
     s = (s ?? "").trim();
@@ -456,6 +458,11 @@
     syncIncludedCalls: (casefileId) => apiRequest("POST",`/casefiles/${casefileId}/traverse:syncIncludedCalls`),
     runTraverse: (casefileId, body=null) => apiRequest("POST",`/casefiles/${casefileId}/traverse:run`,{ json: body || {} }),
     getTraverseResults: (casefileId) => apiRequest("GET",`/casefiles/${casefileId}/traverse/results`),
+
+    // Project-linked Workbench
+    getProjectWorkbench: (projectId) => apiRequest("GET",`/api/projects/${encodeURIComponent(projectId)}/workbench`),
+    createProjectCasefile: (projectId, body={}) => apiRequest("POST",`/api/projects/${encodeURIComponent(projectId)}/workbench/casefile`,{ json: body }),
+    syncProjectWorkbench: (projectId, body={}) => apiRequest("POST",`/api/projects/${encodeURIComponent(projectId)}/workbench/sync`,{ json: body }),
 
     // Outputs
     getPrintablePackage: (casefileId) => apiRequest("GET",`/casefiles/${casefileId}/outputs/package`)
@@ -2125,6 +2132,14 @@ N 00°00'27&quot; W 267.69
     });
     elPrintBtn.addEventListener("click", doPrintOutputs);
 
+    if (activeProjectId){
+      elLoadSampleBtn.style.display = "none";
+      elNewProjectBtn.style.display = "none";
+      elDupProjectBtn.style.display = "none";
+      elDelProjectBtn.style.display = "none";
+      elProjectSelect.title = `Linked to project ${activeProjectId}`;
+    }
+
     elLoadSampleBtn.addEventListener("click", () => {
       const ok = confirm("Create a NEW sample casefile via API? (Does not overwrite existing.)");
       if (!ok) return;
@@ -2142,19 +2157,32 @@ N 00°00'27&quot; W 267.69
       setApiHealthState("ERR");
     }
 
+    let pinnedCasefileId = "";
+    if (activeProjectId){
+      const linked = await api.syncProjectWorkbench(activeProjectId, {});
+      pinnedCasefileId = linked?.link?.casefileId || "";
+    }
+
     await refreshCasefiles();
 
     if (!state.casefiles.length){
-      const cf = await api.createCasefile("New Boundary Casefile", "Idaho", "", true);
+      const cf = activeProjectId
+        ? (await api.createProjectCasefile(activeProjectId, {}))
+        : (await api.createCasefile("New Boundary Casefile", "Idaho", "", true));
+      const createdId = cf?.id || cf?.casefile?.id;
       await refreshCasefiles();
-      await setActiveCasefile(cf.id);
+      await setActiveCasefile(createdId);
       fillProjectSelect();
-      elProjectSelect.value = cf.id;
+      elProjectSelect.value = createdId;
     } else {
       const saved = localStorage.getItem(ACTIVE_KEY);
-      const pick = (saved && state.casefiles.some(x=>x.id===saved)) ? saved : state.casefiles[0].id;
+      const pickDefault = (saved && state.casefiles.some(x=>x.id===saved)) ? saved : state.casefiles[0].id;
+      const pick = (pinnedCasefileId && state.casefiles.some(x=>x.id===pinnedCasefileId)) ? pinnedCasefileId : pickDefault;
       await setActiveCasefile(pick);
       elProjectSelect.value = pick;
+      if (activeProjectId && pinnedCasefileId){
+        elProjectSelect.disabled = true;
+      }
     }
     await ensureTabData(state.tab);
     render();
