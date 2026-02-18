@@ -11,13 +11,19 @@ test('WORKBENCH bootstraps active project casefile linkage via API', async () =>
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
   assert.match(html, /const activeProjectId = pageParams\.get\("activeProjectId"\) \|\| pageParams\.get\("projectId"\) \|\| "";/);
   assert.match(html, /syncProjectWorkbench: \(projectId, body=\{\}\) => apiRequest\("POST",`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/workbench\/sync`/);
-  assert.match(html, /if \(activeProjectId\)\{[\s\S]*const linked = await api\.syncProjectWorkbench\(activeProjectId, \{\}\);[\s\S]*pinnedCasefileId = linked\?\.link\?\.casefileId \|\| linked\?\.casefile\?\.id \|\| "";[\s\S]*\}/);
+  assert.match(html, /if \(activeProjectId\)\{[\s\S]*try\{[\s\S]*const linked = await api\.syncProjectWorkbench\(activeProjectId, \{\}\);[\s\S]*pinnedCasefileId = linked\?\.link\?\.casefileId \|\| linked\?\.casefile\?\.id \|\| "";[\s\S]*\}catch\(err\)\{[\s\S]*project sync bootstrap failed[\s\S]*\}[\s\S]*\}/);
 });
 
 test('WORKBENCH creates linked casefile for active project when missing', async () => {
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
-  assert.match(html, /if \(activeProjectId\)\{[\s\S]*if \(!linkedExists\)\{[\s\S]*await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*\}[\s\S]*\}/);
-  assert.match(html, /if \(!state\.casefiles\.length\)\{[\s\S]*const cf = activeProjectId[\s\S]*await api\.createProjectCasefile\(activeProjectId, \{\}\)[\s\S]*: \(await api\.createCasefile\("New Boundary Casefile", "Idaho", "", true\)\);/);
+  assert.match(html, /if \(activeProjectId\)\{[\s\S]*if \(!linkedExists\)\{[\s\S]*try\{[\s\S]*await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*\}catch\(err\)\{[\s\S]*project-linked casefile bootstrap failed[\s\S]*\}[\s\S]*\}[\s\S]*\}/);
+  assert.match(html, /if \(!state\.casefiles\.length\)\{[\s\S]*let cf = null;[\s\S]*if \(activeProjectId\)\{[\s\S]*cf = await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*\}[\s\S]*if \(!cf\)\{[\s\S]*api\.createCasefile\("New Boundary Casefile", "Idaho", "", true\);[\s\S]*\}[\s\S]*\}/);
+});
+
+test('WORKBENCH chooses a fallback casefile id when bootstrap responses omit id', async () => {
+  const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
+  assert.match(html, /const fallbackId = createdId \|\| state\.casefiles\?\.\[0\]\?\.id \|\| "";/);
+  assert.match(html, /if \(fallbackId\)\{[\s\S]*await setActiveCasefile\(fallbackId\);[\s\S]*\}/);
 });
 
 test('WORKBENCH no longer exposes API base or project picker controls', async () => {
