@@ -148,6 +148,26 @@ Request body for create/update:
 ```
 
 
+
+### API endpoints (project point file CRUD)
+
+PointForge/EvidenceDesk now use project-scoped point-file CRUD endpoints backed by the same shared localStorage sync snapshot, including differential version history so sync/offline flows remain consistent.
+
+- `GET /api/projects/:projectId/point-files` – list point-file summaries for a project.
+- `POST /api/projects/:projectId/point-files` – create a point-file record from `pointFileState`.
+- `GET /api/projects/:projectId/point-files/:pointFileId` – fetch full point-file record + reconstructed `currentState`.
+- `PUT /api/projects/:projectId/point-files/:pointFileId` (or `PATCH`) – append a new differential version for an existing point file.
+- `DELETE /api/projects/:projectId/point-files/:pointFileId` – remove the point-file record from the project.
+
+Request body for create/update:
+
+```json
+{
+  "pointFileName": "Boundary Export.csv",
+  "pointFileState": { "text": "1,100,200", "exportFormat": "csv" }
+}
+```
+
 ### CLI / server commands
 
 - `npm start` – starts the server with optional Redis persistence via `REDIS_URL`.

@@ -884,6 +884,100 @@ Delete a drawing record from a project.
 
 **Response `404`:** `{ "error": "Drawing not found." }`
 
+## Project Point Files (Project-scoped CRUD)
+
+Project-scoped point files are persisted in the shared sync snapshot (Redis-backed when configured) and keep differential version history for offline-friendly reconstruction across PointForge and EvidenceDesk.
+
+### `GET /api/projects/:projectId/point-files`
+
+List point-file summaries for a project.
+
+**Response `200`:**
+```json
+{
+  "projectId": "proj-1",
+  "pointFiles": [
+    {
+      "pointFileId": "boundary-export",
+      "pointFileName": "Boundary Export.csv",
+      "exportFormat": "csv",
+      "createdAt": "2026-02-18T00:00:00.000Z",
+      "updatedAt": "2026-02-18T00:10:00.000Z",
+      "latestVersionId": "v-1739837400000",
+      "versionCount": 2
+    }
+  ]
+}
+```
+
+### `POST /api/projects/:projectId/point-files`
+
+Create a point-file record for a project.
+
+**Request Body:**
+```json
+{
+  "pointFileName": "Boundary Export.csv",
+  "pointFileState": {
+    "text": "1,100,200",
+    "exportFormat": "csv"
+  }
+}
+```
+
+**Response `201`:**
+```json
+{
+  "pointFile": {
+    "projectId": "proj-1",
+    "pointFileId": "boundary-export",
+    "pointFileName": "Boundary Export.csv",
+    "versions": [
+      {
+        "versionId": "v-1739836800000",
+        "savedAt": "2026-02-18T00:00:00.000Z",
+        "label": "Boundary Export.csv",
+        "baseState": { "text": "1,100,200", "exportFormat": "csv" }
+      }
+    ],
+    "currentState": { "text": "1,100,200", "exportFormat": "csv" }
+  }
+}
+```
+
+### `GET /api/projects/:projectId/point-files/:pointFileId`
+
+Fetch the full point-file record and reconstructed latest state.
+
+**Response `200`:**
+```json
+{
+  "pointFile": { ... }
+}
+```
+
+**Response `404`:** `{ "error": "Point file not found." }`
+
+### `PUT /api/projects/:projectId/point-files/:pointFileId`
+### `PATCH /api/projects/:projectId/point-files/:pointFileId`
+
+Append a new point-file version using differential patching from the prior version.
+
+### `DELETE /api/projects/:projectId/point-files/:pointFileId`
+
+Delete a point-file record from a project.
+
+**Response `200`:**
+```json
+{
+  "deleted": true
+}
+```
+
+**Response `404`:** `{ "error": "Point file not found." }`
+
+---
+
 ---
 
 ## PointForge Exports

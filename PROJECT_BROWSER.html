@@ -236,6 +236,45 @@
       window.location.assign(path);
     }
 
+    function buildProjectPointFileApiUrl(projectId = '', pointFileId = '') {
+      if (!projectId) return '';
+      const base = `/api/projects/${encodeURIComponent(projectId)}/point-files`;
+      return pointFileId ? `${base}/${encodeURIComponent(pointFileId)}` : base;
+    }
+
+    function mapApiPointFileToResource(projectId, pointFile = {}) {
+      const pointFileId = String(pointFile.pointFileId || '').trim();
+      const pointFileName = String(pointFile.pointFileName || pointFileId || 'Point File').trim();
+      return {
+        id: pointFileId,
+        folder: 'point-files',
+        title: pointFileName,
+        exportFormat: pointFile.exportFormat || 'csv',
+        reference: {
+          type: 'project-point-file',
+          value: pointFileId,
+          resolverHint: 'project-point-file-api',
+          metadata: {
+            projectId,
+            pointFileId,
+          },
+        },
+      };
+    }
+
+    async function syncProjectPointFilesFromApi(projectContext = {}) {
+      if (!projectContext?.activeProjectId || !projectContext?.projectFile) return;
+      const response = await fetch(buildProjectPointFileApiUrl(projectContext.activeProjectId));
+      if (!response.ok) throw new Error(`Unable to list project point files (${response.status}).`);
+      const payload = await response.json();
+      const list = Array.isArray(payload?.pointFiles) ? payload.pointFiles : [];
+
+      const folder = projectContext.projectFile?.folders?.find((entry) => entry.key === 'point-files');
+      if (!folder) return;
+      folder.index = list.map((entry) => mapApiPointFileToResource(projectContext.activeProjectId, entry));
+      saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+    }
+
     async function resolvePointFileText(resource) {
       const ref = resource?.reference;
       if (!ref?.value) return null;
@@ -252,6 +291,16 @@
         const response = await fetch(ref.value);
         if (!response.ok) return null;
         return await response.text();
+      }
+
+      if (ref.type === 'project-point-file') {
+        const projectId = ref.metadata?.projectId || resource?.projectId || '';
+        const pointFileId = ref.metadata?.pointFileId || ref.value || resource?.id || '';
+        if (!projectId || !pointFileId) return null;
+        const response = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId));
+        if (!response.ok) return null;
+        const payload = await response.json();
+        return String(payload?.pointFile?.currentState?.text || '');
       }
 
       return null;
@@ -286,6 +335,7 @@
       localStorage.setItem(POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY, JSON.stringify({
         csv: text,
         title: resource.title || resource.id || 'Point File',
+        pointFileId: resource?.reference?.metadata?.pointFileId || resource?.id || '',
       }));
 
       const destination = new URL('/POINT_TRANSFORMER.HTML', window.location.origin);
@@ -463,24 +513,24 @@
 
       let uploadedCount = 0;
       for (const file of accepted) {
-        const formData = new FormData();
-        formData.append('projectId', context.activeProjectId);
-        formData.append('folderKey', 'point-files');
-        formData.append('file', file, file.name);
-
         try {
-          const response = await fetch('/api/project-files/upload', {
+          const text = await file.text();
+          const response = await fetch(buildProjectPointFileApiUrl(context.activeProjectId), {
             method: 'POST',
-            body: formData,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pointFileName: file.name,
+              pointFileState: { text, exportFormat: 'csv' },
+              source: 'evidence-desk-upload',
+              sourceLabel: file.name,
+            }),
           });
           if (!response.ok) {
             const err = await response.json().catch(() => ({ error: 'Upload failed.' }));
             context.setUploadStatus(`Failed to upload ${file.name}: ${err.error}`);
             continue;
           }
-          const { resource } = await response.json();
-          const appended = appendResourceToFolder(context.projectFile, 'point-files', resource);
-          if (appended) uploadedCount += 1;
+          uploadedCount += 1;
         } catch (err) {
           context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
         }
@@ -491,7 +541,7 @@
         return;
       }
 
-      saveStoredProjectFile(window.localStorage, context.activeProjectId, context.projectFile);
+      await syncProjectPointFilesFromApi(context);
       context.setUploadStatus(`Uploaded ${uploadedCount} point file${uploadedCount === 1 ? '' : 's'} to this project.`);
       renderTree(context.projectFile, context);
     }
@@ -717,7 +767,7 @@
           const resource = document.createElement('div');
           resource.className = 'file-row';
 
-          const canLaunchPointForge = folder.key === 'point-files' && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload');
+          const canLaunchPointForge = folder.key === 'point-files' && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
           const canOpenLineSmithDrawing = folder.key === 'drawings' && entry?.reference?.type === 'local-storage';
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
@@ -750,15 +800,21 @@
             deletePointFileButton.className = 'launch-btn';
             deletePointFileButton.textContent = 'Delete';
             deletePointFileButton.title = 'Remove this point file from the project';
-            deletePointFileButton.addEventListener('click', (event) => {
+            deletePointFileButton.addEventListener('click', async (event) => {
               event.stopPropagation();
               if (!window.confirm(`Remove "${entry.title}" from the project?`)) return;
-              const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
-              if (!removed) {
+              const projectId = projectContext?.activeProjectId;
+              const pointFileId = entry?.reference?.metadata?.pointFileId || entry?.id;
+              if (!projectId || !pointFileId) {
                 renderError(`Could not remove ${entry?.title || entry?.id || 'point file'}.`);
                 return;
               }
-              saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+              const response = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId), { method: 'DELETE' });
+              if (!response.ok) {
+                renderError(`Could not remove ${entry?.title || entry?.id || 'point file'}.`);
+                return;
+              }
+              await syncProjectPointFilesFromApi(projectContext);
               projectContext.setUploadStatus(`Removed ${entry.title}.`);
               renderTree(projectContext.projectFile, projectContext);
             });
@@ -914,6 +970,11 @@
       if (storedProjectFile) {
         projectContext.projectFile = storedProjectFile;
         projectContext.uploadStatus = uploadStatus;
+        if (activeProjectId) {
+          try {
+            await syncProjectPointFilesFromApi(projectContext);
+          } catch {}
+        }
         renderTree(storedProjectFile, projectContext);
         return;
       }
@@ -936,6 +997,11 @@
 
         projectContext.projectFile = payload.projectFile;
         projectContext.uploadStatus = uploadStatus;
+        if (activeProjectId) {
+          try {
+            await syncProjectPointFilesFromApi(projectContext);
+          } catch {}
+        }
         renderTree(payload.projectFile, projectContext);
       } catch (err) {
         renderError(`Project browser failed to load: ${err.message}`);
