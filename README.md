@@ -115,6 +115,13 @@ Set these environment variables in Heroku:
 
 When `REDIS_URL` is set, `npm start` attempts to hydrate and persist shared sync state in Redis and will retry Redis connections during startup for up to `REDIS_CONNECT_MAX_WAIT_MS`. If Redis remains unavailable after the retry window or `REDIS_URL` is not set, the server falls back to in-memory sync state instead of crashing.
 
+### API/CLI endpoints and commands for this BEW Redis TLS fix
+
+The BEW casefile backend now supports `REDIS_TLS_REJECT_UNAUTHORIZED` (preferred) while retaining compatibility with `REDIS_TLS_INSECURE`, so ioredis can connect to self-signed Heroku Redis certificates without failing TLS verification by default.
+
+- API endpoints (unchanged): `GET /casefiles`, `POST /casefiles`, `GET /casefiles/:casefileId`, `PATCH /casefiles/:casefileId`, `DELETE /casefiles/:casefileId`, plus the equivalent `/api/bew/*` prefixed routes.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ### API endpoints (state sync)
 
 - `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum.
