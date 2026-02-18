@@ -121,6 +121,26 @@ When `REDIS_URL` is set, `npm start` attempts to hydrate and persist shared sync
 - `POST /api/localstorage-sync` – pushes a client snapshot and resolves stale/conflict state.
 - `GET /ws/localstorage-sync` (websocket upgrade) – real-time differential sync for all connected clients.
 
+### API endpoints (LineSmith drawing CRUD in project scope)
+
+Dedicated drawing CRUD endpoints are now available for project-scoped LineSmith drawings. These endpoints persist drawing records (including differential version history) inside the same Redis-backed sync store used by localStorage collaboration, so multi-user sync and offline-first local editing flows remain compatible.
+
+- `GET /api/projects/:projectId/drawings` – list drawing summaries for a project.
+- `POST /api/projects/:projectId/drawings` – create a drawing record (or named drawing id) from `drawingState`.
+- `GET /api/projects/:projectId/drawings/:drawingId` – fetch full drawing record + reconstructed `currentState`.
+- `PUT /api/projects/:projectId/drawings/:drawingId` (or `PATCH`) – append a new differential version for an existing drawing.
+- `DELETE /api/projects/:projectId/drawings/:drawingId` – remove the drawing record from the project.
+
+Request body for create/update:
+
+```json
+{
+  "drawingName": "Boundary Base Map",
+  "drawingState": { "points": [] }
+}
+```
+
+
 ### CLI / server commands
 
 - `npm start` – starts the server with optional Redis persistence via `REDIS_URL`.

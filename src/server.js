@@ -15,6 +15,12 @@ import { createCrewPresenceWsService } from './crew-presence-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
 import { createLmProxyHubWsService } from "./lmstudio-proxy-control-ws.js";
 import { createRedisClient as createBewRedisClient } from "./bew-redis.js";
+import {
+  listProjectDrawings,
+  getProjectDrawing,
+  createOrUpdateProjectDrawing,
+  deleteProjectDrawing,
+} from './project-drawing-store.js';
 
 import { loadFldConfig } from './fld-config.js';
 import {
@@ -58,6 +64,15 @@ function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(payload));
+}
+
+function parseProjectDrawingRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/drawings(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
+  return {
+    projectId: decodeURIComponent(match[1]),
+    drawingId: match[2] ? decodeURIComponent(match[2]) : '',
+  };
 }
 
 function getErrorStatusCode(err) {
@@ -766,6 +781,73 @@ export function createSurveyServer({
           return;
         }
         sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+        return;
+      }
+
+      const drawingRoute = parseProjectDrawingRoute(urlObj.pathname);
+      if (drawingRoute) {
+        const { projectId, drawingId } = drawingRoute;
+
+        if (req.method === 'GET' && !drawingId) {
+          const drawings = await listProjectDrawings(localStorageSyncStore, projectId);
+          sendJson(res, 200, { projectId, drawings });
+          return;
+        }
+
+        if (req.method === 'GET' && drawingId) {
+          const drawing = await getProjectDrawing(localStorageSyncStore, projectId, drawingId);
+          if (!drawing) {
+            sendJson(res, 404, { error: 'Drawing not found.' });
+            return;
+          }
+          sendJson(res, 200, { drawing });
+          return;
+        }
+
+        if ((req.method === 'POST' && !drawingId) || ((req.method === 'PUT' || req.method === 'PATCH') && drawingId)) {
+          const body = await readJsonBody(req);
+          const payloadDrawingId = drawingId || body.drawingId || body.drawingName;
+          const result = await createOrUpdateProjectDrawing(localStorageSyncStore, {
+            projectId,
+            drawingId: payloadDrawingId,
+            drawingName: body.drawingName,
+            drawingState: body.drawingState,
+          });
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { drawing: result.drawing });
+          return;
+        }
+
+        if (req.method === 'DELETE' && drawingId) {
+          const deletedResult = await deleteProjectDrawing(localStorageSyncStore, projectId, drawingId);
+          if (!deletedResult) {
+            sendJson(res, 404, { error: 'Drawing not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: deletedResult?.sync?.allOperations || [],
+            state: {
+              version: deletedResult?.sync?.state?.version,
+              checksum: deletedResult?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
         return;
       }
 

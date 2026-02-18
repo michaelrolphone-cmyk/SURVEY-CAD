@@ -1,0 +1,62 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createSurveyServer } from '../src/server.js';
+import SurveyCadClient from '../src/survey-api.js';
+
+async function startServer() {
+  const server = createSurveyServer({ client: new SurveyCadClient() });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return { server, port: server.address().port };
+}
+
+test('project drawing CRUD API stores drawing versions and supports list/get/delete', async () => {
+  const app = await startServer();
+
+  try {
+    const createRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'Boundary Draft',
+        drawingState: { points: [{ id: 'p-1', x: 1, y: 2 }], mapGeoreference: { origin: [0, 0] } },
+      }),
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.drawing.drawingName, 'Boundary Draft');
+    const drawingId = created.drawing.drawingId;
+
+    const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'Boundary Draft',
+        drawingState: { points: [{ id: 'p-1', x: 3, y: 2 }, { id: 'p-2', x: 5, y: 8 }], mapGeoreference: { origin: [10, 10] } },
+      }),
+    });
+    assert.equal(updateRes.status, 200);
+    const updated = await updateRes.json();
+    assert.equal(updated.drawing.versions.length, 2);
+
+    const listRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`);
+    assert.equal(listRes.status, 200);
+    const listed = await listRes.json();
+    assert.equal(listed.drawings.length, 1);
+    assert.equal(listed.drawings[0].versionCount, 2);
+
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`);
+    assert.equal(getRes.status, 200);
+    const loaded = await getRes.json();
+    assert.equal(loaded.drawing.currentState.points[0].x, 3);
+
+    const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
+      method: 'DELETE',
+    });
+    assert.equal(deleteRes.status, 200);
+
+    const missingRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`);
+    assert.equal(missingRes.status, 404);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
