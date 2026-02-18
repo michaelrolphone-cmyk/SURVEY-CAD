@@ -653,6 +653,8 @@
 
     orbit.target.copy(center);
     orbit.update();
+    updateCameraClippingForBox(box3);
+    updateFogForBox(box3);
   }
 
   function updateFogForBox(box3){
@@ -663,14 +665,43 @@
     }
 
     const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
     box3.getSize(size);
+    box3.getCenter(center);
     const maxDim = Math.max(size.x, size.y, size.z, 1);
+    const cameraDistance = camera.position.distanceTo(center);
 
     // Keep scene readable while zooming very far out/in on large or tiny models.
-    const fogFar = Math.max(maxDim * 24, 7000);
-    const fogNear = Math.max(50, Math.min(fogFar * 0.4, maxDim * 3));
+    const fogFar = Math.max(maxDim * 24, cameraDistance + (maxDim * 8), 7000);
+    const fogNear = Math.max(25, Math.min(fogFar * 0.85, Math.max(maxDim * 0.75, cameraDistance * 0.35)));
     scene.fog.near = fogNear;
     scene.fog.far = fogFar;
+  }
+
+  function updateCameraClippingForBox(box3){
+    if (!box3) {
+      camera.near = 0.1;
+      camera.far = 80000;
+      camera.updateProjectionMatrix();
+      return;
+    }
+
+    const center = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    box3.getCenter(center);
+    box3.getSize(size);
+
+    const maxDim = Math.max(size.x, size.y, size.z, 1);
+    const cameraDistance = camera.position.distanceTo(center);
+    const far = Math.max(80000, cameraDistance + (maxDim * 18));
+    const nearCandidate = Math.max(0.05, (cameraDistance - (maxDim * 1.5)) * 0.25);
+    const near = Math.min(Math.max(0.05, nearCandidate), far * 0.5);
+
+    if (Math.abs(camera.near - near) > 0.0001 || Math.abs(camera.far - far) > 0.1) {
+      camera.near = near;
+      camera.far = far;
+      camera.updateProjectionMatrix();
+    }
   }
 
   function degToRad(d){ return d * Math.PI / 180; }
@@ -1406,6 +1437,7 @@
     applyShadowQuality();
     applyShadowMode();
     updateSunForBounds(box3);
+    updateCameraClippingForBox(box3);
     updateFogForBox(box3);
 
     if (contoursOn.checked){
@@ -1551,7 +1583,6 @@
       const box3 = new THREE.Box3().setFromBufferAttribute(posAttr);
       fitViewToBox(box3);
       updateSunForBounds(box3);
-      updateFogForBox(box3);
       setStatus(true, "Fit view.");
     } catch (err) {
       setStatus(false, err?.message || String(err));
@@ -1657,6 +1688,10 @@
     resize();
     if (orbit.enabled) orbit.update();
     fpsUpdate(dt);
+    if (lastBounds) {
+      updateCameraClippingForBox(lastBounds);
+      updateFogForBox(lastBounds);
+    }
     renderer.render(scene, camera);
   }
   animate();
