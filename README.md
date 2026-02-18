@@ -819,3 +819,31 @@ This prevents PointForge-to-LineSmith imports from transposing easting/northing.
 - API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `POST /api/pointforge-exports`, `GET /api/pointforge-exports`.
 - WebSocket endpoints (unchanged): `GET /ws/lineforge?room=<roomId>`, `GET /ws/localstorage-sync`.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith END-terminated sequence fix
+
+LineSmith field-to-finish sequential line construction now keeps active linework sequences open across unrelated point codes (for example, taking a non-fence utility shot between fence points). Sequential linework now breaks on explicit `END`/`CLO` directives instead of breaking only because intermediate points do not contain the active line code.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith BEG restart sequencing fix
+
+LineSmith sequential command parsing now supports both `CODE BEG` and `BEG CODE` token order. When a new `BEG` for a line code is encountered, the previous run for that code is treated as terminated and a new run starts from that point.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith numbered line-sequence fix
+
+LineSmith now treats numbered line codes as distinct sequence channels (for example, `FL1` and `FL7`). When points are interwoven, each numbered code is resolved and tracked as its own active sequence so unique linework is drawn per numbered run.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith base+numbered coexistence sequence fix
+
+LineSmith now lets an unnumbered base line code (for example, `FL`) continue its own sequence even when interwoven numbered variants (such as `FL1`/`FL7`) are present. Numbered runs remain distinct sequence channels, while the base run is no longer interrupted by those numbered tokens.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.

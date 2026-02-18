@@ -4773,9 +4773,48 @@ function paintBackground(ctx, w, h){
     return markerCanvas;
   }
 
-  function pointSupportsLineworkSequenceToken(tokenSet, lineCode) {
-    if (tokenSet.has(lineCode)) return true;
-    const companionCodes = fieldToFinishRuleState.lineworkCompanionCodes.get(lineCode);
+  function splitLineworkSequenceCodeToken(token = "") {
+    const normalized = String(token ?? "").trim().toUpperCase();
+    if (!normalized) return { sequenceKey: "", baseCode: "", numericSuffix: "" };
+    const match = /^([A-Z]+)(\d+)$/.exec(normalized);
+    if (!match) return { sequenceKey: normalized, baseCode: normalized, numericSuffix: "" };
+    return {
+      sequenceKey: normalized,
+      baseCode: match[1],
+      numericSuffix: match[2],
+    };
+  }
+
+  function resolveLineworkSequenceKey(token = "", explicitSequentialBaseCodes = new Set()) {
+    const parsed = splitLineworkSequenceCodeToken(token);
+    const sequenceKey = parsed.sequenceKey;
+    const baseCode = parsed.baseCode;
+    if (!sequenceKey) return "";
+    if (fieldToFinishRuleState.lineworkCodes.has(sequenceKey) || explicitSequentialBaseCodes.has(sequenceKey)) {
+      return sequenceKey;
+    }
+    if (!parsed.numericSuffix) return "";
+    if (fieldToFinishRuleState.lineworkCodes.has(baseCode) || explicitSequentialBaseCodes.has(baseCode)) {
+      return sequenceKey;
+    }
+    return "";
+  }
+
+  function pointSupportsLineworkSequenceToken(tokenSet, sequenceKey) {
+    const parsed = splitLineworkSequenceCodeToken(sequenceKey);
+    if (!parsed.sequenceKey) return false;
+    if (tokenSet.has(parsed.sequenceKey)) return true;
+
+    if (!parsed.numericSuffix) {
+      for (const token of tokenSet) {
+        const tokenParsed = splitLineworkSequenceCodeToken(token);
+        if (tokenParsed.numericSuffix && tokenParsed.baseCode === parsed.baseCode) return true;
+      }
+    } else {
+      return false;
+    }
+
+    const companionCodes = fieldToFinishRuleState.lineworkCompanionCodes.get(parsed.baseCode);
     if (!companionCodes?.size) return false;
     for (const companionCode of companionCodes) {
       if (tokenSet.has(companionCode)) return true;
@@ -4823,10 +4862,26 @@ function paintBackground(ctx, w, h){
       parse(_raw, tokensUpper) {
         const commands = [];
         const directives = new Set(["BEG", "END", "CLO"]);
+        const seen = new Set();
         for (let i = 0; i < tokensUpper.length - 1; i++) {
-          const baseCode = tokensUpper[i];
-          const action = tokensUpper[i + 1];
-          if (!baseCode || directives.has(baseCode) || !directives.has(action)) continue;
+          const first = tokensUpper[i];
+          const second = tokensUpper[i + 1];
+          if (!first || !second) continue;
+
+          let baseCode = "";
+          let action = "";
+          if (!directives.has(first) && directives.has(second)) {
+            baseCode = first;
+            action = second;
+          } else if (directives.has(first) && !directives.has(second)) {
+            baseCode = second;
+            action = first;
+          }
+
+          if (!baseCode || !action) continue;
+          const key = `${baseCode}:${action}:${i}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
           commands.push({ type: "sequential-line", baseCode, action });
         }
         return commands;
@@ -5151,41 +5206,43 @@ function paintBackground(ctx, w, h){
       const explicitActions = new Set();
       for (const cmd of commands) {
         if (cmd.type !== "sequential-line") continue;
-        const baseCode = cmd.baseCode;
+        const sequenceKey = resolveLineworkSequenceKey(cmd.baseCode, explicitSequentialBaseCodes);
+        if (!sequenceKey) continue;
+        const parsedSequence = splitLineworkSequenceCodeToken(sequenceKey);
+        const baseCode = parsedSequence.baseCode;
         const action = cmd.action;
+        explicitSequentialBaseCodes.add(sequenceKey);
         explicitSequentialBaseCodes.add(baseCode);
-        explicitActions.add(baseCode);
+        explicitActions.add(sequenceKey);
         if (action === "BEG") {
-          activeSequences.set(baseCode, { startPointId: point.id, lastPointId: point.id });
+          activeSequences.set(sequenceKey, { startPointId: point.id, lastPointId: point.id, baseCode: sequenceKey });
           continue;
         }
-        const active = activeSequences.get(baseCode);
+        const active = activeSequences.get(sequenceKey);
         if (!active) continue;
         if (point.id !== active.lastPointId) {
-          lineCommands.push({ a: active.lastPointId, b: point.id, baseCode });
+          lineCommands.push({ a: active.lastPointId, b: point.id, baseCode: sequenceKey });
           active.lastPointId = point.id;
         }
         if (action === "CLO" && active.startPointId !== active.lastPointId) {
-          lineCommands.push({ a: active.lastPointId, b: active.startPointId, baseCode });
+          lineCommands.push({ a: active.lastPointId, b: active.startPointId, baseCode: sequenceKey });
         }
-        activeSequences.delete(baseCode);
+        activeSequences.delete(sequenceKey);
       }
 
-      const pointImplicitSequenceCodes = [...tokenSet].filter((token) => (
-        (lineworkCodes.has(token) || explicitSequentialBaseCodes.has(token))
-        && !curveLineworkCodes.has(token)
-      ));
+      const pointImplicitSequenceCodes = [...tokenSet]
+        .map((token) => resolveLineworkSequenceKey(token, explicitSequentialBaseCodes))
+        .filter((token, index, arr) => token && arr.indexOf(token) === index)
+        .filter((token) => {
+          const tokenBaseCode = splitLineworkSequenceCodeToken(token).baseCode;
+          return !curveLineworkCodes.has(token) && !curveLineworkCodes.has(tokenBaseCode);
+        });
 
       const hasGlobalEndDirective = tokenSet.has("END") && !commands.some((cmd) => cmd.type === "sequential-line");
       if (hasGlobalEndDirective) activeSequences.clear();
 
-      // Maintain sequence continuity for normal linework codes even when a point
-      // also carries join directives (e.g. "FNL JPN131 ...").
-      for (const baseCode of [...activeSequences.keys()]) {
-        if (explicitActions.has(baseCode)) continue;
-        if (pointSupportsLineworkSequenceToken(tokenSet, baseCode)) continue;
-        activeSequences.delete(baseCode);
-      }
+      // Keep active sequences alive across unrelated shots so linework only
+      // terminates when an explicit END/CLO directive is encountered.
 
       for (const lineCode of pointImplicitSequenceCodes) {
         if (explicitActions.has(lineCode)) continue;
