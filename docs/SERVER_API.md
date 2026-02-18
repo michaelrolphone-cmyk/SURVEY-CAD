@@ -770,6 +770,122 @@ Push a full state snapshot to the server (full sync).
 
 ---
 
+## LineSmith Drawings (Project-scoped CRUD)
+
+Project-scoped LineSmith drawings are persisted in the shared sync snapshot (Redis-backed when configured) and keep differential version history for offline-friendly reconstruction.
+
+### `GET /api/projects/:projectId/drawings`
+
+List drawing summaries for a project.
+
+**Response `200`:**
+```json
+{
+  "projectId": "proj-1",
+  "drawings": [
+    {
+      "drawingId": "boundary-base-map",
+      "drawingName": "Boundary Base Map",
+      "createdAt": "2026-02-18T00:00:00.000Z",
+      "updatedAt": "2026-02-18T00:10:00.000Z",
+      "latestVersionId": "v-1739837400000",
+      "versionCount": 3,
+      "latestMapGeoreference": { "origin": [0, 0] }
+    }
+  ]
+}
+```
+
+### `POST /api/projects/:projectId/drawings`
+
+Create a drawing record for a project.
+
+**Request Body:**
+```json
+{
+  "drawingName": "Boundary Base Map",
+  "drawingState": {
+    "points": [{ "id": "p-1", "x": 1000, "y": 2000 }],
+    "mapGeoreference": { "origin": [0, 0] }
+  }
+}
+```
+
+**Response `201`:**
+```json
+{
+  "drawing": {
+    "schemaVersion": "1.0.0",
+    "projectId": "proj-1",
+    "drawingId": "boundary-base-map",
+    "drawingName": "Boundary Base Map",
+    "createdAt": "2026-02-18T00:00:00.000Z",
+    "updatedAt": "2026-02-18T00:00:00.000Z",
+    "latestMapGeoreference": { "origin": [0, 0] },
+    "versions": [
+      {
+        "versionId": "v-1739836800000",
+        "savedAt": "2026-02-18T00:00:00.000Z",
+        "label": "Boundary Base Map",
+        "baseState": { "points": [] }
+      }
+    ],
+    "currentState": { "points": [] }
+  }
+}
+```
+
+### `GET /api/projects/:projectId/drawings/:drawingId`
+
+Fetch the full drawing record and reconstructed latest state.
+
+**Response `200`:**
+```json
+{
+  "drawing": { ... }
+}
+```
+
+**Response `404`:** `{ "error": "Drawing not found." }`
+
+### `PUT /api/projects/:projectId/drawings/:drawingId`
+### `PATCH /api/projects/:projectId/drawings/:drawingId`
+
+Append a new drawing version using differential patching from the prior version.
+
+**Request Body:**
+```json
+{
+  "drawingName": "Boundary Base Map",
+  "drawingState": {
+    "points": [{ "id": "p-1", "x": 1010, "y": 2010 }],
+    "mapGeoreference": { "origin": [10, 10] }
+  }
+}
+```
+
+**Response `200`:**
+```json
+{
+  "drawing": { ... }
+}
+```
+
+### `DELETE /api/projects/:projectId/drawings/:drawingId`
+
+Delete a drawing record from a project.
+
+**Response `200`:**
+```json
+{
+  "deleted": true
+}
+```
+
+**Response `404`:** `{ "error": "Drawing not found." }`
+
+---
+
 ## PointForge Exports
 
 ### `GET /api/pointforge-exports`
