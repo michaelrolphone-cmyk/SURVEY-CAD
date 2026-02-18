@@ -17,3 +17,12 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\([^,]+,\s*pointFileId\),\s*\{ method: 'DELETE' \}\)/, 'EvidenceDesk should delete point files through API endpoint');
   assert.match(html, /pointFileState:\s*\{\s*text,\s*exportFormat:\s*'csv'\s*\}/, 'EvidenceDesk upload should post point file state payloads to API');
 });
+
+test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and launch hydration', async () => {
+  const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+  assert.match(html, /async function\s+syncProjectDrawingsFromApi\(/, 'EvidenceDesk should sync drawings from API');
+  assert.match(html, /reference:\s*\{[\s\S]*type:\s*'project-drawing'/, 'EvidenceDesk drawing rows should be API-backed resources');
+  assert.match(html, /fetch\(buildProjectDrawingApiUrl\(projectContext\.activeProjectId\)\)/, 'EvidenceDesk should list drawings via project drawing collection endpoint');
+  assert.match(html, /fetch\(buildProjectDrawingApiUrl\(projectId, drawingId\)\)/, 'EvidenceDesk should fetch drawing record by id before launch');
+  assert.match(html, /localStorage\.setItem\(storageKey, JSON\.stringify\(drawing\)\)/, 'EvidenceDesk should hydrate localStorage with API drawing payload for LineSmith import');
+});

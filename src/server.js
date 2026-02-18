@@ -1111,6 +1111,12 @@ export function createSurveyServer({
             notes: body.notes || '',
             roles: Array.isArray(body.roles) ? body.roles : [],
             photo: body.photo || null,
+            lineSmithActiveDrawingByProject: body.lineSmithActiveDrawingByProject && typeof body.lineSmithActiveDrawingByProject === 'object' && !Array.isArray(body.lineSmithActiveDrawingByProject)
+              ? Object.fromEntries(Object.entries(body.lineSmithActiveDrawingByProject).map(([projectId, drawingId]) => [
+                String(projectId || '').trim(),
+                String(drawingId || '').trim(),
+              ]).filter(([projectId, drawingId]) => projectId && drawingId))
+              : undefined,
             createdAt: body.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };

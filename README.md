@@ -149,6 +149,23 @@ Dedicated drawing CRUD endpoints are now available for project-scoped LineSmith 
 - `PUT /api/projects/:projectId/drawings/:drawingId` (or `PATCH`) – append a new differential version for an existing drawing.
 - `DELETE /api/projects/:projectId/drawings/:drawingId` – remove the drawing record from the project.
 
+LineSmith now uses these drawing CRUD endpoints as the primary load/save path for project drawings. Collaboration socket rooms are scoped per drawing (`projectId + drawingId`) so users on different drawings do not conflict, while users on the same drawing continue to receive shared real-time updates.
+
+Crew active-drawing restore uses existing crew profile APIs:
+
+- `GET /api/crew?id=:crewMemberId` – resolve a crew member's persisted `lineSmithActiveDrawingByProject` preference.
+- `POST /api/crew` – upsert crew profile fields (including `lineSmithActiveDrawingByProject`) when LineSmith saves/opens a project drawing.
+
+Crew preference payload fragment:
+
+```json
+{
+  "lineSmithActiveDrawingByProject": {
+    "project-123": "boundary-base-map"
+  }
+}
+```
+
 Request body for create/update:
 
 ```json
@@ -158,6 +175,7 @@ Request body for create/update:
 }
 ```
 
+EvidenceDesk now hydrates its **Drawings** folder from the drawing CRUD API (`GET /api/projects/:projectId/drawings`) and fetches selected drawing history records from `GET /api/projects/:projectId/drawings/:drawingId` before launching LineSmith, so project browser drawing lists stay API-backed rather than relying only on legacy local-storage indexes.
 
 
 ### API endpoints (project point file CRUD)
@@ -185,6 +203,8 @@ Request body for create/update:
 - `npm test` – runs the full unit/integration test suite.
 - `npm run cli -- --help` – survey CLI entrypoint and subcommands.
 - `npm run ros:cli -- --help` – ROS basis extraction CLI.
+
+No new CLI commands were added for this LineSmith multi-drawing/channel update.
 
 ## BoundaryLab
 
@@ -833,4 +853,30 @@ Workbench can now be launched from a SurveyFoundry project (`activeProjectId`) a
   - `GET /api/projects/{projectId}/workbench/sources` — list project-derived evidence sources used by Workbench sync.
   - `POST /api/projects/{projectId}/workbench/sync` — upsert/remove project-derived evidence in the linked casefile.
 - Existing BEW casefile APIs remain available (`/casefiles/*`) for direct operations.
+## API and CLI notes for this LineSmith END-terminated sequence fix
+
+LineSmith field-to-finish sequential line construction now keeps active linework sequences open across unrelated point codes (for example, taking a non-fence utility shot between fence points). Sequential linework now breaks on explicit `END`/`CLO` directives instead of breaking only because intermediate points do not contain the active line code.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith BEG restart sequencing fix
+
+LineSmith sequential command parsing now supports both `CODE BEG` and `BEG CODE` token order. When a new `BEG` for a line code is encountered, the previous run for that code is treated as terminated and a new run starts from that point.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith numbered line-sequence fix
+
+LineSmith now treats numbered line codes as distinct sequence channels (for example, `FL1` and `FL7`). When points are interwoven, each numbered code is resolved and tracked as its own active sequence so unique linework is drawn per numbered run.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith base+numbered coexistence sequence fix
+
+LineSmith now lets an unnumbered base line code (for example, `FL`) continue its own sequence even when interwoven numbered variants (such as `FL1`/`FL7`) are present. Numbered runs remain distinct sequence channels, while the base run is no longer interrupted by those numbered tokens.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.

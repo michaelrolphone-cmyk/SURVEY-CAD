@@ -2821,6 +2821,13 @@
               "null"
             ]
           },
+          "lineSmithActiveDrawingByProject": {
+            "type": "object",
+            "description": "Optional map of projectId to the last active drawingId for LineSmith cross-device restore.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -2886,6 +2893,13 @@
                   "null"
                 ],
                 "default": null
+              },
+              "lineSmithActiveDrawingByProject": {
+                "type": "object",
+                "description": "Optional map of projectId to the last active drawingId for LineSmith cross-device restore.",
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
               "createdAt": {
                 "type": "string",

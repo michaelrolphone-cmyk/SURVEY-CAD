@@ -476,6 +476,9 @@ List all crew members, or retrieve one by ID.
       "notes": "",
       "roles": ["chief", "rodman"],
       "photo": null,
+      "lineSmithActiveDrawingByProject": {
+        "project-123": "boundary-base-map"
+      },
       "createdAt": "2026-01-15T08:00:00.000Z",
       "updatedAt": "2026-02-10T12:30:00.000Z"
     }
@@ -511,6 +514,9 @@ Create or update a crew member.
   "notes": "Experienced with GPS",
   "roles": ["operator"],
   "photo": null,
+  "lineSmithActiveDrawingByProject": {
+    "project-123": "boundary-base-map"
+  },
   "createdAt": "2026-01-01T00:00:00.000Z"
 }
 ```
@@ -527,6 +533,7 @@ Create or update a crew member.
 | `notes` | `string` | No | `""` | Free-form notes |
 | `roles` | `string[]` | No | `[]` | Array of role strings |
 | `photo` | `any` | No | `null` | Photo data (nullable) |
+| `lineSmithActiveDrawingByProject` | `object` | No | omitted | Optional map of `projectId -> drawingId` used by LineSmith cross-device drawing restore |
 | `createdAt` | `string` | No | Now (ISO 8601) | Creation timestamp |
 
 **Response `201`:**

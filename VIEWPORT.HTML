@@ -2092,6 +2092,7 @@
   const activeProjectName = queryParams.get("activeProjectName") || "";
   const collabRoomParam = queryParams.get("drawingId") || queryParams.get("collabRoom") || "";
   let activeDrawingStorageKey = "";
+  let activeDrawingId = "";
   let lastSavedDrawingSnapshot = "";
 
   const collab = {
@@ -3676,6 +3677,7 @@
   }
 
   function resolveCollabRoomId() {
+    if (activeProjectId && activeDrawingId) return drawingStorageKey(activeProjectId, activeDrawingId);
     if (activeDrawingStorageKey) return activeDrawingStorageKey;
     if (activeProjectId) {
       const drawingName = String($("#drawingName")?.value || "").trim() || "default";
@@ -3683,6 +3685,33 @@
       return drawingStorageKey(activeProjectId, drawingId);
     }
     return collabRoomParam || "global";
+  }
+
+  function reconnectCollaborationForActiveDrawing() {
+    if (!collab.enabled) return;
+    const targetRoomId = resolveCollabRoomId();
+    if (!targetRoomId || targetRoomId === collab.roomId) return;
+    collab.connectToken += 1;
+    if (collab.reconnectTimer) {
+      clearTimeout(collab.reconnectTimer);
+      collab.reconnectTimer = null;
+    }
+    if (collab.socket) {
+      try { collab.socket.close(); } catch {}
+      collab.socket = null;
+    }
+    collab.remoteCursors.clear();
+    collab.remoteArPresence.clear();
+    collab.peers.clear();
+    collab.stateInFlight = null;
+    collab.pendingState = "";
+    collab.pendingDragLockRelease = null;
+    for (const pending of collab.pendingLockRequests.values()) {
+      if (pending.timeoutId) window.clearTimeout(pending.timeoutId);
+    }
+    collab.objectLocks.clear();
+    collab.pendingLockRequests.clear();
+    connectCollaboration({ skipInitialStateHydration: true, syncLocalStateOnConnect: true });
   }
 
   function setCollabStatus(text) {
@@ -4773,9 +4802,48 @@ function paintBackground(ctx, w, h){
     return markerCanvas;
   }
 
-  function pointSupportsLineworkSequenceToken(tokenSet, lineCode) {
-    if (tokenSet.has(lineCode)) return true;
-    const companionCodes = fieldToFinishRuleState.lineworkCompanionCodes.get(lineCode);
+  function splitLineworkSequenceCodeToken(token = "") {
+    const normalized = String(token ?? "").trim().toUpperCase();
+    if (!normalized) return { sequenceKey: "", baseCode: "", numericSuffix: "" };
+    const match = /^([A-Z]+)(\d+)$/.exec(normalized);
+    if (!match) return { sequenceKey: normalized, baseCode: normalized, numericSuffix: "" };
+    return {
+      sequenceKey: normalized,
+      baseCode: match[1],
+      numericSuffix: match[2],
+    };
+  }
+
+  function resolveLineworkSequenceKey(token = "", explicitSequentialBaseCodes = new Set()) {
+    const parsed = splitLineworkSequenceCodeToken(token);
+    const sequenceKey = parsed.sequenceKey;
+    const baseCode = parsed.baseCode;
+    if (!sequenceKey) return "";
+    if (fieldToFinishRuleState.lineworkCodes.has(sequenceKey) || explicitSequentialBaseCodes.has(sequenceKey)) {
+      return sequenceKey;
+    }
+    if (!parsed.numericSuffix) return "";
+    if (fieldToFinishRuleState.lineworkCodes.has(baseCode) || explicitSequentialBaseCodes.has(baseCode)) {
+      return sequenceKey;
+    }
+    return "";
+  }
+
+  function pointSupportsLineworkSequenceToken(tokenSet, sequenceKey) {
+    const parsed = splitLineworkSequenceCodeToken(sequenceKey);
+    if (!parsed.sequenceKey) return false;
+    if (tokenSet.has(parsed.sequenceKey)) return true;
+
+    if (!parsed.numericSuffix) {
+      for (const token of tokenSet) {
+        const tokenParsed = splitLineworkSequenceCodeToken(token);
+        if (tokenParsed.numericSuffix && tokenParsed.baseCode === parsed.baseCode) return true;
+      }
+    } else {
+      return false;
+    }
+
+    const companionCodes = fieldToFinishRuleState.lineworkCompanionCodes.get(parsed.baseCode);
     if (!companionCodes?.size) return false;
     for (const companionCode of companionCodes) {
       if (tokenSet.has(companionCode)) return true;
@@ -4823,10 +4891,26 @@ function paintBackground(ctx, w, h){
       parse(_raw, tokensUpper) {
         const commands = [];
         const directives = new Set(["BEG", "END", "CLO"]);
+        const seen = new Set();
         for (let i = 0; i < tokensUpper.length - 1; i++) {
-          const baseCode = tokensUpper[i];
-          const action = tokensUpper[i + 1];
-          if (!baseCode || directives.has(baseCode) || !directives.has(action)) continue;
+          const first = tokensUpper[i];
+          const second = tokensUpper[i + 1];
+          if (!first || !second) continue;
+
+          let baseCode = "";
+          let action = "";
+          if (!directives.has(first) && directives.has(second)) {
+            baseCode = first;
+            action = second;
+          } else if (directives.has(first) && !directives.has(second)) {
+            baseCode = second;
+            action = first;
+          }
+
+          if (!baseCode || !action) continue;
+          const key = `${baseCode}:${action}:${i}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
           commands.push({ type: "sequential-line", baseCode, action });
         }
         return commands;
@@ -5151,41 +5235,43 @@ function paintBackground(ctx, w, h){
       const explicitActions = new Set();
       for (const cmd of commands) {
         if (cmd.type !== "sequential-line") continue;
-        const baseCode = cmd.baseCode;
+        const sequenceKey = resolveLineworkSequenceKey(cmd.baseCode, explicitSequentialBaseCodes);
+        if (!sequenceKey) continue;
+        const parsedSequence = splitLineworkSequenceCodeToken(sequenceKey);
+        const baseCode = parsedSequence.baseCode;
         const action = cmd.action;
+        explicitSequentialBaseCodes.add(sequenceKey);
         explicitSequentialBaseCodes.add(baseCode);
-        explicitActions.add(baseCode);
+        explicitActions.add(sequenceKey);
         if (action === "BEG") {
-          activeSequences.set(baseCode, { startPointId: point.id, lastPointId: point.id });
+          activeSequences.set(sequenceKey, { startPointId: point.id, lastPointId: point.id, baseCode: sequenceKey });
           continue;
         }
-        const active = activeSequences.get(baseCode);
+        const active = activeSequences.get(sequenceKey);
         if (!active) continue;
         if (point.id !== active.lastPointId) {
-          lineCommands.push({ a: active.lastPointId, b: point.id, baseCode });
+          lineCommands.push({ a: active.lastPointId, b: point.id, baseCode: sequenceKey });
           active.lastPointId = point.id;
         }
         if (action === "CLO" && active.startPointId !== active.lastPointId) {
-          lineCommands.push({ a: active.lastPointId, b: active.startPointId, baseCode });
+          lineCommands.push({ a: active.lastPointId, b: active.startPointId, baseCode: sequenceKey });
         }
-        activeSequences.delete(baseCode);
+        activeSequences.delete(sequenceKey);
       }
 
-      const pointImplicitSequenceCodes = [...tokenSet].filter((token) => (
-        (lineworkCodes.has(token) || explicitSequentialBaseCodes.has(token))
-        && !curveLineworkCodes.has(token)
-      ));
+      const pointImplicitSequenceCodes = [...tokenSet]
+        .map((token) => resolveLineworkSequenceKey(token, explicitSequentialBaseCodes))
+        .filter((token, index, arr) => token && arr.indexOf(token) === index)
+        .filter((token) => {
+          const tokenBaseCode = splitLineworkSequenceCodeToken(token).baseCode;
+          return !curveLineworkCodes.has(token) && !curveLineworkCodes.has(tokenBaseCode);
+        });
 
       const hasGlobalEndDirective = tokenSet.has("END") && !commands.some((cmd) => cmd.type === "sequential-line");
       if (hasGlobalEndDirective) activeSequences.clear();
 
-      // Maintain sequence continuity for normal linework codes even when a point
-      // also carries join directives (e.g. "FNL JPN131 ...").
-      for (const baseCode of [...activeSequences.keys()]) {
-        if (explicitActions.has(baseCode)) continue;
-        if (pointSupportsLineworkSequenceToken(tokenSet, baseCode)) continue;
-        activeSequences.delete(baseCode);
-      }
+      // Keep active sequences alive across unrelated shots so linework only
+      // terminates when an explicit END/CLO directive is encountered.
 
       for (const lineCode of pointImplicitSequenceCodes) {
         if (explicitActions.has(lineCode)) continue;
@@ -9176,6 +9262,64 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     return String(localStorage.getItem(projectLastDrawingStorageKey(projectId)) || "").trim();
   }
 
+  function resolveActiveCrewMemberId() {
+    return String(localStorage.getItem('surveyfoundryActiveCrewMemberId') || '').trim();
+  }
+
+  function buildProjectDrawingApiUrl(projectId, drawingId = "") {
+    if (!projectId) return "";
+    const encodedProjectId = encodeURIComponent(projectId);
+    if (!drawingId) return `/api/projects/${encodedProjectId}/drawings`;
+    return `/api/projects/${encodedProjectId}/drawings/${encodeURIComponent(drawingId)}`;
+  }
+
+  async function fetchProjectDrawingById(projectId, drawingId) {
+    if (!projectId || !drawingId) return null;
+    const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId));
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return payload?.drawing || null;
+  }
+
+  async function saveCrewActiveDrawingPreference(projectId, drawingId) {
+    const crewMemberId = resolveActiveCrewMemberId();
+    if (!projectId || !drawingId || !crewMemberId) return false;
+    try {
+      const memberRes = await fetch(`/api/crew?id=${encodeURIComponent(crewMemberId)}`);
+      if (!memberRes.ok) return false;
+      const payload = await memberRes.json();
+      const member = payload?.member;
+      if (!member) return false;
+      const nextPreference = {
+        ...(member.lineSmithActiveDrawingByProject || {}),
+        [projectId]: drawingId,
+      };
+      const update = { ...member, lineSmithActiveDrawingByProject: nextPreference };
+      const saveRes = await fetch('/api/crew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(update),
+      });
+      return saveRes.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function loadCrewActiveDrawingPreference(projectId) {
+    const crewMemberId = resolveActiveCrewMemberId();
+    if (!projectId || !crewMemberId) return "";
+    try {
+      const response = await fetch(`/api/crew?id=${encodeURIComponent(crewMemberId)}`);
+      if (!response.ok) return "";
+      const payload = await response.json();
+      const preference = payload?.member?.lineSmithActiveDrawingByProject?.[projectId];
+      return typeof preference === 'string' ? preference.trim() : "";
+    } catch {
+      return "";
+    }
+  }
+
   function drawingStorageKey(projectId, drawingId) {
     return `${PROJECT_DRAWING_STORAGE_PREFIX}:${projectId}:${drawingId}`;
   }
@@ -9240,6 +9384,14 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     return true;
   }
 
+  function restoreDrawingFromApiRecord(drawing) {
+    const state = drawing?.currentState;
+    if (!state || typeof state !== 'object') return false;
+    restoreState(JSON.stringify(state));
+    markDrawingAsSaved();
+    return true;
+  }
+
   function upsertProjectDrawingResource({ projectId, drawingId, drawingName, storageKey, versionCount, latestVersionId, latestMapGeoreference }) {
     if (!projectId) return;
     const key = projectFileStorageKey(projectId);
@@ -9264,12 +9416,14 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       title: drawingName,
       exportFormat: "json",
       reference: {
-        type: "local-storage",
-        value: storageKey,
-        resolverHint: "linesmith-drawing-history",
+        type: "project-drawing",
+        value: drawingId,
+        resolverHint: "linesmith-project-drawing-api",
         metadata: {
+          projectId,
           drawingId,
           drawingName,
+          storageKey,
           versionCount,
           latestVersionId,
           latestSavedAt: new Date().toISOString(),
@@ -9289,7 +9443,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     localStorage.setItem(key, JSON.stringify(projectFile));
   }
 
-  function saveDrawingToProject() {
+  async function saveDrawingToProject() {
     const appliedPendingEdits = applyPendingPrimaryPointEditorEdits("point editor save");
     if (!appliedPendingEdits) return false;
 
@@ -9312,48 +9466,64 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
 
     const drawingId = normalizeDrawingId(drawingName);
     const storageKey = drawingStorageKey(activeProjectId, drawingId);
-    const now = new Date().toISOString();
     const currentState = getSerializableStateObject();
-    const existing = loadStoredDrawingRecord(storageKey);
-
-    let record;
-    if (!existing || !existing.versions?.length) {
-      record = {
-        schemaVersion: "1.0.0",
-        projectId: activeProjectId,
-        projectName: activeProjectName,
-        drawingId,
-        drawingName,
-        createdAt: now,
-        updatedAt: now,
-        versions: [
-          {
+    let record = null;
+    try {
+      const existingFromApi = await fetchProjectDrawingById(activeProjectId, drawingId);
+      const method = existingFromApi ? 'PUT' : 'POST';
+      const endpoint = method === 'PUT'
+        ? buildProjectDrawingApiUrl(activeProjectId, drawingId)
+        : buildProjectDrawingApiUrl(activeProjectId);
+      const response = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drawingId, drawingName, drawingState: currentState }),
+      });
+      if (!response.ok) throw new Error('api-save-failed');
+      const payload = await response.json();
+      record = payload?.drawing || null;
+      localStorage.setItem(storageKey, JSON.stringify(record));
+    } catch {
+      const now = new Date().toISOString();
+      const existing = loadStoredDrawingRecord(storageKey);
+      if (!existing || !existing.versions?.length) {
+        record = {
+          schemaVersion: "1.0.0",
+          projectId: activeProjectId,
+          projectName: activeProjectName,
+          drawingId,
+          drawingName,
+          createdAt: now,
+          updatedAt: now,
+          versions: [{
             versionId: `v-${Date.now()}`,
             savedAt: now,
             label: drawingName,
             baseState: currentState,
-          },
-        ],
-      };
-    } else {
-      const prevState = materializeDrawingVersion(existing, -1);
-      const diff = diffState(prevState, currentState);
-      const changePatch = diff === undefined ? {} : diff;
-      record = existing;
-      record.updatedAt = now;
-      record.drawingName = drawingName;
-      record.versions.push({
-        versionId: `v-${Date.now()}`,
-        savedAt: now,
-        label: drawingName,
-        diffFromPrevious: changePatch,
-      });
+          }],
+        };
+      } else {
+        const prevState = materializeDrawingVersion(existing, -1);
+        const diff = diffState(prevState, currentState);
+        record = existing;
+        record.updatedAt = now;
+        record.drawingName = drawingName;
+        record.versions.push({
+          versionId: `v-${Date.now()}`,
+          savedAt: now,
+          label: drawingName,
+          diffFromPrevious: diff === undefined ? {} : diff,
+        });
+      }
+      record.latestMapGeoreference = sanitizeMapGeoreference(currentState.mapGeoreference);
+      localStorage.setItem(storageKey, JSON.stringify(record));
     }
-    record.latestMapGeoreference = sanitizeMapGeoreference(currentState.mapGeoreference);
 
-    localStorage.setItem(storageKey, JSON.stringify(record));
+    activeDrawingId = drawingId;
     activeDrawingStorageKey = storageKey;
     saveLastOpenedProjectDrawing(activeProjectId, storageKey);
+    saveCrewActiveDrawingPreference(activeProjectId, drawingId);
+    reconnectCollaborationForActiveDrawing();
     upsertProjectDrawingResource({
       projectId: activeProjectId,
       drawingId,
@@ -9410,7 +9580,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     setStatus(`Restored drawing version ${parsed} of ${record.versions.length}.`, "ok");
   }
 
-  function tryImportProjectBrowserDrawingPayload() {
+  async function tryImportProjectBrowserDrawingPayload() {
     if (queryParams.get("source") !== "project-browser-drawing") return false;
     const raw = localStorage.getItem(PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY);
     if (!raw) {
@@ -9419,18 +9589,35 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     }
     try {
       const payload = JSON.parse(raw);
+      const payloadDrawingId = String(payload?.drawingId || '').trim();
       const storageKey = payload?.storageKey;
-      if (!storageKey) {
+      if (!payloadDrawingId && !storageKey) {
         setStatus("Project Browser drawing payload was invalid.", "warn");
         return false;
       }
-      const restored = restoreDrawingVersion(storageKey, -1);
+      let restored = false;
+      if (payloadDrawingId && activeProjectId) {
+        const drawing = await fetchProjectDrawingById(activeProjectId, payloadDrawingId);
+        if (drawing) {
+          restored = restoreDrawingFromApiRecord(drawing);
+          if (restored) {
+            activeDrawingId = drawing.drawingId || payloadDrawingId;
+            activeDrawingStorageKey = drawingStorageKey(activeProjectId, activeDrawingId);
+            localStorage.setItem(activeDrawingStorageKey, JSON.stringify(drawing));
+            saveLastOpenedProjectDrawing(activeProjectId, activeDrawingStorageKey);
+            saveCrewActiveDrawingPreference(activeProjectId, activeDrawingId);
+          }
+        }
+      }
+      if (!restored && storageKey) restored = restoreDrawingVersion(storageKey, -1);
       if (!restored) {
         setStatus("Drawing file could not be opened from project storage.", "warn");
         return false;
       }
-      activeDrawingStorageKey = storageKey;
-    saveLastOpenedProjectDrawing(activeProjectId, storageKey);
+      if (!activeDrawingStorageKey) activeDrawingStorageKey = storageKey;
+      activeDrawingId = String(payloadDrawingId || '').trim() || activeDrawingId || String(storageKey.split(':').pop() || '').trim();
+      saveLastOpenedProjectDrawing(activeProjectId, activeDrawingStorageKey);
+      if (activeDrawingId) saveCrewActiveDrawingPreference(activeProjectId, activeDrawingId);
       const drawingName = String(payload?.drawingName || "").trim();
       if (drawingName) $("#drawingName").value = drawingName;
       localStorage.removeItem(PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY);
@@ -9443,22 +9630,39 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   }
 
 
-  function tryRestoreLastOpenedProjectDrawing() {
+  async function tryRestoreLastOpenedProjectDrawing() {
     if (queryParams.get("source")) return false;
     if (!activeProjectId) return false;
+    const crewDrawingId = await loadCrewActiveDrawingPreference(activeProjectId);
+    if (crewDrawingId) {
+      const apiDrawing = await fetchProjectDrawingById(activeProjectId, crewDrawingId);
+      if (apiDrawing && restoreDrawingFromApiRecord(apiDrawing)) {
+        activeDrawingId = apiDrawing.drawingId || crewDrawingId;
+        activeDrawingStorageKey = drawingStorageKey(activeProjectId, activeDrawingId);
+        localStorage.setItem(activeDrawingStorageKey, JSON.stringify(apiDrawing));
+        saveLastOpenedProjectDrawing(activeProjectId, activeDrawingStorageKey);
+        const drawingNameFromApi = String(apiDrawing.drawingName || "").trim();
+        if (drawingNameFromApi) $("#drawingName").value = drawingNameFromApi;
+        reconnectCollaborationForActiveDrawing();
+        setStatus(`Opened active crew drawing for project ${activeProjectName || activeProjectId}.`, "ok");
+        return true;
+      }
+    }
     const storageKey = loadLastOpenedProjectDrawing(activeProjectId);
     if (!storageKey) return false;
     const restored = restoreDrawingVersion(storageKey, -1);
     if (!restored) return false;
     activeDrawingStorageKey = storageKey;
+    activeDrawingId = String(storageKey.split(':').pop() || '').trim();
     const record = loadStoredDrawingRecord(storageKey);
     const drawingName = String(record?.drawingName || "").trim();
     if (drawingName) $("#drawingName").value = drawingName;
+    reconnectCollaborationForActiveDrawing();
     setStatus(`Opened last drawing for project ${activeProjectName || activeProjectId}.`, "ok");
     return true;
   }
 
-  $("#saveDrawingToProject").addEventListener("click", saveDrawingToProject);
+  $("#saveDrawingToProject").addEventListener("click", () => { void saveDrawingToProject(); });
   $("#restoreDrawingVersion").addEventListener("click", promptRestoreDrawingVersion);
   $("#openArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
 
@@ -10525,7 +10729,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
 
     if ((e.ctrlKey || e.metaKey) && !e.altKey && key === "s") {
       e.preventDefault();
-      saveDrawingToProject();
+      void saveDrawingToProject();
       return;
     }
 
@@ -11777,7 +11981,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   setInterval(updateDerivedSelectionInfo, 250);
   setInterval(updateLineInspector, 250);
 
-  window.addEventListener("message", (event) => {
+  window.addEventListener("message", async (event) => {
     if (event.origin !== window.location.origin) return;
     if (event.source !== window.parent) return;
     const message = event.data;
@@ -11797,7 +12001,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       const hadUnsavedChanges = hasUnsavedDrawingChanges();
       let saved = !hadUnsavedChanges;
       if (hadUnsavedChanges) {
-        saved = saveDrawingToProject();
+        saved = await saveDrawingToProject();
       }
       window.parent.postMessage({
         type: "survey-cad:request-save-before-navigate:response",
@@ -11860,7 +12064,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       }
 
       setLineSmithLoadingStage("Restoring saved drawing state…");
-      const openedFromProjectBrowser = tryImportProjectBrowserDrawingPayload();
+      const openedFromProjectBrowser = await tryImportProjectBrowserDrawingPayload();
       if (openedFromProjectBrowser) {
         setLineSmithLoadingStage("Syncing collaboration room…");
         connectCollaboration();
@@ -11874,7 +12078,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
         return;
       }
 
-      const restoredLastDrawing = tryRestoreLastOpenedProjectDrawing();
+      const restoredLastDrawing = await tryRestoreLastOpenedProjectDrawing();
       if (restoredLastDrawing) {
         setLineSmithLoadingStage("Opening previous project drawing…");
         connectCollaboration();
