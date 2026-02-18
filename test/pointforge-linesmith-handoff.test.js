@@ -25,6 +25,7 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.doesNotMatch(html, /transformPoints\(input,\s*\{\s*renumberStart\s*\}\)/, 'PointForge should not apply sequential renumbering during normal processing');
   assert.doesNotMatch(html, /sortable\.forEach\(\(r,\s*index\)=>\{[\s\S]*renumberStart/, 'PointForge transform should not force sequential renumbering by default');
   assert.match(html, /id="btnOpenLineSmith"/, 'PointForge should render the LineSmith handoff button');
+  assert.match(html, /function\s+buildLineSmithImportPayload\(recordsSorted\)\{[\s\S]*rows\s*=\s*\[\["point","northing","easting","code","description"\]\]/, 'PointForge should export canonical point,northing,easting,code,description headers for LineSmith imports');
   assert.match(html, /<div class="statusbar">[\s\S]*id="btnOpenLineSmith"\s+class="btn workflowPrimary workflowHeaderAction"/, 'PointForge should place the LineSmith workflow button in the upper-right status area as a primary action');
   assert.doesNotMatch(html, /G\/REF RENUMB \+ MAP PREVIEW/, 'PointForge should remove long header subtitle text so the mobile workflow action remains visible');
   assert.doesNotMatch(html, /NAD83 Idaho West map preview and point renumbering\./, 'PointForge should remove the secondary header copy that pushes the workflow action below the fold on mobile');
@@ -34,11 +35,11 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app"[\s\S]*path,/, 'PointForge should notify launcher iframe host to navigate embedded app');
   assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate LineSmith using launcher-aware helper');
-  assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into LineSmith code field');
-  assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into LineSmith notes field');
-  assert.match(html, /const\s+handoffX\s*=\s*swapXY\s*\?\s*y\s*:\s*x\s*;/, 'PointForge should map handoff X to the state-plane easting used by LineSmith');
-  assert.match(html, /const\s+handoffY\s*=\s*swapXY\s*\?\s*x\s*:\s*y\s*;/, 'PointForge should map handoff Y to the state-plane northing used by LineSmith');
-  assert.match(html, /rows\.push\(\[number, handoffX, handoffY, z, code, notes\]\)/, 'PointForge should preserve handoff coordinates and metadata without additional normalization');
+  assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[hasLegacyZColumn\s*\?\s*4\s*:\s*3\]\)/, 'PointForge should map code from canonical point,northing,easting,code,description rows while tolerating legacy z columns');
+  assert.match(html, /const\s+description\s*=\s*trimOrEmpty\(record\.fields\[hasLegacyZColumn\s*\?\s*5\s*:\s*4\]\)/, 'PointForge should map description from canonical point exports while tolerating legacy z columns');
+  assert.match(html, /const\s+handoffX\s*=\s*swapXY\s*\?\s*easting\s*:\s*northing\s*;/, 'PointForge georeference handoff X should remain the easting axis used by LineSmith drawing');
+  assert.match(html, /const\s+handoffY\s*=\s*swapXY\s*\?\s*northing\s*:\s*easting\s*;/, 'PointForge georeference handoff Y should remain the northing axis used by LineSmith drawing');
+  assert.match(html, /rows\.push\(\[number, northing, easting, code, description\]\)/, 'PointForge handoff CSV should emit canonical point,northing,easting,code,description columns');
   assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for LineSmith map alignment');
   assert.match(html, /georeference:\s*\{[\s\S]*type:\s*"idaho-state-plane-usft"[\s\S]*zone,[\s\S]*swapXY,[\s\S]*points:\s*georeferencePoints/, 'PointForge handoff payload should include georeference metadata and sample points');
   assert.match(html, /georeferencePoints\.push\(\{\s*x:\s*handoffX,\s*y:\s*handoffY,\s*lat,\s*lng:\s*lon\s*\}\)/, 'PointForge georeference samples should be keyed to the exact handoff coordinates');
@@ -53,6 +54,18 @@ test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
   assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'LineSmith should reuse CSV import pipeline for PointForge payloads');
   assert.match(html, /const\s+aligned\s*=\s*syncViewToGeoreference\(payload\)/, 'LineSmith should apply georeference alignment when PointForge provides it');
   assert.match(html, /if \(aligned && mapLayerState\.enabled\) \{[\s\S]*syncMapToView\(true\);/, 'LineSmith should refresh map view after georeference alignment when map layer is enabled');
+});
+
+
+
+test('VIEWPORT.HTML enforces canonical point,northing,easting CSV import/export ordering', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /rows\.push\(\["point","northing","easting","code","description"\]\)/, 'LineSmith CSV export should write canonical point,northing,easting,code,description headers');
+  assert.match(html, /for \(const p of sorted\) rows\.push\(\[p\.num, p\.y, p\.x, p\.code, p\.notes\]/, 'LineSmith CSV export should map northing to column 2 and easting to column 3 while keeping drawing x=easting/y=northing');
+  assert.match(html, /idx\.northing\s*=\s*pick\("n","north","northing","y"\)\s*\?\?\s*1;/, 'LineSmith CSV import should map northing headers and legacy y aliases into the northing column');
+  assert.match(html, /idx\.easting\s*=\s*pick\("e","east","easting","x"\)\s*\?\?\s*2;/, 'LineSmith CSV import should map easting headers and legacy x aliases into the easting column');
+  assert.match(html, /p\.x\s*=\s*easting;\s*p\.y\s*=\s*northing;/, 'LineSmith drawing state should keep x=easting and y=northing after imports');
 });
 
 
