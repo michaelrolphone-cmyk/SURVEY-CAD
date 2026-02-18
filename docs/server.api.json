@@ -1699,6 +1699,244 @@
           }
         }
       }
+    },
+    "/api/projects/{projectId}/workbench": {
+      "get": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "Get project linked Workbench casefile",
+        "operationId": "getProjectWorkbench",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project link and linked casefile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/workbench/link": {
+      "put": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "Link an existing Workbench casefile to project",
+        "operationId": "setProjectWorkbenchLink",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkbenchLinkMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Link updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "link": {
+                      "$ref": "#/components/schemas/ProjectWorkbenchLink"
+                    }
+                  },
+                  "required": [
+                    "projectId",
+                    "link"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "Unlink Workbench casefile from project",
+        "operationId": "deleteProjectWorkbenchLink",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link delete status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchDeleteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/workbench/casefile": {
+      "post": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "Create linked casefile and sync project evidence",
+        "operationId": "createProjectWorkbenchCasefile",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Linked casefile with sync summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchSyncResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "Delete linked casefile and unlink project",
+        "operationId": "deleteProjectWorkbenchCasefile",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/workbench/sources": {
+      "get": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "List project-derived Workbench evidence sources",
+        "operationId": "listProjectWorkbenchSources",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Derived source list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchSourcesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/workbench/sync": {
+      "post": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "Sync project-derived evidence into linked casefile",
+        "operationId": "syncProjectWorkbench",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchSyncResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3989,6 +4227,103 @@
         "required": [
           "pointFile"
         ]
+      }
+      ,
+      "ProjectWorkbenchLink": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "casefileId": { "type": "string", "format": "uuid" },
+          "linkedAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "lastSyncedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        },
+        "required": ["projectId", "casefileId", "linkedAt", "updatedAt"]
+      },
+      "ProjectWorkbenchLinkMutationRequest": {
+        "type": "object",
+        "properties": {
+          "casefileId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["casefileId"]
+      },
+      "ProjectWorkbenchLinkResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "link": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/ProjectWorkbenchLink" },
+              { "type": "null" }
+            ]
+          },
+          "casefile": {
+            "oneOf": [
+              { "type": "object", "additionalProperties": true },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["projectId", "link", "casefile"]
+      },
+      "ProjectWorkbenchSource": {
+        "type": "object",
+        "properties": {
+          "sourceKey": { "type": "string" },
+          "sourceType": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "sourceLabel": { "type": "string" },
+          "referenceUrl": { "type": "string" },
+          "detail": { "type": "string" }
+        },
+        "required": ["sourceKey", "sourceType", "type", "title"]
+      },
+      "ProjectWorkbenchSourcesResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "sources": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProjectWorkbenchSource" }
+          }
+        },
+        "required": ["projectId", "sources"]
+      },
+      "ProjectWorkbenchSyncSummary": {
+        "type": "object",
+        "properties": {
+          "created": { "type": "integer" },
+          "updated": { "type": "integer" },
+          "deleted": { "type": "integer" },
+          "totalSources": { "type": "integer" }
+        },
+        "required": ["created", "updated", "deleted", "totalSources"]
+      },
+      "ProjectWorkbenchSyncResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "link": { "$ref": "#/components/schemas/ProjectWorkbenchLink" },
+          "casefile": { "type": "object", "additionalProperties": true },
+          "sync": { "$ref": "#/components/schemas/ProjectWorkbenchSyncSummary" },
+          "sources": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProjectWorkbenchSource" }
+          }
+        },
+        "required": ["projectId", "link", "casefile", "sync", "sources"]
+      },
+      "ProjectWorkbenchDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "deleted": { "type": "boolean" }
+        },
+        "required": ["projectId", "deleted"]
       }
     }
   }

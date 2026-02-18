@@ -1563,3 +1563,42 @@ WorkerInfo {
   capabilities: object | null
 }
 ```
+
+## Project Workbench (Project-scoped casefile integration)
+
+Project Workbench endpoints link SurveyFoundry projects to BEW casefiles and synchronize project-derived evidence (drawings, point-files, and uploaded files) into Workbench evidence records.
+
+### `GET /api/projects/:projectId/workbench`
+
+Return the current project↔casefile link and the linked casefile payload (if linked).
+
+### `PUT /api/projects/:projectId/workbench/link`
+
+Link an existing casefile to a project.
+
+**Request Body:**
+```json
+{
+  "casefileId": "2e9e8fd9-58c8-41b5-8a10-2fd2e2f9a2f7"
+}
+```
+
+### `DELETE /api/projects/:projectId/workbench/link`
+
+Remove a project↔casefile link.
+
+### `POST /api/projects/:projectId/workbench/casefile`
+
+Create (or force-create) a project-linked casefile and synchronize project-derived evidence into that casefile.
+
+### `DELETE /api/projects/:projectId/workbench/casefile`
+
+Delete the linked casefile and remove the project link.
+
+### `GET /api/projects/:projectId/workbench/sources`
+
+List the derived project sources used for Workbench sync.
+
+### `POST /api/projects/:projectId/workbench/sync`
+
+Synchronize project-derived evidence into the linked casefile and return sync counts (`created`, `updated`, `deleted`, `totalSources`).
