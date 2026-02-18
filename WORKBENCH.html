@@ -2119,8 +2119,13 @@ N 00°00'27&quot; W 267.69
 
     let pinnedCasefileId = "";
     if (activeProjectId){
-      const linked = await api.syncProjectWorkbench(activeProjectId, {});
-      pinnedCasefileId = linked?.link?.casefileId || linked?.casefile?.id || "";
+      try{
+        const linked = await api.syncProjectWorkbench(activeProjectId, {});
+        pinnedCasefileId = linked?.link?.casefileId || linked?.casefile?.id || "";
+      }catch(err){
+        toast("Warning", "Project sync unavailable. Falling back to local casefile bootstrap.", "warn");
+        console.warn("[WORKBENCH] project sync bootstrap failed", err);
+      }
     }
 
     await refreshCasefiles();
@@ -2128,19 +2133,35 @@ N 00°00'27&quot; W 267.69
     if (activeProjectId){
       const linkedExists = pinnedCasefileId && state.casefiles.some(x=>x.id===pinnedCasefileId);
       if (!linkedExists){
-        const created = await api.createProjectCasefile(activeProjectId, {});
-        pinnedCasefileId = created?.id || created?.casefile?.id || pinnedCasefileId;
-        await refreshCasefiles();
+        try{
+          const created = await api.createProjectCasefile(activeProjectId, {});
+          pinnedCasefileId = created?.id || created?.casefile?.id || pinnedCasefileId;
+          await refreshCasefiles();
+        }catch(err){
+          toast("Warning", "Could not create project-linked casefile. Creating a local casefile instead.", "warn");
+          console.warn("[WORKBENCH] project-linked casefile bootstrap failed", err);
+        }
       }
     }
 
     if (!state.casefiles.length){
-      const cf = activeProjectId
-        ? (await api.createProjectCasefile(activeProjectId, {}))
-        : (await api.createCasefile("New Boundary Casefile", "Idaho", "", true));
+      let cf = null;
+      if (activeProjectId){
+        try{
+          cf = await api.createProjectCasefile(activeProjectId, {});
+        }catch(err){
+          console.warn("[WORKBENCH] project-linked casefile create failed, using local fallback", err);
+        }
+      }
+      if (!cf){
+        cf = await api.createCasefile("New Boundary Casefile", "Idaho", "", true);
+      }
       const createdId = cf?.id || cf?.casefile?.id;
       await refreshCasefiles();
-      await setActiveCasefile(createdId);
+      const fallbackId = createdId || state.casefiles?.[0]?.id || "";
+      if (fallbackId){
+        await setActiveCasefile(fallbackId);
+      }
     } else {
       const saved = localStorage.getItem(ACTIVE_KEY);
       const pickDefault = (saved && state.casefiles.some(x=>x.id===saved)) ? saved : state.casefiles[0].id;
