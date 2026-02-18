@@ -38,7 +38,7 @@ export function createLmProxyHubWsService({
   path = "/ws/lmproxy",
   token = "",
   pingIntervalMs = 25_000,
-  requestTimeoutMs = 120_000,
+  requestTimeoutMs = 0,
   log = console
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 10 * 1024 * 1024 });
@@ -133,7 +133,7 @@ export function createLmProxyHubWsService({
       // Fail any inflight requests assigned to this proxy
       for (const [rid, inf] of inflight) {
         if (inf.proxyId !== id) continue;
-        clearTimeout(inf.timer);
+        if (inf.timer) clearTimeout(inf.timer);
         inflight.delete(rid);
         wsSend(inf.uiWs, { type: "error", id: rid, error: { message: `proxy_disconnected:${reason}` } });
       }
@@ -147,7 +147,7 @@ export function createLmProxyHubWsService({
       // Cancel any inflight owned by this UI
       for (const [rid, inf] of inflight) {
         if (inf.uiWs !== ws) continue;
-        clearTimeout(inf.timer);
+        if (inf.timer) clearTimeout(inf.timer);
         inflight.delete(rid);
         const p = proxies.get(inf.proxyId)?.ws;
         if (p) wsSend(p, { type: "cancel", id: rid });
@@ -158,14 +158,17 @@ export function createLmProxyHubWsService({
   }
 
   function setInflight(id, uiWs, proxyId) {
-    const timer = setTimeout(() => {
-      const inf = inflight.get(id);
-      if (!inf) return;
-      inflight.delete(id);
-      wsSend(uiWs, { type: "error", id, error: { message: `timeout:${requestTimeoutMs}ms` } });
-      const p = proxies.get(proxyId)?.ws;
-      if (p) wsSend(p, { type: "cancel", id });
-    }, requestTimeoutMs);
+    const timeoutEnabled = Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0;
+    const timer = timeoutEnabled
+      ? setTimeout(() => {
+        const inf = inflight.get(id);
+        if (!inf) return;
+        inflight.delete(id);
+        wsSend(uiWs, { type: "error", id, error: { message: `timeout:${requestTimeoutMs}ms` } });
+        const p = proxies.get(proxyId)?.ws;
+        if (p) wsSend(p, { type: "cancel", id });
+      }, requestTimeoutMs)
+      : null;
 
     inflight.set(id, { uiWs, proxyId, timer });
   }
@@ -173,7 +176,7 @@ export function createLmProxyHubWsService({
   function clearInflight(id) {
     const inf = inflight.get(id);
     if (!inf) return;
-    clearTimeout(inf.timer);
+    if (inf.timer) clearTimeout(inf.timer);
     inflight.delete(id);
   }
 
@@ -340,7 +343,7 @@ export function createLmProxyHubWsService({
     clearInterval(pingTimer);
     try { wss.close(); } catch {}
     for (const [rid, inf] of inflight) {
-      clearTimeout(inf.timer);
+      if (inf.timer) clearTimeout(inf.timer);
       inflight.delete(rid);
       try { wsSend(inf.uiWs, { type: "error", id: rid, error: { message: "service_stopped" } }); } catch {}
     }

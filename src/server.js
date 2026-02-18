@@ -576,10 +576,13 @@ export function createSurveyServer({
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
   const workerSocket = createWorkerSchedulerService();
   const crewPresence = createCrewPresenceWsService();
+  const lmProxyRequestTimeoutMs = Number(process.env.LM_PROXY_REQUEST_TIMEOUT_MS);
   const lmProxy = createLmProxyHubWsService({
     path: "/ws/lmproxy",
     token: process.env.CONTROL_TOKEN || "",
-    requestTimeoutMs: 120_000
+    requestTimeoutMs: Number.isFinite(lmProxyRequestTimeoutMs)
+      ? Math.max(0, lmProxyRequestTimeoutMs)
+      : 0,
   });
 
   const pointforgeExportStore = new Map();
