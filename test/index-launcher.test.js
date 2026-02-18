@@ -294,3 +294,18 @@ test('launcher back-button navigation is wired through browser history state', a
   assert.doesNotMatch(launcherHtml, /if \(!canNavigateHome\)/, 'popstate handling should not block returning home behind unsaved guards');
   assert.match(launcherHtml, /if \(!window\.history\.state\?\.\[LAUNCHER_HISTORY_STATE_KEY\]\) \{[\s\S]*writeHistoryState\(buildHomeHistoryState\(\), 'replace'\);/, 'launcher should seed initial home history state for first back transition');
 });
+
+test('launcher requires crew identity from crew API selection before app usage and app launches include crew context', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /const\s+CREW_MEMBER_STORAGE_KEY\s*=\s*'surveyfoundryCrewMemberId'/, 'launcher should persist selected crew identity in localStorage');
+  assert.match(launcherHtml, /async\s+function\s+loadCrewMembers\(\)/, 'launcher should load crew member options from the crew API');
+  assert.match(launcherHtml, /fetch\('\/api\/crew-members'\)/, 'launcher should request crew members from server API');
+  assert.match(launcherHtml, /id="crewIdentitySelect"/, 'launcher should render a crew member select input rather than free text');
+  assert.doesNotMatch(launcherHtml, /id="crewIdentityInput"/, 'launcher should no longer render free text crew identity input');
+  assert.match(launcherHtml, /function\s+requireCrewMemberIdentity\(\)/, 'launcher should include a crew-identity gate helper');
+  assert.match(launcherHtml, /if \(!requireCrewMemberIdentity\(\)\) return;[\s\S]*function\s+openApp\(/, 'launcher should block app opening until crew identity is selected');
+  assert.match(launcherHtml, /crewIdentityForm\.addEventListener\('submit'/, 'launcher should save crew identity from selected crew member option');
+  assert.match(launcherHtml, /url\.searchParams\.set\('crewMemberId',\s*String\(crewMemberId\)\)/, 'launcher app URLs should include crewMemberId context');
+  assert.match(launcherHtml, /crewMemberId:\s*String\(crewMemberId \|\| ''\)/, 'RecordQuarry start flow should include crewMemberId query params');
+});

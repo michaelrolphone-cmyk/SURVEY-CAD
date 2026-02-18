@@ -142,3 +142,59 @@ test('localstorage websocket upgrade accepts prefixed router paths', () => {
   const welcome = parseServerTextMessage(socket, 1);
   assert.equal(welcome.type, 'sync-welcome');
 });
+
+
+test('localstorage websocket isolates broadcasts by crew/project context', () => {
+  const stores = new Map();
+  const service = createLocalStorageSyncWsService({
+    getStoreForRequest: (req) => {
+      const url = new URL(req.url || '/', 'http://localhost');
+      const crewMemberId = String(url.searchParams.get('crewMemberId') || '');
+      const projectId = String(url.searchParams.get('projectId') || '');
+      if (!crewMemberId) throw new Error('missing crew');
+      const key = `${crewMemberId}::${projectId}`;
+      if (!stores.has(key)) stores.set(key, new LocalStorageSyncStore({ snapshot: {} }));
+      return {
+        context: { crewMemberId, projectId, contextKey: key },
+        store: stores.get(key),
+      };
+    },
+  });
+
+  const s1 = new FakeSocket();
+  const s2 = new FakeSocket();
+  const s3 = new FakeSocket();
+
+  service.handleUpgrade({ url: '/ws/localstorage-sync?crewMemberId=a&projectId=p1', headers: { upgrade: 'websocket', 'sec-websocket-key': 'k-1==' } }, s1);
+  service.handleUpgrade({ url: '/ws/localstorage-sync?crewMemberId=a&projectId=p1', headers: { upgrade: 'websocket', 'sec-websocket-key': 'k-2==' } }, s2);
+  service.handleUpgrade({ url: '/ws/localstorage-sync?crewMemberId=b&projectId=p2', headers: { upgrade: 'websocket', 'sec-websocket-key': 'k-3==' } }, s3);
+
+  const welcome1 = parseServerTextMessage(s1, 1);
+
+  s1.emit('data', clientFrame({
+    type: 'sync-differential',
+    requestId: 'ctx-1',
+    baseChecksum: welcome1.state.checksum,
+    operations: [{ type: 'set', key: 'shared', value: 'only-p1' }],
+  }));
+
+  const scopedBroadcast1 = parseServerTextMessage(s1);
+  const scopedBroadcast2 = parseServerTextMessage(s2);
+  assert.equal(scopedBroadcast1.type, 'sync-differential-applied');
+  assert.equal(scopedBroadcast2.type, 'sync-differential-applied');
+  assert.equal(s3.writes.length, 2, 'other contexts should only receive their initial handshake + welcome');
+});
+
+test('localstorage websocket rejects missing crew identity context', () => {
+  const service = createLocalStorageSyncWsService({
+    getStoreForRequest: () => {
+      throw new Error('missing crew');
+    },
+  });
+  const socket = new FakeSocket();
+  assert.equal(service.handleUpgrade({
+    url: '/ws/localstorage-sync',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'k-missing==' },
+  }, socket), true);
+  assert.equal(socket.destroyed, true);
+});

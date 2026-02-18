@@ -9,6 +9,18 @@ function createMockServer(options = {}) {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
+    if (url.pathname === '/crew-members') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        crewMembers: [
+          { id: 'crew-a', name: 'Alice' },
+          { id: 'crew-b', name: 'Bob' },
+        ],
+      }));
+      return;
+    }
+
+
     if (url.pathname === '/geocode') {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify([{ lat: '43.61', lon: '-116.20', display_name: 'Boise' }]));
@@ -160,18 +172,20 @@ test('server exposes survey APIs and static html', async () => {
     idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
   });
-  const app = await startApiServer(client);
+  const app = await startApiServer(client, {
+    crewApiUrl: `${base}/crew-members`,
+  });
 
   try {
     const healthRes = await fetch(`http://127.0.0.1:${app.port}/health`);
     assert.equal(healthRes.status, 200);
 
-    const localStorageInitialRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`);
+    const localStorageInitialRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync?crewMemberId=crew-a&projectId=project-1`);
     assert.equal(localStorageInitialRes.status, 200);
     const localStorageInitial = await localStorageInitialRes.json();
     assert.equal(localStorageInitial.version, 0);
 
-    const localStorageUpdateRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+    const localStorageUpdateRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync?crewMemberId=crew-a&projectId=project-1`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -182,7 +196,7 @@ test('server exposes survey APIs and static html', async () => {
     const localStorageUpdate = await localStorageUpdateRes.json();
     assert.equal(localStorageUpdate.status, 'server-updated');
 
-    const localStorageStaleRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+    const localStorageStaleRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync?crewMemberId=crew-a&projectId=project-1`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -195,7 +209,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.deepEqual(localStorageStale.state.snapshot, { sample: 'value' });
 
 
-    const localStorageConflictRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+    const localStorageConflictRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync?crewMemberId=crew-a&projectId=project-1`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -207,9 +221,26 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(localStorageConflict.status, 'checksum-conflict');
     assert.deepEqual(localStorageConflict.state.snapshot, { sample: 'value' });
 
+    const otherContextRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync?crewMemberId=crew-b&projectId=project-2`);
+    assert.equal(otherContextRes.status, 200);
+    const otherContextState = await otherContextRes.json();
+    assert.equal(otherContextState.version, 0);
+    assert.deepEqual(otherContextState.snapshot, {});
+
+    const missingCrewRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`);
+    assert.equal(missingCrewRes.status, 400);
+
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();
+
+    const crewRes = await fetch(`http://127.0.0.1:${app.port}/api/crew-members`);
+    assert.equal(crewRes.status, 200);
+    const crewPayload = await crewRes.json();
+    assert.deepEqual(crewPayload.crewMembers, [
+      { id: 'crew-a', name: 'Alice' },
+      { id: 'crew-b', name: 'Bob' },
+    ]);
     assert.equal(appsPayload.apps.length, 9);
     assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/SurveyFoundry\.png$/i);

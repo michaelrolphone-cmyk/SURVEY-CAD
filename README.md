@@ -354,6 +354,11 @@ Example:
 npm run ros:cli -- --pdf ./sample.pdf --maxPages 2 --dpi 300 --debug
 ```
 
+### CLI endpoint/status notes
+
+- No new CLI commands were introduced for crew/project workspace isolation.
+- Existing commands above remain the supported CLI surface.
+
 ### Utility Scripts
 
 - Generate app icons:
@@ -385,13 +390,15 @@ Base URL (local): `http://localhost:3000`
 - Launcher project management now uses a shared modal form for both create and edit flows with inline required-field validation (project name + address) instead of browser prompt/alert dialogs.
 - Launcher project saves now persist project edits immediately, then trigger a non-blocking PLSS/index backfill via `GET /api/lookup` + `GET /api/aliquots` so Save still works when lookup services are degraded.
 - SurveyFoundry header now renders an Index value derived from normalized PLSS metadata using township/range/section + aliquot coding (for example `44-01-430-0-0`) when an active project has indexed data.
+- Launcher now requires selecting a crew member identity from the Crew API directory before opening apps or project manager actions; launched app URLs include `crewMemberId` so per-crew sync channels stay isolated.
 - Launcher project edits bind updates to the originally edited project id, clear stale PLSS/index values when the address changes, and queue background metadata refreshes without requiring a full app reload.
 
 
 - `GET /health`
 - `GET /api/apps`
+- `GET /api/crew-members` (returns `{ crewMembers: [{ id, name }] }` from configured Crew API directory source for launcher identity selection)
 - `GET /ws/lineforge?room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration; includes `state-ack`/`state-rejected` optimistic concurrency and object lock handshake messages: `lock-request`, `lock-granted`, `lock-denied`, `lock-release`, `lock-updated`)
-- `GET /ws/localstorage-sync` (WebSocket upgrade endpoint used for launcher/app localStorage differential synchronization)
+- `GET /ws/localstorage-sync?crewMemberId=...&projectId=...` (WebSocket upgrade endpoint used for launcher/app localStorage differential synchronization; `crewMemberId` is required and `projectId` scopes sync channels)
 - Static asset delivery: `/assets/icons/*` and `/assets/survey-symbols/*` now return long-lived immutable caching headers (`Cache-Control: public, max-age=31536000, immutable`) for faster repeat icon/SVG loads.
 
 ### Survey and geospatial
@@ -440,11 +447,13 @@ When saving/downloading, unknown columns from the FLD header are preserved and n
 
 ### Local storage sync
 
-- `GET /api/localstorage-sync`
-  - Returns authoritative server state: `{ version, snapshot, checksum, updatedAt }`.
-- `POST /api/localstorage-sync`
+- `GET /api/localstorage-sync?crewMemberId=...&projectId=...`
+  - Returns authoritative server state for that crew/project context: `{ version, snapshot, checksum, updatedAt, crewMemberId, projectId }`.
+  - `crewMemberId` is required; missing crew identity returns HTTP 400.
+- `POST /api/localstorage-sync?crewMemberId=...&projectId=...`
   - JSON body: `{ "version": number, "snapshot": object }` for full-state bootstrap/compatibility sync writes.
-- `GET /ws/localstorage-sync`
+  - You can also provide `crewMemberId` and `projectId` in the JSON body if not sent as query params.
+- `GET /ws/localstorage-sync?crewMemberId=...&projectId=...`
   - WebSocket differential sync channel used by launcher apps that read/write `localStorage`.
   - Clients wrap `localStorage` writes, emit differentials (`set`/`remove`/`clear`) with a base checksum, and queue pending differentials while offline.
   - Server applies valid patches to the in-memory localStorage store, then broadcasts the accepted differential + canonical checksum to all connected clients.

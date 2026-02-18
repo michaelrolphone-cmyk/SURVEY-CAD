@@ -222,10 +222,77 @@ export function createSurveyServer({
   rosOcrHandler,
   staticMapFetcher = fetch,
   localStorageSyncStore = new LocalStorageSyncStore(),
+  crewApiUrl = process.env.CREW_API_URL || '',
+  crewApiFetcher = fetch,
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
   const lineforgeCollab = createLineforgeCollabService();
-  const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
+  const localStorageSyncStoresByContext = new Map();
+
+  function normalizeSyncContextValue(value = '') {
+    return String(value || '').trim();
+  }
+
+  function resolveSyncContext(urlObj, body = null) {
+    const crewMemberId = normalizeSyncContextValue(
+      urlObj.searchParams.get('crewMemberId') || body?.crewMemberId,
+    );
+    const projectId = normalizeSyncContextValue(
+      urlObj.searchParams.get('projectId') || body?.projectId,
+    );
+    if (!crewMemberId) {
+      throw new Error('crewMemberId is required for localStorage sync.');
+    }
+    return {
+      crewMemberId,
+      projectId,
+      contextKey: `${crewMemberId}::${projectId || '__no_project__'}`,
+    };
+  }
+
+
+
+  function normalizeCrewMember(entry = {}) {
+    const id = String(entry?.id || entry?.crewMemberId || entry?.memberId || '').trim();
+    if (!id) return null;
+    const name = String(entry?.name || entry?.displayName || entry?.fullName || id).trim() || id;
+    return { id, name };
+  }
+
+  async function fetchCrewMembers() {
+    if (!crewApiUrl) return [];
+    const response = await crewApiFetcher(crewApiUrl);
+    if (!response.ok) {
+      throw new Error(`Crew API request failed (${response.status})`);
+    }
+    const payload = await response.json();
+    const list = Array.isArray(payload)
+      ? payload
+      : (Array.isArray(payload?.crewMembers) ? payload.crewMembers : []);
+    return list.map((entry) => normalizeCrewMember(entry)).filter(Boolean);
+  }
+
+  function getLocalStorageSyncStoreForContext(contextKey) {
+    const key = String(contextKey || '__default__');
+    if (!localStorageSyncStoresByContext.has(key)) {
+      const initialStore = key === '__default__' && localStorageSyncStore
+        ? localStorageSyncStore
+        : new LocalStorageSyncStore();
+      localStorageSyncStoresByContext.set(key, initialStore);
+    }
+    return localStorageSyncStoresByContext.get(key);
+  }
+
+  const localStorageSyncWsService = createLocalStorageSyncWsService({
+    getStoreForRequest: (req) => {
+      const urlObj = new URL(req.url || '/', 'http://localhost');
+      const context = resolveSyncContext(urlObj);
+      return {
+        store: getLocalStorageSyncStoreForContext(context.contextKey),
+        context,
+      };
+    },
+  });
 
   const server = createServer(async (req, res) => {
     if (!req.url) {
@@ -267,19 +334,42 @@ export function createSurveyServer({
       }
 
 
+      if (urlObj.pathname === '/api/crew-members') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const crewMembers = await fetchCrewMembers();
+        sendJson(res, 200, { crewMembers });
+        return;
+      }
+
+
       if (urlObj.pathname === '/api/localstorage-sync') {
         if (req.method === 'GET') {
-          sendJson(res, 200, localStorageSyncStore.getState());
+          const context = resolveSyncContext(urlObj);
+          const store = getLocalStorageSyncStoreForContext(context.contextKey);
+          sendJson(res, 200, {
+            ...store.getState(),
+            crewMemberId: context.crewMemberId,
+            projectId: context.projectId,
+          });
           return;
         }
 
         if (req.method === 'POST') {
           const body = await readJsonBody(req);
-          const result = localStorageSyncStore.syncIncoming({
+          const context = resolveSyncContext(urlObj, body);
+          const store = getLocalStorageSyncStoreForContext(context.contextKey);
+          const result = store.syncIncoming({
             version: body.version,
             snapshot: body.snapshot,
           });
-          sendJson(res, 200, result);
+          sendJson(res, 200, {
+            ...result,
+            crewMemberId: context.crewMemberId,
+            projectId: context.projectId,
+          });
           return;
         }
 
