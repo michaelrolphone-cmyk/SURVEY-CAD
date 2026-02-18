@@ -573,7 +573,7 @@ export function createSurveyServer({
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
 
   // optional reuse: if your localStorage sync store exposes the ioredis client, BEW will share it
-  const existingRedis = localStorageSyncStore?.redis || localStorageSyncStore?.client || null;
+  const existingRedis = null // localStorageSyncStore?.redis || localStorageSyncStore?.client || null;
 
   // ensure BEW redis closes on server close (only if we created it)
   let bewCloseHookInstalled = false;
