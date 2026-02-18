@@ -12,4 +12,7 @@ test('WORKBENCH links to project workbench bootstrap API when launched with acti
   assert.match(html, /const activeProjectId = pageParams\.get\("activeProjectId"\) \|\| pageParams\.get\("projectId"\) \|\| "";/);
   assert.match(html, /syncProjectWorkbench: \(projectId, body=\{\}\) => apiRequest\("POST",`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/workbench\/sync`/);
   assert.match(html, /const linked = await api\.syncProjectWorkbench\(activeProjectId, \{\}\);/);
+  assert.match(html, /async function doOpenActiveProjectFromApi\(\)\{[\s\S]*await api\.syncProjectWorkbench\(activeProjectId, \{\}\);/);
+  assert.match(html, /elImportBtn\.addEventListener\("click", \(\) => \{[\s\S]*if \(activeProjectId\) \{[\s\S]*doOpenActiveProjectFromApi\(\);[\s\S]*\}/);
+  assert.match(html, /elImportBtn\.textContent = "Open Project";/);
 });
