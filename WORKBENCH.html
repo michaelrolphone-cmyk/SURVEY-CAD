@@ -1978,6 +1978,25 @@ N 00°00'27&quot; W 267.69
     }
   }
 
+  async function doOpenActiveProjectFromApi(){
+    if (!activeProjectId) return;
+    try{
+      const linked = await api.syncProjectWorkbench(activeProjectId, {});
+      const linkedCasefileId = linked?.link?.casefileId || linked?.casefile?.id || "";
+      if (!linkedCasefileId){
+        throw new Error(`No linked casefile found for project ${activeProjectId}.`);
+      }
+      await refreshCasefiles();
+      await setActiveCasefile(linkedCasefileId);
+      fillProjectSelect();
+      elProjectSelect.value = linkedCasefileId;
+      toast("Loaded",`Opened project ${activeProjectId} from API.`,"good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
   async function doPrintOutputs(){
     setTab("outputs");
     // ensure outputs loaded then print
@@ -2123,7 +2142,13 @@ N 00°00'27&quot; W 267.69
     elDupProjectBtn.addEventListener("click", doDuplicateProject);
     elDelProjectBtn.addEventListener("click", doDeleteProject);
     elExportBtn.addEventListener("click", doExportProject);
-    elImportBtn.addEventListener("click", () => elHiddenImport.click());
+    elImportBtn.addEventListener("click", () => {
+      if (activeProjectId) {
+        doOpenActiveProjectFromApi();
+        return;
+      }
+      elHiddenImport.click();
+    });
     elHiddenImport.addEventListener("change", () => {
       const f = elHiddenImport.files?.[0];
       if (!f) return;
@@ -2137,6 +2162,8 @@ N 00°00'27&quot; W 267.69
       elNewProjectBtn.style.display = "none";
       elDupProjectBtn.style.display = "none";
       elDelProjectBtn.style.display = "none";
+      elImportBtn.textContent = "Open Project";
+      elImportBtn.title = `Open project ${activeProjectId} from API`;
       elProjectSelect.title = `Linked to project ${activeProjectId}`;
     }
 
