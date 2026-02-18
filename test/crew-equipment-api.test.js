@@ -322,6 +322,41 @@ test('POST /api/crew updates existing member when id matches', async () => {
   }
 });
 
+test('POST /api/crew preserves lineSmithActiveDrawingByProject preferences for cross-device restore', async () => {
+  const app = await startApiServer(buildSnapshot());
+  try {
+    const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/crew`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 'crew-1',
+        firstName: 'John',
+        lastName: 'Smith',
+        lineSmithActiveDrawingByProject: {
+          'project-alpha': 'boundary-base-map',
+          'project-beta': 'lot-12-revision-a',
+        },
+      }),
+    });
+    assert.equal(updateRes.status, 201);
+    const updatedPayload = await updateRes.json();
+    assert.deepEqual(updatedPayload.member.lineSmithActiveDrawingByProject, {
+      'project-alpha': 'boundary-base-map',
+      'project-beta': 'lot-12-revision-a',
+    });
+
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/crew?id=crew-1`);
+    assert.equal(getRes.status, 200);
+    const getPayload = await getRes.json();
+    assert.deepEqual(getPayload.member.lineSmithActiveDrawingByProject, {
+      'project-alpha': 'boundary-base-map',
+      'project-beta': 'lot-12-revision-a',
+    });
+  } finally {
+    app.server.close();
+  }
+});
+
 test('GET /api/equipment returns equipment inventory', async () => {
   const app = await startApiServer(buildSnapshot());
   try {
