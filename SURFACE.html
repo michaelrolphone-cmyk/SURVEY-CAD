@@ -446,6 +446,7 @@
   orbit.enableDamping = true;
   orbit.dampingFactor = 0.08;
   orbit.screenSpacePanning = true;
+  orbit.zoomToCursor = false;
 
   function updateOrbitDistanceLimits(box3){
     if (!box3) {
@@ -457,11 +458,12 @@
     const size = new THREE.Vector3();
     box3.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z, 1);
+    const diagonal = Math.max(size.length(), 1);
 
-    // Keep wheel zoom from collapsing the camera into the target (which can make
-    // subsequent pan/orbit interactions feel frozen) or drifting too far away.
-    orbit.minDistance = Math.max(0.25, maxDim * 0.02);
-    orbit.maxDistance = Math.max(maxDim * 250, orbit.minDistance * 12, 3000);
+    // Keep wheel zoom from collapsing into the target (which can feel like being
+    // trapped inside the mesh) while still allowing broad navigation around it.
+    orbit.minDistance = Math.max(0.5, diagonal * 0.03, maxDim * 0.05);
+    orbit.maxDistance = Math.max(diagonal * 600, orbit.minDistance * 30, 12000);
   }
   updateOrbitDistanceLimits(null);
 
