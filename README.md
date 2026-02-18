@@ -394,13 +394,14 @@ Base URL (local): `http://localhost:3000`
 - Launcher project saves now persist project edits immediately, then trigger a non-blocking PLSS/index backfill via `GET /api/lookup` + `GET /api/aliquots` so Save still works when lookup services are degraded.
 - SurveyFoundry header now renders an Index value derived from normalized PLSS metadata using township/range/section + aliquot coding (for example `44-01-430-0-0`) when an active project has indexed data.
 - Launcher now requires selecting a crew member identity from the Crew API directory before opening apps or project manager actions; launched app URLs include `crewMemberId` so per-crew sync channels stay isolated.
+- Launcher now normalizes every app handoff URL (card launches and in-iframe navigation messages) with the active `crewMemberId` and active project params so app sessions stay isolated to the selected crew/project workspace.
 - Launcher project edits bind updates to the originally edited project id, clear stale PLSS/index values when the address changes, and queue background metadata refreshes without requiring a full app reload.
 
 
 - `GET /health`
 - `GET /api/apps`
 - `GET /api/crew-members` (returns `{ crewMembers: [{ id, name }] }` from configured Crew API directory source for launcher identity selection)
-- `GET /ws/lineforge?room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration; includes `state-ack`/`state-rejected` optimistic concurrency and object lock handshake messages: `lock-request`, `lock-granted`, `lock-denied`, `lock-release`, `lock-updated`)
+- `GET /ws/lineforge?crewMemberId=...&projectId=...&room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration; `crewMemberId` is required, room state is isolated per crew/project context, and the channel includes `state-ack`/`state-rejected` optimistic concurrency plus object lock handshake messages: `lock-request`, `lock-granted`, `lock-denied`, `lock-release`, `lock-updated`)
 - `GET /ws/localstorage-sync?crewMemberId=...&projectId=...` (WebSocket upgrade endpoint used for launcher/app localStorage differential synchronization; `crewMemberId` is required and `projectId` scopes sync channels)
 - Static asset delivery: `/assets/icons/*` and `/assets/survey-symbols/*` now return long-lived immutable caching headers (`Cache-Control: public, max-age=31536000, immutable`) for faster repeat icon/SVG loads.
 
@@ -476,7 +477,7 @@ curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/section?lon=-116.20&lat=43.61"
 curl "http://localhost:3000/api/fld-config?file=config/MLS.fld"
-curl -X POST "http://localhost:3000/api/localstorage-sync" \
+curl -X POST "http://localhost:3000/api/localstorage-sync?crewMemberId=crew-1&projectId=project-1" \
   -H "Content-Type: application/json" \
   -d '{"version":1730000000000,"snapshot":{"surveyfoundryProjects":"[]"}}'
 curl -I "http://localhost:3000/assets/survey-symbols/monument.svg"

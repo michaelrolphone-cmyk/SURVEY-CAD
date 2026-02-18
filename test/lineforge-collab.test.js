@@ -48,7 +48,7 @@ test('lineforge websocket handshake and broadcast keeps state/cursor in-room', (
 
   const s1 = new FakeSocket();
   const req1 = {
-    url: '/ws/lineforge?room=alpha',
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=alpha',
     headers: {
       upgrade: 'websocket',
       'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
@@ -62,7 +62,7 @@ test('lineforge websocket handshake and broadcast keeps state/cursor in-room', (
 
   const s2 = new FakeSocket();
   const req2 = {
-    url: '/ws/lineforge?room=alpha',
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=alpha',
     headers: {
       upgrade: 'websocket',
       'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZTI=',
@@ -122,12 +122,12 @@ test('lineforge rejects stale state revisions and returns canonical room state',
   const s2 = new FakeSocket();
 
   assert.equal(collab.handleUpgrade({
-    url: '/ws/lineforge?room=beta',
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=beta',
     headers: { upgrade: 'websocket', 'sec-websocket-key': 'key-a==' },
   }, s1, Buffer.alloc(0)), true);
 
   assert.equal(collab.handleUpgrade({
-    url: '/ws/lineforge?room=beta',
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=beta',
     headers: { upgrade: 'websocket', 'sec-websocket-key': 'key-b==' },
   }, s2, Buffer.alloc(0)), true);
 
@@ -167,11 +167,11 @@ test('lineforge lock handshake grants, denies, and releases object edit locks', 
   const s2 = new FakeSocket();
 
   assert.equal(collab.handleUpgrade({
-    url: '/ws/lineforge?room=locks',
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=locks',
     headers: { upgrade: 'websocket', 'sec-websocket-key': 'lock-a==' },
   }, s1, Buffer.alloc(0)), true);
   assert.equal(collab.handleUpgrade({
-    url: '/ws/lineforge?room=locks',
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=locks',
     headers: { upgrade: 'websocket', 'sec-websocket-key': 'lock-b==' },
   }, s2, Buffer.alloc(0)), true);
 
@@ -219,4 +219,42 @@ test('lineforge lock handshake grants, denies, and releases object edit locks', 
   assert.equal(released1.action, 'released');
   assert.equal(released2.type, 'lock-updated');
   assert.equal(released2.action, 'released');
+});
+
+test('lineforge isolates rooms across crew/project context even when room id matches', () => {
+  const collab = createLineforgeCollabService();
+  const sameCrewProject = new FakeSocket();
+  const otherCrewProject = new FakeSocket();
+
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=shared-room',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'iso-a==' },
+  }, sameCrewProject, Buffer.alloc(0)), true);
+
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?crewMemberId=crew-b&projectId=proj-2&room=shared-room',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'iso-b==' },
+  }, otherCrewProject, Buffer.alloc(0)), true);
+
+  const sameCrewWelcome = parseServerTextMessage(sameCrewProject, 1);
+  const otherCrewWelcome = parseServerTextMessage(otherCrewProject, 1);
+  assert.equal(sameCrewWelcome.type, 'welcome');
+  assert.equal(otherCrewWelcome.type, 'welcome');
+  assert.equal(sameCrewWelcome.peers.length, 0);
+  assert.equal(otherCrewWelcome.peers.length, 0);
+
+  sameCrewProject.emit('data', clientFrame({ type: 'cursor', cursor: { x: 7, y: 9 } }));
+  assert.equal(otherCrewProject.writes.length, 2, 'peer in different crew/project should not receive updates');
+});
+
+test('lineforge websocket requires crew member identity context', () => {
+  const collab = createLineforgeCollabService();
+  const socket = new FakeSocket();
+  const handled = collab.handleUpgrade({
+    url: '/ws/lineforge?room=alpha',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'missing-crew==' },
+  }, socket, Buffer.alloc(0));
+
+  assert.equal(handled, false);
+  assert.equal(socket.destroyed, true);
 });

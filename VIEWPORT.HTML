@@ -2084,6 +2084,7 @@
 
   const queryParams = new URLSearchParams(window.location.search);
   const launchSource = queryParams.get("source") || "";
+  const crewMemberId = queryParams.get("crewMemberId") || "";
   const activeProjectId = queryParams.get("activeProjectId") || "";
   const activeProjectName = queryParams.get("activeProjectName") || "";
   const collabRoomParam = queryParams.get("drawingId") || queryParams.get("collabRoom") || "";
@@ -3848,13 +3849,17 @@
   }
 
   function connectCollaboration({ skipInitialStateHydration = false, syncLocalStateOnConnect = false } = {}) {
+    if (!crewMemberId) {
+      setCollabStatus("crew identity required");
+      return;
+    }
     const roomId = resolveCollabRoomId();
     if (!roomId) return;
     collab.roomId = roomId;
     collab.enabled = true;
 
     const scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const wsUrl = `${scheme}://${window.location.host}/ws/lineforge?room=${encodeURIComponent(roomId)}`;
+    const wsUrl = `${scheme}://${window.location.host}/ws/lineforge?room=${encodeURIComponent(roomId)}&crewMemberId=${encodeURIComponent(crewMemberId)}&projectId=${encodeURIComponent(activeProjectId)}`;
     collab.wsUrl = wsUrl;
     if (collab.reconnectTimer) {
       clearTimeout(collab.reconnectTimer);

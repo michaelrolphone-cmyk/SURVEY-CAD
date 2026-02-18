@@ -155,12 +155,12 @@ test('launcher tracks active project and app launches include active project que
 
   assert.match(launcherHtml, /const\s+ACTIVE_PROJECT_STORAGE_KEY\s*=\s*'surveyfoundryActiveProjectId'/, 'launcher should persist active project identity');
   assert.match(launcherHtml, /function\s+setActiveProject\(projectId\)/, 'launcher should define active-project setter');
-  assert.match(launcherHtml, /function\s+withActiveProject\(file\)/, 'launcher should define active-project URL mapper');
-  assert.match(launcherHtml, /url\.searchParams\.set\('activeProjectId',\s*String\(project\.id\)\)/, 'launcher should append activeProjectId to launched apps');
-  assert.match(launcherHtml, /url\.searchParams\.set\('activeProjectName',\s*String\(project\.name\s*\|\|\s*''\)\)/, 'launcher should append activeProjectName to launched apps');
+  assert.match(launcherHtml, /function\s+normalizeAppLaunchTarget\(file\)/, 'launcher should define app URL normalization mapper');
+  assert.match(launcherHtml, /params\.set\('activeProjectId',\s*String\(project\.id\)\)/, 'launcher should append activeProjectId to launched apps');
+  assert.match(launcherHtml, /params\.set\('activeProjectName',\s*String\(project\.name\s*\|\|\s*''\)\)/, 'launcher should append activeProjectName to launched apps');
   assert.match(launcherHtml, /setActiveProject\(project\.id\);[\s\S]*const params = new URLSearchParams\(/, 'starting a project in RecordQuarry should mark project active');
   assert.match(launcherHtml, /makeActive\.textContent\s*=\s*project\.id === activeProjectId \? 'Active project' : 'Set active project'/, 'project list should expose explicit set-active action');
-  assert.match(launcherHtml, /const resolvedFile = withActiveProject\(file\);/, 'openApp should resolve app URL with active project metadata');
+  assert.match(launcherHtml, /const resolvedFile = normalizeAppLaunchTarget\(file\);/, 'openApp should resolve app URL with active project metadata');
 });
 test('launcher includes SurveyFoundry project manager and RecordQuarry start workflow', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
@@ -304,8 +304,12 @@ test('launcher requires crew identity from crew API selection before app usage a
   assert.match(launcherHtml, /id="crewIdentitySelect"/, 'launcher should render a crew member select input rather than free text');
   assert.doesNotMatch(launcherHtml, /id="crewIdentityInput"/, 'launcher should no longer render free text crew identity input');
   assert.match(launcherHtml, /function\s+requireCrewMemberIdentity\(\)/, 'launcher should include a crew-identity gate helper');
+  assert.match(launcherHtml, /function\s+normalizeAppLaunchTarget\(file\)/, 'launcher should normalize app launch targets with enforced identity and project context');
+  assert.match(launcherHtml, /params\.set\('crewMemberId',\s*String\(crewMemberId\)\)/, 'launcher should force crewMemberId into all app launch URLs');
+  assert.match(launcherHtml, /params\.set\('activeProjectId',\s*String\(project\.id\)\)/, 'launcher should force activeProjectId into all app launch URLs when a project is selected');
+  assert.match(launcherHtml, /params\.set\('activeProjectName',\s*String\(project\.name \|\| ''\)\)/, 'launcher should force activeProjectName into all app launch URLs when a project is selected');
   assert.match(launcherHtml, /if \(!requireCrewMemberIdentity\(\)\) return;[\s\S]*function\s+openApp\(/, 'launcher should block app opening until crew identity is selected');
   assert.match(launcherHtml, /crewIdentityForm\.addEventListener\('submit'/, 'launcher should save crew identity from selected crew member option');
-  assert.match(launcherHtml, /url\.searchParams\.set\('crewMemberId',\s*String\(crewMemberId\)\)/, 'launcher app URLs should include crewMemberId context');
+  assert.match(launcherHtml, /const\s+resolvedFile\s*=\s*normalizeAppLaunchTarget\(file\);/, 'launcher should resolve app URLs through the context-normalizing helper before opening');
   assert.match(launcherHtml, /crewMemberId:\s*String\(crewMemberId \|\| ''\)/, 'RecordQuarry start flow should include crewMemberId query params');
 });
