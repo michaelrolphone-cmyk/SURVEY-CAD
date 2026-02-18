@@ -31,7 +31,7 @@ import {
 // --- BEW (Boundary Evidence Workbench) routes + Redis store (do not redefine; just mount) ---
 import { createRedisClient as createBewRedisClient } from './bew-redis.js';
 import { createBewStore } from './bew-store.js';
-import { createBewRoutes } from './bew-routes.js';
+import { registerBewRoutes } from './bew-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -331,7 +331,7 @@ export function createSurveyServer({
         redisUrl: process.env.BEW_REDIS_URL || process.env.REDIS_URL || process.env.REDIS_TLS_URL || '',
       });
 
-      const routes = createBewRoutes({ store });
+      const routes = registerBewRoutes({ store });
 
       // Support either: function(req,res,urlObj,ctx) OR object.handleHttp(...)
       const handler =
