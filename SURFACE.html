@@ -615,6 +615,7 @@
     lastZEx = 1;
     lastTileBbox = null;
     lastTileState = { provider:null, size:null, west:null, south:null, east:null, north:null };
+    updateFogForBox(null);
 
     kvCount.textContent = "0";
     kvExcluded.textContent = "0";
@@ -652,6 +653,24 @@
 
     orbit.target.copy(center);
     orbit.update();
+  }
+
+  function updateFogForBox(box3){
+    if (!box3) {
+      scene.fog.near = 250;
+      scene.fog.far = 7000;
+      return;
+    }
+
+    const size = new THREE.Vector3();
+    box3.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z, 1);
+
+    // Keep scene readable while zooming very far out/in on large or tiny models.
+    const fogFar = Math.max(maxDim * 24, 7000);
+    const fogNear = Math.max(50, Math.min(fogFar * 0.4, maxDim * 3));
+    scene.fog.near = fogNear;
+    scene.fog.far = fogFar;
   }
 
   function degToRad(d){ return d * Math.PI / 180; }
@@ -1387,6 +1406,7 @@
     applyShadowQuality();
     applyShadowMode();
     updateSunForBounds(box3);
+    updateFogForBox(box3);
 
     if (contoursOn.checked){
       buildContoursFromSurface(
@@ -1531,6 +1551,7 @@
       const box3 = new THREE.Box3().setFromBufferAttribute(posAttr);
       fitViewToBox(box3);
       updateSunForBounds(box3);
+      updateFogForBox(box3);
       setStatus(true, "Fit view.");
     } catch (err) {
       setStatus(false, err?.message || String(err));

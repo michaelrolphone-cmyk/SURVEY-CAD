@@ -17,4 +17,7 @@ test('SURFACE.html can load project point files for an active project', async ()
   assert.match(html, /await\s+fetch\(buildProjectPointFileApiUrl\(activeProjectId\)\)/, 'Surface Weaver should fetch project point file lists from the project API');
   assert.match(html, /await\s+fetch\(buildProjectPointFileApiUrl\(activeProjectId,\s*pointFileId\)\)/, 'Surface Weaver should fetch selected point file details from the project API');
   assert.match(html, /btnLoadProjectPointFile\.addEventListener\("click",\s*async\s*\(\)\s*=>\s*\{[\s\S]*await\s+loadProjectPointFileIntoCsv\(\)/, 'Surface Weaver should wire the load button to import selected point file text into the CSV editor');
+  assert.match(html, /function\s+updateFogForBox\(box3\)\s*\{[\s\S]*scene\.fog\.near\s*=\s*fogNear;[\s\S]*scene\.fog\.far\s*=\s*fogFar;/, 'Surface Weaver should compute adaptive fog bounds so zooming does not fade the entire viewport to blank');
+  assert.match(html, /renderFromText\(text\)\{[\s\S]*updateSunForBounds\(box3\);[\s\S]*updateFogForBox\(box3\);/, 'Surface Weaver should apply adaptive fog when rendering a surface');
+  assert.match(html, /btnFit\.addEventListener\("click",\s*\(\)\s*=>\s*\{[\s\S]*updateSunForBounds\(box3\);[\s\S]*updateFogForBox\(box3\);/, 'Surface Weaver should refresh fog bounds when fitting the camera to the surface');
 });
