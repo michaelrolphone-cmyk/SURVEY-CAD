@@ -14,6 +14,7 @@ import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { createCrewPresenceWsService } from './crew-presence-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
 import { createLmProxyHubWsService } from "./lmstudio-proxy-control-ws.js";
+import { createRedisClient as createBewRedisClient } from "./bew-redis.js";
 
 import { loadFldConfig } from './fld-config.js';
 import {
@@ -446,6 +447,9 @@ function findHerokuRedisUrl() {
   }
   return null;
 }
+function isIoredisLike(client) {
+  return !!client && typeof client.multi === "function" && typeof client.zrevrange === "function";
+}
 
 async function ensureBew({ existingRedis = null } = {}) {
   if (_bewRuntime) return _bewRuntime;
@@ -453,43 +457,44 @@ async function ensureBew({ existingRedis = null } = {}) {
 
   _bewPromise = (async () => {
     const redisUrl = findHerokuRedisUrl();
-    const redis = existingRedis || (await (async () => {
-      if (!redisUrl) throw new Error('Missing Heroku Redis URL env (REDIS_URL / REDIS_TLS_URL / REDISCLOUD_URL).');
-      const mod = await import('ioredis');
-      const IORedis = mod?.default || mod;
-      // ioredis supports redis:// and rediss:// URLs directly
-      return new IORedis(redisUrl, {
-        maxRetriesPerRequest: null,
-        enableReadyCheck: true,
-        lazyConnect: false,
-      });
-    })());
+
+    const redis =
+      (isIoredisLike(existingRedis) ? existingRedis : null) ||
+      (() => {
+        if (!redisUrl) {
+          throw new Error("Missing Heroku Redis URL env (REDIS_URL / REDIS_TLS_URL / REDISCLOUD_URL).");
+        }
+        return createBewRedisClient({ url: redisUrl });
+      })();
+
+    // only connect if we created it (or if it's ioredis and not connected yet)
+    if (!isIoredisLike(existingRedis)) {
+      await redis.connect(); // ensures listeners exist before TLS handshake
+    }
 
     const StoreCtor =
       BewStore.RedisBewStore ||
       BewStore.BewStore ||
       BewStore.Store ||
-      (typeof BewStore.default === 'function' ? BewStore.default : null);
+      (typeof BewStore.default === "function" ? BewStore.default : null);
 
     if (!StoreCtor) {
       throw new Error(
-        `BEW store module missing RedisBewStore export. Exports: ${Object.keys(BewStore || {}).join(', ') || '(none)'}`
+        `BEW store module missing RedisBewStore export. Exports: ${Object.keys(BewStore || {}).join(", ") || "(none)"}`
       );
     }
 
-    // Your bew-store.js expects ioredis-style client methods (zrevrange, smembers, multi().exec()).
     const store = new StoreCtor(redis, {
-      prefix: process.env.BEW_REDIS_PREFIX || 'bew',
+      prefix: process.env.BEW_REDIS_PREFIX || "bew",
       attachmentMaxBytes: process.env.BEW_ATTACHMENT_MAX_BYTES ? Number(process.env.BEW_ATTACHMENT_MAX_BYTES) : undefined,
     });
 
-    // routes module may export a factory or a handler
     const createRoutes = pickFirstFunction(BewRoutes, [
-      'createBewRoutes',
-      'createBewRouter',
-      'createRoutes',
-      'createRouter',
-      'default',
+      "createBewRoutes",
+      "createBewRouter",
+      "createRoutes",
+      "createRouter",
+      "default",
     ]);
 
     let routesProduct = null;
@@ -497,18 +502,15 @@ async function ensureBew({ existingRedis = null } = {}) {
       routesProduct = await createRoutes({ store, redis, redisUrl });
     } else {
       routesProduct =
-        pickFirstFunction(BewRoutes, ['handle', 'handler', 'dispatch']) ||
-        pickFirstObject(BewRoutes, ['routes', 'router', 'api', 'service', 'default']) ||
-        null;
-
-      // if default export is function, normalizeBewHandler will handle it
-      if (!routesProduct && typeof BewRoutes.default === 'function') routesProduct = BewRoutes.default;
+        pickFirstFunction(BewRoutes, ["handle", "handler", "dispatch"]) ||
+        pickFirstObject(BewRoutes, ["routes", "router", "api", "service", "default"]) ||
+        (typeof BewRoutes.default === "function" ? BewRoutes.default : null);
     }
 
     const handler = normalizeBewHandler(routesProduct);
     if (!handler) {
       throw new Error(
-        `BEW routes module did not provide a usable handler/factory. Exports: ${Object.keys(BewRoutes || {}).join(', ') || '(none)'}`
+        `BEW routes module did not provide a usable handler/factory. Exports: ${Object.keys(BewRoutes || {}).join(", ") || "(none)"}`
       );
     }
 
@@ -522,7 +524,7 @@ async function ensureBew({ existingRedis = null } = {}) {
       handler,
       close: async () => {
         // only quit if we created the client (not reusing existingRedis)
-        if (!existingRedis && redis && typeof redis.quit === 'function') {
+        if (!isIoredisLike(existingRedis) && redis && typeof redis.quit === "function") {
           try { await redis.quit(); } catch {}
         }
       },
@@ -533,6 +535,7 @@ async function ensureBew({ existingRedis = null } = {}) {
 
   return _bewPromise;
 }
+
 
 function sendBewError(res, err) {
   const status = Number(err?.status);
