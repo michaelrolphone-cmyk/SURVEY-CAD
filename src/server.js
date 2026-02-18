@@ -28,6 +28,11 @@ import {
   saveEquipmentLog,
 } from './crew-equipment-api.js';
 
+// --- BEW (Boundary Evidence Workbench) routes + Redis store (do not redefine; just mount) ---
+import { createRedisClient as createBewRedisClient } from './bew-redis.js';
+import { createBewStore } from './bew-store.js';
+import { createBewRoutes } from './bew-routes.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_STATIC_DIR = path.resolve(__dirname, '..');
@@ -54,7 +59,6 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
-
 function getErrorStatusCode(err) {
   const message = err?.message || '';
   if (/^HTTP\s+\d{3}:/i.test(message)) {
@@ -62,7 +66,6 @@ function getErrorStatusCode(err) {
   }
   return 400;
 }
-
 
 function parseRemotePdfUrl(urlObj) {
   const rawUrl = urlObj.searchParams.get('url');
@@ -316,6 +319,43 @@ export function createSurveyServer({
   localStorageSyncStore = new LocalStorageSyncStore(),
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
+
+  // --- BEW init is lazy (ensures Redis + store are created once, on-demand) ---
+  let bewPromise = null;
+  const ensureBew = async () => {
+    if (bewPromise) return bewPromise;
+    bewPromise = (async () => {
+      const redis = createBewRedisClient();
+      const store = await createBewStore({
+        redis,
+        redisUrl: process.env.BEW_REDIS_URL || process.env.REDIS_URL || process.env.REDIS_TLS_URL || '',
+      });
+
+      const routes = createBewRoutes({ store });
+
+      // Support either: function(req,res,urlObj,ctx) OR object.handleHttp(...)
+      const handler =
+        (routes && typeof routes.handleHttp === 'function' && routes.handleHttp.bind(routes))
+        || (routes && typeof routes.handleRequest === 'function' && routes.handleRequest.bind(routes))
+        || (typeof routes === 'function' ? routes : null);
+
+      if (!handler) {
+        throw new Error('BEW routes module did not provide a callable handler.');
+      }
+
+      const close = async () => {
+        // Close routes/store first (they may flush), then Redis.
+        try { if (routes && typeof routes.close === 'function') await routes.close(); } catch {}
+        try { if (store && typeof store.close === 'function') await store.close(); } catch {}
+        try { if (redis && typeof redis.quit === 'function') await redis.quit(); } catch {}
+        try { if (redis && typeof redis.disconnect === 'function') redis.disconnect(); } catch {}
+      };
+
+      return { handler, close };
+    })();
+    return bewPromise;
+  };
+
   const lineforgeCollab = createLineforgeCollabService();
   const localStorageSyncWsService = createLocalStorageSyncWsService({ store: localStorageSyncStore });
   const workerSocket = createWorkerSchedulerService();
@@ -353,56 +393,71 @@ export function createSurveyServer({
         return;
       }
 
-    // --- Worker task submit (MUST be before the "Only GET is supported" gate) ---
-if (urlObj.pathname === '/api/worker/submit' || urlObj.pathname === '/api/worker/submit/') {
-  if (req.method !== 'POST') {
-    sendJson(res, 405, { error: 'Only POST is supported.' });
-    return;
-  }
+      // --- BEW HTTP routes (must be before the "Only GET is supported" gate) ---
+      // OpenAPI paths include:
+      //   /casefiles, /casefiles:import, /casefiles/{id}, /casefiles/{id}/evidence, etc.
+      if (/^\/casefiles(?=\/|:|$)/.test(urlObj.pathname)) {
+        const { handler } = await ensureBew();
+        const handled = await handler(req, res, urlObj, {
+          sendJson,
+          readJsonBody,
+          parseMultipartUpload,
+          sanitizeFileName,
+          MIME_TYPES,
+          MAX_UPLOAD_FILE_BYTES,
+        });
+        if (handled === true || res.writableEnded) return;
+      }
 
-  const body = await readJsonBody(req);
+      // --- Worker task submit (MUST be before the "Only GET is supported" gate) ---
+      if (urlObj.pathname === '/api/worker/submit' || urlObj.pathname === '/api/worker/submit/') {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
 
-  const poolId = String(body.poolId || 'default');
-  const kind = String(body.kind || '');
-  const payload = body.payload ?? null;
+        const body = await readJsonBody(req);
 
-  if (!kind) {
-    sendJson(res, 400, { error: 'kind is required.' });
-    return;
-  }
+        const poolId = String(body.poolId || 'default');
+        const kind = String(body.kind || '');
+        const payload = body.payload ?? null;
 
-  // optional: check workers
-  const workers = workerSocket.listWorkers(poolId);
-  if (!workers.some(w => w.online)) {
-    sendJson(res, 503, { error: 'No online workers in pool.', workers });
-    return;
-  }
+        if (!kind) {
+          sendJson(res, 400, { error: 'kind is required.' });
+          return;
+        }
 
-  const p = workerSocket.submitTask(poolId, kind, payload);
-  const taskId = p.taskId;
+        // optional: check workers
+        const workers = workerSocket.listWorkers(poolId);
+        if (!workers.some(w => w.online)) {
+          sendJson(res, 503, { error: 'No online workers in pool.', workers });
+          return;
+        }
 
-  try {
-    const result = await p;
-    sendJson(res, 200, { ok: true, taskId, result });
-  } catch (err) {
-    sendJson(res, 500, {
-      ok: false,
-      taskId,
-      error: err?.message || String(err),
-      details: err?.details ?? null,
-    });
-  }
-  return;
-}
+        const p = workerSocket.submitTask(poolId, kind, payload);
+        const taskId = p.taskId;
 
-// optional: list workers
-if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worker/workers/') {
-  const poolId = String(urlObj.searchParams.get('pool') || 'default');
-  sendJson(res, 200, { workers: workerSocket.listWorkers(poolId) });
-  return;
-}
+        try {
+          const result = await p;
+          sendJson(res, 200, { ok: true, taskId, result });
+        } catch (err) {
+          sendJson(res, 500, {
+            ok: false,
+            taskId,
+            error: err?.message || String(err),
+            details: err?.details ?? null,
+          });
+        }
+        return;
+      }
 
-      
+      // optional: list workers
+      if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worker/workers/') {
+        const poolId = String(urlObj.searchParams.get('pool') || 'default');
+        sendJson(res, 200, { workers: workerSocket.listWorkers(poolId) });
+        return;
+      }
+
       if (urlObj.pathname === '/api/fld-config') {
         if (req.method !== 'GET') {
           sendJson(res, 405, { error: 'Only GET is supported.' });
@@ -419,7 +474,6 @@ if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worke
         sendJson(res, 200, config);
         return;
       }
-
 
       // --- PointForge export persistence ---
       if (urlObj.pathname === '/api/pointforge-exports' || urlObj.pathname === '/api/pointforge-exports/') {
@@ -894,7 +948,6 @@ if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worke
         }
       }
 
-
       if (urlObj.pathname === '/api/parcel') {
         const { lon, lat } = parseLonLat(urlObj);
         const outSR = Number(urlObj.searchParams.get('outSR') || 4326);
@@ -973,62 +1026,67 @@ if (urlObj.pathname === '/api/worker/workers' || urlObj.pathname === '/api/worke
       sendJson(res, getErrorStatusCode(err), { error: err.message || 'Bad request.' });
     }
   });
-  
-server.on('upgrade', (req, socket, head) => {
-  // Detect if ANY handler wrote a 101 to this socket
-  let wrote101 = false;
-  const rawWrite = socket.write.bind(socket);
 
-  socket.write = (chunk, ...args) => {
+  // Ensure BEW resources can be closed if the server is stopped programmatically
+  server.on('close', () => {
+    if (bewPromise) {
+      bewPromise.then(({ close }) => close()).catch(() => {});
+    }
+  });
+
+  server.on('upgrade', (req, socket, head) => {
+    // Detect if ANY handler wrote a 101 to this socket
+    let wrote101 = false;
+    const rawWrite = socket.write.bind(socket);
+
+    socket.write = (chunk, ...args) => {
+      try {
+        const s = Buffer.isBuffer(chunk)
+          ? chunk.toString('utf8', 0, 16)
+          : String(chunk).slice(0, 16);
+        if (s.startsWith('HTTP/1.1 101')) wrote101 = true;
+      } catch {}
+      return rawWrite(chunk, ...args);
+    };
+
+    let handled = false;
     try {
-      const s = Buffer.isBuffer(chunk)
-        ? chunk.toString('utf8', 0, 16)
-        : String(chunk).slice(0, 16);
-      if (s.startsWith('HTTP/1.1 101')) wrote101 = true;
-    } catch {}
-    return rawWrite(chunk, ...args);
-  };
+      const url = new URL(req.url || '/', 'http://localhost');
+      const path = url.pathname.replace(/\/+$/, '');
 
-  let handled = false;
-  try {
-    const url = new URL(req.url || '/', 'http://localhost');
-    const path = url.pathname.replace(/\/+$/, '');
-  
-    if (path === '/ws/lmproxy') {
-      handled = !!lmProxy.handleUpgrade(req, socket, head);
-    } else if (path === '/ws/worker') {
-      handled = !!workerSocket.handleUpgrade(req, socket, head);
-    } else if (path === '/ws/lineforge') {
-      handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
-    } else if (path === '/ws/crew-presence') {
-      handled = !!crewPresence.handleUpgrade(req, socket, head);
-    } else if (path === '/ws/localstorage-sync') {
-      handled = !!localStorageSyncWsService.handleUpgrade(req, socket, head);
-    } else {
+      if (path === '/ws/lmproxy') {
+        handled = !!lmProxy.handleUpgrade(req, socket, head);
+      } else if (path === '/ws/worker') {
+        handled = !!workerSocket.handleUpgrade(req, socket, head);
+      } else if (path === '/ws/lineforge') {
+        handled = !!lineforgeCollab.handleUpgrade(req, socket, head);
+      } else if (path === '/ws/crew-presence') {
+        handled = !!crewPresence.handleUpgrade(req, socket, head);
+      } else if (path === '/ws/localstorage-sync') {
+        handled = !!localStorageSyncWsService.handleUpgrade(req, socket, head);
+      } else {
+        handled = false;
+      }
+    } catch (e) {
+      console.error(e);
       handled = false;
+    } finally {
+      // restore original write so WS handler can keep using it normally
+      socket.write = rawWrite;
     }
-  } catch (e) {
-    console.error(e);
-    handled = false;
-  } finally {
-    // restore original write so WS handler can keep using it normally
-    socket.write = rawWrite;
-  }
 
-  // If a 101 was written, DO NOT write any HTTP fallback onto the socket.
-  if (!handled) {
-    if (wrote101 || socket.__wsUpgraded) {
-      if (!socket.destroyed) socket.destroy();
-      return;
+    // If a 101 was written, DO NOT write any HTTP fallback onto the socket.
+    if (!handled) {
+      if (wrote101 || socket.__wsUpgraded) {
+        if (!socket.destroyed) socket.destroy();
+        return;
+      }
+      if (!socket.destroyed) {
+        socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+        socket.destroy();
+      }
     }
-    if (!socket.destroyed) {
-      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-      socket.destroy();
-    }
-  }
-});
-
-
+  });
 
   return server;
 }
