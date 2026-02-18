@@ -2173,7 +2173,13 @@ N 00°00'27&quot; W 267.69
       seedSampleCasefile();
     });
 
-    await initData();
+    try{
+      await initData();
+    }catch(err){
+      setApiHealthState("ERR");
+      toast("Error", err?.message || String(err), "bad");
+      render();
+    }
   }
 
   async function initData(){
