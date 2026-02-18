@@ -1937,6 +1937,36 @@
           }
         }
       }
+    },
+    "/api/glo-records": {
+      "get": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Fetch BLM GLO documents for an address",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GLO records lookup response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GloRecordsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4227,103 +4257,265 @@
         "required": [
           "pointFile"
         ]
-      }
-      ,
+      },
       "ProjectWorkbenchLink": {
         "type": "object",
         "properties": {
-          "projectId": { "type": "string" },
-          "casefileId": { "type": "string", "format": "uuid" },
-          "linkedAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" },
+          "projectId": {
+            "type": "string"
+          },
+          "casefileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "linkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "lastSyncedAt": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           }
         },
-        "required": ["projectId", "casefileId", "linkedAt", "updatedAt"]
+        "required": [
+          "projectId",
+          "casefileId",
+          "linkedAt",
+          "updatedAt"
+        ]
       },
       "ProjectWorkbenchLinkMutationRequest": {
         "type": "object",
         "properties": {
-          "casefileId": { "type": "string", "format": "uuid" }
+          "casefileId": {
+            "type": "string",
+            "format": "uuid"
+          }
         },
-        "required": ["casefileId"]
+        "required": [
+          "casefileId"
+        ]
       },
       "ProjectWorkbenchLinkResponse": {
         "type": "object",
         "properties": {
-          "projectId": { "type": "string" },
+          "projectId": {
+            "type": "string"
+          },
           "link": {
             "oneOf": [
-              { "$ref": "#/components/schemas/ProjectWorkbenchLink" },
-              { "type": "null" }
+              {
+                "$ref": "#/components/schemas/ProjectWorkbenchLink"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "casefile": {
             "oneOf": [
-              { "type": "object", "additionalProperties": true },
-              { "type": "null" }
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
-        "required": ["projectId", "link", "casefile"]
+        "required": [
+          "projectId",
+          "link",
+          "casefile"
+        ]
       },
       "ProjectWorkbenchSource": {
         "type": "object",
         "properties": {
-          "sourceKey": { "type": "string" },
-          "sourceType": { "type": "string" },
-          "type": { "type": "string" },
-          "title": { "type": "string" },
-          "sourceLabel": { "type": "string" },
-          "referenceUrl": { "type": "string" },
-          "detail": { "type": "string" }
+          "sourceKey": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sourceLabel": {
+            "type": "string"
+          },
+          "referenceUrl": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
         },
-        "required": ["sourceKey", "sourceType", "type", "title"]
+        "required": [
+          "sourceKey",
+          "sourceType",
+          "type",
+          "title"
+        ]
       },
       "ProjectWorkbenchSourcesResponse": {
         "type": "object",
         "properties": {
-          "projectId": { "type": "string" },
+          "projectId": {
+            "type": "string"
+          },
           "sources": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ProjectWorkbenchSource" }
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkbenchSource"
+            }
           }
         },
-        "required": ["projectId", "sources"]
+        "required": [
+          "projectId",
+          "sources"
+        ]
       },
       "ProjectWorkbenchSyncSummary": {
         "type": "object",
         "properties": {
-          "created": { "type": "integer" },
-          "updated": { "type": "integer" },
-          "deleted": { "type": "integer" },
-          "totalSources": { "type": "integer" }
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "deleted": {
+            "type": "integer"
+          },
+          "totalSources": {
+            "type": "integer"
+          }
         },
-        "required": ["created", "updated", "deleted", "totalSources"]
+        "required": [
+          "created",
+          "updated",
+          "deleted",
+          "totalSources"
+        ]
       },
       "ProjectWorkbenchSyncResponse": {
         "type": "object",
         "properties": {
-          "projectId": { "type": "string" },
-          "link": { "$ref": "#/components/schemas/ProjectWorkbenchLink" },
-          "casefile": { "type": "object", "additionalProperties": true },
-          "sync": { "$ref": "#/components/schemas/ProjectWorkbenchSyncSummary" },
+          "projectId": {
+            "type": "string"
+          },
+          "link": {
+            "$ref": "#/components/schemas/ProjectWorkbenchLink"
+          },
+          "casefile": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sync": {
+            "$ref": "#/components/schemas/ProjectWorkbenchSyncSummary"
+          },
           "sources": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ProjectWorkbenchSource" }
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkbenchSource"
+            }
           }
         },
-        "required": ["projectId", "link", "casefile", "sync", "sources"]
+        "required": [
+          "projectId",
+          "link",
+          "casefile",
+          "sync",
+          "sources"
+        ]
       },
       "ProjectWorkbenchDeleteResponse": {
         "type": "object",
         "properties": {
-          "projectId": { "type": "string" },
-          "deleted": { "type": "boolean" }
+          "projectId": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
         },
-        "required": ["projectId", "deleted"]
+        "required": [
+          "projectId",
+          "deleted"
+        ]
+      },
+      "GloDocument": {
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "details"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      },
+      "GloRecordsResponse": {
+        "type": "object",
+        "required": [
+          "address",
+          "searchUrl",
+          "documents"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "township": {
+            "type": "string"
+          },
+          "townshipDir": {
+            "type": "string"
+          },
+          "range": {
+            "type": "string"
+          },
+          "rangeDir": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string"
+          },
+          "townshipRange": {
+            "type": "string"
+          },
+          "searchUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GloDocument"
+            }
+          }
+        }
       }
     }
   }

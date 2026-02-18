@@ -1487,6 +1487,14 @@ export function createSurveyServer({
         return;
       }
 
+      if (urlObj.pathname === '/api/glo-records') {
+        const address = urlObj.searchParams.get('address');
+        if (!address) throw new Error('address query parameter is required.');
+        const payload = await client.lookupGloRecordsByAddress(address);
+        sendJson(res, 200, payload);
+        return;
+      }
+
       if (urlObj.pathname === '/api/static-map') {
         const { lon, lat } = parseLonLat(urlObj);
         const address = urlObj.searchParams.get('address') || '';

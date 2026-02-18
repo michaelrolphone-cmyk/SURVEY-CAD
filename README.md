@@ -682,6 +682,7 @@ Base URL (local): `http://localhost:3000`
 
 - `RecordQuarry.html` — full research bundle harvest workflow (plats, ROS, parcels, subdivision, and utility overlays).
 - `UtilitiesPack.html` — utilities-only workflow that fetches utility records for an address, stores state-plane coordinates in app state, and exports power utility CSV rows in `name,northing,easting,elevation,code,description` format.
+- `GLO_RECORDS.html` — township/range/section lookup helper that auto-fetches available BLM GLO document links for the active project address.
 
 - Launcher project management now uses a shared modal form for both create and edit flows with inline required-field validation (project name + address) instead of browser prompt/alert dialogs.
 - Launcher project saves now persist project edits immediately, then trigger a non-blocking PLSS/index backfill via `GET /api/lookup` + `GET /api/aliquots` so Save still works when lookup services are degraded.
@@ -701,6 +702,7 @@ Base URL (local): `http://localhost:3000`
 - `GET /api/geocode?address=...`
 - `GET /api/utilities?address=...&outSR=2243&sources=power`
   - `sources` accepts a comma-separated list (for example `power,water`) so utility providers can be added incrementally. Current implementation returns Idaho Power records for `power`.
+- `GET /api/glo-records?address=...`
 - `GET /api/parcel?lon=...&lat=...&outSR=4326&searchMeters=40`
 - `GET /api/section?lon=...&lat=...`
 - `GET /api/aliquots?lon=...&lat=...&outSR=4326`

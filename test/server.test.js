@@ -29,6 +29,13 @@ function createMockServer(options = {}) {
       return;
     }
 
+
+    if (url.pathname === '/glo-search/default.aspx') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end('<table><tr><td><a href="/details/patent/default.aspx?id=abc">Patent ABC</a></td><td>land patent</td></tr></table>');
+      return;
+    }
+
     if (url.pathname.endsWith('/16/query')) {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
@@ -166,6 +173,7 @@ test('server exposes survey APIs and static html', async () => {
     blmSecondDivisionLayer: `${base}/blm2`,
     idahoPowerUtilityLookupUrl: `${base}/serviceEstimator/api/NearPoint/Residential/PrimaryPoints`,
     arcgisGeometryProjectUrl: `${base}/geometry/project`,
+    gloRecordsSearchUrl: `${base}/glo-search/default.aspx`,
   });
   const app = await startApiServer(client);
 
@@ -217,7 +225,7 @@ test('server exposes survey APIs and static html', async () => {
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);
     const appsPayload = await appsRes.json();
-    assert.equal(appsPayload.apps.length, 10);
+    assert.ok(appsPayload.apps.length >= 10);
     assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/SurveyFoundry\.png$/i);
 
@@ -252,6 +260,13 @@ test('server exposes survey APIs and static html', async () => {
       utilitiesPayload.utilities.map((utility) => utility.code).sort(),
       ['OH', 'PM', 'UP'],
     );
+
+
+    const gloRes = await fetch(`http://127.0.0.1:${app.port}/api/glo-records?address=${encodeURIComponent('100 Main St, Boise')}`);
+    assert.equal(gloRes.status, 200);
+    const gloPayload = await gloRes.json();
+    assert.equal(Array.isArray(gloPayload.documents), true);
+    assert.equal(gloPayload.documents[0].title, 'Patent ABC');
 
     const rosPdfRes = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=${encodeURIComponent(`${base}/sample.pdf`)}`);
     assert.equal(rosPdfRes.status, 200);

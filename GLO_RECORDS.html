@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GLO Records</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    main { max-width: 960px; margin: 0 auto; padding: 24px; }
+    .card { background: #111827; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    h1 { margin-top: 0; font-size: 1.6rem; }
+    a { color: #93c5fd; }
+    ul { padding-left: 20px; }
+    .muted { color: #94a3b8; }
+    .error { color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>BLM GLO Records</h1>
+    <div class="card">
+      <div><strong id="projectName">Project</strong></div>
+      <div class="muted" id="addressText">Resolving active project address…</div>
+      <div class="muted" id="plssText"></div>
+      <p><a id="officialSearchLink" href="https://glorecords.blm.gov/search/default.aspx#searchTabIndex=0&searchByTypeIndex=1" target="_blank" rel="noopener noreferrer">Open official GLO records search</a></p>
+    </div>
+    <div class="card">
+      <h2>Available documents</h2>
+      <p class="muted" id="statusText">Loading…</p>
+      <ul id="documentsList"></ul>
+    </div>
+  </main>
+  <script>
+    const projectNameEl = document.getElementById('projectName');
+    const addressEl = document.getElementById('addressText');
+    const plssEl = document.getElementById('plssText');
+    const statusEl = document.getElementById('statusText');
+    const docsEl = document.getElementById('documentsList');
+    const searchLinkEl = document.getElementById('officialSearchLink');
+
+    function resolveActiveProject() {
+      const params = new URLSearchParams(window.location.search);
+      const projectId = params.get('activeProjectId') || '';
+      const projectName = params.get('activeProjectName') || '';
+      let address = params.get('address') || '';
+
+      try {
+        if ((!address || !projectName) && projectId) {
+          const projects = JSON.parse(localStorage.getItem('surveyfoundryProjects') || '[]');
+          const match = projects.find((project) => String(project.id) === String(projectId));
+          if (match) {
+            address = address || String(match.address || '');
+            if (!projectName) projectNameEl.textContent = String(match.name || 'Project');
+          }
+        }
+      } catch {
+        // ignore localStorage parse issues
+      }
+
+      if (projectName) projectNameEl.textContent = projectName;
+      return { address: String(address || '').trim() };
+    }
+
+    function renderDocuments(documents) {
+      docsEl.innerHTML = '';
+      documents.forEach((doc) => {
+        const li = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = doc.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = doc.title;
+        li.appendChild(link);
+        if (doc.details) {
+          const meta = document.createElement('div');
+          meta.className = 'muted';
+          meta.textContent = doc.details;
+          li.appendChild(meta);
+        }
+        docsEl.appendChild(li);
+      });
+    }
+
+    async function loadGloRecords() {
+      const { address } = resolveActiveProject();
+      if (!address) {
+        addressEl.textContent = 'No active project address available. Select an active project in SurveyFoundry first.';
+        statusEl.className = 'error';
+        statusEl.textContent = 'Unable to fetch documents without an address.';
+        return;
+      }
+
+      addressEl.textContent = address;
+      try {
+        const response = await fetch(`/api/glo-records?address=${encodeURIComponent(address)}`);
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        const payload = await response.json();
+
+        const plss = payload.townshipRange || [payload.township ? `T${payload.township}${payload.townshipDir || ''}` : '', payload.range ? `R${payload.range}${payload.rangeDir || ''}` : '', payload.section ? `Sec ${payload.section}` : ''].filter(Boolean).join(' ');
+        plssEl.textContent = plss ? `PLSS: ${plss}` : 'PLSS: unavailable';
+
+        if (payload.searchUrl) searchLinkEl.href = payload.searchUrl;
+
+        const documents = Array.isArray(payload.documents) ? payload.documents : [];
+        if (!documents.length) {
+          statusEl.textContent = 'No documents were parsed from the response. Open official search for full results.';
+          return;
+        }
+
+        statusEl.textContent = `Found ${documents.length} document${documents.length === 1 ? '' : 's'}.`;
+        renderDocuments(documents);
+      } catch (err) {
+        statusEl.className = 'error';
+        statusEl.textContent = `Unable to fetch GLO records: ${err.message || 'Unknown error'}`;
+      }
+    }
+
+    loadGloRecords();
+  </script>
+</body>
+</html>
