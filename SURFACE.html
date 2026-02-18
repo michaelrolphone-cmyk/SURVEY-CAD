@@ -447,6 +447,24 @@
   orbit.dampingFactor = 0.08;
   orbit.screenSpacePanning = true;
 
+  function updateOrbitDistanceLimits(box3){
+    if (!box3) {
+      orbit.minDistance = 0.25;
+      orbit.maxDistance = 250000;
+      return;
+    }
+
+    const size = new THREE.Vector3();
+    box3.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z, 1);
+
+    // Keep wheel zoom from collapsing the camera into the target (which can make
+    // subsequent pan/orbit interactions feel frozen) or drifting too far away.
+    orbit.minDistance = Math.max(0.25, maxDim * 0.02);
+    orbit.maxDistance = Math.max(maxDim * 250, orbit.minDistance * 12, 3000);
+  }
+  updateOrbitDistanceLimits(null);
+
   const fps = new PointerLockControls(camera, renderer.domElement);
   let fpsEnabled = false;
 
@@ -652,6 +670,7 @@
     camera.lookAt(center);
 
     orbit.target.copy(center);
+    updateOrbitDistanceLimits(box3);
     orbit.update();
     updateCameraClippingForBox(box3);
     updateFogForBox(box3);
@@ -680,6 +699,7 @@
 
   function updateCameraClippingForBox(box3){
     if (!box3) {
+      updateOrbitDistanceLimits(null);
       camera.near = 0.1;
       camera.far = 80000;
       camera.updateProjectionMatrix();
@@ -693,6 +713,7 @@
 
     const maxDim = Math.max(size.x, size.y, size.z, 1);
     const cameraDistance = camera.position.distanceTo(center);
+    updateOrbitDistanceLimits(box3);
     const far = Math.max(80000, cameraDistance + (maxDim * 18));
     const nearCandidate = Math.max(0.05, (cameraDistance - (maxDim * 1.5)) * 0.25);
     const near = Math.min(Math.max(0.05, nearCandidate), far * 0.5);
