@@ -1301,7 +1301,7 @@ header {
     const LAUNCHER_HISTORY_STATE_KEY = 'survey-cad-launcher-view';
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
-    const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
+    const ACTIVE_PROJECT_STORAGE_KEY_PREFIX = 'surveyfoundryActiveProjectId';
     const LAUNCHER_VIEW_STATE_KEY = 'surveyfoundryLauncherViewState';
     const PROJECT_STATUS_SEQUENCE = [
       'Proposed',
@@ -1686,11 +1686,20 @@ header {
       localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
     }
 
+    function getActiveProjectStorageKey() {
+      const activeCrewMemberId = String(getActiveCrewMemberId() || '').trim();
+      if (!activeCrewMemberId) {
+        return ACTIVE_PROJECT_STORAGE_KEY_PREFIX;
+      }
+      return `${ACTIVE_PROJECT_STORAGE_KEY_PREFIX}:${activeCrewMemberId}`;
+    }
+
     function loadActiveProject() {
-      const stored = localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
+      const activeProjectStorageKey = getActiveProjectStorageKey();
+      const stored = localStorage.getItem(activeProjectStorageKey);
       activeProjectId = stored && projects.some((project) => project.id === stored) ? stored : null;
       if (!activeProjectId) {
-        localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+        localStorage.removeItem(activeProjectStorageKey);
       }
     }
 
@@ -1701,10 +1710,11 @@ header {
     function setActiveProject(projectId) {
       const exists = projects.some((project) => project.id === projectId);
       activeProjectId = exists ? projectId : null;
+      const activeProjectStorageKey = getActiveProjectStorageKey();
       if (activeProjectId) {
-        localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, activeProjectId);
+        localStorage.setItem(activeProjectStorageKey, activeProjectId);
       } else {
-        localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+        localStorage.removeItem(activeProjectStorageKey);
       }
       renderProjects();
       syncProjectPlssMetadata(activeProjectId);
@@ -2445,6 +2455,8 @@ if (marksQuickQa) {
       } else {
         localStorage.removeItem(ACTIVE_CREW_MEMBER_KEY);
       }
+      loadActiveProject();
+      renderProjects();
       renderCrewPicker();
       sendCrewPresenceIdentity();
     }
