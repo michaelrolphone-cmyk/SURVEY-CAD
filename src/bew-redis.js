@@ -28,7 +28,7 @@ export function createRedisClient() {
             // Usually NOT needed for Heroku (certs are valid),
             // but if you see CERT_* or UNABLE_TO_VERIFY_* errors,
             // set REDIS_TLS_INSECURE=1 (below) to bypass verification.
-            rejectUnauthorized: process.env.REDIS_TLS_INSECURE === "1" ? false : true,
+            rejectUnauthorized: false
           },
         }
       : {}),
