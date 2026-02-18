@@ -40,8 +40,8 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.match(html, /openLinkedApp\(`\/VIEWPORT\.HTML\?source=pointforge\$\{/, 'PointForge should navigate LineSmith using launcher-aware helper');
   assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into LineSmith code field');
   assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into LineSmith notes field');
-  assert.match(html, /const\s+handoffX\s*=\s*x\s*;/, 'PointForge should always export handoff X as easting');
-  assert.match(html, /const\s+handoffY\s*=\s*y\s*;/, 'PointForge should always export handoff Y as northing');
+  assert.match(html, /const\s+handoffX\s*=\s*y\s*;/, 'PointForge should export handoff X from source easting values');
+  assert.match(html, /const\s+handoffY\s*=\s*x\s*;/, 'PointForge should export handoff Y from source northing values');
   assert.match(html, /const\s+swapXY\s*=\s*false\s*;/, 'PointForge handoff metadata should declare unswapped X/Y coordinates');
   assert.match(html, /rows\.push\(\[number, handoffX, handoffY, z, code, notes\]\)/, 'PointForge should preserve handoff coordinates and metadata without additional normalization');
   assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for LineSmith map alignment');
