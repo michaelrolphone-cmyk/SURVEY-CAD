@@ -1,4 +1,5 @@
 import { translateLocalPointsToStatePlane } from './georeference-transform.js';
+import { buildGloSearchUrl, extractTrsMetadataFromLookup, parseGloDocumentListHtml } from './glo-records.js';
 
 const DEFAULTS = {
   adaMapServer: "https://adacountyassessor.org/arcgis/rest/services/External/ExternalMap/MapServer",
@@ -19,6 +20,7 @@ const DEFAULTS = {
   nominatimEmail: "admin@example.com",
   arcgisGeocodeUrl:
     "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+  gloRecordsSearchUrl: 'https://glorecords.blm.gov/search/default.aspx',
   idahoPowerUtilityLookupUrl: "https://api.idahopower.com/serviceEstimator/api/NearPoint/Residential/PrimaryPoints",
   arcgisGeometryProjectUrl: "https://utility.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer/project",
 };
@@ -501,6 +503,19 @@ export class SurveyCadClient {
         throw new Error(payload.error.message || "ArcGIS error");
       }
       return payload;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async fetchText(url, opts = {}) {
+    const ctrl = new AbortController();
+    const timeoutMs = opts.timeoutMs ?? 25000;
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, ...opts });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
+      return await res.text();
     } finally {
       clearTimeout(timer);
     }
@@ -1050,6 +1065,39 @@ export class SurveyCadClient {
       subdivision,
       ros,
       utilities,
+    };
+  }
+
+  async lookupGloRecordsByAddress(address) {
+    const trimmedAddress = String(address || '').trim();
+    if (!trimmedAddress) throw new Error('address is required.');
+
+    const lookupPayload = await this.lookupByAddress(trimmedAddress);
+    const trs = extractTrsMetadataFromLookup(lookupPayload);
+    const searchUrl = buildGloSearchUrl(this.config.gloRecordsSearchUrl, trs);
+
+    let searchHtml = '';
+    try {
+      searchHtml = await this.fetchText(searchUrl, {
+        headers: {
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'User-Agent': this.config.nominatimUserAgent,
+        },
+      });
+    } catch {
+      searchHtml = '';
+    }
+
+    return {
+      address: trimmedAddress,
+      township: trs.township,
+      townshipDir: trs.townshipDir,
+      range: trs.range,
+      rangeDir: trs.rangeDir,
+      section: trs.section,
+      townshipRange: trs.townshipRange,
+      searchUrl,
+      documents: parseGloDocumentListHtml(searchHtml, this.config.gloRecordsSearchUrl),
     };
   }
 }

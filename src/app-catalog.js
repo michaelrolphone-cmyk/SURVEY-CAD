@@ -32,6 +32,17 @@ export const APP_CATALOG = [
     section: 'Research',
   },
   {
+    id: 'glo-records',
+    name: 'GLO Records',
+    description: 'Looks up BLM GLO records for the active project township/range/section and lists available documents.',
+    entryHtml: 'GLO_RECORDS.html',
+    iconPath: '/assets/icons/ros-lookup.svg',
+    color: '#854D0E',
+    accent: '#FEF9C3',
+    glyph: 'GLO',
+    section: 'Research',
+  },
+  {
     id: 'utilities-pack',
     name: 'UtilitiesPack',
     description: 'Fetches utility records, keeps state-plane coordinates, and exports power utility CSV bundles.',
