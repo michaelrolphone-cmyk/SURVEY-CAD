@@ -382,6 +382,9 @@ Base URL (local): `http://localhost:3000`
 - `RecordQuarry.html` — full research bundle harvest workflow (plats, ROS, parcels, subdivision, and utility overlays).
 - `UtilitiesPack.html` — utilities-only workflow that fetches utility records for an address, stores state-plane coordinates in app state, and exports power utility CSV rows in `name,northing,easting,elevation,code,description` format.
 
+- `POINT_TRANSFORMER.HTML` (PointForge) now exports LineSmith handoff CSVs in canonical `point,northing,easting,code,description` order and georeferences points with `x=easting`, `y=northing`.
+- `VIEWPORT.HTML` (LineSmith) now imports/exports canonical `point,northing,easting,code,description` CSV rows while keeping drawing coordinates on `x=easting` and `y=northing`.
+
 - Launcher project management now uses a shared modal form for both create and edit flows with inline required-field validation (project name + address) instead of browser prompt/alert dialogs.
 - Launcher project saves now persist project edits immediately, then trigger a non-blocking PLSS/index backfill via `GET /api/lookup` + `GET /api/aliquots` so Save still works when lookup services are degraded.
 - SurveyFoundry header now renders an Index value derived from normalized PLSS metadata using township/range/section + aliquot coding (for example `44-01-430-0-0`) when an active project has indexed data.

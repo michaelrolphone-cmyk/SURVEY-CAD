@@ -1511,7 +1511,7 @@
     <div class="section">
       <div class="title">
         <b>CSV</b>
-        <span>number,x,y,z,code,notes</span>
+        <span>point,northing,easting,code,description</span>
       </div>
       <label>
         Import points CSV
@@ -1533,8 +1533,8 @@
         <label style="flex:1;">
           Coordinate columns (headerless CSV only)
           <select id="csvCoordOrder">
-            <option value="xy">Assume X,Y (Easting,Northing)</option>
-            <option value="yx">Assume Y,X (Northing,Easting) — swap on import</option>
+            <option value="yx" selected>Assume Northing,Easting (survey canonical)</option>
+            <option value="xy">Assume Easting,Northing (legacy)</option>
           </select>
         </label>
       </div>
@@ -1548,8 +1548,8 @@
         <button id="swapXYAll" class="danger" style="flex:1;">Swap X↔Y for ALL Points</button>
       </div>
       <div class="hint mini">
-        If your drawing came in “transposed”, that’s X/Y swapped in the point data (common when a headerless CSV is N,E instead of E,N).
-        This button fixes existing points (Undo works). For future imports, set “Coordinate columns” to Y,X.
+        If your drawing came in “transposed”, northing/easting may have been swapped.
+        This button fixes existing points (Undo works). For future imports, keep “Coordinate columns” set to Northing,Easting.
       </div>
 
       <div class="row" style="margin-top:8px;">
@@ -8527,7 +8527,7 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     history.push("csv import");
 
     let startRow = 0;
-    let idx = { num:0, x:1, y:2, z:3, code:4, notes:5 };
+    let idx = { num:0, northing:1, easting:2, code:3, description:4 };
     const h = rows[0].map(normalizeHeader);
     const headerLikely = h.includes("number") || h.includes("num") || h.includes("x") || h.includes("y") || h.includes("northing") || h.includes("easting") || h.includes("n") || h.includes("e");
     if (headerLikely) {
@@ -8538,11 +8538,10 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
         return null;
       };
       idx.num = pick("number","num","pt","point","pointnumber") ?? 0;
-      idx.x = pick("x","e","east","easting") ?? 1;
-      idx.y = pick("y","n","north","northing") ?? 2;
-      idx.z = pick("z","elev","elevation") ?? 3;
-      idx.code = pick("code","desc","description") ?? 4;
-      idx.notes = pick("notes","note","comments","comment") ?? 5;
+      idx.northing = pick("n","north","northing","y") ?? 1;
+      idx.easting = pick("e","east","easting","x") ?? 2;
+      idx.code = pick("code") ?? 3;
+      idx.description = pick("description","desc","notes","note","comments","comment") ?? 4;
     }
 
     const mode = $("#importMode").value;
@@ -8557,25 +8556,22 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
     for (let r = startRow; r < rows.length; r++) {
       const row = rows[r];
       const numRaw = (row[idx.num] ?? "").toString().trim();
-      const xRaw = row[idx.x];
-      const yRaw = row[idx.y];
-      if (!numRaw || xRaw==null || yRaw==null) { skipped++; continue; }
+      const northingRaw = row[idx.northing];
+      const eastingRaw = row[idx.easting];
+      if (!numRaw || northingRaw==null || eastingRaw==null) { skipped++; continue; }
 
-      let x = Number(String(xRaw).trim());
-      let y = Number(String(yRaw).trim());
-      if (!Number.isFinite(x) || !Number.isFinite(y)) { skipped++; continue; }
+      let northing = Number(String(northingRaw).trim());
+      let easting = Number(String(eastingRaw).trim());
+      if (!Number.isFinite(northing) || !Number.isFinite(easting)) { skipped++; continue; }
 
-      // FIX: root cause for headerless N,E files
-      // If there is NO real header and user says columns are Y,X (N,E),
-      // then swap parsed values so internal point data remains x=easting, y=northing.
-      if (!headerLikely && coordOrder === "yx") {
-        const t = x; x = y; y = t;
+      // Internal drawing coordinates remain x=easting, y=northing.
+      if (!headerLikely && coordOrder === "xy") {
+        const t = northing; northing = easting; easting = t;
         swappedApplied++;
       }
 
-      const z = parseNum(row[idx.z], 0);
       const code = String(row[idx.code] ?? "");
-      const notes = String(row[idx.notes] ?? "");
+      const notes = String(row[idx.description] ?? "");
       const ruleLayerId = resolveFieldToFinishLayerIdForCode(code);
 
       let num = numRaw;
@@ -8584,7 +8580,7 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
         if (mode === "merge") {
           const pid = byNum.get(num);
           const p = points.get(pid);
-          p.x = x; p.y = y; p.z = z; p.code = code; p.notes = notes;
+          p.x = easting; p.y = northing; p.code = code; p.notes = notes;
           if (ruleLayerId && layers.has(ruleLayerId)) p.layerId = ruleLayerId;
           updated++;
           continue;
@@ -8597,7 +8593,7 @@ Y: [${fmt(minY)}, ${fmt(maxY)}]`, "ok");
         }
       }
 
-      const pid = addPoint({ num, x, y, z, code, notes, movable:false, layerId: ruleLayerId || selectedLayerId });
+      const pid = addPoint({ num, x: easting, y: northing, z: 0, code, notes, movable:false, layerId: ruleLayerId || selectedLayerId });
       byNum.set(String(num), pid);
       added++;
     }
@@ -9052,9 +9048,9 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
 
   $("#exportCsv").addEventListener("click", () => {
     const rows = [];
-    rows.push(["number","x","y","z","code","notes"]);
+    rows.push(["point","northing","easting","code","description"]);
     const sorted = Array.from(points.values()).sort((a,b)=>Number(a.num)-Number(b.num));
-    for (const p of sorted) rows.push([p.num, p.x, p.y, p.z, p.code, p.notes].map(v => csvEscape(v)));
+    for (const p of sorted) rows.push([p.num, p.y, p.x, p.code, p.notes].map(v => csvEscape(v)));
     const csv = rows.map(r=>r.join(",")).join("\n");
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
     const url = URL.createObjectURL(blob);

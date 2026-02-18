@@ -1501,36 +1501,32 @@
 
 
     function buildLineSmithImportPayload(recordsSorted){
-      const rows = [["number","x","y","z","code","notes"]];
+      const rows = [["point","northing","easting","code","description"]];
       const georeferencePoints = [];
       const zone = elZone.value || "west";
       const def = PROJ_DEFS_USFT[zone];
       const swapXY = true;
 
       for (const record of recordsSorted || []){
-        if (!Array.isArray(record?.fields) || record.fields.length < 4) continue;
+        if (!Array.isArray(record?.fields) || record.fields.length < 3) continue;
 
         const number = trimOrEmpty(record.fields[0]);
         if (!number) continue;
 
-        const x = Number(record.fields[1]);
-        const y = Number(record.fields[2]);
-        const zRaw = trimOrEmpty(record.fields[3]);
-        const z = Number.isFinite(Number(zRaw)) ? Number(zRaw) : 0;
-        const code = trimOrEmpty(record.fields[4]);
-        const notes = trimOrEmpty(record.fields[5]);
+        const northing = Number(record.fields[1]);
+        const easting = Number(record.fields[2]);
+        if (!Number.isFinite(northing) || !Number.isFinite(easting)) continue;
 
-        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const hasLegacyZColumn = record.fields.length >= 6;
+        const code = trimOrEmpty(record.fields[hasLegacyZColumn ? 4 : 3]);
+        const description = trimOrEmpty(record.fields[hasLegacyZColumn ? 5 : 4]);
 
-        const handoffX = swapXY ? y : x;
-        const handoffY = swapXY ? x : y;
-
-        rows.push([number, handoffX, handoffY, z, code, notes]);
+        rows.push([number, northing, easting, code, description]);
 
         try {
-          const projectedX = handoffX;
-          const projectedY = handoffY;
-          const ll = proj4(def, "WGS84", [projectedX, projectedY]);
+          const handoffX = swapXY ? easting : northing;
+          const handoffY = swapXY ? northing : easting;
+          const ll = proj4(def, "WGS84", [handoffX, handoffY]);
           const lon = ll[0];
           const lat = ll[1];
           if (Number.isFinite(lat) && Number.isFinite(lon)) {
