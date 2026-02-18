@@ -32,6 +32,8 @@ function buildSocketEndpointCandidates({
   protocol = 'https:',
   host = '',
   pathname = '/',
+  crewMemberId = '',
+  projectId = '',
 } = {}) {
   const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
   const normalizedPathname = typeof pathname === 'string' && pathname ? pathname : '/';
@@ -39,9 +41,14 @@ function buildSocketEndpointCandidates({
     ? normalizedPathname.slice(0, -1)
     : normalizedPathname.replace(/\/[^/]*$/, '');
 
-  const candidates = [`${wsProtocol}//${host}/ws/localstorage-sync`];
+  const query = new URLSearchParams();
+  if (crewMemberId) query.set('crewMemberId', String(crewMemberId));
+  if (projectId) query.set('projectId', String(projectId));
+  const querySuffix = query.toString() ? `?${query.toString()}` : '';
+
+  const candidates = [`${wsProtocol}//${host}/ws/localstorage-sync${querySuffix}`];
   if (baseDir && baseDir !== '/') {
-    candidates.push(`${wsProtocol}//${host}${baseDir}/ws/localstorage-sync`);
+    candidates.push(`${wsProtocol}//${host}${baseDir}/ws/localstorage-sync${querySuffix}`);
   }
   return [...new Set(candidates)];
 }
@@ -49,17 +56,32 @@ function buildSocketEndpointCandidates({
 function buildApiEndpointCandidates({
   origin = '',
   pathname = '/',
+  crewMemberId = '',
+  projectId = '',
 } = {}) {
   const normalizedPathname = typeof pathname === 'string' && pathname ? pathname : '/';
   const baseDir = normalizedPathname.endsWith('/')
     ? normalizedPathname.slice(0, -1)
     : normalizedPathname.replace(/\/[^/]*$/, '');
 
-  const candidates = [`${origin}/api/localstorage-sync`];
+  const query = new URLSearchParams();
+  if (crewMemberId) query.set('crewMemberId', String(crewMemberId));
+  if (projectId) query.set('projectId', String(projectId));
+  const querySuffix = query.toString() ? `?${query.toString()}` : '';
+
+  const candidates = [`${origin}/api/localstorage-sync${querySuffix}`];
   if (baseDir && baseDir !== '/') {
-    candidates.push(`${origin}${baseDir}/api/localstorage-sync`);
+    candidates.push(`${origin}${baseDir}/api/localstorage-sync${querySuffix}`);
   }
   return [...new Set(candidates)];
+}
+
+function getSyncIdentityFromLocation(locationLike = window.location) {
+  const params = new URLSearchParams(locationLike?.search || '');
+  return {
+    crewMemberId: String(params.get('crewMemberId') || '').trim(),
+    projectId: String(params.get('activeProjectId') || params.get('projectId') || '').trim(),
+  };
 }
 
 function buildSnapshot() {
@@ -300,25 +322,43 @@ class LocalStorageSocketSync {
     this.httpFallbackTimer = null;
     this.httpFallbackInProgress = false;
     this.offlineSince = navigator.onLine ? null : Date.now();
-    this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+    this.syncIdentity = getSyncIdentityFromLocation(window.location);
+    this.hasSyncIdentity = Boolean(this.syncIdentity.crewMemberId);
+    this.socketEndpointCandidates = buildSocketEndpointCandidates({
+      ...window.location,
+      ...this.syncIdentity,
+    });
     this.socketEndpointIndex = 0;
-    this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+    this.apiEndpointCandidates = buildApiEndpointCandidates({
+      ...window.location,
+      ...this.syncIdentity,
+    });
     this.apiEndpointIndex = 0;
 
     this.#patchStorage();
-    this.#connect();
+    if (this.hasSyncIdentity) {
+      this.#connect();
+    }
 
     window.addEventListener('online', () => {
       this.dormantUntilMs = 0;
       this.httpFallbackInProgress = false;
-      this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+      this.syncIdentity = getSyncIdentityFromLocation(window.location);
+      this.hasSyncIdentity = Boolean(this.syncIdentity.crewMemberId);
+      this.socketEndpointCandidates = buildSocketEndpointCandidates({
+        ...window.location,
+        ...this.syncIdentity,
+      });
       this.socketEndpointIndex = 0;
-      this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+      this.apiEndpointCandidates = buildApiEndpointCandidates({
+        ...window.location,
+        ...this.syncIdentity,
+      });
       this.apiEndpointIndex = 0;
-      if (!this.socket || this.socket.readyState >= WebSocket.CLOSING) {
+      if (this.hasSyncIdentity && (!this.socket || this.socket.readyState >= WebSocket.CLOSING)) {
         this.#connect();
       }
-      this.flush();
+      if (this.hasSyncIdentity) this.flush();
     });
     window.addEventListener('offline', () => {
       if (!this.offlineSince) this.offlineSince = Date.now();
@@ -327,6 +367,7 @@ class LocalStorageSocketSync {
   }
 
   #connect() {
+    if (!this.hasSyncIdentity) return;
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -358,9 +399,15 @@ class LocalStorageSocketSync {
       this.consecutiveConnectFailures = 0;
       this.dormantUntilMs = 0;
       this.httpFallbackInProgress = false;
-      this.socketEndpointCandidates = buildSocketEndpointCandidates(window.location);
+      this.socketEndpointCandidates = buildSocketEndpointCandidates({
+        ...window.location,
+        ...this.syncIdentity,
+      });
       this.socketEndpointIndex = 0;
-      this.apiEndpointCandidates = buildApiEndpointCandidates(window.location);
+      this.apiEndpointCandidates = buildApiEndpointCandidates({
+        ...window.location,
+        ...this.syncIdentity,
+      });
       this.apiEndpointIndex = 0;
       this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
       this.#cancelHttpFallbackSync();
@@ -808,7 +855,10 @@ class LocalStorageSocketSync {
   async #requestLocalStorageSyncApi(fetchInit = undefined) {
     const candidates = Array.isArray(this.apiEndpointCandidates) && this.apiEndpointCandidates.length
       ? this.apiEndpointCandidates
-      : buildApiEndpointCandidates(window.location);
+      : buildApiEndpointCandidates({
+        ...window.location,
+        ...this.syncIdentity,
+      });
     let lastResponse = null;
 
     for (let i = 0; i < candidates.length; i += 1) {
@@ -925,4 +975,5 @@ export {
   shouldRunHttpFallbackSync,
   buildSocketEndpointCandidates,
   buildApiEndpointCandidates,
+  getSyncIdentityFromLocation,
 };

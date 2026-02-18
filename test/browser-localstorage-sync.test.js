@@ -14,6 +14,7 @@ import {
   shouldRunHttpFallbackSync,
   buildSocketEndpointCandidates,
   buildApiEndpointCandidates,
+  getSyncIdentityFromLocation,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -146,6 +147,16 @@ test('buildSocketEndpointCandidates includes root and base-path websocket URLs',
   }), [
     'ws://localhost:3000/ws/localstorage-sync',
   ]);
+
+  assert.deepEqual(buildSocketEndpointCandidates({
+    protocol: 'https:',
+    host: 'example.com',
+    pathname: '/index.html',
+    crewMemberId: 'crew-1',
+    projectId: 'project-9',
+  }), [
+    'wss://example.com/ws/localstorage-sync?crewMemberId=crew-1&projectId=project-9',
+  ]);
 });
 
 test('buildApiEndpointCandidates includes root and base-path API URLs', () => {
@@ -163,8 +174,33 @@ test('buildApiEndpointCandidates includes root and base-path API URLs', () => {
   }), [
     'http://localhost:3000/api/localstorage-sync',
   ]);
+
+  assert.deepEqual(buildApiEndpointCandidates({
+    origin: 'https://example.com',
+    pathname: '/index.html',
+    crewMemberId: 'crew-1',
+    projectId: 'project-9',
+  }), [
+    'https://example.com/api/localstorage-sync?crewMemberId=crew-1&projectId=project-9',
+  ]);
 });
 
+
+test('getSyncIdentityFromLocation maps URL search params to crew/project sync identity', () => {
+  assert.deepEqual(getSyncIdentityFromLocation({
+    search: '?crewMemberId=crew-1&activeProjectId=project-7',
+  }), {
+    crewMemberId: 'crew-1',
+    projectId: 'project-7',
+  });
+
+  assert.deepEqual(getSyncIdentityFromLocation({
+    search: '?projectId=project-legacy',
+  }), {
+    crewMemberId: '',
+    projectId: 'project-legacy',
+  });
+});
 
 test('shouldRunHttpFallbackSync runs only while online and websocket is not open', () => {
   assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 3, online: true }), true);

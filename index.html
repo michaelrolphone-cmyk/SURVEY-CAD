@@ -578,6 +578,7 @@
         <div class="project-manager-meta">
           <strong>Project manager</strong>
           <small id="activeProjectSummary">No active project selected.</small>
+          <small id="activeCrewSummary">Crew member not selected.</small>
         </div>
         <button id="openProjectManagerButton" class="project-manager-button" type="button">Choose project</button>
         <section id="activeProjectOverview" class="active-project-overview" aria-live="polite">
@@ -659,6 +660,23 @@
           </div>
         </div>
       </div>
+      <div id="crewIdentityModalBackdrop" class="project-modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="Crew member identity required">
+        <div class="project-modal" style="width:min(440px, 100%);max-height:none">
+          <div class="project-modal-header">
+            <strong>Select crew member identity</strong>
+          </div>
+          <p class="subtitle" style="margin-top:0.2rem">Choose who you are before using SurveyFoundry so project workspaces stay separated per crew member.</p>
+          <form id="crewIdentityForm" class="project-form" style="padding:0">
+            <select id="crewIdentitySelect" aria-label="Select a crew member">
+              <option value="">Loading crew members…</option>
+            </select>
+            <p id="crewIdentityError" class="project-form-error hidden" role="alert" style="margin-top:0.6rem"></p>
+            <div class="project-form-actions" style="padding:0;margin-top:0.7rem">
+              <button id="saveCrewIdentityButton" type="submit">Continue</button>
+            </div>
+          </form>
+        </div>
+      </div>
       <div class="app-sections" id="appSections"></div>
     </section>
 
@@ -701,6 +719,12 @@
     const leaveLineSmithDiscardButton = document.getElementById('leaveLineSmithDiscardButton');
     const leaveLineSmithCancelButton = document.getElementById('leaveLineSmithCancelButton');
     const activeProjectSummary = document.getElementById('activeProjectSummary');
+    const activeCrewSummary = document.getElementById('activeCrewSummary');
+    const crewIdentityModalBackdrop = document.getElementById('crewIdentityModalBackdrop');
+    const crewIdentityForm = document.getElementById('crewIdentityForm');
+    const crewIdentitySelect = document.getElementById('crewIdentitySelect');
+    const crewIdentityError = document.getElementById('crewIdentityError');
+    const saveCrewIdentityButton = document.getElementById('saveCrewIdentityButton');
     const activeProjectHeader = document.getElementById('activeProjectHeader');
     const activeProjectNameOverview = document.getElementById('activeProjectNameOverview');
     const activeProjectClientOverview = document.getElementById('activeProjectClientOverview');
@@ -720,6 +744,7 @@
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
     const ACTIVE_PROJECT_STORAGE_KEY = 'surveyfoundryActiveProjectId';
+    const CREW_MEMBER_STORAGE_KEY = 'surveyfoundryCrewMemberId';
     const LAUNCHER_VIEW_STATE_KEY = 'surveyfoundryLauncherViewState';
     const PROJECT_STATUS_SEQUENCE = [
       'Proposed',
@@ -740,6 +765,9 @@
     let editingProjectId = null;
     let projects = [];
     let activeProjectId = null;
+    let crewMemberId = '';
+    let crewMembers = [];
+    let isLoadingCrewMembers = false;
     let isSavingProjectForm = false;
     const backgroundMapUrlCache = new Map();
     let backgroundRequestToken = 0;
@@ -1061,6 +1089,8 @@
     function syncLauncherStateFromStorageEvent() {
       loadProjects();
       loadActiveProject();
+      loadCrewMemberIdentity();
+      renderCrewMemberOptions();
       renderProjects();
     }
 
@@ -1093,6 +1123,112 @@
       }
     }
 
+    function getCrewMemberById(memberId = '') {
+      return crewMembers.find((member) => member.id === String(memberId || '').trim()) || null;
+    }
+
+    function clearCrewIdentityError() {
+      crewIdentityError.textContent = '';
+      crewIdentityError.classList.add('hidden');
+    }
+
+    function setCrewIdentityError(message) {
+      crewIdentityError.textContent = message;
+      crewIdentityError.classList.remove('hidden');
+    }
+
+    function renderCrewMemberOptions() {
+      const selected = getCrewMemberById(crewMemberId);
+      const options = ['<option value="">Select a crew member</option>'];
+      crewMembers.forEach((member) => {
+        const selectedAttr = selected?.id === member.id ? ' selected' : '';
+        options.push(`<option value="${member.id}"${selectedAttr}>${member.name}</option>`);
+      });
+      crewIdentitySelect.innerHTML = options.join('');
+      if (!selected) crewIdentitySelect.value = '';
+      saveCrewIdentityButton.disabled = !crewMembers.length || isLoadingCrewMembers;
+    }
+
+    async function loadCrewMembers() {
+      if (isLoadingCrewMembers) return;
+      isLoadingCrewMembers = true;
+      clearCrewIdentityError();
+      saveCrewIdentityButton.disabled = true;
+      crewIdentitySelect.innerHTML = '<option value="">Loading crew members…</option>';
+      try {
+        const response = await fetch('/api/crew-members');
+        if (!response.ok) {
+          throw new Error(`Crew API unavailable (${response.status})`);
+        }
+        const payload = await response.json();
+        const list = Array.isArray(payload?.crewMembers) ? payload.crewMembers : [];
+        crewMembers = list
+          .map((member) => ({
+            id: String(member?.id || '').trim(),
+            name: String(member?.name || '').trim(),
+          }))
+          .filter((member) => member.id && member.name);
+        if (!crewMembers.length) {
+          crewMemberId = '';
+          localStorage.removeItem(CREW_MEMBER_STORAGE_KEY);
+          setCrewIdentityError('No crew members are currently available from the Crew API.');
+        }
+      } catch (err) {
+        crewMembers = [];
+        crewMemberId = '';
+        localStorage.removeItem(CREW_MEMBER_STORAGE_KEY);
+        setCrewIdentityError(`Unable to load crew members: ${err.message}`);
+      } finally {
+        isLoadingCrewMembers = false;
+        renderCrewMemberOptions();
+        renderCrewSummary();
+      }
+    }
+
+    function loadCrewMemberIdentity() {
+      const storedCrewMemberId = String(localStorage.getItem(CREW_MEMBER_STORAGE_KEY) || '').trim();
+      crewMemberId = getCrewMemberById(storedCrewMemberId) ? storedCrewMemberId : '';
+      if (!crewMemberId) {
+        localStorage.removeItem(CREW_MEMBER_STORAGE_KEY);
+      }
+    }
+
+    function saveCrewMemberIdentity(nextCrewMemberId) {
+      const normalized = String(nextCrewMemberId || '').trim();
+      crewMemberId = getCrewMemberById(normalized) ? normalized : '';
+      if (crewMemberId) {
+        localStorage.setItem(CREW_MEMBER_STORAGE_KEY, crewMemberId);
+      } else {
+        localStorage.removeItem(CREW_MEMBER_STORAGE_KEY);
+      }
+      renderCrewMemberOptions();
+      renderCrewSummary();
+    }
+
+    function hasCrewMemberIdentity() {
+      return Boolean(getCrewMemberById(crewMemberId));
+    }
+
+    function renderCrewSummary() {
+      const member = getCrewMemberById(crewMemberId);
+      activeCrewSummary.textContent = member
+        ? `Crew member: ${member.name}`
+        : 'Crew member not selected.';
+    }
+
+    function requireCrewMemberIdentity() {
+      if (hasCrewMemberIdentity()) {
+        crewIdentityModalBackdrop.classList.add('hidden');
+        return true;
+      }
+      if (!crewMembers.length && !isLoadingCrewMembers) {
+        loadCrewMembers();
+      }
+      crewIdentityModalBackdrop.classList.remove('hidden');
+      window.requestAnimationFrame(() => crewIdentitySelect.focus());
+      return false;
+    }
+
     function getActiveProject() {
       return projects.find((project) => project.id === activeProjectId) || null;
     }
@@ -1110,6 +1246,7 @@
     }
 
     function openProjectManager() {
+      if (!requireCrewMemberIdentity()) return;
       projectModalBackdrop.classList.remove('hidden');
     }
 
@@ -1119,11 +1256,14 @@
 
     function withActiveProject(file) {
       const project = getActiveProject();
-      if (!project) return file;
-
       const url = new URL(file, window.location.origin);
-      url.searchParams.set('activeProjectId', String(project.id));
-      url.searchParams.set('activeProjectName', String(project.name || ''));
+      if (project) {
+        url.searchParams.set('activeProjectId', String(project.id));
+        url.searchParams.set('activeProjectName', String(project.name || ''));
+      }
+      if (crewMemberId) {
+        url.searchParams.set('crewMemberId', String(crewMemberId));
+      }
       return `${url.pathname.replace(/^\//, '')}${url.search}`;
     }
 
@@ -1134,6 +1274,7 @@
         address: String(project.address || ''),
         projectName: String(project.name || ''),
         client: String(project.client || ''),
+        crewMemberId: String(crewMemberId || ''),
         autostart: '1',
       });
       openApp(`RecordQuarry.html?${params.toString()}`);
@@ -1305,6 +1446,7 @@
     }
 
     function renderProjects() {
+      renderCrewSummary();
       const activeProject = getActiveProject();
       activeProjectSummary.textContent = activeProject
         ? `Active project: ${activeProject.name}`
@@ -1520,6 +1662,7 @@
     }
 
     function openApp(file, { historyMode = 'push' } = {}) {
+      if (!requireCrewMemberIdentity()) return;
       const resolvedFile = withActiveProject(file);
       currentApp = resolvedFile;
       appFrame.src = resolvedFile;
@@ -1612,6 +1755,20 @@
       }
     });
 
+    crewIdentityForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const nextCrewMemberId = crewIdentitySelect.value;
+      if (!nextCrewMemberId) {
+        setCrewIdentityError('Please select a crew member to continue.');
+        crewIdentitySelect.focus();
+        return;
+      }
+      clearCrewIdentityError();
+      saveCrewMemberIdentity(nextCrewMemberId);
+      crewIdentityModalBackdrop.classList.add('hidden');
+      renderProjects();
+    });
+
     openProjectFormButton.addEventListener('click', () => openProjectForm());
     projectForm.addEventListener('submit', saveProjectFromForm);
     closeProjectFormButton.addEventListener('click', closeProjectForm);
@@ -1657,6 +1814,9 @@
       if (!leaveLineSmithModalBackdrop.classList.contains('hidden')) {
         closeLeaveLineSmithModal('cancel');
       }
+      if (!crewIdentityModalBackdrop.classList.contains('hidden')) {
+        crewIdentitySelect.focus();
+      }
     });
 
 
@@ -1684,6 +1844,11 @@
     renderProjects();
     syncProjectPlssMetadata(activeProjectId);
 
+    loadCrewMembers().then(() => {
+      loadCrewMemberIdentity();
+      renderProjects();
+      requireCrewMemberIdentity();
+    });
 
     loadApps().then(() => {
       restoreLauncherViewState();
