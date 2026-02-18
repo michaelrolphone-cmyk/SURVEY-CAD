@@ -28,3 +28,14 @@ test('BoundaryLab stacks preview below call table on mobile and resizes canvas t
   assert.match(html, /function resizeCanvasToDisplaySize\(\) \{[\s\S]*window\.devicePixelRatio[\s\S]*canvas\.width = displayWidth;[\s\S]*canvas\.height = displayHeight;/);
   assert.match(html, /window\.addEventListener\('resize', render\);/);
 });
+
+
+test('BoundaryLab includes project traverse API controls for load/save', async () => {
+  const html = await readFile(path.join(rootDir, 'BoundaryLab.html'), 'utf8');
+  assert.match(html, /id="traversePicker"/);
+  assert.match(html, /id="traverseName"/);
+  assert.match(html, /id="saveTraverse"/);
+  assert.match(html, /id="saveTraverseAs"/);
+  assert.match(html, /\/api\/projects\/\$\{encodeURIComponent\(activeProjectId\)\}\/workbench\/traverses/);
+  assert.match(html, /traversePicker\.addEventListener\('change'/);
+});

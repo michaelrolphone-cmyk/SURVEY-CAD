@@ -219,6 +219,186 @@ A new launcher app, **BoundaryLab** (`/BoundaryLab.html`), helps you validate bo
 - See an immediate boundary preview as each call changes.
 - Review live closure metrics: total distance, linear misclosure, closure bearing (quadrant format), and closure ratio.
 
+### API/CLI endpoints and commands for BoundaryLab traverse persistence
+
+BoundaryLab can now save and reopen named traverses for a project by using project Workbench traverse APIs (the same traverse storage model Workbench uses via BEW casefile traverse config).
+
+- `GET /api/projects/:projectId/workbench/traverses` – list saved traverses in the project.
+- `GET /api/projects/:projectId/workbench/traverses/:traverseId` – load one saved traverse for editing.
+- `POST /api/projects/:projectId/workbench/traverses` – create or update a named traverse.
+
+CLI/server commands for this workflow:
+
+- `npm start` – run the API server that serves BoundaryLab + traverse endpoints.
+- `npm test` – run BoundaryLab/project-workbench traverse API tests.
+
+## API and CLI notes for this PLSS section parsing fix
+
+Launcher PLSS metadata parsing now treats combined township/range identifiers (for example, `FRSTDIVNO: 3N2E7`) as non-section values and only renders section labels from explicit section fields (such as `SEC`, `SECTION`, `SECNO`).
+
+- API endpoints (unchanged): `GET /api/lookup`, `GET /api/aliquots`, `GET /api/section`, `GET /api/apps`, `GET /health`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI Notes for this change
+
+LineSmith 3-point PC/PT curve rendering now draws a true circular arc fit through the start, middle, and end points instead of approximating the path with a Bezier segment.
+
+API and CLI surface area remains unchanged for this bug fix. Continue using:
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI Notes for this curve-inspector enhancement
+
+LineSmith now shows a curve table in the inspector drawer when a selected line is a 3-point curve. The table includes radius, arc length, chord bearing, chord distance, and delta angle for the fitted circular arc through start/middle/end points.
+
+API and CLI surface area remains unchanged for this UI/measurement enhancement. Continue using:
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith curve tap-selection fix
+
+LineSmith line hit-testing now follows the true three-point arc geometry when a line has PC/PT middle-point metadata, so tapping directly on a curve on touch devices selects that curve and opens the curve table in the inspector.
+
+- API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith collaboration frame-handling fix
+
+LineSmith collaboration websocket handling now correctly processes fragmented frames and multiple coalesced frames in a single TCP packet, which prevents missed point/code saves and stale peer point positions during concurrent editing.
+
+- Collaboration endpoint (unchanged): `GET /ws/lineforge?room=<roomId>`
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`
+
+## LocalStorage sync architecture reference
+
+For a focused, implementation-level explanation of browser-to-browser sync over websocket (including **initial state loading on connect**, queueing, checksum reconciliation, HTTP fallback, and sequence diagrams), see:
+
+- `docs/localstorage-sync-architecture.md`
+
+### API endpoints and commands used by sync
+
+- WebSocket endpoint: `GET /ws/localstorage-sync`
+- REST endpoints: `GET /api/localstorage-sync`, `POST /api/localstorage-sync`
+- Startup bootstrap (no websocket wait): on first load, clients call `GET /api/localstorage-sync` immediately, compare server `version` + `checksum` against local sync metadata, and hydrate when storage is blank or server state is newer and there are no pending local diffs.
+- Run server: `npm start`
+- Run tests: `npm test`
+
+### API and CLI notes for this localStorage realtime sync fix
+
+Clients now apply the websocket `sync-welcome` snapshot immediately when checksums differ and no unsafe local pending queue exists, so newly connected browsers reflect recent remote edits right away instead of waiting for delayed fallback sync loops.
+
+- API endpoints (unchanged): `GET /api/localstorage-sync`, `POST /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## Redis-backed shared platform state
+
+To persist shared browser/platform state across dyno restarts and deploys, the server can use Heroku Key-Value Store (Redis) for `/api/localstorage-sync` and `/ws/localstorage-sync`.
+
+Set these environment variables in Heroku:
+
+- `REDIS_URL` (provided by Heroku Key-Value Store)
+- `LOCALSTORAGE_SYNC_REDIS_KEY` (optional, default: `survey-cad:localstorage-sync:state`)
+- `REDIS_CONNECT_MAX_WAIT_MS` (optional, default: `15000`) — total startup wait budget for Redis connect retries before fallback.
+- `REDIS_CONNECT_RETRY_DELAY_MS` (optional, default: `750`) — delay between Redis connect retry attempts during startup.
+- `REDIS_TLS_REJECT_UNAUTHORIZED` (optional, default: `false`) — TLS certificate verification for `rediss://` Redis connections.
+
+When `REDIS_URL` is set, `npm start` attempts to hydrate and persist shared sync state in Redis and will retry Redis connections during startup for up to `REDIS_CONNECT_MAX_WAIT_MS`. If Redis remains unavailable after the retry window or `REDIS_URL` is not set, the server falls back to in-memory sync state instead of crashing.
+
+### API/CLI endpoints and commands for this BEW Redis TLS fix
+
+The BEW casefile backend now supports `REDIS_TLS_REJECT_UNAUTHORIZED` (preferred) while retaining compatibility with `REDIS_TLS_INSECURE`, so ioredis can connect to self-signed Heroku Redis certificates without failing TLS verification by default.
+
+- API endpoints (unchanged): `GET /casefiles`, `POST /casefiles`, `GET /casefiles/:casefileId`, `PATCH /casefiles/:casefileId`, `DELETE /casefiles/:casefileId`, plus the equivalent `/api/bew/*` prefixed routes.
+- CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+### API endpoints (state sync)
+
+- `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum.
+- `POST /api/localstorage-sync` – pushes a client snapshot and resolves stale/conflict state.
+- `GET /ws/localstorage-sync` (websocket upgrade) – real-time differential sync for all connected clients.
+
+### API endpoints (LineSmith drawing CRUD in project scope)
+
+Dedicated drawing CRUD endpoints are now available for project-scoped LineSmith drawings. These endpoints persist drawing records (including differential version history) inside the same Redis-backed sync store used by localStorage collaboration, so multi-user sync and offline-first local editing flows remain compatible.
+
+- `GET /api/projects/:projectId/drawings` – list drawing summaries for a project.
+- `POST /api/projects/:projectId/drawings` – create a drawing record (or named drawing id) from `drawingState`.
+- `GET /api/projects/:projectId/drawings/:drawingId` – fetch full drawing record + reconstructed `currentState`.
+- `PUT /api/projects/:projectId/drawings/:drawingId` (or `PATCH`) – append a new differential version for an existing drawing.
+- `DELETE /api/projects/:projectId/drawings/:drawingId` – remove the drawing record from the project.
+
+LineSmith now uses these drawing CRUD endpoints as the primary load/save path for project drawings. Collaboration socket rooms are scoped per drawing (`projectId + drawingId`) so users on different drawings do not conflict, while users on the same drawing continue to receive shared real-time updates.
+
+Crew active-drawing restore uses existing crew profile APIs:
+
+- `GET /api/crew?id=:crewMemberId` – resolve a crew member's persisted `lineSmithActiveDrawingByProject` preference.
+- `POST /api/crew` – upsert crew profile fields (including `lineSmithActiveDrawingByProject`) when LineSmith saves/opens a project drawing.
+
+Crew preference payload fragment:
+
+```json
+{
+  "lineSmithActiveDrawingByProject": {
+    "project-123": "boundary-base-map"
+  }
+}
+```
+
+Request body for create/update:
+
+```json
+{
+  "drawingName": "Boundary Base Map",
+  "drawingState": { "points": [] }
+}
+```
+
+EvidenceDesk now hydrates its **Drawings** folder from the drawing CRUD API (`GET /api/projects/:projectId/drawings`) and fetches selected drawing history records from `GET /api/projects/:projectId/drawings/:drawingId` before launching LineSmith, so project browser drawing lists stay API-backed rather than relying only on legacy local-storage indexes.
+
+
+### API endpoints (project point file CRUD)
+
+PointForge/EvidenceDesk now use project-scoped point-file CRUD endpoints backed by the same shared localStorage sync snapshot, including differential version history so sync/offline flows remain consistent.
+
+- `GET /api/projects/:projectId/point-files` – list point-file summaries for a project.
+- `POST /api/projects/:projectId/point-files` – create a point-file record from `pointFileState`.
+- `GET /api/projects/:projectId/point-files/:pointFileId` – fetch full point-file record + reconstructed `currentState`.
+- `PUT /api/projects/:projectId/point-files/:pointFileId` (or `PATCH`) – append a new differential version for an existing point file.
+- `DELETE /api/projects/:projectId/point-files/:pointFileId` – remove the point-file record from the project.
+
+Request body for create/update:
+
+```json
+{
+  "pointFileName": "Boundary Export.csv",
+  "pointFileState": { "text": "1,100,200", "exportFormat": "csv" }
+}
+```
+
+### CLI / server commands
+
+- `npm start` – starts the server with optional Redis persistence via `REDIS_URL`.
+- `npm test` – runs the full unit/integration test suite.
+- `npm run cli -- --help` – survey CLI entrypoint and subcommands.
+- `npm run ros:cli -- --help` – ROS basis extraction CLI.
+
+### Surface Weaver project point-file loading
+
+Surface Weaver (`/SURFACE.html`) now reads project-scoped point files directly when launched with `activeProjectId` (or `projectId`) query params.
+
+- `GET /api/projects/:projectId/point-files` – populates the Surface Weaver point-file picker.
+- `GET /api/projects/:projectId/point-files/:pointFileId` – loads the selected project point file into the Surface Weaver CSV editor.
+
+## BoundaryLab
+
+A new launcher app, **BoundaryLab** (`/BoundaryLab.html`), helps you validate boundary closure from an ordered list of bearings and distances.
+
+- Enter calls in order (bearing + distance) and edit rows live.
+- See an immediate boundary preview as each call changes.
+- Review live closure metrics: total distance, linear misclosure, closure bearing (quadrant format), and closure ratio.
+
 ### API/CLI endpoints and commands for this BoundaryLab input-focus fix
 
 BoundaryLab now preserves keyboard focus/caret position while you type in call bearing and distance fields, so continuous entry no longer requires re-clicking the field after each character.

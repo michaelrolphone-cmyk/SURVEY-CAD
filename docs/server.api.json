@@ -1967,6 +1967,115 @@
           }
         }
       }
+    },
+    "/api/projects/{projectId}/workbench/traverses": {
+      "get": {
+        "summary": "List BoundaryLab traverses saved for a project",
+        "operationId": "listProjectTraverses",
+        "tags": [
+          "Project Workbench"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project traverse list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchTraverseListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create or update a project traverse using Workbench traverse storage",
+        "operationId": "upsertProjectTraverse",
+        "tags": [
+          "Project Workbench"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkbenchTraverseUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated traverse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchTraverseResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created traverse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchTraverseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/workbench/traverses/{traverseId}": {
+      "get": {
+        "summary": "Load a saved project traverse with traverse config",
+        "operationId": "getProjectTraverse",
+        "tags": [
+          "Project Workbench"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectIdPath"
+          },
+          {
+            "$ref": "#/components/parameters/TraverseIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project traverse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchTraverseLoadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Traverse not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2215,6 +2324,14 @@
           "default": "0"
         },
         "description": "Include debug output"
+      },
+      "TraverseIdPath": {
+        "name": "traverseId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
       }
     },
     "responses": {
@@ -4516,6 +4633,143 @@
             }
           }
         }
+      },
+      "ProjectWorkbenchTraverseRecord": {
+        "type": "object",
+        "properties": {
+          "traverseId": {
+            "type": "string"
+          },
+          "casefileId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "traverseId",
+          "casefileId",
+          "name",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ProjectWorkbenchTraverseListResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "traverses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkbenchTraverseRecord"
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "traverses"
+        ]
+      },
+      "ProjectWorkbenchTraverseUpsertRequest": {
+        "type": "object",
+        "properties": {
+          "traverseId": {
+            "type": "string"
+          },
+          "casefileId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bearing": {
+                  "type": "string"
+                },
+                "distance": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "bearing",
+                "distance"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "calls"
+        ]
+      },
+      "ProjectWorkbenchTraverseResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "traverseId": {
+            "type": "string"
+          },
+          "casefileId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "traverse": {
+            "$ref": "#/components/schemas/TraverseConfig"
+          }
+        },
+        "required": [
+          "projectId",
+          "traverseId",
+          "casefileId",
+          "name",
+          "traverse"
+        ]
+      },
+      "ProjectWorkbenchTraverseLoadResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "traverseId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "casefile": {
+            "$ref": "#/components/schemas/Casefile"
+          },
+          "traverse": {
+            "$ref": "#/components/schemas/TraverseConfig"
+          }
+        },
+        "required": [
+          "projectId",
+          "traverseId",
+          "name",
+          "casefile",
+          "traverse"
+        ]
       }
     }
   }

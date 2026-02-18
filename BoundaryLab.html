@@ -12,13 +12,13 @@
     h1 { margin: 0 0 6px; font-size: 1.25rem; }
     p { margin: 0 0 14px; color: #9fb0cc; }
     .toolbar { display: flex; gap: 8px; margin: 10px 0 14px; }
-    button, input { border: 1px solid #2a3f62; border-radius: 8px; background: #12203a; color: #e2e8f0; padding: 8px 10px; }
+    button, input, select { border: 1px solid #2a3f62; border-radius: 8px; background: #12203a; color: #e2e8f0; padding: 8px 10px; }
     button { cursor: pointer; }
     .primary { background: #2563eb; border-color: #3b82f6; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { border-bottom: 1px solid #22314f; padding: 6px; text-align: left; }
     th { color: #9fb0cc; }
-    input { width: 100%; box-sizing: border-box; }
+    input, select { width: 100%; box-sizing: border-box; }
     .summary { margin-top: 14px; background: #0f1a2e; border: 1px solid #22314f; border-radius: 10px; padding: 12px; }
     .summaryRow { display: flex; justify-content: space-between; margin: 5px 0; gap: 10px; }
     .bad { color: #fca5a5; }
@@ -40,12 +40,20 @@
       <h1>BoundaryLab</h1>
       <p>
         Enter bearings and distances in order. Bearings accept DMS (e.g. <code>N 45°01'07" E</code> or <code>N 45-01-07 E</code>).
-        The boundary preview and closure error update as you edit.
+        The boundary preview and closure error update as you edit. When opened from a project, traverses can be saved to and loaded from the project API.
       </p>
       <div class="toolbar">
         <button id="addCall" class="primary" type="button">Add Call</button>
         <button id="clearCalls" type="button">Clear</button>
         <button id="exportPointForge" type="button">Export to PointForge</button>
+      </div>
+      <div class="toolbar">
+        <select id="traversePicker" aria-label="Saved traverses in this project">
+          <option value="">Project traverses (not connected)</option>
+        </select>
+        <input id="traverseName" type="text" placeholder="Traverse name" aria-label="Traverse name" />
+        <button id="saveTraverse" type="button">Save</button>
+        <button id="saveTraverseAs" type="button">Save As New</button>
       </div>
       <table>
         <thead>
@@ -78,6 +86,8 @@
         { id: crypto.randomUUID(), bearing: 'N 45°00\'00" E', distance: '100' },
         { id: crypto.randomUUID(), bearing: 'S 45-00-00 E', distance: '100' },
       ],
+      activeTraverseId: '',
+      activeTraverseCasefileId: '',
     };
 
     const body = document.getElementById('callsBody');
@@ -90,7 +100,86 @@
     const closureStatusEl = document.getElementById('closureStatus');
     const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
+    const traversePicker = document.getElementById('traversePicker');
+    const traverseNameInput = document.getElementById('traverseName');
+    const saveTraverseButton = document.getElementById('saveTraverse');
+    const saveTraverseAsButton = document.getElementById('saveTraverseAs');
 
+    const pageParams = new URLSearchParams(window.location.search || '');
+    const activeProjectId = String(pageParams.get('activeProjectId') || pageParams.get('projectId') || '').trim();
+
+
+    async function apiRequest(method, url, body) {
+      const res = await fetch(url, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!res.ok) {
+        const details = await res.text();
+        throw new Error(details || `Request failed: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    async function listProjectTraverses() {
+      if (!activeProjectId) return [];
+      const out = await apiRequest('GET', `/api/projects/${encodeURIComponent(activeProjectId)}/workbench/traverses`);
+      return Array.isArray(out?.traverses) ? out.traverses : [];
+    }
+
+    async function loadProjectTraverse(traverseId) {
+      if (!activeProjectId || !traverseId) return null;
+      return apiRequest('GET', `/api/projects/${encodeURIComponent(activeProjectId)}/workbench/traverses/${encodeURIComponent(traverseId)}`);
+    }
+
+    async function saveProjectTraverse({ asNew = false } = {}) {
+      if (!activeProjectId) {
+        alert('BoundaryLab is not connected to a project. Open BoundaryLab from Project Browser to save traverses.');
+        return;
+      }
+      const name = String(traverseNameInput.value || '').trim();
+      if (!name) {
+        alert('Traverse name is required.');
+        traverseNameInput.focus();
+        return;
+      }
+      const calls = state.calls.map((call) => ({
+        bearing: String(call.bearing || '').trim(),
+        distance: Number.parseFloat(call.distance),
+      })).filter((call) => call.bearing && Number.isFinite(call.distance));
+
+      const payload = {
+        name,
+        calls,
+      };
+
+      if (!asNew && state.activeTraverseCasefileId) {
+        payload.casefileId = state.activeTraverseCasefileId;
+        payload.traverseId = state.activeTraverseId;
+      }
+
+      const saved = await apiRequest('POST', `/api/projects/${encodeURIComponent(activeProjectId)}/workbench/traverses`, payload);
+      state.activeTraverseId = saved?.traverseId || '';
+      state.activeTraverseCasefileId = saved?.casefileId || '';
+      await refreshTraversePicker();
+    }
+
+    async function refreshTraversePicker() {
+      const traverses = await listProjectTraverses();
+      const previous = state.activeTraverseId || traversePicker.value || '';
+      const options = ['<option value="">Project traverses (select to open)</option>'];
+      for (const item of traverses) {
+        options.push(`<option value="${esc(item.traverseId)}">${esc(item.name)}</option>`);
+      }
+      traversePicker.innerHTML = options.join('');
+      if (previous) traversePicker.value = traverses.some((item) => item.traverseId === previous) ? previous : '';
+      if (!activeProjectId) {
+        traversePicker.disabled = true;
+        saveTraverseButton.disabled = true;
+        saveTraverseAsButton.disabled = true;
+      }
+    }
     function esc(v = '') {
       return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
@@ -355,9 +444,58 @@
       window.location.assign('/POINT_TRANSFORMER.HTML?source=boundary-lab');
     });
 
+
+    traversePicker.addEventListener('change', async () => {
+      const traverseId = String(traversePicker.value || '').trim();
+      if (!traverseId) {
+        state.activeTraverseId = '';
+        state.activeTraverseCasefileId = '';
+        return;
+      }
+      try {
+        const loaded = await loadProjectTraverse(traverseId);
+        const calls = Array.isArray(loaded?.traverse?.calls) ? loaded.traverse.calls : [];
+        state.calls = calls.map((call) => ({
+          id: crypto.randomUUID(),
+          bearing: String(call?.bearing || ''),
+          distance: Number.isFinite(Number(call?.distance)) ? String(call.distance) : '',
+        }));
+        state.activeTraverseId = traverseId;
+        state.activeTraverseCasefileId = String(loaded?.casefile?.id || '');
+        traverseNameInput.value = String(loaded?.name || loaded?.casefile?.meta?.name || '');
+        render();
+      } catch (error) {
+        console.error(error);
+        alert('Unable to load traverse from API.');
+      }
+    });
+
+    saveTraverseButton.addEventListener('click', async () => {
+      try {
+        await saveProjectTraverse({ asNew: false });
+      } catch (error) {
+        console.error(error);
+        alert('Unable to save traverse.');
+      }
+    });
+
+    saveTraverseAsButton.addEventListener('click', async () => {
+      try {
+        state.activeTraverseId = '';
+        state.activeTraverseCasefileId = '';
+        await saveProjectTraverse({ asNew: true });
+      } catch (error) {
+        console.error(error);
+        alert('Unable to save traverse as new.');
+      }
+    });
+
     window.addEventListener('resize', render);
 
     render();
+    refreshTraversePicker().catch((error) => {
+      console.error(error);
+    });
   </script>
 </body>
 </html>

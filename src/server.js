@@ -34,6 +34,8 @@ import {
   getProjectMetadata,
   collectProjectWorkbenchSources,
   syncProjectSourcesToCasefile,
+  listProjectTraverses,
+  upsertProjectTraverseRecord,
 } from './project-workbench.js';
 
 import { loadFldConfig } from './fld-config.js';
@@ -99,11 +101,14 @@ function parseProjectPointFileRoute(pathname = '') {
 }
 
 function parseProjectWorkbenchRoute(pathname = '') {
-  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/workbench(?:\/(link|casefile|sources|sync))?\/?$/);
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/workbench(?:\/(link|casefile|sources|sync|traverses(?:\/[^/]+)?))?\/?$/);
   if (!match) return null;
+  const action = match[2] ? decodeURIComponent(match[2]) : '';
+  const traverseMatch = action.match(/^traverses(?:\/([^/]+))?$/);
   return {
     projectId: decodeURIComponent(match[1]),
-    action: match[2] ? decodeURIComponent(match[2]) : '',
+    action,
+    traverseId: traverseMatch?.[1] ? decodeURIComponent(traverseMatch[1]) : '',
   };
 }
 
@@ -932,7 +937,7 @@ export function createSurveyServer({
 
       const projectWorkbenchRoute = parseProjectWorkbenchRoute(urlObj.pathname);
       if (projectWorkbenchRoute) {
-        const { projectId, action } = projectWorkbenchRoute;
+        const { projectId, action, traverseId } = projectWorkbenchRoute;
 
         if (req.method === 'GET' && (!action || action === 'link')) {
           const link = await getProjectWorkbenchLink(localStorageSyncStore, projectId);
@@ -1060,6 +1065,122 @@ export function createSurveyServer({
             validFolderKeys: VALID_FOLDER_KEYS,
           });
           sendJson(res, 200, { projectId, sources });
+          return;
+        }
+
+        if (req.method === 'GET' && action === 'traverses') {
+          const bew = await ensureBew({ existingRedis });
+          const traverses = await listProjectTraverses(localStorageSyncStore, projectId);
+          const hydrated = [];
+          for (const traverse of traverses) {
+            try {
+              const casefile = await bew.store.getCasefile(traverse.casefileId);
+              hydrated.push({
+                ...traverse,
+                casefileId: casefile.id,
+                name: traverse.name || casefile.meta?.name || 'Untitled Traverse',
+                casefileName: casefile.meta?.name || traverse.name || 'Untitled Traverse',
+                updatedAt: casefile.meta?.updatedAt || traverse.updatedAt,
+              });
+            } catch {
+              // skip stale records that reference deleted casefiles
+            }
+          }
+          sendJson(res, 200, { projectId, traverses: hydrated });
+          return;
+        }
+
+        if (req.method === 'GET' && action.startsWith('traverses/') && traverseId) {
+          const bew = await ensureBew({ existingRedis });
+          const traverses = await listProjectTraverses(localStorageSyncStore, projectId);
+          const selected = traverses.find((item) => item.traverseId === traverseId);
+          if (!selected) {
+            sendJson(res, 404, { error: 'Traverse not found.' });
+            return;
+          }
+          const casefile = await bew.store.getCasefile(selected.casefileId);
+          const traverse = await bew.store.getTraverseConfig(selected.casefileId);
+          sendJson(res, 200, {
+            projectId,
+            traverseId: selected.traverseId,
+            name: selected.name,
+            casefile,
+            traverse,
+          });
+          return;
+        }
+
+        if (req.method === 'POST' && action === 'traverses') {
+          const body = await readJsonBody(req);
+          const name = String(body?.name || '').trim();
+          if (!name) {
+            sendJson(res, 400, { error: 'name is required.' });
+            return;
+          }
+
+          const inputCalls = Array.isArray(body?.calls)
+            ? body.calls
+            : Array.isArray(body?.traverse?.calls)
+              ? body.traverse.calls
+              : [];
+          const normalizedCalls = inputCalls
+            .map((call) => ({
+              bearing: String(call?.bearing || ''),
+              distance: Number(call?.distance),
+            }))
+            .filter((call) => call.bearing && Number.isFinite(call.distance));
+
+          const traversePayload = {
+            start: {
+              N: Number(body?.traverse?.start?.N ?? body?.start?.N ?? 10000),
+              E: Number(body?.traverse?.start?.E ?? body?.start?.E ?? 10000),
+            },
+            basis: {
+              label: String(body?.traverse?.basis?.label ?? body?.basis?.label ?? 'BASIS'),
+              rotationDeg: Number(body?.traverse?.basis?.rotationDeg ?? body?.basis?.rotationDeg ?? 0),
+            },
+            calls: normalizedCalls,
+          };
+
+          const bew = await ensureBew({ existingRedis });
+          let casefileId = String(body?.casefileId || '').trim();
+          let casefile;
+          if (casefileId) {
+            casefile = await bew.store.updateCasefile(casefileId, { meta: { name } });
+          } else {
+            casefile = await bew.store.createCasefile({
+              name,
+              notes: `BoundaryLab traverse for project ${projectId}`,
+              initializeDefaults: true,
+            });
+            casefileId = casefile.id;
+          }
+
+          await bew.store.updateTraverseConfig(casefileId, traversePayload);
+          const result = await upsertProjectTraverseRecord(localStorageSyncStore, projectId, {
+            traverseId: String(body?.traverseId || casefileId),
+            casefileId,
+            name,
+          });
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+
+          const traverse = await bew.store.getTraverseConfig(casefileId);
+          sendJson(res, body?.casefileId ? 200 : 201, {
+            projectId,
+            traverseId: result.traverse?.traverseId,
+            name: result.traverse?.name,
+            casefileId,
+            traverse,
+          });
           return;
         }
 

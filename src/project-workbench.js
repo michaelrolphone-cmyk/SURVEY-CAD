@@ -13,6 +13,10 @@ function projectWorkbenchLinkKey(projectId) {
   return `workbench:project-link:${projectId}`;
 }
 
+function projectWorkbenchTraverseIndexKey(projectId) {
+  return `workbench:project-traverses:${projectId}`;
+}
+
 function parseSnapshotJson(snapshot = {}, key = '') {
   const raw = snapshot[key];
   if (!raw || typeof raw !== 'string') return null;
@@ -26,6 +30,21 @@ function parseSnapshotJson(snapshot = {}, key = '') {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function normalizeTraverseName(name = '') {
+  return String(name || '').trim();
+}
+
+function normalizeTraverseIndexEntry(entry = {}) {
+  const traverseId = String(entry?.traverseId || '').trim();
+  const casefileId = String(entry?.casefileId || '').trim();
+  const name = normalizeTraverseName(entry?.name || entry?.traverseName || 'Untitled Traverse');
+  if (!traverseId || !casefileId || !name) return null;
+
+  const createdAt = String(entry?.createdAt || nowIso());
+  const updatedAt = String(entry?.updatedAt || createdAt || nowIso());
+  return { traverseId, casefileId, name, createdAt, updatedAt };
 }
 
 function mapUploadFolderToEvidenceType(folderKey = '') {
@@ -149,6 +168,68 @@ export async function getProjectMetadata(store, projectIdRaw) {
     state: String(match?.state || ''),
     notes: String(match?.notes || ''),
   };
+}
+
+export async function listProjectTraverses(store, projectIdRaw) {
+  const projectId = normalizeProjectId(projectIdRaw);
+  if (!projectId) throw new Error('projectId is required.');
+  const state = await Promise.resolve(store.getState());
+  const snapshot = state?.snapshot || {};
+  const parsed = parseSnapshotJson(snapshot, projectWorkbenchTraverseIndexKey(projectId));
+  const items = Array.isArray(parsed?.items)
+    ? parsed.items.map((item) => normalizeTraverseIndexEntry(item)).filter(Boolean)
+    : [];
+  return items.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+}
+
+export async function upsertProjectTraverseRecord(store, projectIdRaw, entry = {}) {
+  const projectId = normalizeProjectId(projectIdRaw);
+  if (!projectId) throw new Error('projectId is required.');
+
+  const normalized = normalizeTraverseIndexEntry({
+    ...entry,
+    traverseId: entry?.traverseId || entry?.casefileId,
+  });
+  if (!normalized) throw new Error('traverseId, casefileId, and name are required.');
+
+  const existing = await listProjectTraverses(store, projectId);
+  const updatedAt = nowIso();
+  let createdAt = updatedAt;
+
+  const items = existing.map((item) => {
+    if (item.traverseId !== normalized.traverseId) return item;
+    createdAt = item.createdAt || updatedAt;
+    return {
+      ...item,
+      casefileId: normalized.casefileId,
+      name: normalized.name,
+      updatedAt,
+    };
+  });
+
+  if (!items.some((item) => item.traverseId === normalized.traverseId)) {
+    items.push({
+      traverseId: normalized.traverseId,
+      casefileId: normalized.casefileId,
+      name: normalized.name,
+      createdAt,
+      updatedAt,
+    });
+  }
+
+  const payload = { items };
+  const sync = await Promise.resolve(store.applyDifferentialBatch({
+    diffs: [{
+      operations: [{
+        type: 'set',
+        key: projectWorkbenchTraverseIndexKey(projectId),
+        value: JSON.stringify(payload),
+      }],
+    }],
+  }));
+
+  const traverse = items.find((item) => item.traverseId === normalized.traverseId) || null;
+  return { traverse, traverses: items.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))), sync };
 }
 
 async function collectUploadedProjectFiles(projectId, { uploadsDir, validFolderKeys = new Set() } = {}) {
