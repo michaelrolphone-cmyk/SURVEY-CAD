@@ -149,6 +149,23 @@ Dedicated drawing CRUD endpoints are now available for project-scoped LineSmith 
 - `PUT /api/projects/:projectId/drawings/:drawingId` (or `PATCH`) – append a new differential version for an existing drawing.
 - `DELETE /api/projects/:projectId/drawings/:drawingId` – remove the drawing record from the project.
 
+LineSmith now uses these drawing CRUD endpoints as the primary load/save path for project drawings. Collaboration socket rooms are scoped per drawing (`projectId + drawingId`) so users on different drawings do not conflict, while users on the same drawing continue to receive shared real-time updates.
+
+Crew active-drawing restore uses existing crew profile APIs:
+
+- `GET /api/crew?id=:crewMemberId` – resolve a crew member's persisted `lineSmithActiveDrawingByProject` preference.
+- `POST /api/crew` – upsert crew profile fields (including `lineSmithActiveDrawingByProject`) when LineSmith saves/opens a project drawing.
+
+Crew preference payload fragment:
+
+```json
+{
+  "lineSmithActiveDrawingByProject": {
+    "project-123": "boundary-base-map"
+  }
+}
+```
+
 Request body for create/update:
 
 ```json
@@ -186,6 +203,8 @@ Request body for create/update:
 - `npm test` – runs the full unit/integration test suite.
 - `npm run cli -- --help` – survey CLI entrypoint and subcommands.
 - `npm run ros:cli -- --help` – ROS basis extraction CLI.
+
+No new CLI commands were added for this LineSmith multi-drawing/channel update.
 
 ## BoundaryLab
 

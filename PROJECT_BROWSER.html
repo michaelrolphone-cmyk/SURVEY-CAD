@@ -377,6 +377,7 @@
       return null;
     }
 
+
     async function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
       let storageKey = resource?.reference?.value;
       if (resource?.reference?.type === 'project-drawing') {
@@ -387,13 +388,16 @@
           return;
         }
       }
-      if (!storageKey) {
+      const drawingId = String(resource?.reference?.metadata?.drawingId || resource?.id || '').replace(/^linesmith-/, '').trim();
+      if (!storageKey && !drawingId) {
+
         renderError(`Selected drawing could not be opened. Missing storage key for ${resource?.title || 'resource'}.`);
         return;
       }
 
       localStorage.setItem(LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY, JSON.stringify({
         storageKey,
+        drawingId,
         drawingName: resource.title || resource.id || 'Drawing',
       }));
 
@@ -847,7 +851,8 @@
           resource.className = 'file-row';
 
           const canLaunchPointForge = folder.key === 'point-files' && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
-          const canOpenLineSmithDrawing = folder.key === 'drawings' && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
+          const canOpenLineSmithDrawing = folder.key === 'drawings'
+            && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
 

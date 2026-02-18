@@ -689,7 +689,7 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /const\s+PROJECT_DRAWING_STORAGE_PREFIX\s*=\s*"surveyfoundryLineSmithDrawing"/, 'LineSmith should persist drawing history using a dedicated local storage namespace');
   assert.match(html, /function\s+diffState\(previous, next\)/, 'LineSmith should compute differential patches between saved drawing states');
   assert.match(html, /function\s+applyStateDiff\(base, diff\)/, 'LineSmith should reconstruct drawing versions from differential history');
-  assert.match(html, /function\s+saveDrawingToProject\(\)/, 'LineSmith should define drawing save handler');
+  assert.match(html, /async\s+function\s+saveDrawingToProject\(\)/, 'LineSmith should define drawing save handler');
   assert.match(html, /window\.prompt\("Name this drawing before saving:",\s*"Boundary Base Map"\)/, 'save workflow should prompt for a drawing name when blank');
   assert.match(html, /if \(drawingNameInput\) drawingNameInput\.value = drawingName;/, 'save workflow should write prompted drawing name back to input');
   assert.match(html, /versions\.push\(\{[\s\S]*diffFromPrevious:/, 'subsequent saves should append differential revisions');
@@ -715,10 +715,10 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /let\s+lastSavedDrawingSnapshot\s*=\s*"";/, 'LineSmith should track a saved-state snapshot for unsaved-change prompts');
   assert.match(html, /function\s+markDrawingAsSaved\(\)/, 'LineSmith should expose helper to refresh saved snapshot baseline');
   assert.match(html, /function\s+hasUnsavedDrawingChanges\(\)/, 'LineSmith should expose helper to compare current state against last saved snapshot');
-  assert.match(html, /window\.addEventListener\("message", \(event\) => \{[\s\S]*survey-cad:request-unsaved-state[\s\S]*hasUnsavedChanges: hasUnsavedDrawingChanges\(\)/, 'LineSmith should reply to launcher unsaved-state checks');
+  assert.match(html, /window\.addEventListener\("message",\s*async\s*\(event\) => \{[\s\S]*survey-cad:request-unsaved-state[\s\S]*hasUnsavedChanges: hasUnsavedDrawingChanges\(\)/, 'LineSmith should reply to launcher unsaved-state checks');
   assert.match(html, /survey-cad:request-save-before-navigate:response/, 'LineSmith should respond to launcher save-before-leave requests');
-  assert.match(html, /saved = saveDrawingToProject\(\);/, 'LineSmith should attempt project save when launcher requests save-before-navigation');
-  assert.match(html, /function\s+saveDrawingToProject\(\)\s*\{[\s\S]*return false;[\s\S]*markDrawingAsSaved\(\);[\s\S]*return true;/, 'save workflow should return explicit success status and refresh saved snapshot baseline');
+  assert.match(html, /saved = await saveDrawingToProject\(\);/, 'LineSmith should attempt project save when launcher requests save-before-navigation');
+  assert.match(html, /async\s+function\s+saveDrawingToProject\(\)\s*\{[\s\S]*return false;[\s\S]*markDrawingAsSaved\(\);[\s\S]*return true;/, 'save workflow should return explicit success status and refresh saved snapshot baseline');
   assert.match(html, /requestAnimationFrame\(draw\);[\s\S]*markDrawingAsSaved\(\);/, 'boot should initialize unsaved-change baseline before new edits occur');
 });
 
@@ -729,9 +729,9 @@ test('VIEWPORT.HTML restores the last project drawing when launched directly wit
   assert.match(html, /const\s+PROJECT_LAST_DRAWING_STORAGE_PREFIX\s*=\s*"surveyfoundryLastLineSmithDrawing"/, 'LineSmith should define a stable storage namespace for the last-opened project drawing');
   assert.match(html, /function\s+saveLastOpenedProjectDrawing\(projectId, storageKey\)/, 'LineSmith should persist the last-opened drawing key by project');
   assert.match(html, /saveLastOpenedProjectDrawing\(activeProjectId, storageKey\);/, 'LineSmith should update last-opened drawing state when a project drawing is saved or opened');
-  assert.match(html, /function\s+tryRestoreLastOpenedProjectDrawing\(\)/, 'LineSmith should define a direct-launch restore helper for last-opened drawings');
+  assert.match(html, /async\s+function\s+tryRestoreLastOpenedProjectDrawing\(\)/, 'LineSmith should define a direct-launch restore helper for last-opened drawings');
   assert.match(html, /if \(queryParams\.get\("source"\)\) return false;/, 'LineSmith should only restore last-opened drawings for direct launches without source');
-  assert.match(html, /const\s+restoredLastDrawing\s*=\s*tryRestoreLastOpenedProjectDrawing\(\);[\s\S]*if \(restoredLastDrawing\) \{[\s\S]*connectCollaboration\(\);[\s\S]*return;[\s\S]*\}/, 'LineSmith boot should restore last-opened drawing and then connect collaboration before showing default ready state');
+  assert.match(html, /const\s+restoredLastDrawing\s*=\s*await\s+tryRestoreLastOpenedProjectDrawing\(\);[\s\S]*if \(restoredLastDrawing\) \{[\s\S]*connectCollaboration\(\);[\s\S]*return;[\s\S]*\}/, 'LineSmith boot should restore last-opened drawing and then connect collaboration before showing default ready state');
 });
 
 test('VIEWPORT.HTML keeps PointForge imports from being overwritten by prior collaboration room state', async () => {
@@ -1088,4 +1088,14 @@ test('VIEWPORT.HTML pickLine hit-testing follows three-point curve arc geometry 
   assert.match(html, /function\s+pickLine\(screenX, screenY, thresholdPx=8\)\s*\{[\s\S]*const\s+middle\s*=\s*getCurveMiddlePoint\(ln\);[\s\S]*const\s+circle\s*=\s*getCircleFromThreePoints\(pa, middle, pb\);/, 'pickLine should detect when a line is a 3-point curve and compute a circle fit for hit testing');
   assert.match(html, /const\s+sweepToTarget\s*=\s*clockwise[\s\S]*if\s*\(sweepRad > 0 && sweepToTarget <= sweepRad\)\s*\{[\s\S]*cp\s*=\s*\{[\s\S]*t:\s*sweepToTarget \/ sweepRad,/, 'pickLine should project taps onto the valid arc sweep and preserve grip interpolation for curve selections');
   assert.match(html, /if\s*\(!cp\)\s*cp\s*=\s*segmentClosestPoint\(\{x:w\.x,y:w\.y\}, pa, pb\);/, 'pickLine should keep linear-segment fallback behavior for non-curve lines and degenerate arcs');
+});
+
+test('VIEWPORT.HTML scopes collaboration rooms to project drawing ids and persists crew drawing preference through API', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /if \(activeProjectId && activeDrawingId\) return drawingStorageKey\(activeProjectId, activeDrawingId\);/, 'collaboration room resolution should prefer project+drawing scoped room keys');
+  assert.match(html, /function\s+saveCrewActiveDrawingPreference\(projectId, drawingId\)\s*\{[\s\S]*\/api\/crew\?id=/, 'LineSmith should load the active crew member profile before persisting drawing preference');
+  assert.match(html, /lineSmithActiveDrawingByProject/, 'crew profile sync payload should include project-indexed active drawing preferences');
+  assert.match(html, /await fetchProjectDrawingById\(activeProjectId, crewDrawingId\)/, 'startup restore flow should attempt loading the active crew drawing through project drawing CRUD API');
+  assert.match(html, /saveCrewActiveDrawingPreference\(activeProjectId, drawingId\);/, 'saving drawings should update the active crew drawing preference for cross-device restore');
 });
