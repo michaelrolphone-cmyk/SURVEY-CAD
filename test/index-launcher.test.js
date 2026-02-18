@@ -303,3 +303,12 @@ test('launcher back-button navigation is wired through browser history state', a
   assert.doesNotMatch(launcherHtml, /if \(!canNavigateHome\)/, 'popstate handling should not block returning home behind unsaved guards');
   assert.match(launcherHtml, /if \(!window\.history\.state\?\.\[LAUNCHER_HISTORY_STATE_KEY\]\) \{[\s\S]*writeHistoryState\(buildHomeHistoryState\(\), 'replace'\);/, 'launcher should seed initial home history state for first back transition');
 });
+
+test('launcher requires a valid crew identity before opening non-CrewManager apps', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /function\s+hasValidActiveCrewIdentity\(\)\s*\{[\s\S]*getActiveCrewMemberId\(\)[\s\S]*getCrewProfiles\(\)\.some\(\(profile\)\s*=>\s*profile\.id\s*===\s*activeId\);/, 'launcher should validate that the selected crew id still exists in crew profiles');
+  assert.match(launcherHtml, /function\s+requiresCrewIdentity\(file\)\s*\{[\s\S]*getEntryFile\(file\)\s*!==\s*'CrewManager\.html';[\s\S]*\}/, 'launcher should exempt CrewManager so identities can still be managed');
+  assert.match(launcherHtml, /function\s+ensureCrewIdentityForApp\(file\)\s*\{[\s\S]*setActiveCrewMemberId\(null\);[\s\S]*openCrewSelectModal\(\);[\s\S]*crewPickerDetail\.textContent\s*=\s*'Choose your crew identity to open apps\.';[\s\S]*return false;/, 'launcher should block app opening and force the crew picker modal when identity is missing');
+  assert.match(launcherHtml, /function\s+openApp\(file,\s*\{\s*historyMode\s*=\s*'push'\s*\}\s*=\s*\{\}\)\s*\{[\s\S]*if\s*\(!ensureCrewIdentityForApp\(file\)\)\s*return;/, 'openApp should enforce crew identity gate before showing apps');
+});

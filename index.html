@@ -2153,7 +2153,32 @@ header {
       launcherHomeLink.setAttribute('aria-label', `Return to SurveyFoundry home from ${appName}`);
     }
 
+    function getEntryFile(file) {
+      return String(file || '').split(/[?#]/)[0].replace(/^\//, '');
+    }
+
+    function hasValidActiveCrewIdentity() {
+      const activeId = getActiveCrewMemberId();
+      if (!activeId) return false;
+      return getCrewProfiles().some((profile) => profile.id === activeId);
+    }
+
+    function requiresCrewIdentity(file) {
+      return getEntryFile(file) !== 'CrewManager.html';
+    }
+
+    function ensureCrewIdentityForApp(file) {
+      if (!requiresCrewIdentity(file)) return true;
+      if (hasValidActiveCrewIdentity()) return true;
+
+      setActiveCrewMemberId(null);
+      openCrewSelectModal();
+      crewPickerDetail.textContent = 'Choose your crew identity to open apps.';
+      return false;
+    }
+
     function openApp(file, { historyMode = 'push' } = {}) {
+      if (!ensureCrewIdentityForApp(file)) return;
       const resolvedFile = withActiveProject(file);
       currentApp = resolvedFile;
       appFrame.src = resolvedFile;
