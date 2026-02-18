@@ -148,15 +148,11 @@
             <div style="font-weight:800;">Boundary Evidence Workbench</div>
             <div class="small muted">Evidence-first boundary analysis • demo client</div>
           </div>
-          <span class="badge">concept prototype — api-driven</span>
-        </div>
+                  </div>
 
         <div class="row">
           <span class="pill" id="autosavePill">Sync: <b class="mono" id="autosaveState">OK</b></span>
           <span class="pill" id="apiHealthPill">API: <b class="mono" id="apiHealth">…</b></span>
-          <input id="apiBaseInput" type="text" placeholder="API Base (blank = same origin)" style="min-width:260px" />
-
-          <select id="projectSelect" style="min-width:260px;"></select>
           <button class="btn" id="newProjectBtn">New</button>
           <button class="btn" id="duplicateProjectBtn">Duplicate</button>
           <button class="btn danger" id="deleteProjectBtn">Delete</button>
@@ -206,7 +202,6 @@
   const elToastT = $("#toastTitle");
   const elToastM = $("#toastMsg");
 
-  const elProjectSelect = $("#projectSelect");
   const elNewProjectBtn = $("#newProjectBtn");
   const elDupProjectBtn = $("#duplicateProjectBtn");
   const elDelProjectBtn = $("#deleteProjectBtn");
@@ -217,7 +212,6 @@
 
   const elAutosaveState = $("#autosaveState");
   const elApiHealth     = $("#apiHealth");
-  const elApiBaseInput  = $("#apiBaseInput");
   const elLoadSampleBtn = $("#loadSampleBtn");
 
   /* ---------------------------- Helpers --------------------------- */
@@ -316,23 +310,13 @@
     modalHost.innerHTML = "";
   }
 
-  /* ----------------------------- API ------------------------------ */
-  const API_BASE_KEY = "bew_api_base_v1";
-  const ACTIVE_KEY   = "bew_active_casefile_id_v1";
-  const pageParams = new URLSearchParams(window.location.search);
+  const ACTIVE_KEY = "bew_active_casefile_v1";
+  const pageParams = new URLSearchParams(window.location.search || "");
   const activeProjectId = pageParams.get("activeProjectId") || pageParams.get("projectId") || "";
 
-  function normalizeBase(s){
-    s = (s ?? "").trim();
-    if (!s) return "";
-    return s.replace(/\/+$/,"");
-  }
-
-  let apiBase = normalizeBase(localStorage.getItem(API_BASE_KEY) || "");
-  elApiBaseInput.value = apiBase;
-
+  /* ----------------------------- API ------------------------------ */
   function urlFor(path){
-    return apiBase ? (apiBase + path) : path;
+    return path;
   }
 
   async function apiRequest(method, path, { query=null, json=null, formData=null, responseType="json" } = {}){
@@ -513,17 +497,7 @@
     fillProjectSelect();
   }
 
-  function fillProjectSelect(){
-    const cur = state.activeId;
-    elProjectSelect.innerHTML = state.casefiles.map(cf =>
-      `<option value="${esc(cf.id)}">${esc(cf.meta?.name || "Untitled")}</option>`
-    ).join("");
-    if (cur && state.casefiles.some(x => x.id === cur)){
-      elProjectSelect.value = cur;
-    } else if (state.casefiles.length){
-      elProjectSelect.value = state.casefiles[0].id;
-    }
-  }
+  function fillProjectSelect(){}
 
   async function setActiveCasefile(id){
     state.activeId = id;
@@ -672,7 +646,6 @@
             <div class="hd">Status</div>
             <div class="bd">
               <div class="row">
-                <span class="pill">API Base: <b class="mono">${esc(apiBase || "(same origin)")}</b></span>
                 <span class="pill">Traverse last run: <b class="mono">${state.traverseResults?.lastRun ? fmtDateTime(state.traverseResults.lastRun) : "—"}</b></span>
               </div>
 
@@ -787,7 +760,6 @@
                 <div>
                   <div class="small muted">Attachment (optional)</div>
                   <input id="evFile" type="file"/>
-                  <div class="small muted">Uploads to: <span class="mono">${esc(apiBase || "(same origin)")}</span></div>
                 </div>
                 <button class="btn primary" id="saveEvBtn">Save Evidence</button>
               </div>
@@ -1228,6 +1200,15 @@ N 00°00'27&quot; W 267.69
       await ensureTabData(state.tab);
       if (seq !== state.renderSeq) return;
 
+      if (!haveActive()){
+        elMain.innerHTML = `<div class="pad"><div class="card"><div class="bd">
+          <div class="pill warn">No active casefile</div>
+          <div style="margin-top:10px;"><b>No casefile is currently loaded.</b></div>
+          <div class="small muted" style="margin-top:10px;">Create one with <span class="mono">New</span> or verify server status.</div>
+        </div></div></div>`;
+        return;
+      }
+
       if (state.tab === "dashboard") elMain.innerHTML = viewDashboard();
       else if (state.tab === "evidence") elMain.innerHTML = viewEvidence();
       else if (state.tab === "extract") elMain.innerHTML = viewExtract();
@@ -1240,7 +1221,7 @@ N 00°00'27&quot; W 267.69
       elMain.innerHTML = `<div class="pad"><div class="card"><div class="bd">
         <div class="pill bad">Error</div>
         <div style="margin-top:10px;"><b>${esc(err.message || err)}</b></div>
-        <div class="small muted" style="margin-top:10px;">Check API Base + server status.</div>
+        <div class="small muted" style="margin-top:10px;">Check server status.</div>
       </div></div></div>`;
       toast("Error", err.message || String(err), "bad");
     }
@@ -1903,8 +1884,6 @@ N 00°00'27&quot; W 267.69
       const cf = await api.createCasefile(name, "Idaho", "", true);
       await refreshCasefiles();
       await setActiveCasefile(cf.id);
-      fillProjectSelect();
-      elProjectSelect.value = cf.id;
       toast("Created","Casefile created.","good");
       render();
     }catch(err){
@@ -1919,8 +1898,6 @@ N 00°00'27&quot; W 267.69
       const cf = await api.duplicateCasefile(state.activeId, name.trim() ? name.trim() : null);
       await refreshCasefiles();
       await setActiveCasefile(cf.id);
-      fillProjectSelect();
-      elProjectSelect.value = cf.id;
       toast("Duplicated","Casefile duplicated.","good");
       render();
     }catch(err){
@@ -1941,7 +1918,6 @@ N 00°00'27&quot; W 267.69
       await refreshCasefiles();
       if (state.casefiles.length){
         await setActiveCasefile(state.casefiles[0].id);
-        elProjectSelect.value = state.activeId;
       }
       toast("Deleted","Casefile deleted.","good");
       render();
@@ -1969,28 +1945,7 @@ N 00°00'27&quot; W 267.69
       const created = await api.importCasefile(bundle, true);
       await refreshCasefiles();
       await setActiveCasefile(created.id);
-      fillProjectSelect();
-      elProjectSelect.value = created.id;
       toast("Imported","Casefile imported (IDs rewritten).","good");
-      render();
-    }catch(err){
-      toast("Error", err.message || String(err), "bad");
-    }
-  }
-
-  async function doOpenActiveProjectFromApi(){
-    if (!activeProjectId) return;
-    try{
-      const linked = await api.syncProjectWorkbench(activeProjectId, {});
-      const linkedCasefileId = linked?.link?.casefileId || linked?.casefile?.id || "";
-      if (!linkedCasefileId){
-        throw new Error(`No linked casefile found for project ${activeProjectId}.`);
-      }
-      await refreshCasefiles();
-      await setActiveCasefile(linkedCasefileId);
-      fillProjectSelect();
-      elProjectSelect.value = linkedCasefileId;
-      toast("Loaded",`Opened project ${activeProjectId} from API.`,"good");
       render();
     }catch(err){
       toast("Error", err.message || String(err), "bad");
@@ -2057,8 +2012,6 @@ N 00°00'27&quot; W 267.69
       // Select new casefile
       await refreshCasefiles();
       await setActiveCasefile(cf.id);
-      fillProjectSelect();
-      elProjectSelect.value = cf.id;
       toast("Seeded","Sample casefile created via API.","good");
       setTab("dashboard");
     }catch(err){
@@ -2113,40 +2066,16 @@ N 00°00'27&quot; W 267.69
     setApiHealthState("…");
     setSyncState("OK");
 
-    // API base input
-    elApiBaseInput.addEventListener("change", async () => {
-      apiBase = normalizeBase(elApiBaseInput.value);
-      localStorage.setItem(API_BASE_KEY, apiBase);
-      toast("API Base", apiBase ? apiBase : "Using same origin", "good");
-      // refresh everything
-      state.activeId = null;
-      state.active = null;
-      await initData();
-    });
 
     // nav tabs
     $$(".nav .tab").forEach(t => t.addEventListener("click", () => setTab(t.dataset.tab)));
 
     // topbar
-    elProjectSelect.addEventListener("change", async () => {
-      const id = elProjectSelect.value;
-      if (!id) return;
-      try{
-        await setActiveCasefile(id);
-        render();
-      }catch(err){
-        toast("Error", err.message || String(err), "bad");
-      }
-    });
     elNewProjectBtn.addEventListener("click", doNewProject);
     elDupProjectBtn.addEventListener("click", doDuplicateProject);
     elDelProjectBtn.addEventListener("click", doDeleteProject);
     elExportBtn.addEventListener("click", doExportProject);
     elImportBtn.addEventListener("click", () => {
-      if (activeProjectId) {
-        doOpenActiveProjectFromApi();
-        return;
-      }
       elHiddenImport.click();
     });
     elHiddenImport.addEventListener("change", () => {
@@ -2162,9 +2091,7 @@ N 00°00'27&quot; W 267.69
       elNewProjectBtn.style.display = "none";
       elDupProjectBtn.style.display = "none";
       elDelProjectBtn.style.display = "none";
-      elImportBtn.textContent = "Open Project";
-      elImportBtn.title = `Open project ${activeProjectId} from API`;
-      elProjectSelect.title = `Linked to project ${activeProjectId}`;
+      elImportBtn.style.display = "none";
     }
 
     elLoadSampleBtn.addEventListener("click", () => {
@@ -2193,10 +2120,19 @@ N 00°00'27&quot; W 267.69
     let pinnedCasefileId = "";
     if (activeProjectId){
       const linked = await api.syncProjectWorkbench(activeProjectId, {});
-      pinnedCasefileId = linked?.link?.casefileId || "";
+      pinnedCasefileId = linked?.link?.casefileId || linked?.casefile?.id || "";
     }
 
     await refreshCasefiles();
+
+    if (activeProjectId){
+      const linkedExists = pinnedCasefileId && state.casefiles.some(x=>x.id===pinnedCasefileId);
+      if (!linkedExists){
+        const created = await api.createProjectCasefile(activeProjectId, {});
+        pinnedCasefileId = created?.id || created?.casefile?.id || pinnedCasefileId;
+        await refreshCasefiles();
+      }
+    }
 
     if (!state.casefiles.length){
       const cf = activeProjectId
@@ -2205,17 +2141,11 @@ N 00°00'27&quot; W 267.69
       const createdId = cf?.id || cf?.casefile?.id;
       await refreshCasefiles();
       await setActiveCasefile(createdId);
-      fillProjectSelect();
-      elProjectSelect.value = createdId;
     } else {
       const saved = localStorage.getItem(ACTIVE_KEY);
       const pickDefault = (saved && state.casefiles.some(x=>x.id===saved)) ? saved : state.casefiles[0].id;
-      const pick = (pinnedCasefileId && state.casefiles.some(x=>x.id===pinnedCasefileId)) ? pinnedCasefileId : pickDefault;
+      const pick = (activeProjectId && pinnedCasefileId && state.casefiles.some(x=>x.id===pinnedCasefileId)) ? pinnedCasefileId : pickDefault;
       await setActiveCasefile(pick);
-      elProjectSelect.value = pick;
-      if (activeProjectId && pinnedCasefileId){
-        elProjectSelect.disabled = true;
-      }
     }
     await ensureTabData(state.tab);
     render();
