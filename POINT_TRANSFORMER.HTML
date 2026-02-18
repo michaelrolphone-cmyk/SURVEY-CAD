@@ -1576,8 +1576,10 @@
 
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
-        const handoffX = x;
-        const handoffY = y;
+        // PointForge source rows are parsed as number,northing,easting,...
+        // Normalize to LineSmith's x=easting,y=northing handoff contract.
+        const handoffX = y;
+        const handoffY = x;
 
         rows.push([number, handoffX, handoffY, z, code, notes]);
 
