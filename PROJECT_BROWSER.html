@@ -216,6 +216,7 @@
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
+    const PROJECT_DRAWING_STORAGE_PREFIX = 'surveyfoundryLineSmithDrawing';
     const ADA_CPF_PDF_BASE = 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/';
 
     const projectLabel = document.getElementById('projectLabel');
@@ -240,6 +241,17 @@
       if (!projectId) return '';
       const base = `/api/projects/${encodeURIComponent(projectId)}/point-files`;
       return pointFileId ? `${base}/${encodeURIComponent(pointFileId)}` : base;
+    }
+
+    function buildProjectDrawingApiUrl(projectId = '', drawingId = '') {
+      if (!projectId) return '';
+      const base = `/api/projects/${encodeURIComponent(projectId)}/drawings`;
+      return drawingId ? `${base}/${encodeURIComponent(drawingId)}` : base;
+    }
+
+    function buildProjectDrawingStorageKey(projectId = '', drawingId = '') {
+      if (!projectId || !drawingId) return '';
+      return `${PROJECT_DRAWING_STORAGE_PREFIX}:${projectId}:${drawingId}`;
     }
 
     function mapApiPointFileToResource(projectId, pointFile = {}) {
@@ -275,6 +287,65 @@
       saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
     }
 
+    function mapApiDrawingToResource(projectId, drawing = {}) {
+      const drawingId = String(drawing.drawingId || '').trim();
+      const drawingName = String(drawing.drawingName || drawingId || 'Drawing').trim();
+      return {
+        id: `linesmith-${drawingId}`,
+        folder: 'drawings',
+        title: drawingName,
+        exportFormat: 'json',
+        reference: {
+          type: 'project-drawing',
+          value: drawingId,
+          resolverHint: 'project-drawing-api',
+          metadata: {
+            projectId,
+            drawingId,
+            drawingName,
+            versionCount: Number(drawing.versionCount) || 0,
+            latestVersionId: drawing.latestVersionId || null,
+            latestMapGeoreference: drawing.latestMapGeoreference || null,
+            updatedAt: drawing.updatedAt || null,
+            storageKey: buildProjectDrawingStorageKey(projectId, drawingId),
+          },
+        },
+      };
+    }
+
+    async function syncProjectDrawingsFromApi(projectContext = {}) {
+      if (!projectContext?.activeProjectId || !projectContext?.projectFile) return;
+      const response = await fetch(buildProjectDrawingApiUrl(projectContext.activeProjectId));
+      if (!response.ok) throw new Error(`Unable to list project drawings (${response.status}).`);
+      const payload = await response.json();
+      const list = Array.isArray(payload?.drawings) ? payload.drawings : [];
+
+      const folder = projectContext.projectFile?.folders?.find((entry) => entry.key === 'drawings');
+      if (!folder) return;
+      folder.index = list.map((entry) => mapApiDrawingToResource(projectContext.activeProjectId, entry));
+      saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+    }
+
+    async function cacheProjectDrawingRecord(resource) {
+      const ref = resource?.reference;
+      const projectId = ref?.metadata?.projectId || '';
+      const drawingId = ref?.metadata?.drawingId || ref?.value || '';
+      if (!projectId || !drawingId) return '';
+
+      const storageKey = ref?.metadata?.storageKey || buildProjectDrawingStorageKey(projectId, drawingId);
+      const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId));
+      if (!response.ok) {
+        throw new Error(`Unable to load drawing (${response.status}).`);
+      }
+      const payload = await response.json();
+      const drawing = payload?.drawing;
+      if (!drawing?.versions?.length) {
+        throw new Error('Drawing payload was missing version history.');
+      }
+      localStorage.setItem(storageKey, JSON.stringify(drawing));
+      return storageKey;
+    }
+
     async function resolvePointFileText(resource) {
       const ref = resource?.reference;
       if (!ref?.value) return null;
@@ -306,11 +377,21 @@
       return null;
     }
 
-    function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
-      const storageKey = resource?.reference?.value || '';
+
+    async function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
+      let storageKey = resource?.reference?.value;
+      if (resource?.reference?.type === 'project-drawing') {
+        try {
+          storageKey = await cacheProjectDrawingRecord(resource);
+        } catch (err) {
+          renderError(`Selected drawing could not be opened. ${err.message}`);
+          return;
+        }
+      }
       const drawingId = String(resource?.reference?.metadata?.drawingId || resource?.id || '').replace(/^linesmith-/, '').trim();
       if (!storageKey && !drawingId) {
-        renderError(`Selected drawing could not be opened. Missing drawing reference for ${resource?.title || 'resource'}.`);
+
+        renderError(`Selected drawing could not be opened. Missing storage key for ${resource?.title || 'resource'}.`);
         return;
       }
 
@@ -970,10 +1051,13 @@
       };
 
       const storedProjectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
-      if (storedProjectFile) {
+        if (storedProjectFile) {
         projectContext.projectFile = storedProjectFile;
         projectContext.uploadStatus = uploadStatus;
         if (activeProjectId) {
+          try {
+            await syncProjectDrawingsFromApi(projectContext);
+          } catch {}
           try {
             await syncProjectPointFilesFromApi(projectContext);
           } catch {}
@@ -1001,6 +1085,9 @@
         projectContext.projectFile = payload.projectFile;
         projectContext.uploadStatus = uploadStatus;
         if (activeProjectId) {
+          try {
+            await syncProjectDrawingsFromApi(projectContext);
+          } catch {}
           try {
             await syncProjectPointFilesFromApi(projectContext);
           } catch {}

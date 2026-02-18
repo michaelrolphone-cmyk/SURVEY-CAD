@@ -278,6 +278,7 @@ test('Project Browser can open drawing resources directly in LineSmith', async (
 
   assert.match(projectBrowserHtml, /const\s+LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY\s*=\s*'lineSmithProjectBrowserDrawingImport'/, 'Project Browser should use a stable localStorage key for LineSmith drawing launches');
   assert.match(projectBrowserHtml, /function\s+launchLineSmithFromDrawingResource\s*\(/, 'Project Browser should define LineSmith launch helper for drawing resources');
+  assert.match(projectBrowserHtml, /async function\s+syncProjectDrawingsFromApi\(/, 'Project Browser should sync drawing resources through the drawings API');
   assert.match(projectBrowserHtml, /destination\.searchParams\.set\('source',\s*'project-browser-drawing'\)/, 'Project Browser should tag drawing launches for LineSmith bootstrap import');
   assert.match(projectBrowserHtml, /const\s+canOpenLineSmithDrawing\s*=\s*folder\.key\s*===\s*'drawings'[\s\S]*entry\?\.reference\?\.type\s*===\s*'local-storage'[\s\S]*entry\?\.reference\?\.type\s*===\s*'project-drawing'/, 'Project Browser should detect both local and API-backed drawing records as LineSmith-openable');
   assert.match(projectBrowserHtml, /resource\.addEventListener\('click',\s*\(\)\s*=>\s*launchLineSmithFromDrawingResource\(entry, projectContext\)\)/, 'drawing row tap should launch LineSmith directly');
