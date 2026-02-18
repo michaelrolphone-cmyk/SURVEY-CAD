@@ -144,8 +144,17 @@ export function createLineforgeCollabService() {
       return false;
     }
 
+    const crewMemberId = String(url.searchParams.get('crewMemberId') || '').trim();
+    if (!crewMemberId) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      socket.destroy();
+      return false;
+    }
+
+    const projectId = String(url.searchParams.get('projectId') || '').trim();
     const roomId = String(url.searchParams.get('room') || 'default');
-    const room = getOrCreateRoom(roomId);
+    const scopedRoomId = `${crewMemberId}::${projectId || '__no_project__'}::${roomId}`;
+    const room = getOrCreateRoom(scopedRoomId);
     const clientId = randomUUID();
     const color = USER_COLORS[room.clients.size % USER_COLORS.length];
     const client = { id: clientId, color, socket };
@@ -390,7 +399,7 @@ export function createLineforgeCollabService() {
         }, clientId);
       });
 
-      if (room.clients.size === 0) rooms.delete(roomId);
+      if (room.clients.size === 0) rooms.delete(scopedRoomId);
     });
 
     socket.on('error', () => {

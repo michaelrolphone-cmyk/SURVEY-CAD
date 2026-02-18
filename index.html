@@ -1254,19 +1254,6 @@
       projectModalBackdrop.classList.add('hidden');
     }
 
-    function withActiveProject(file) {
-      const project = getActiveProject();
-      const url = new URL(file, window.location.origin);
-      if (project) {
-        url.searchParams.set('activeProjectId', String(project.id));
-        url.searchParams.set('activeProjectName', String(project.name || ''));
-      }
-      if (crewMemberId) {
-        url.searchParams.set('crewMemberId', String(crewMemberId));
-      }
-      return `${url.pathname.replace(/^\//, '')}${url.search}`;
-    }
-
     function openProject(project) {
       setActiveProject(project.id);
       const params = new URLSearchParams({
@@ -1278,6 +1265,28 @@
         autostart: '1',
       });
       openApp(`RecordQuarry.html?${params.toString()}`);
+    }
+
+    function normalizeAppLaunchTarget(file) {
+      const normalizedFile = String(file || '').trim();
+      const [entryPart, queryPart = ''] = normalizedFile.split('?');
+      const safeEntry = String(entryPart || '').replace(/^\/+/, '');
+      const params = new URLSearchParams(queryPart);
+      const project = getActiveProject();
+      if (project) {
+        params.set('activeProjectId', String(project.id));
+        params.set('activeProjectName', String(project.name || ''));
+      } else {
+        params.delete('activeProjectId');
+        params.delete('activeProjectName');
+      }
+      if (crewMemberId) {
+        params.set('crewMemberId', String(crewMemberId));
+      } else {
+        params.delete('crewMemberId');
+      }
+      const query = params.toString();
+      return query ? `${safeEntry}?${query}` : safeEntry;
     }
 
     function resetProjectFormError() {
@@ -1663,14 +1672,14 @@
 
     function openApp(file, { historyMode = 'push' } = {}) {
       if (!requireCrewMemberIdentity()) return;
-      const resolvedFile = withActiveProject(file);
+      const resolvedFile = normalizeAppLaunchTarget(file);
       currentApp = resolvedFile;
       appFrame.src = resolvedFile;
       homeView.classList.add('hidden');
       viewerView.classList.remove('hidden');
       footerLogoWrap?.classList.add('hidden');
-      updateHeaderForApp(file);
-      writeHistoryState(buildAppHistoryState(file), historyMode);
+      updateHeaderForApp(resolvedFile);
+      writeHistoryState(buildAppHistoryState(resolvedFile), historyMode);
     }
 
     function createAppCard(app) {

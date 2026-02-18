@@ -1021,3 +1021,11 @@ test('VIEWPORT.HTML fades map layer visibility and centers/fades the loading mod
   assert.match(html, /\.linesmith-loading-overlay\{[\s\S]*display:flex;[\s\S]*align-items:center;[\s\S]*justify-content:center;/, 'loading overlay should center the modal both vertically and horizontally');
   assert.match(html, /\.linesmith-loading-overlay\.hidden\s+\.linesmith-loading-card\{[\s\S]*opacity:0;[\s\S]*transform:translateY\(8px\) scale\(0\.985\);/, 'loading modal card should fade and ease out when the overlay is hidden');
 });
+
+test('VIEWPORT.HTML requires crew identity before starting collaboration websocket and sends crew/project context', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+crewMemberId\s*=\s*queryParams\.get\("crewMemberId"\)\s*\|\|\s*"";/, 'LineSmith should read crew identity context from launcher URL params');
+  assert.match(html, /if \(!crewMemberId\) \{[\s\S]*setCollabStatus\("crew identity required"\);[\s\S]*return;/, 'LineSmith collaboration should stop when crew identity is missing');
+  assert.match(html, /\/ws\/lineforge\?room=\$\{encodeURIComponent\(roomId\)\}&crewMemberId=\$\{encodeURIComponent\(crewMemberId\)\}&projectId=\$\{encodeURIComponent\(activeProjectId\)\}/, 'LineSmith collaboration websocket URL should include crew and project context for isolation');
+});
