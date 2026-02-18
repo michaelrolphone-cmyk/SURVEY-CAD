@@ -21,6 +21,12 @@ import {
   createOrUpdateProjectDrawing,
   deleteProjectDrawing,
 } from './project-drawing-store.js';
+import {
+  listProjectPointFiles,
+  getProjectPointFile,
+  createOrUpdateProjectPointFile,
+  deleteProjectPointFile,
+} from './project-point-file-store.js';
 
 import { loadFldConfig } from './fld-config.js';
 import {
@@ -72,6 +78,15 @@ function parseProjectDrawingRoute(pathname = '') {
   return {
     projectId: decodeURIComponent(match[1]),
     drawingId: match[2] ? decodeURIComponent(match[2]) : '',
+  };
+}
+
+function parseProjectPointFileRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/point-files(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
+  return {
+    projectId: decodeURIComponent(match[1]),
+    pointFileId: match[2] ? decodeURIComponent(match[2]) : '',
   };
 }
 
@@ -831,6 +846,75 @@ export function createSurveyServer({
           const deletedResult = await deleteProjectDrawing(localStorageSyncStore, projectId, drawingId);
           if (!deletedResult) {
             sendJson(res, 404, { error: 'Drawing not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: deletedResult?.sync?.allOperations || [],
+            state: {
+              version: deletedResult?.sync?.state?.version,
+              checksum: deletedResult?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
+        return;
+      }
+
+      const pointFileRoute = parseProjectPointFileRoute(urlObj.pathname);
+      if (pointFileRoute) {
+        const { projectId, pointFileId } = pointFileRoute;
+
+        if (req.method === 'GET' && !pointFileId) {
+          const pointFiles = await listProjectPointFiles(localStorageSyncStore, projectId);
+          sendJson(res, 200, { projectId, pointFiles });
+          return;
+        }
+
+        if (req.method === 'GET' && pointFileId) {
+          const pointFile = await getProjectPointFile(localStorageSyncStore, projectId, pointFileId);
+          if (!pointFile) {
+            sendJson(res, 404, { error: 'Point file not found.' });
+            return;
+          }
+          sendJson(res, 200, { pointFile });
+          return;
+        }
+
+        if ((req.method === 'POST' && !pointFileId) || ((req.method === 'PUT' || req.method === 'PATCH') && pointFileId)) {
+          const body = await readJsonBody(req);
+          const payloadPointFileId = pointFileId || body.pointFileId || body.pointFileName;
+          const result = await createOrUpdateProjectPointFile(localStorageSyncStore, {
+            projectId,
+            pointFileId: payloadPointFileId,
+            pointFileName: body.pointFileName,
+            pointFileState: body.pointFileState,
+            source: body.source,
+            sourceLabel: body.sourceLabel,
+          });
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { pointFile: result.pointFile });
+          return;
+        }
+
+        if (req.method === 'DELETE' && pointFileId) {
+          const deletedResult = await deleteProjectPointFile(localStorageSyncStore, projectId, pointFileId);
+          if (!deletedResult) {
+            sendJson(res, 404, { error: 'Point file not found.' });
             return;
           }
           localStorageSyncWsService.broadcast({

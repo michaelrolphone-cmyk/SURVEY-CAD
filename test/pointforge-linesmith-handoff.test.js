@@ -37,7 +37,7 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app"[\s\S]*path,/, 'PointForge should notify launcher iframe host to navigate embedded app');
-  assert.match(html, /openLinkedApp\("\/VIEWPORT\.HTML\?source=pointforge"\)/, 'PointForge should navigate LineSmith using launcher-aware helper');
+  assert.match(html, /openLinkedApp\(`\/VIEWPORT\.HTML\?source=pointforge\$\{/, 'PointForge should navigate LineSmith using launcher-aware helper');
   assert.match(html, /const\s+code\s*=\s*trimOrEmpty\(record\.fields\[4\]\)/, 'PointForge should map CSV column 5 into LineSmith code field');
   assert.match(html, /const\s+notes\s*=\s*trimOrEmpty\(record\.fields\[5\]\)/, 'PointForge should map CSV column 6 into LineSmith notes field');
   assert.match(html, /const\s+handoffX\s*=\s*x\s*;/, 'PointForge should always export handoff X as easting');

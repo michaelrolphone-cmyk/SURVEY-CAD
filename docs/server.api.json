@@ -83,6 +83,10 @@
     {
       "name": "LineSmith Drawings",
       "description": "Project-scoped LineSmith drawing CRUD"
+    },
+    {
+      "name": "Project Point Files",
+      "description": "Project-scoped point file CRUD for PointForge/EvidenceDesk"
     }
   ],
   "paths": {
@@ -287,11 +291,11 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Error404"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       }
@@ -525,11 +529,11 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Error404"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       }
@@ -593,11 +597,11 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Error404"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       },
@@ -686,11 +690,11 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Error404"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       },
@@ -757,11 +761,11 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Error404"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       },
@@ -884,11 +888,11 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Error404"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       },
@@ -986,6 +990,9 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
           "500": {
             "description": "Task failed",
             "content": {
@@ -1005,9 +1012,6 @@
                 }
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error400"
           }
         }
       }
@@ -1242,11 +1246,11 @@
               }
             }
           },
-          "502": {
-            "$ref": "#/components/responses/Error502"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error502"
           }
         }
       }
@@ -1447,6 +1451,251 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/point-files": {
+      "get": {
+        "tags": [
+          "Project Point Files"
+        ],
+        "summary": "List project point files",
+        "operationId": "listProjectPointFiles",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Point file summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPointFileListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Project Point Files"
+        ],
+        "summary": "Create project point file",
+        "operationId": "createProjectPointFile",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPointFileMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPointFileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/point-files/{pointFileId}": {
+      "get": {
+        "tags": [
+          "Project Point Files"
+        ],
+        "summary": "Get project point file",
+        "operationId": "getProjectPointFile",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pointFileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Point file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPointFileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Project Point Files"
+        ],
+        "summary": "Update project point file (append differential version)",
+        "operationId": "updateProjectPointFile",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pointFileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPointFileMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPointFileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Project Point Files"
+        ],
+        "summary": "Patch project point file (append differential version)",
+        "operationId": "patchProjectPointFile",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pointFileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPointFileMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPointFileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Project Point Files"
+        ],
+        "summary": "Delete project point file",
+        "operationId": "deleteProjectPointFile",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pointFileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -3535,6 +3784,197 @@
           "deleted"
         ],
         "additionalProperties": false
+      },
+      "ProjectPointFileState": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "exportFormat": {
+            "type": "string",
+            "default": "csv"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "ProjectPointFileVersion": {
+        "type": "object",
+        "properties": {
+          "versionId": {
+            "type": "string"
+          },
+          "savedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "label": {
+            "type": "string"
+          },
+          "baseState": {
+            "$ref": "#/components/schemas/ProjectPointFileState"
+          },
+          "diffFromPrevious": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ProjectPointFile": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "pointFileId": {
+            "type": "string"
+          },
+          "pointFileName": {
+            "type": "string"
+          },
+          "exportFormat": {
+            "type": "string"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectPointFileVersion"
+            }
+          },
+          "currentState": {
+            "$ref": "#/components/schemas/ProjectPointFileState"
+          }
+        },
+        "required": [
+          "projectId",
+          "pointFileId",
+          "pointFileName",
+          "versions"
+        ]
+      },
+      "ProjectPointFileSummary": {
+        "type": "object",
+        "properties": {
+          "pointFileId": {
+            "type": "string"
+          },
+          "pointFileName": {
+            "type": "string"
+          },
+          "exportFormat": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestVersionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "versionCount": {
+            "type": "integer"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "pointFileId",
+          "pointFileName"
+        ]
+      },
+      "ProjectPointFileMutationRequest": {
+        "type": "object",
+        "properties": {
+          "pointFileId": {
+            "type": "string"
+          },
+          "pointFileName": {
+            "type": "string"
+          },
+          "pointFileState": {
+            "$ref": "#/components/schemas/ProjectPointFileState"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sourceLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pointFileState"
+        ]
+      },
+      "ProjectPointFileListResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "pointFiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectPointFileSummary"
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "pointFiles"
+        ]
+      },
+      "ProjectPointFileResponse": {
+        "type": "object",
+        "properties": {
+          "pointFile": {
+            "$ref": "#/components/schemas/ProjectPointFile"
+          }
+        },
+        "required": [
+          "pointFile"
+        ]
       }
     }
   }

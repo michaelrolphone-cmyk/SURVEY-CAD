@@ -196,9 +196,9 @@ test('Project Browser supports point file drag-and-drop and mobile file picker u
   assert.match(projectBrowserHtml, /picker\.accept\s*=\s*'\.csv,text\/csv,\.txt,text\/plain'/, 'Project Browser should allow csv and txt through file picker');
   assert.match(projectBrowserHtml, /panel\.addEventListener\('drop',\s*\(event\)\s*=>\s*\{[\s\S]*uploadPointFilesToServer\(event\.dataTransfer\?\.files, context\)/, 'Project Browser should support desktop drag-and-drop upload via server API');
   assert.match(projectBrowserHtml, /async function uploadPointFilesToServer\(files, context\)/, 'Project Browser should define an async server upload handler for point files');
-  assert.match(projectBrowserHtml, /formData\.append\('folderKey', 'point-files'\)/, 'Point file uploads should target the point-files folder');
-  assert.match(projectBrowserHtml, /fetch\('\/api\/project-files\/upload'/, 'Point file uploads should use the project-files upload API');
-  assert.match(projectBrowserHtml, /appendResourceToFolder\(context\.projectFile, 'point-files', resource\)/, 'Point file uploads should append server resource to project file');
+  assert.match(projectBrowserHtml, /pointFileState:\s*\{\s*text,\s*exportFormat:\s*'csv'\s*\}/, 'Point file uploads should send point file text/state payloads');
+  assert.match(projectBrowserHtml, /fetch\(buildProjectPointFileApiUrl\(context\.activeProjectId\),/, 'Point file uploads should use the project point-file API');
+  assert.match(projectBrowserHtml, /await\s+syncProjectPointFilesFromApi\(context\)/, 'Point file uploads should refresh point-file resources from API');
   assert.doesNotMatch(projectBrowserHtml, /indexFile\.innerHTML\s*=\s*'<span class=\"icon\">📄<\/span>index\.json'/, 'Project Browser should hide folder metadata index.json rows from the visible tree');
 });
 
@@ -218,7 +218,7 @@ test('Project Browser can open point files directly in PointForge via async text
   assert.match(projectBrowserHtml, /resource\.addEventListener\('keydown',\s*\(event\)\s*=>\s*\{[\s\S]*event\.key\s*!==\s*'Enter'[\s\S]*event\.key\s*!==\s*' '\)/, 'Point-file row keyboard activation should support Enter and Space for accessibility');
   assert.match(projectBrowserHtml, /openButton\.addEventListener\('click',\s*\(event\)\s*=>\s*\{[\s\S]*event\.stopPropagation\(\)/, 'Open button click should stop propagation to avoid duplicate launches');
   assert.match(projectBrowserHtml, /textContent\s*=\s*'Open in PointForge'/, 'Project Browser should render an Open in PointForge button for supported point files');
-  assert.match(projectBrowserHtml, /entry\?\.reference\?\.type\s*===\s*'server-upload'\)/, 'PointForge launch should be available for server-uploaded point files');
+  assert.match(projectBrowserHtml, /entry\?\.reference\?\.type\s*===\s*'project-point-file'/, 'PointForge launch should be available for API-backed point files');
 });
 
 test('Project Browser can open CP&F rows as PDF links in a new tab', async () => {
