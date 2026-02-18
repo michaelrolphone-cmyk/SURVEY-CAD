@@ -458,9 +458,7 @@ async function ensureBew({ existingRedis = null } = {}) {
   _bewPromise = (async () => {
     const redisUrl = findHerokuRedisUrl();
 
-    const redis =
-      (isIoredisLike(existingRedis) ? existingRedis : null) ||
-      (() => {
+    const redis = (() => {
         if (!redisUrl) {
           throw new Error("Missing Heroku Redis URL env (REDIS_URL / REDIS_TLS_URL / REDISCLOUD_URL).");
         }
