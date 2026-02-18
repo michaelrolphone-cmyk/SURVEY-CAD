@@ -459,10 +459,11 @@
     box3.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z, 1);
     const diagonal = Math.max(size.length(), 1);
+    const boundingRadius = diagonal * 0.5;
 
-    // Keep wheel zoom from collapsing into the target (which can feel like being
-    // trapped inside the mesh) while still allowing broad navigation around it.
-    orbit.minDistance = Math.max(0.5, diagonal * 0.03, maxDim * 0.05);
+    // Keep wheel zoom from collapsing into the model center where navigation can
+    // feel "stuck inside" the mesh, while preserving broad zoom-out range.
+    orbit.minDistance = Math.max(0.5, boundingRadius * 1.05, maxDim * 0.18);
     orbit.maxDistance = Math.max(diagonal * 600, orbit.minDistance * 30, 12000);
   }
   updateOrbitDistanceLimits(null);
