@@ -221,7 +221,12 @@ export class RedisEvidenceDeskFileStore {
   }
 }
 
-export async function createEvidenceDeskFileStore({ redisUrl = process.env.REDIS_URL, redisClient = null } = {}) {
+export async function createEvidenceDeskFileStore({
+  redisUrl = process.env.REDIS_URL,
+  redisClient = null,
+  createRedisClient = createClient,
+  connectTimeoutMs = Number(process.env.EVIDENCE_DESK_REDIS_CONNECT_TIMEOUT_MS || 3000),
+} = {}) {
   if (redisClient) {
     return { store: new RedisEvidenceDeskFileStore(redisClient), redisClient, type: 'redis-shared' };
   }
@@ -229,8 +234,25 @@ export async function createEvidenceDeskFileStore({ redisUrl = process.env.REDIS
     return { store: new InMemoryEvidenceDeskFileStore(), redisClient: null, type: 'memory' };
   }
 
-  const client = createClient({ url: redisUrl });
-  client.on('error', () => {});
-  await client.connect();
-  return { store: new RedisEvidenceDeskFileStore(client), redisClient: client, type: 'redis' };
+  const client = createRedisClient({ url: redisUrl });
+  client.on?.('error', () => {});
+
+  try {
+    if (Number.isFinite(connectTimeoutMs) && connectTimeoutMs > 0) {
+      await Promise.race([
+        client.connect(),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`Redis connect timed out after ${connectTimeoutMs}ms`)), connectTimeoutMs);
+        }),
+      ]);
+    } else {
+      await client.connect();
+    }
+    return { store: new RedisEvidenceDeskFileStore(client), redisClient: client, type: 'redis' };
+  } catch {
+    try {
+      await client.quit?.();
+    } catch {}
+    return { store: new InMemoryEvidenceDeskFileStore(), redisClient: null, type: 'memory' };
+  }
 }
