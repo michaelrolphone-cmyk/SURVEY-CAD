@@ -177,6 +177,17 @@
       flex: none;
     }
 
+    .pdf-preview-thumb {
+      width: 86px;
+      height: 50px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
+      pointer-events: none;
+      flex: none;
+    }
+
     .pdf-preview-icon {
       width: 1.35rem;
       height: 1.35rem;
@@ -657,6 +668,29 @@
       if (!popup) {
         renderError('Your browser blocked the PDF window. Please allow pop-ups and try again.');
       }
+    }
+
+    function getPdfPreviewUrl(folder, entry) {
+      if (folder?.key === 'cpfs') {
+        return getCpfPdfUrl(entry);
+      }
+      if (entry?.reference?.type === 'server-upload') {
+        return String(entry.reference.value || '').trim();
+      }
+      return '';
+    }
+
+    function attachPdfPreview(resource, folder, entry) {
+      const previewBaseUrl = getPdfPreviewUrl(folder, entry);
+      if (!previewBaseUrl) return;
+      const previewUrl = `${previewBaseUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
+      const thumb = document.createElement('iframe');
+      thumb.className = 'pdf-preview-thumb';
+      thumb.src = previewUrl;
+      thumb.title = `${entry?.title || entry?.id || 'PDF'} preview`;
+      thumb.setAttribute('aria-hidden', 'true');
+      thumb.setAttribute('tabindex', '-1');
+      resource.querySelector('.file-preview-slot')?.replaceChildren(thumb);
     }
 
     function describeCpfPointLinks(links = []) {
@@ -1149,7 +1183,7 @@
             && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           const isPdfResource = entry?.exportFormat === 'pdf';
-          const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing;
+          const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing || isPdfResource;
           const actualFileName = `${entry.id}.${entry.exportFormat}`;
           const configuredFileName = entry?.title || actualFileName;
           const leadingIcon = isPdfResource ? '<span class="pdf-preview-icon" aria-label="PDF preview icon">PDF</span>' : '<span class="icon">📄</span>';
@@ -1162,6 +1196,10 @@
 
           if (canOpenLineSmithDrawing) {
             attachDrawingPreview(resource, entry).catch(() => {});
+          }
+
+          if (isPdfResource) {
+            attachPdfPreview(resource, folder, entry);
           }
 
           if (canLaunchPointForge) {
