@@ -121,9 +121,12 @@
       display:grid;
       grid-template-columns: 460px 1fr;
       gap: 14px;
+      transition: grid-template-columns .25s ease;
     }
+    main.pointEditorFocusOutput{ grid-template-columns: 120px 1fr; }
     @media (max-width: 1020px){
       main{ grid-template-columns: 1fr; }
+      main.pointEditorFocusOutput{ grid-template-columns: 1fr; }
     }
 
     .panel{
@@ -137,6 +140,12 @@
     .panel::before{
       content:none;
     }
+    main.pointEditorFocusOutput #ingestPanel .panelbody{ display:none; }
+    main.pointEditorFocusOutput #ingestPanel .panelhead{ cursor:pointer; }
+    main.pointEditorFocusOutput #ingestPanel .panelhead h2{ writing-mode:vertical-rl; text-orientation:mixed; }
+    main.pointEditorFocusOutput #ingestPanel .panelhead{ min-height: 420px; justify-content: center; }
+    main.pointEditorFocusOutput #outputPanel .panelbody textarea,
+    main.pointEditorFocusOutput #outputPanel .panelbody .pointsTableWrap.active{ min-height: 460px; }
     .panelhead{
       position: relative;
       padding: 12px 12px;
@@ -444,10 +453,10 @@
 
   <main>
     <!-- Left: Input + Controls -->
-    <section class="panel">
+    <section class="panel" id="ingestPanel">
       <div class="panelhead">
         <h2><span class="sig"></span> Ingest Console</h2>
-        <div class="pill">
+        <div class="pill" id="ingestControls">
           <input id="autoProcess" type="checkbox" checked />
           <label for="autoProcess" style="color:var(--text); margin:0;">Auto-process</label>
         </div>
@@ -542,7 +551,7 @@
           </div>
         </div>
 
-        <div class="stats">
+        <div class="stats" hidden>
           <div class="stat">
             <div class="k">Input lines</div>
             <div class="v"><span id="st_lines" class="glow">—</span><span class="mono">ln</span></div>
@@ -569,7 +578,7 @@
           </div>
         </div>
 
-        <div class="log" id="log"></div>
+        <div class="log" id="log" hidden></div>
       </div>
     </section>
 
@@ -599,7 +608,7 @@
         </div>
       </section>
 
-      <section class="panel outputArea">
+      <section class="panel outputArea" id="outputPanel">
         <div class="panelhead">
           <h2><span class="sig"></span> Output Stream</h2>
           <div class="chip">Sorted: <span class="mono">numeric point id</span></div>
@@ -998,6 +1007,9 @@
     // -----------------------------
     // UI + Map (basemap switcher)
     // -----------------------------
+    const elMain = document.querySelector("main");
+    const elIngestPanel = document.getElementById("ingestPanel");
+    const elOutputPanel = document.getElementById("outputPanel");
     const elFile = document.getElementById("file");
     const elIn = document.getElementById("inText");
     const elOut = document.getElementById("outText");
@@ -1044,6 +1056,7 @@
     let selectedGroupSelection = null;
     let currentImportContext = null;
     let usePointEditorView = false;
+    let pointEditorAccordionMode = "input";
     let projectPointFilesCache = [];
 
     const elInputTableWrap = document.getElementById("inputTableWrap");
@@ -1403,6 +1416,20 @@
       if (usePointEditorView) refreshPointEditorTables();
     }
 
+    function setPointEditorAccordionMode(mode = "input"){
+      pointEditorAccordionMode = mode === "output" ? "output" : "input";
+      const outputFocused = usePointEditorView && pointEditorAccordionMode === "output";
+      if (elMain) elMain.classList.toggle("pointEditorFocusOutput", outputFocused);
+      if (elIngestPanel) elIngestPanel.setAttribute("aria-expanded", outputFocused ? "false" : "true");
+      if (elOutputPanel) elOutputPanel.setAttribute("aria-expanded", outputFocused ? "true" : "false");
+    }
+
+    function activatePointEditorOutputAccordion(){
+      setPointEditorView(true);
+      setPointEditorAccordionMode("output");
+      refreshPointEditorTables();
+    }
+
     let map = null;
     let layer = null;
 
@@ -1677,7 +1704,7 @@
       };
       elIn.value = String(pointSet.text);
       processNow();
-      refreshPointEditorTables();
+      activatePointEditorOutputAccordion();
       elMapHint.innerHTML = `<span class="ok">Opened last point file for this active project: ${escapeHtml(title)}.</span>`;
       return true;
     }
@@ -2015,7 +2042,7 @@
       elIn.value = text;
       persistPointSetToProjectFile({ kind: "import", text, context, timestamp: new Date() });
       processNow();
-      refreshPointEditorTables();
+      activatePointEditorOutputAccordion();
     });
 
 
@@ -2066,7 +2093,31 @@
     });
 
 
-    elToggleInputView.addEventListener("click", ()=>setPointEditorView(!usePointEditorView));
+    elToggleInputView.addEventListener("click", ()=>{
+      const nextEnabled = !usePointEditorView;
+      setPointEditorView(nextEnabled);
+      setPointEditorAccordionMode(nextEnabled ? "output" : "input");
+    });
+
+    elIn.addEventListener("paste", ()=>{
+      requestAnimationFrame(()=>{
+        if (!elIn.value.trim()) return;
+        activatePointEditorOutputAccordion();
+      });
+    });
+
+    elIngestPanel?.addEventListener("click", (event)=>{
+      if (pointEditorAccordionMode !== "output") return;
+      if (!(event.target instanceof Node)) return;
+      if (elIn && elIn.contains(event.target)) return;
+      setPointEditorAccordionMode("input");
+    });
+
+    elOutputPanel?.addEventListener("click", ()=>{
+      if (!usePointEditorView) return;
+      if (pointEditorAccordionMode === "output") return;
+      setPointEditorAccordionMode("output");
+    });
 
     // Re-render map when settings change (does not alter output)
     elZone.addEventListener("change", ()=>{
@@ -2222,6 +2273,7 @@
         const context = setImportContextFromRos();
         persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context, timestamp: new Date() });
         processNow();
+        activatePointEditorOutputAccordion();
         localStorage.removeItem(ROS_POINTFORGE_IMPORT_STORAGE_KEY);
         return true;
       } catch (_error){
@@ -2255,7 +2307,7 @@
         elIn.value = String(payload.csv);
         persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context: currentImportContext, timestamp: new Date() });
         processNow();
-        refreshPointEditorTables();
+        activatePointEditorOutputAccordion();
         localStorage.removeItem(PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY);
         return true;
       } catch {
@@ -2286,7 +2338,7 @@
         elIn.value = String(payload.csv);
         persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context: currentImportContext, timestamp: new Date() });
         processNow();
-        refreshPointEditorTables();
+        activatePointEditorOutputAccordion();
         elMapHint.innerHTML = `<span class="ok">Imported traversal from BoundaryLab.</span>`;
         localStorage.removeItem(BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY);
         return true;
@@ -2376,7 +2428,7 @@
 
       elIn.value = text;
       processNow();
-      refreshPointEditorTables();
+      activatePointEditorOutputAccordion();
       saveLastOpenedProjectPointSet(projectContext.projectId, pointSetStorageKey(pointFileId));
       elMapHint.innerHTML = `<span class="ok">Opened point file: ${escapeHtml(title)}.</span>`;
     });
@@ -2386,6 +2438,7 @@
     setLocalizationInputsEnabled(false);
     elIn.value = "";
     setPointEditorView(false);
+    setPointEditorAccordionMode("input");
     setBasemap("street");
     setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
     elMapHint.textContent = "Load a file or paste points to plot. Basemap toggle: Street / Satellite.";
