@@ -147,6 +147,22 @@
       min-width: 0;
     }
 
+    .pdf-preview-icon {
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #bae6fd;
+      background: rgba(14, 116, 144, 0.2);
+      flex: none;
+    }
+
     .file-name {
       display: flex;
       align-items: baseline;
@@ -544,7 +560,15 @@
         renderError(`Selected CP&F file could not be opened. Missing instrument number for ${resource?.title || 'resource'}.`);
         return;
       }
-      window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      openPdfInNewWindow(pdfUrl);
+    }
+
+    function openPdfInNewWindow(pdfUrl) {
+      if (!pdfUrl) return;
+      const popup = window.open(pdfUrl, '_blank', 'popup=yes,width=1200,height=900,noopener,noreferrer');
+      if (!popup) {
+        renderError('Your browser blocked the PDF window. Please allow pop-ups and try again.');
+      }
     }
 
     function describeCpfPointLinks(links = []) {
@@ -937,9 +961,11 @@
           const canOpenLineSmithDrawing = folder.key === 'drawings'
             && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
+          const isPdfResource = entry?.exportFormat === 'pdf';
           const actualFileName = `${entry.id}.${entry.exportFormat}`;
           const configuredFileName = entry?.title || actualFileName;
-          resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
+          const leadingIcon = isPdfResource ? '<span class="pdf-preview-icon" aria-label="PDF preview icon">PDF</span>' : '<span class="icon">📄</span>';
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
 
           if (canLaunchPointForge) {
             resource.classList.add('pointforge-openable');
@@ -1040,7 +1066,7 @@
             resource.classList.add('pointforge-openable');
             resource.setAttribute('role', 'button');
             resource.setAttribute('tabindex', '0');
-            resource.title = 'Tap to open this CP&F PDF in a new tab';
+            resource.title = 'Tap to open this CP&F PDF in a new browser window';
             resource.addEventListener('click', () => openCpfPdfFromResource(entry));
             resource.addEventListener('keydown', (event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -1052,7 +1078,7 @@
             openButton.type = 'button';
             openButton.className = 'launch-btn';
             openButton.textContent = 'Open PDF';
-            openButton.title = 'Opens this CP&F PDF in a new tab';
+            openButton.title = 'Opens this CP&F PDF in a new browser window';
             openButton.addEventListener('click', (event) => {
               event.stopPropagation();
               openCpfPdfFromResource(entry);
@@ -1085,14 +1111,25 @@
           const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;
           if (isServerUpload) {
             const downloadUrl = entry.reference.value;
+            const isServerPdf = entry?.exportFormat === 'pdf';
             resource.classList.add('pointforge-openable');
             resource.setAttribute('role', 'button');
             resource.setAttribute('tabindex', '0');
             resource.title = 'Click to open this file';
-            resource.addEventListener('click', () => window.open(downloadUrl, '_blank', 'noopener,noreferrer'));
+            resource.addEventListener('click', () => {
+              if (isServerPdf) {
+                openPdfInNewWindow(downloadUrl);
+                return;
+              }
+              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+            });
             resource.addEventListener('keydown', (event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
+              if (isServerPdf) {
+                openPdfInNewWindow(downloadUrl);
+                return;
+              }
               window.open(downloadUrl, '_blank', 'noopener,noreferrer');
             });
 
@@ -1100,9 +1137,15 @@
             openButton.type = 'button';
             openButton.className = 'launch-btn';
             openButton.textContent = 'Open';
-            openButton.title = 'Opens this file in a new tab';
+            openButton.title = isServerPdf
+              ? 'Opens this PDF in a new browser window'
+              : 'Opens this file in a new tab';
             openButton.addEventListener('click', (event) => {
               event.stopPropagation();
+              if (isServerPdf) {
+                openPdfInNewWindow(downloadUrl);
+                return;
+              }
               window.open(downloadUrl, '_blank', 'noopener,noreferrer');
             });
             resource.appendChild(openButton);
