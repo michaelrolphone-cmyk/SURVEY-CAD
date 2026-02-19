@@ -56,6 +56,8 @@ test('PointForge renders code-group explorer with thumbnails and BoundaryLab han
   assert.match(html, /Point Groups by Code/, 'PointForge should render a point-group explorer section.');
   assert.match(html, /<h2><span class="sig"><\/span> Spatial HUD<\/h2>[\s\S]*<section class="pointGroupExplorer"[\s\S]*<div id="map">/, 'PointForge should render the point-group explorer above the map in Spatial HUD.');
   assert.match(html, /function\s+buildPointGroupsFromRecords\(/, 'PointForge should build visual point groups from output records.');
+  assert.match(html, /function\s+getPointGroupCodeToken\(code\s*=\s*""\)\s*\{[\s\S]*split\(/, 'PointForge should derive point-group keys from the first code token before field-to-finish commands/notes.');
+  assert.match(html, /const\s+codeToken\s*=\s*getPointGroupCodeToken\(codeRaw\);[\s\S]*const\s+codeKey\s*=\s*codeToken\s*\|\|\s*"UNCODED";/, 'PointForge code grouping should use the first code token and fallback uncoded records.');
   assert.match(html, /function\s+buildLineworkThumbnailDataUrl\(/, 'PointForge should generate linework thumbnail previews for grouped codes.');
   assert.match(html, /data:image\/svg\+xml;utf8,\$\{encodeURIComponent\(svg\)\}/, 'PointForge thumbnails should URL-encode SVG data URLs so preview <img> tags remain valid HTML.');
   assert.match(html, /function\s+parseFieldToFinishDirective\(/, 'PointForge should parse field-to-finish directives to identify linework groupings.');

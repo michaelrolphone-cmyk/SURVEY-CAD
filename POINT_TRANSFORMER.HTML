@@ -1042,6 +1042,14 @@
       return String(token || "").trim().toUpperCase();
     }
 
+    function getPointGroupCodeToken(code = ""){
+      const [groupToken] = String(code || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      return normalizeCodeToken(groupToken || "");
+    }
+
     function parseFieldToFinishDirective(code = ""){
       const tokens = String(code || "")
         .split(/[\s;|,/]+/)
@@ -1133,8 +1141,10 @@
       const byCode = new Map();
       for (const record of recordsSorted){
         const codeRaw = trimOrEmpty(record.fields?.[4]);
-        const codeKey = normalizeCodeToken(codeRaw || "UNCODED");
-        if (!byCode.has(codeKey)) byCode.set(codeKey, { codeKey, codeLabel: codeRaw || "(No code)", points: [] });
+        const codeToken = getPointGroupCodeToken(codeRaw);
+        const codeKey = codeToken || "UNCODED";
+        const codeLabel = codeToken || "(No code)";
+        if (!byCode.has(codeKey)) byCode.set(codeKey, { codeKey, codeLabel, points: [] });
         byCode.get(codeKey).points.push({
           number: trimOrEmpty(record.fields?.[0]),
           code: codeRaw,
