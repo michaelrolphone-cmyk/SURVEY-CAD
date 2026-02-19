@@ -39,3 +39,18 @@ test('PointForge renders code-group explorer with thumbnails and BoundaryLab han
   assert.match(html, /function\s+buildBoundaryLabCsvFromSegments\(/, 'PointForge should build BoundaryLab handoff payloads from selected groups/subgroups.');
   assert.match(html, /openLinkedApp\(`\/BoundaryLab\.html\?source=pointforge/, 'PointForge group explorer should offer opening selected linework in BoundaryLab.');
 });
+
+
+test('PointForge auto-focuses transformed point editor accordion and hides stats/log panels', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+  assert.match(html, /<section class="leftStack">[\s\S]*<section class="panel" id="ingestPanel">[\s\S]*<section class="panel outputArea" id="outputPanel">/, 'PointForge should place ingest and output panels in the same left accordion stack.');
+  assert.match(html, /#outputPanel\{[\s\S]*position:absolute;[\s\S]*opacity:0;[\s\S]*transform:\s*translateX\(24px\);/, 'PointForge should keep output panel hidden and offset until accordion output mode activates.');
+  assert.match(html, /main\.pointEditorFocusOutput\s+#outputPanel\{[\s\S]*opacity:1;[\s\S]*left:\s*56px;/, 'PointForge should slide output panel in over input points when output accordion is active.');
+  assert.match(html, /main\.pointEditorFocusOutput\s+#ingestPanel\s*\{[\s\S]*width:56px;/, 'PointForge should collapse ingest panel to a narrow accordion rail when output is shown.');
+  assert.match(html, /function\s+activatePointEditorOutputAccordion\(\)\s*\{[\s\S]*setPointEditorView\(true\);[\s\S]*setPointEditorAccordionMode\("output"\);/, 'PointForge should provide helper that auto-focuses transformed output in point editor mode.');
+  assert.match(html, /elIn\.addEventListener\("paste",\s*\(\)=>\{[\s\S]*activatePointEditorOutputAccordion\(\);/, 'PointForge should auto-open transformed point-editor view when points are pasted.');
+  assert.match(html, /elFile\.addEventListener\("change",\s*async\s*\(e\)=>\{[\s\S]*activatePointEditorOutputAccordion\(\);/, 'PointForge should auto-open transformed point-editor view when files are uploaded.');
+  assert.doesNotMatch(html, /<div class="stats"/, 'PointForge should remove ingest stats panel below localization controls.');
+  assert.match(html, /<div class="log" id="log"><\/div>/, 'PointForge should keep a log node for existing logic while hiding the visible logs section.');
+  assert.match(html, /\.log\{\s*display:none;\s*\}/, 'PointForge should hide ingest logs section below localization controls.');
+});
