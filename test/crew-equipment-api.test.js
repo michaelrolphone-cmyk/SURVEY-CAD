@@ -11,6 +11,7 @@ import {
   findEquipmentLogById,
   saveCrewMember,
   saveEquipmentItem,
+  deleteEquipmentItem,
   saveEquipmentLog,
   CREW_KEY,
   EQUIPMENT_KEY,
@@ -121,6 +122,23 @@ test('saveEquipmentItem adds a new item to empty store', async () => {
   const items = getEquipmentInventory(store.getState().snapshot);
   assert.equal(items.length, 1);
   assert.equal(items[0].make, 'Topcon');
+});
+
+test('deleteEquipmentItem removes an existing item by id', async () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: buildSnapshot() });
+  const result = await deleteEquipmentItem(store, 'equip-1');
+  assert.equal(result.status, 'applied');
+  const items = getEquipmentInventory(store.getState().snapshot);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].id, 'equip-2');
+});
+
+test('deleteEquipmentItem returns null for unknown id', async () => {
+  const store = new LocalStorageSyncStore({ version: 1, snapshot: buildSnapshot() });
+  const result = await deleteEquipmentItem(store, 'missing-id');
+  assert.equal(result, null);
+  const items = getEquipmentInventory(store.getState().snapshot);
+  assert.equal(items.length, 2);
 });
 
 test('saveEquipmentLog adds a new log to empty store', async () => {
@@ -386,6 +404,50 @@ test('GET /api/equipment?id= returns 404 for unknown id', async () => {
   const app = await startApiServer(buildSnapshot());
   try {
     const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment?id=unknown`);
+    assert.equal(res.status, 404);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('DELETE /api/equipment?id= removes persisted equipment item', async () => {
+  const app = await startApiServer(buildSnapshot());
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment?id=equip-1`, {
+      method: 'DELETE',
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.deleted, true);
+    assert.equal(body.id, 'equip-1');
+
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/equipment`);
+    const getBody = await getRes.json();
+    assert.equal(getBody.equipment.length, 1);
+    assert.equal(getBody.equipment[0].id, 'equip-2');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('DELETE /api/equipment requires id', async () => {
+  const app = await startApiServer(buildSnapshot());
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment`, {
+      method: 'DELETE',
+    });
+    assert.equal(res.status, 400);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('DELETE /api/equipment?id= returns 404 for unknown id', async () => {
+  const app = await startApiServer(buildSnapshot());
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/equipment?id=unknown`, {
+      method: 'DELETE',
+    });
     assert.equal(res.status, 404);
   } finally {
     app.server.close();
