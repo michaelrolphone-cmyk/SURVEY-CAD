@@ -889,6 +889,11 @@ Base URL (local): `http://localhost:3000`
 
 - `GET /health`
 - `GET /api/apps`
+- `GET /api/equipment`
+- `POST /api/equipment`
+- `DELETE /api/equipment?id=<equipmentId>`
+- `GET /api/equipment-logs`
+- `POST /api/equipment-logs`
 - `GET /ws/lineforge?room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration; includes `state-ack`/`state-rejected` optimistic concurrency and object lock handshake messages: `lock-request`, `lock-granted`, `lock-denied`, `lock-release`, `lock-updated`)
 - `GET /ws/localstorage-sync` (WebSocket upgrade endpoint used for launcher/app localStorage differential synchronization)
 - Static asset delivery: `/assets/icons/*` and `/assets/survey-symbols/*` now return long-lived immutable caching headers (`Cache-Control: public, max-age=31536000, immutable`) for faster repeat icon/SVG loads.

@@ -729,6 +729,57 @@
             "$ref": "#/components/responses/Error400"
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Equipment"
+        ],
+        "summary": "Delete an equipment item by ID",
+        "operationId": "deleteEquipment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Equipment item ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted equipment item result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "deleted",
+                    "id"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
       }
     },
     "/api/equipment-logs": {

@@ -254,6 +254,20 @@
       return await res.json();
     }
 
+
+    async function deleteEquipmentItemById(id) {
+      const res = await fetch(`${EQUIPMENT_API_URL}?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`DELETE ${EQUIPMENT_API_URL}?id=${encodeURIComponent(id)} failed (${res.status}) ${text}`.trim());
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) return null;
+      return await res.json();
+    }
+
     /* ── helpers ── */
     function esc(v = '') {
       return String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -435,19 +449,37 @@
         const item = items.find(i => i.id === id);
         if (item) populateForm(item);
       } else if (target.classList.contains('delete-btn')) {
+        const prevItems = [...items];
         items = items.filter(i => i.id !== id);
         saveItems();
         if (editingId === id) clearForm();
         render();
+
+        deleteEquipmentItemById(id).catch(err => {
+          console.warn('Equipment DELETE failed; restoring local record:', err);
+          items = prevItems;
+          saveItems();
+          render();
+        });
       }
     });
 
-    clearAllBtn.addEventListener('click', () => {
+    clearAllBtn.addEventListener('click', async () => {
       if (!confirm('Delete all equipment records? This cannot be undone.')) return;
+      const prevItems = [...items];
       items = [];
       saveItems();
       clearForm();
       render();
+
+      try {
+        await Promise.all(prevItems.map((item) => deleteEquipmentItemById(item.id)));
+      } catch (err) {
+        console.warn('Bulk equipment DELETE failed; restoring local records:', err);
+        items = prevItems;
+        saveItems();
+        render();
+      }
     });
 
     exportCsvBtn.addEventListener('click', () => {
