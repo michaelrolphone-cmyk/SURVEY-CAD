@@ -30,35 +30,40 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 See **API Endpoints** and **CLI Commands** below for the complete endpoint and command reference used by this release.
 
-### API/CLI endpoints and commands (current for this bug fix)
+## API Endpoints
 
-- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
-- CLI commands: `npm run cli -- --help` and `npm run ros:cli -- --help` (with subcommands documented in [CLI Commands](#cli-commands)).
+Authoritative API documentation is maintained in [`docs/openapi.json`](docs/openapi.json).
 
-This LineSmith mobile-toolbar layout fix is UI-only and does not add or modify API endpoints or CLI commands; continue using the endpoints and commands listed above.
+### REST
 
+- `GET /health`
+- `GET /api/apps`
+- `GET /api/crew-members`
+- `GET /api/lookup`
+- `GET /api/geocode`
+- `GET /api/utilities`
+- `GET /api/static-map`
+- `GET /api/parcel`
+- `GET /api/section`
+- `GET /api/aliquots`
+- `GET /api/subdivision`
+- `GET /api/ros-pdf`
+- `POST /extract`
+- `GET /api/fld-config`
+- `GET|POST|PUT|DELETE /api/field-to-finish`
+- `GET /api/project-file/template`
+- `POST /api/project-file/compile`
+- `GET|POST /api/localstorage-sync`
 
-## API and CLI Notes for this change
+### WebSocket (Upgrade)
 
-SurveyFoundry Launcher now shows an on-home active project metadata overview (Project, Client, Contact info, Address, PLSS, and Index) directly inside the `project-manager-launch` section and adds tap-friendly deep links for phone (`tel:`), email (`mailto:`), and address (`geo:` native maps deep link) from the project manager section. This is a launcher UI behavior update only and does not add or change API endpoints or CLI commands.
-The browser localStorage real-time sync bootstrap now hydrates a newly opened browser session from the server snapshot when checksums differ and there are no unsent local edits. This fixes stale local browser state when multiple browser windows/devices are open on the same project.
+- `GET /ws/localstorage-sync`
+- `GET /ws/lineforge`
 
-API and CLI surface area remains unchanged for this fix. Sync continues to use:
-- REST snapshot endpoint: `GET /api/localstorage-sync`
-- WebSocket endpoint: `GET /ws/localstorage-sync` (upgrade)
-- Existing CLI commands listed below (`npm run cli -- --help`, `npm run ros:cli -- --help`).
+## CLI Commands
 
-## API and CLI Notes for this change
-
-SurveyFoundry PLSS index generation now normalizes township/range values to single-digit components before composing the first index segment so the prefix remains at the expected three-digit maximum (`TRQ`). This prevents malformed four-digit prefixes when upstream PLSS values arrive zero-padded.
-
-API endpoints and CLI commands remain unchanged for this bug fix. Continue using the existing routes (`GET /api/lookup`, `GET /api/aliquots`) and command references documented below.
-
-## API and CLI Notes for this change
-
-SurveyFoundry Launcher now automatically backfills project PLSS and SurveyFoundry Index metadata when an active project is loaded (including launcher startup and active-project switches) and either field is missing. The launcher uses the existing address-based lookup endpoints (`/api/lookup` and `/api/aliquots`) and does not introduce any new API or CLI surface area.
-
-The SurveyFoundry launcher has been visually redesigned around a rustic survey workshop motif (hand-painted texture layering, warm lamplight earth tones, and subtle futuristic cyan/amber glow accents). This is a UI-only refresh and does not add, remove, or modify server API endpoints or CLI commands; the endpoint and command references below remain current for this release.
+- General CLI help: `npm run cli -- --help`
+- ROS CLI help: `npm run ros:cli -- --help`
 
 ## LineSmith Loading Experience
 

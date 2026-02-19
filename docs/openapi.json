@@ -1,0 +1,544 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SURVEY-CAD Platform API",
+    "version": "1.0.0",
+    "description": "REST and WebSocket surface for the SURVEY-CAD platform server (`src/server.js`)."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Default local development server"
+    }
+  ],
+  "tags": [
+    { "name": "System" },
+    { "name": "Catalog" },
+    { "name": "Lookup" },
+    { "name": "Utilities" },
+    { "name": "Project Files" },
+    { "name": "Field-to-Finish" },
+    { "name": "Sync" },
+    { "name": "ROS" },
+    { "name": "Collaboration" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Server is running",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/apps": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List launcher app catalog entries",
+        "responses": {
+          "200": {
+            "description": "App catalog",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppCatalogResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/crew-members": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "Fetch crew members from configured upstream API",
+        "responses": {
+          "200": {
+            "description": "Crew members list",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CrewMembersResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/lookup": {
+      "get": {
+        "tags": ["Lookup"],
+        "summary": "Lookup parcel context by address",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Street address to resolve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lookup payload including geocode, parcel, and nearby records",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "502": { "$ref": "#/components/responses/BadGateway" }
+        }
+      }
+    },
+    "/api/geocode": {
+      "get": {
+        "tags": ["Lookup"],
+        "summary": "Geocode an address",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geocoding provider response",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/utilities": {
+      "get": {
+        "tags": ["Utilities"],
+        "summary": "Lookup utility records for an address",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "outSR", "in": "query", "required": false, "schema": { "type": "integer", "default": 2243 } },
+          { "name": "sources", "in": "query", "required": false, "schema": { "type": "string", "default": "power" }, "description": "Comma-separated source list." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Utility feature list",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UtilitiesResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/static-map": {
+      "get": {
+        "tags": ["Utilities"],
+        "summary": "Fetch a static map tile near coordinates",
+        "description": "Proxies ArcGIS imagery first, then OpenStreetMap tile fallback, then SVG fallback if no provider is available.",
+        "parameters": [
+          { "name": "lon", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "address", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "PNG tile or SVG fallback",
+            "content": {
+              "image/png": { "schema": { "type": "string", "format": "binary" } },
+              "image/svg+xml": { "schema": { "type": "string" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/parcel": {
+      "get": {
+        "tags": ["Lookup"],
+        "summary": "Find nearest parcel for coordinates",
+        "parameters": [
+          { "name": "lon", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "outSR", "in": "query", "required": false, "schema": { "type": "integer", "default": 4326 } },
+          { "name": "searchMeters", "in": "query", "required": false, "schema": { "type": "number", "default": 40 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parcel lookup result",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "parcel": { "type": ["object", "null"], "additionalProperties": true } } } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/section": {
+      "get": {
+        "tags": ["Lookup"],
+        "summary": "Load PLSS section at coordinates",
+        "parameters": [
+          { "name": "lon", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Section result",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "section": { "type": ["object", "null"], "additionalProperties": true } } } } }
+          }
+        }
+      }
+    },
+    "/api/aliquots": {
+      "get": {
+        "tags": ["Lookup"],
+        "summary": "Load aliquots for section at coordinates",
+        "parameters": [
+          { "name": "lon", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "outSR", "in": "query", "required": false, "schema": { "type": "integer", "default": 4326 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Section and aliquot polygons",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "section": { "type": "object", "additionalProperties": true }, "aliquots": { "type": "array", "items": { "type": "object", "additionalProperties": true } } } } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/subdivision": {
+      "get": {
+        "tags": ["Lookup"],
+        "summary": "Load subdivision feature at coordinates",
+        "description": "Tries provided outSR and falls back to 4326 on failure.",
+        "parameters": [
+          { "name": "lon", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "outSR", "in": "query", "required": false, "schema": { "type": "integer", "default": 4326 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subdivision polygon",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "subdivision": { "type": ["object", "null"], "additionalProperties": true } } } } }
+          }
+        }
+      }
+    },
+    "/api/ros-pdf": {
+      "get": {
+        "tags": ["ROS"],
+        "summary": "Proxy a remote ROS PDF",
+        "parameters": [
+          { "name": "url", "in": "query", "required": true, "schema": { "type": "string", "format": "uri" }, "description": "Absolute HTTP(S) URL to fetch." }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF file bytes",
+            "content": {
+              "application/pdf": { "schema": { "type": "string", "format": "binary" } },
+              "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "502": { "$ref": "#/components/responses/BadGateway" }
+        }
+      }
+    },
+    "/extract": {
+      "post": {
+        "tags": ["ROS"],
+        "summary": "Run ROS OCR extractor pipeline",
+        "description": "Delegates request handling to the ROS OCR express app created by `createRosOcrApp`.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "multipart/form-data": {
+              "schema": { "type": "object", "additionalProperties": true }
+            },
+            "application/json": {
+              "schema": { "type": "object", "additionalProperties": true }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Extraction completed", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/fld-config": {
+      "get": {
+        "tags": ["Field-to-Finish"],
+        "summary": "Load and parse FLD configuration file",
+        "parameters": [
+          { "name": "file", "in": "query", "required": false, "schema": { "type": "string", "default": "config/MLS.fld" }, "description": "Path under server static root." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parsed FLD config model",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+          },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/field-to-finish": {
+      "get": {
+        "tags": ["Field-to-Finish"],
+        "summary": "Get active field-to-finish configuration state",
+        "responses": { "200": { "description": "Current state", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } } }
+      },
+      "post": {
+        "tags": ["Field-to-Finish"],
+        "summary": "Create API override config",
+        "requestBody": {
+          "required": false,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "config": { "type": "object", "additionalProperties": true } } } } }
+        },
+        "responses": { "201": { "description": "Override created", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } } }
+      },
+      "put": {
+        "tags": ["Field-to-Finish"],
+        "summary": "Replace API override config",
+        "requestBody": {
+          "required": false,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "config": { "type": "object", "additionalProperties": true } } } } }
+        },
+        "responses": { "200": { "description": "Override updated", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } } }
+      },
+      "delete": {
+        "tags": ["Field-to-Finish"],
+        "summary": "Delete API override and restore default config",
+        "responses": { "200": { "description": "Override removed", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } } }
+      }
+    },
+    "/api/project-file/template": {
+      "get": {
+        "tags": ["Project Files"],
+        "summary": "Build a project-file template document",
+        "parameters": [
+          { "name": "projectId", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "projectName", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "client", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "address", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "resources", "in": "query", "required": false, "schema": { "type": "string" }, "description": "JSON-encoded array of resource entries." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Generated project-file template",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "projectFile": { "type": "object", "additionalProperties": true } } } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/project-file/compile": {
+      "post": {
+        "tags": ["Project Files"],
+        "summary": "Compile project-file and archive plan",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project": { "type": "object", "additionalProperties": true },
+                  "projectFile": { "type": "object", "additionalProperties": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Compiled project file and archive plan",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectFileCompileResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/localstorage-sync": {
+      "get": {
+        "tags": ["Sync"],
+        "summary": "Read localStorage sync state for crew/project context",
+        "parameters": [
+          { "name": "crewMemberId", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "projectId", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current sync state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LocalStorageStateResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      },
+      "post": {
+        "tags": ["Sync"],
+        "summary": "Push localStorage sync snapshot",
+        "parameters": [
+          { "name": "crewMemberId", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "projectId", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["version", "snapshot"],
+                "properties": {
+                  "version": { "type": "integer" },
+                  "snapshot": { "type": "object", "additionalProperties": true },
+                  "crewMemberId": { "type": "string" },
+                  "projectId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync merge result",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LocalStorageSyncResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/ws/localstorage-sync": {
+      "get": {
+        "tags": ["Sync", "Collaboration"],
+        "summary": "WebSocket upgrade endpoint for localStorage real-time sync",
+        "description": "Upgrade requires `crewMemberId` query parameter and optional `projectId` for context scoping.",
+        "parameters": [
+          { "name": "crewMemberId", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "projectId", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "101": { "description": "Switching Protocols (WebSocket)" },
+          "400": { "description": "Missing or invalid websocket request" }
+        },
+        "x-websocket": true
+      }
+    },
+    "/ws/lineforge": {
+      "get": {
+        "tags": ["Collaboration"],
+        "summary": "WebSocket endpoint for LineForge collaboration",
+        "description": "Requires `crewMemberId`; supports optional `projectId` and room selector `room`.",
+        "parameters": [
+          { "name": "crewMemberId", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "projectId", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "room", "in": "query", "required": false, "schema": { "type": "string", "default": "default" } }
+        ],
+        "responses": {
+          "101": { "description": "Switching Protocols (WebSocket)" },
+          "400": { "description": "Missing required websocket headers or query params" }
+        },
+        "x-websocket": true
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Forbidden": {
+        "description": "Forbidden",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "BadGateway": {
+        "description": "Upstream provider error",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } },
+        "required": ["error"]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": { "ok": { "type": "boolean" } },
+        "required": ["ok"]
+      },
+      "AppCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "iconPath": { "type": "string" },
+                "entry": { "type": "string" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": ["apps"]
+      },
+      "CrewMembersResponse": {
+        "type": "object",
+        "properties": {
+          "crewMembers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"]
+            }
+          }
+        },
+        "required": ["crewMembers"]
+      },
+      "UtilitiesResponse": {
+        "type": "object",
+        "properties": {
+          "sources": { "type": "array", "items": { "type": "string" } },
+          "utilities": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+        },
+        "required": ["sources", "utilities"]
+      },
+      "ProjectFileCompileResponse": {
+        "type": "object",
+        "properties": {
+          "projectFile": { "type": "object", "additionalProperties": true },
+          "archivePlan": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["projectFile", "archivePlan"]
+      },
+      "LocalStorageStateResponse": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "integer" },
+          "checksum": { "type": "string" },
+          "snapshot": { "type": "object", "additionalProperties": true },
+          "crewMemberId": { "type": "string" },
+          "projectId": { "type": "string" }
+        },
+        "required": ["version", "checksum", "snapshot", "crewMemberId"]
+      },
+      "LocalStorageSyncResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/LocalStorageStateResponse" },
+          {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string", "enum": ["server-updated", "client-stale", "checksum-conflict"] },
+              "state": { "$ref": "#/components/schemas/LocalStorageStateResponse" }
+            },
+            "required": ["status"]
+          }
+        ]
+      }
+    }
+  }
+}
