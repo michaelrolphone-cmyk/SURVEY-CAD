@@ -1101,3 +1101,10 @@ LineSmith now lets an unnumbered base line code (for example, `FL`) continue its
 
 - API endpoints (unchanged): `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI notes for this LineSmith CLO-after-curve-marker sequencing fix
+
+LineSmith now resolves sequential `END`/`CLO` directives from the nearest valid linework base code token while skipping curve markers such as `PC` and `PT`. This allows codes like `TBC PT CLO` to close the active `TBC` sequence the same way as `TBC CLO`.
+
+- API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
+- CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
