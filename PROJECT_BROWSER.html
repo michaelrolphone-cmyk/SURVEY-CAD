@@ -957,7 +957,11 @@
           const resource = document.createElement('div');
           resource.className = 'file-row';
 
-          const canLaunchPointForge = folder.key === 'point-files' && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
+          const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
+          const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
+          const canLaunchPointForge = folder.key === 'point-files'
+            && isPointFileFormat
+            && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
           const canOpenLineSmithDrawing = folder.key === 'drawings'
             && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
