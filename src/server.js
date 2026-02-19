@@ -1317,11 +1317,23 @@ export function createSurveyServer({
           if (casefileId) {
             casefile = await bew.store.updateCasefile(casefileId, { meta: { name } });
           } else {
-            casefile = await bew.store.createCasefile({
-              name,
-              notes: `BoundaryLab traverse for project ${projectId}`,
-              initializeDefaults: true,
-            });
+            let linkedCasefileId = '';
+            try {
+              const link = await getProjectWorkbenchLink(localStorageSyncStore, projectId);
+              linkedCasefileId = String(link?.casefileId || '').trim();
+            } catch {
+              linkedCasefileId = '';
+            }
+
+            if (linkedCasefileId) {
+              casefile = await bew.store.duplicateCasefile(linkedCasefileId, { name });
+            } else {
+              casefile = await bew.store.createCasefile({
+                name,
+                notes: `BoundaryLab traverse for project ${projectId}`,
+                initializeDefaults: true,
+              });
+            }
             casefileId = casefile.id;
           }
 
