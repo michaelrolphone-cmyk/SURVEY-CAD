@@ -33,6 +33,13 @@ test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and 
   assert.match(html, /renameResourceTitle\(projectContext\?\.projectFile, folder\?\.key, entry\?\.id, nextTitle\)/, 'EvidenceDesk should rename non-API resources in project-file index state');
 });
 
+test('EvidenceDesk file rows prioritize configured names and truncate actual file names', async () => {
+  const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+  assert.match(html, /\.file-name-configured\s*\{[\s\S]*color:\s*#f8fafc;[\s\S]*font-weight:\s*600;/, 'EvidenceDesk should render configured names in brighter text.');
+  assert.match(html, /\.file-name-actual\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/, 'EvidenceDesk should truncate long actual file names with ellipsis.');
+  assert.match(html, /<span class="file-name-configured">\$\{configuredFileName\}<\/span><span class="file-name-actual" title="\$\{actualFileName\}">— \$\{actualFileName\}<\/span>/, 'EvidenceDesk should display configured file name first and actual file name after it.');
+});
+
 
 test('PointForge renders code-group explorer with thumbnails and BoundaryLab handoff', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');

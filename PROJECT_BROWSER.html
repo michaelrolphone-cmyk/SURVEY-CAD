@@ -148,9 +148,24 @@
     }
 
     .file-name {
+      display: flex;
+      align-items: baseline;
+      gap: 0.3rem;
+      min-width: 0;
+    }
+
+    .file-name-configured {
+      color: #f8fafc;
+      font-weight: 600;
+      flex: none;
+    }
+
+    .file-name-actual {
+      color: var(--muted);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      min-width: 0;
     }
 
     .launch-btn {
@@ -922,7 +937,9 @@
           const canOpenLineSmithDrawing = folder.key === 'drawings'
             && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
-          resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name">${entry.id}.${entry.exportFormat} <span class="muted">— ${entry.title}</span></span></span>`;
+          const actualFileName = `${entry.id}.${entry.exportFormat}`;
+          const configuredFileName = entry?.title || actualFileName;
+          resource.innerHTML = `<span class="file-meta"><span class="icon">📄</span><span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
 
           if (canLaunchPointForge) {
             resource.classList.add('pointforge-openable');
