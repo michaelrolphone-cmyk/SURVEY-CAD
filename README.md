@@ -921,6 +921,16 @@ Base URL (local): `http://localhost:3000`
 - `POST /api/project-file/compile`
   - JSON body accepts either `{ "projectFile": ... }` or `{ "project": ... }`.
 
+### Equipment inventory and setup logs
+
+- `GET /api/equipment`
+- `POST /api/equipment`
+- `GET /api/equipment?id=<equipmentId>`
+- `GET /api/equipment-logs`
+- `POST /api/equipment-logs`
+- `GET /api/equipment-logs?id=<logId>`
+- `EquipmentLog.html` now hydrates its **Equipment Type** dropdown from Equipment Manager inventory records (`/api/equipment` + `surveyfoundryEquipmentInventory` local cache), so users select actual managed equipment entries instead of generic type presets.
+
 ### Field-to-Finish (FLD)
 
 - `GET /api/fld-config?file=config/MLS.fld`
