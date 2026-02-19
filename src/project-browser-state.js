@@ -102,6 +102,24 @@ export function removeResourceById(projectFile, folderKey, resourceId) {
   return folder.index.length !== before;
 }
 
+export function renameResourceTitle(projectFile, folderKey, resourceId, nextTitle) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey || !resourceId) return false;
+  const title = String(nextTitle || '').trim();
+  if (!title) return false;
+
+  const folder = projectFile.folders.find((entry) => entry.key === folderKey);
+  if (!folder || !Array.isArray(folder.index)) return false;
+
+  const resource = folder.index.find((entry) => entry?.id === resourceId);
+  if (!resource) return false;
+
+  resource.title = title;
+  if (resource?.reference?.metadata && typeof resource.reference.metadata === 'object') {
+    resource.reference.metadata.fileName = title;
+  }
+  return true;
+}
+
 function parseCsvLine(line = '') {
   const cells = [];
   let current = '';

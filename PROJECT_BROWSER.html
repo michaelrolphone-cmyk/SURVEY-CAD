@@ -212,7 +212,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, findCpfPointLinksAsync } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, renameResourceTitle, findCpfPointLinksAsync } from './src/project-browser-state.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
@@ -426,6 +426,74 @@
       if (projectContext.projectId) destination.searchParams.set('projectId', projectContext.projectId);
       if (projectContext.projectName) destination.searchParams.set('projectName', projectContext.projectName);
       openLinkedApp(`${destination.pathname}${destination.search}`);
+    }
+
+    async function renameResourceFromEvidenceDesk(folder, entry, projectContext = {}) {
+      const currentTitle = String(entry?.title || '').trim() || 'Untitled';
+      const nextTitleRaw = window.prompt('Rename file', currentTitle);
+      if (nextTitleRaw == null) return;
+
+      const nextTitle = String(nextTitleRaw || '').trim();
+      if (!nextTitle || nextTitle === currentTitle) return;
+
+      const projectId = projectContext?.activeProjectId;
+      if (!projectId) {
+        renderError('Cannot rename resources without an active project.');
+        return;
+      }
+
+      try {
+        if (entry?.reference?.type === 'project-point-file') {
+          const pointFileId = entry?.reference?.metadata?.pointFileId || entry?.reference?.value || entry?.id;
+          const detailRes = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId));
+          if (!detailRes.ok) throw new Error(`Unable to load point file (${detailRes.status}).`);
+          const detail = await detailRes.json();
+          const currentState = detail?.pointFile?.currentState;
+          if (!currentState || typeof currentState !== 'object') {
+            throw new Error('Point file state was missing.');
+          }
+
+          const renameRes = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pointFileName: nextTitle,
+              pointFileState: currentState,
+            }),
+          });
+          if (!renameRes.ok) throw new Error(`Unable to rename point file (${renameRes.status}).`);
+          await syncProjectPointFilesFromApi(projectContext);
+        } else if (entry?.reference?.type === 'project-drawing') {
+          const drawingId = entry?.reference?.metadata?.drawingId || entry?.reference?.value || entry?.id;
+          const detailRes = await fetch(buildProjectDrawingApiUrl(projectId, drawingId));
+          if (!detailRes.ok) throw new Error(`Unable to load drawing (${detailRes.status}).`);
+          const detail = await detailRes.json();
+          const currentState = detail?.drawing?.currentState;
+          if (!currentState || typeof currentState !== 'object') {
+            throw new Error('Drawing state was missing.');
+          }
+
+          const renameRes = await fetch(buildProjectDrawingApiUrl(projectId, drawingId), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              drawingName: nextTitle,
+              drawingState: currentState,
+            }),
+          });
+          if (!renameRes.ok) throw new Error(`Unable to rename drawing (${renameRes.status}).`);
+          await syncProjectDrawingsFromApi(projectContext);
+        } else {
+          const renamed = renameResourceTitle(projectContext?.projectFile, folder?.key, entry?.id, nextTitle);
+          if (!renamed) throw new Error('File rename could not be applied.');
+        }
+
+        saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+        projectContext.setUploadStatus(`Renamed ${currentTitle} to ${nextTitle}.`);
+        renderTree(projectContext.projectFile, projectContext);
+      } catch (err) {
+        renderError(`Could not rename ${currentTitle}. ${err.message}`);
+      }
     }
 
     function getCpfPdfUrl(resource) {
@@ -903,6 +971,17 @@
               renderTree(projectContext.projectFile, projectContext);
             });
             resource.appendChild(deletePointFileButton);
+
+            const renamePointFileButton = document.createElement('button');
+            renamePointFileButton.type = 'button';
+            renamePointFileButton.className = 'launch-btn';
+            renamePointFileButton.textContent = 'Rename';
+            renamePointFileButton.title = 'Rename this point file across project references';
+            renamePointFileButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            resource.appendChild(renamePointFileButton);
           }
 
           if (canOpenLineSmithDrawing) {
@@ -927,6 +1006,17 @@
               launchLineSmithFromDrawingResource(entry, projectContext);
             });
             resource.appendChild(openButton);
+
+            const renameDrawingButton = document.createElement('button');
+            renameDrawingButton.type = 'button';
+            renameDrawingButton.className = 'launch-btn';
+            renameDrawingButton.textContent = 'Rename';
+            renameDrawingButton.title = 'Rename this drawing across project references';
+            renameDrawingButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            resource.appendChild(renameDrawingButton);
           }
 
           if (canOpenCpfPdf) {
@@ -962,6 +1052,17 @@
               deleteCpfResource(folder, entry, projectContext);
             });
             resource.appendChild(deleteButton);
+
+            const renameButton = document.createElement('button');
+            renameButton.type = 'button';
+            renameButton.className = 'launch-btn';
+            renameButton.textContent = 'Rename';
+            renameButton.title = 'Rename this file in the project EvidenceDesk index';
+            renameButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            resource.appendChild(renameButton);
           }
 
           const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;

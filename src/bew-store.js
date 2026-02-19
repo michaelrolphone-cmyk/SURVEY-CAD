@@ -848,10 +848,30 @@ export class RedisBewStore {
     if (patch.tags != null) next.tags = Array.isArray(patch.tags) ? patch.tags.map((t) => String(t)) : [];
     if (patch.notes != null) next.notes = String(patch.notes);
 
+    if (patch.attachmentName != null) {
+      const attachmentName = String(patch.attachmentName || "").trim();
+      if (!attachmentName) throw new HttpError(400, "attachmentName cannot be empty.", "bad_request");
+      if (!next.attachment) throw new HttpError(400, "Evidence has no attachment to rename.", "bad_request");
+
+      const previousAttachmentName = String(next.attachment.name || "");
+      next.attachment.name = attachmentName;
+
+      // Keep user-facing references in sync when they still mirror the attachment filename.
+      if (String(next.title || "") === previousAttachmentName) {
+        next.title = attachmentName;
+      }
+      if (String(next.source || "") === previousAttachmentName) {
+        next.source = attachmentName;
+      }
+    }
+
     next.updatedAt = nowIso();
     cf.meta.updatedAt = next.updatedAt;
 
     const multi = this.redis.multi();
+    if (patch.attachmentName != null) {
+      multi.set(this.kAttachmentMeta(evidenceId), JSON.stringify(next.attachment));
+    }
     multi.set(this.kEvidence(evidenceId), JSON.stringify(next));
     multi.set(this.kCasefile(casefileId), JSON.stringify(cf));
     multi.zadd(this.kCasefilesUpdated(), toScoreFromIso(cf.meta.updatedAt), casefileId);

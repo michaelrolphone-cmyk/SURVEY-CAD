@@ -1047,6 +1047,20 @@ This prevents PointForge-to-LineSmith imports from transposing easting/northing,
 - WebSocket endpoints: `GET /ws/lineforge?room=<roomId>`, `GET /ws/localstorage-sync`.
 - CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
+
+## API and CLI notes for EvidenceDesk file rename support
+
+EvidenceDesk now supports renaming files directly from the file rows.
+
+- Point files are renamed through project point-file APIs so the updated name propagates to project-backed references:
+  - `GET /api/projects/{projectId}/point-files/{pointFileId}`
+  - `PATCH /api/projects/{projectId}/point-files/{pointFileId}`
+- Drawings are renamed through project drawing APIs so the updated name propagates to project-backed references:
+  - `GET /api/projects/{projectId}/drawings/{drawingId}`
+  - `PATCH /api/projects/{projectId}/drawings/{drawingId}`
+- Uploaded EvidenceDesk files in non-API folders are renamed in the stored project-file index so folder references remain consistent in the app.
+- CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
 ## API and CLI notes for project-linked Workbench persistence
 
 Workbench can now be launched from a SurveyFoundry project (`activeProjectId`) and bootstrap a linked casefile automatically. The server persists project↔casefile links in the sync snapshot and can derive/sync Workbench evidence from project sources (LineSmith drawings, PointForge point-files, and uploaded project files).
