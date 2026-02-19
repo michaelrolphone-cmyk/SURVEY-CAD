@@ -1351,7 +1351,8 @@
           "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
           "source": { "type": "string", "maxLength": 500 },
           "tags": { "type": "array", "items": { "type": "string", "maxLength": 64 } },
-          "notes": { "type": "string", "maxLength": 20000 }
+          "notes": { "type": "string", "maxLength": 20000 },
+          "attachmentName": { "type": "string", "maxLength": 255, "description": "Rename the attached file and keep filename-based references in sync." }
         }
       },
 

@@ -10,6 +10,7 @@ import {
   appendResourceToFolder,
   saveStoredProjectFile,
   removeResourceById,
+  renameResourceTitle,
   extractCpfInstrumentsFromPointNote,
   findCpfPointLinks,
   findCpfPointLinksAsync,
@@ -104,6 +105,32 @@ test('removeResourceById removes matching resources from the requested folder', 
 
   assert.equal(removed, true);
   assert.deepEqual(projectFile.folders[0].index.map((entry) => entry.id), ['cpf-1']);
+});
+
+test('renameResourceTitle updates resource title and metadata filename for project references', () => {
+  const projectFile = {
+    folders: [
+      {
+        key: 'cpfs',
+        index: [
+          {
+            id: 'cpf-1',
+            title: 'Old Name.pdf',
+            reference: {
+              type: 'server-upload',
+              metadata: { fileName: 'Old Name.pdf' },
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  const renamed = renameResourceTitle(projectFile, 'cpfs', 'cpf-1', 'Renamed CP&F.pdf');
+
+  assert.equal(renamed, true);
+  assert.equal(projectFile.folders[0].index[0].title, 'Renamed CP&F.pdf');
+  assert.equal(projectFile.folders[0].index[0].reference.metadata.fileName, 'Renamed CP&F.pdf');
 });
 
 test('extractCpfInstrumentsFromPointNote parses CPNFS note instruments', () => {

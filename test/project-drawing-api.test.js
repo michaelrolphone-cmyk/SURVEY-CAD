@@ -26,23 +26,36 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(created.drawing.drawingName, 'Boundary Draft');
     const drawingId = created.drawing.drawingId;
 
+    const renameRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'Boundary Draft Renamed',
+        drawingState: created.drawing.currentState,
+      }),
+    });
+    assert.equal(renameRes.status, 200);
+    const renamed = await renameRes.json();
+    assert.equal(renamed.drawing.drawingName, 'Boundary Draft Renamed');
+
     const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        drawingName: 'Boundary Draft',
+        drawingName: 'Boundary Draft Renamed',
         drawingState: { points: [{ id: 'p-1', x: 3, y: 2 }, { id: 'p-2', x: 5, y: 8 }], mapGeoreference: { origin: [10, 10] } },
       }),
     });
     assert.equal(updateRes.status, 200);
     const updated = await updateRes.json();
-    assert.equal(updated.drawing.versions.length, 2);
+    assert.equal(updated.drawing.versions.length, 3);
 
     const listRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`);
     assert.equal(listRes.status, 200);
     const listed = await listRes.json();
     assert.equal(listed.drawings.length, 1);
-    assert.equal(listed.drawings[0].versionCount, 2);
+    assert.equal(listed.drawings[0].versionCount, 3);
+    assert.equal(listed.drawings[0].drawingName, 'Boundary Draft Renamed');
 
     const getRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`);
     assert.equal(getRes.status, 200);

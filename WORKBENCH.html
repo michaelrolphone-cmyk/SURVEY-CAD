@@ -734,7 +734,8 @@
           <td style="text-align:right;">
             <button class="btn" data-act="editEvidence" data-id="${esc(ev.id)}">Edit</button>
             <button class="btn" data-act="uploadEvidence" data-id="${esc(ev.id)}">Upload</button>
-            ${att ? `<a class="btn" href="${esc(downloadUrl)}" target="_blank" rel="noopener">Download</a>
+            ${att ? `<button class="btn" data-act="renameAttachment" data-id="${esc(ev.id)}">Rename File</button>
+                    <a class="btn" href="${esc(downloadUrl)}" target="_blank" rel="noopener">Download</a>
                     <button class="btn danger" data-act="deleteAttachment" data-id="${esc(ev.id)}">Remove</button>` : `<span class="muted small">No file</span>`}
             <button class="btn danger" data-act="deleteEvidence" data-id="${esc(ev.id)}">Delete</button>
           </td>
@@ -1468,6 +1469,29 @@ N 00°00'27&quot; W 267.69
     }
   }
 
+
+  async function renameAttachment(evidenceId){
+    await ensureEvidence();
+    const ev = evById(evidenceId);
+    if (!ev?.attachment) return;
+
+    const currentName = String(ev.attachment.name || "attachment.bin");
+    const nextName = prompt("Rename attachment", currentName);
+    if (nextName == null) return;
+    const trimmedName = nextName.trim();
+    if (!trimmedName || trimmedName === currentName) return;
+
+    try{
+      await api.patchEvidence(state.activeId, evidenceId, { attachmentName: trimmedName });
+      await ensureEvidence(true);
+      await Promise.all([refreshActiveCasefile(), refreshCasefiles()]);
+      toast("Saved","Attachment renamed and references synced.","good");
+      render();
+    }catch(err){
+      toast("Error", err.message || String(err), "bad");
+    }
+  }
+
   async function deleteAttachment(evidenceId){
     const ok = confirm("Remove the attachment file from this evidence item?");
     if (!ok) return;
@@ -2059,6 +2083,7 @@ N 00°00'27&quot; W 267.69
     if (act === "editEvidence"){ editEvidence(id); return; }
     if (act === "uploadEvidence"){ uploadEvidenceFile(id); return; }
     if (act === "deleteEvidence"){ deleteEvidence(id); return; }
+    if (act === "renameAttachment"){ renameAttachment(id); return; }
     if (act === "deleteAttachment"){ deleteAttachment(id); return; }
 
     if (act === "moveCallUp"){ moveCall(id, -1); return; }
