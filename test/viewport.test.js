@@ -477,7 +477,7 @@ test('VIEWPORT.HTML parses generic field-to-finish commands for sequential BEG/E
   assert.match(html, /function\s+isLineworkEntityType\(entityType\)\s*\{[\s\S]*normalized === "2" \|\| normalized === "1";/, 'LineSmith should classify both standard linework and 2D polyline entity types as linework');
   assert.match(html, /function\s+deriveFieldToFinishCodeSetsFromConfig\(config\)\s*\{[\s\S]*if \(isLineworkEntityType\(entityType\)\) lineworkCodes\.add\(code\);[\s\S]*if \(entityType === "0"\) symbolCodes\.add\(code\);[\s\S]*lineworkCompanionCodes\.set\(code, new Set\(normalizedCompanions\)\);[\s\S]*companionToLineworkCodes\.get\(companionCode\)\.add\(code\);/, 'LineSmith should derive linework, symbol, and companion-code classes from FLD entity definitions instead of hardcoded point-code values');
   assert.match(html, /await\s+loadFieldToFinishRulesFromFld\(defaultFldConfigPath\);/, 'LineSmith boot should load FLD field-to-finish rules before import workflows run');
-  assert.match(html, /function\s+loadFieldToFinishRulesFromFld\(path\s*=\s*defaultFldConfigPath\)\s*\{[\s\S]*fetch\(`\/api\/fld-config\?file=\$\{encodeURIComponent\(path\)\}`\)/, 'LineSmith should fetch FLD parser output from the server API so different FLD files can drive drawing behavior');
+  assert.match(html, /function\s+loadFieldToFinishRulesFromFld\(path\s*=\s*defaultFldConfigPath\)\s*\{[\s\S]*fetchFieldToFinishSettingsFromApi\(\)/, 'LineSmith should fetch shared FLD settings from the CRUD API so all users and projects stay in sync');
   assert.match(html, /\{\s*type:\s*"sequential-line",[\s\S]*const\s+directives\s*=\s*new\s+Set\(\["BEG",\s*"END",\s*"CLO"\]\)/, 'field-to-finish parser should recognize sequential line directives BEG, END, and CLO');
   assert.match(html, /for \(let i = 0; i < tokensUpper\.length; i\+\+\) \{[\s\S]*const action = tokensUpper\[i\];[\s\S]*const baseCode = resolveSequentialDirectiveBaseCode\(tokensUpper, i\);/, 'field-to-finish parser should resolve sequential directives from nearby base-code tokens instead of only adjacent pairs');
   assert.match(html, /function\s+isCurveMarkerToken\(token\s*=\s*""\)\s*\{[\s\S]*normalized === "PC" \|\| normalized === "PT";/, 'sequential directive base-code resolution should skip curve marker tokens so PT/PC can coexist with END/CLO directives');
@@ -933,13 +933,11 @@ test('VIEWPORT.HTML points manager supports grouping and layer-tinted rows', asy
 });
 
 
-test('VIEWPORT.HTML exposes an FLD editor with local override save/reset and downloads', async () => {
+test('VIEWPORT.HTML exposes an FLD editor backed by shared API save/reset and downloads', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="openFldEditor"/, 'LineSmith should expose a toolbar section button for opening the FLD editor');
   assert.match(html, /id="fldModal"/, 'LineSmith should render an FLD editor modal container');
-  assert.match(html, /const\s+FLD_CONFIG_LOCAL_STORAGE_KEY\s*=\s*"lineSmithFldConfigLocal";/, 'LineSmith should keep local FLD overrides in localStorage');
-  assert.match(html, /const\s+FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY\s*=\s*"lineSmithFldSymbolSvgOverrides";/, 'LineSmith should keep symbol-to-SVG overrides in dedicated localStorage state');
   assert.doesNotMatch(html, /id="fldSymbolGallery"/, 'FLD editor should not include a separate symbol gallery region');
   assert.match(html, /function\s+loadSurveySymbolLibrary\(\)\s*\{[\s\S]*fetch\("\/assets\/survey-symbols\/index\.json"\)/, 'FLD editor should load survey SVG symbol manifest data for symbol mapping choices');
   assert.doesNotMatch(html, /function\s+renderFldSymbolGallery\(config\)/, 'FLD editor should not keep the legacy symbol gallery renderer');
@@ -947,14 +945,14 @@ test('VIEWPORT.HTML exposes an FLD editor with local override save/reset and dow
   assert.match(html, /symbolScaleInput\.type\s*=\s*"number"[\s\S]*rule\.raw\.symbol_size\s*=\s*symbolScaleInput\.value/, 'FLD editor should expose symbol scale editing backed by the FLD symbol_size column');
   assert.match(html, /function\s+buildFldSymbolPreviewPicker\(\{ symbolMapChoices, currentValue, onPick \}\)\s*\{[\s\S]*fldSymbolPickerButton[\s\S]*fldSymbolChoiceBtn/, 'FLD editor should build a dropdown-style preview picker so symbol mappings can be selected visually');
   assert.match(html, /function\s+normalizeSymbolOverrideKey\(symbolName = ""\)\s*\{[\s\S]*toUpperCase\(\)/, 'FLD editor should normalize symbol-override keys case-insensitively so mappings survive symbol casing changes');
-  assert.match(html, /function\s+getSymbolMapFileForRule\(rule\)\s*\{[\s\S]*normalizeSymbolOverrideKey\(rule\?\.raw\?\.symbol\)[\s\S]*fieldToFinishRuleState\.symbolSvgOverrides\.get\(symbolName\)/, 'FLD editor should resolve symbol SVG mappings from normalized symbol-name local overrides first');
+  assert.match(html, /function\s+getSymbolMapFileForRule\(rule\)\s*\{[\s\S]*normalizeSymbolOverrideKey\(rule\?\.raw\?\.symbol\)[\s\S]*fieldToFinishRuleState\.symbolSvgOverrides\.get\(symbolName\)/, 'FLD editor should resolve symbol SVG mappings from normalized symbol-name shared overrides first');
   assert.doesNotMatch(html, /Symbol rule: set FLD Symbol name/, 'FLD editor should remove symbol helper copy from type config rows');
   assert.match(html, /lineTypeSelect\.addEventListener\("change", \(\) => \{[\s\S]*rule\.raw\.linetype\s*=\s*lineTypeSelect\.value;/, 'FLD editor should expose linetype selection for linework entity rows');
   assert.match(html, /function\s+normalizeLineworkRuleDefaults\(rule\)\s*\{[\s\S]*rule\.raw\.symbol = "SPT10";[\s\S]*setRuleSymbolMapFile\(rule\.raw, ""\);/, 'FLD editor should enforce default linework symbols and remove symbol SVG mappings for line entities');
   assert.match(html, /function\s+setSymbolMapFileForRule\(rule, value\)\s*\{[\s\S]*setRuleSymbolMapFile\(rule\?\.raw, mappedFile\);[\s\S]*fieldToFinishRuleState\.symbolSvgOverrides\.set\(symbolName, mappedFile\);/, 'FLD editor SVG picker should persist symbol-to-SVG overrides and mirror the selected mapping into FLD row columns');
-  assert.match(html, /function\s+saveFldEditorLocalOverride\(\)\s*\{[\s\S]*saveLocalFldOverride\(fldEditorState\.activeConfig\);[\s\S]*applyFieldToFinishConfig\(fldEditorState\.activeConfig, "localStorage"\);/, 'FLD editor save action should persist local overrides and apply them to active linework rules');
-  assert.match(html, /function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*clearLocalFldOverride\(\);[\s\S]*fldEditorState\.activeConfig = cloneFldConfig\(fldEditorState\.serverConfig\);/, 'FLD editor reset action should clear local override and restore the server FLD rules');
-  assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-LocalOverride\.fld", serializeFieldToFinishConfig\(local\)\);/, 'FLD editor should support downloading local override FLD files');
+  assert.match(html, /function\s+saveFldEditorLocalOverride\(\)\s*\{[\s\S]*saveFieldToFinishSettingsToApi\(fldEditorState\.activeConfig\)[\s\S]*applyFieldToFinishConfig\(fldEditorState\.activeConfig, "api"\);/, 'FLD editor save action should persist shared API settings and apply them to active linework rules');
+  assert.match(html, /function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*resetFieldToFinishSettingsToServerDefaults\(\)[\s\S]*loadFieldToFinishRulesFromFld\(defaultFldConfigPath\)/, 'FLD editor reset action should clear shared settings and restore the server FLD rules');
+  assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-Shared\.fld", serializeFieldToFinishConfig\(fldEditorState\.activeConfig\)\);/, 'FLD editor should support downloading shared FLD files');
 });
 
 
@@ -991,7 +989,7 @@ test('VIEWPORT.HTML renders configured survey symbol SVG markers for point codes
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /codeSymbolMapFiles:\s*new Map\(\)/, 'field-to-finish state should track symbol SVG mappings per point code');
-  assert.match(html, /function\s+applyFieldToFinishConfig\(config, sourceLabel = defaultFldConfigPath\)\s*\{[\s\S]*fieldToFinishRuleState\.symbolSvgOverrides = loadFldSymbolMapOverrides\(\);[\s\S]*deriveFieldToFinishCodeSetsFromConfig\(config\)/, 'field-to-finish config should load symbol-name SVG overrides before deriving per-code symbol mappings');
+  assert.match(html, /function\s+applyFieldToFinishConfig\(config, sourceLabel = defaultFldConfigPath\)\s*\{[\s\S]*fieldToFinishRuleState\.symbolSvgOverrides = new Map\(fldEditorState\.symbolSvgOverrides\);[\s\S]*deriveFieldToFinishCodeSetsFromConfig\(config\)/, 'field-to-finish config should load symbol-name SVG overrides before deriving per-code symbol mappings');
   assert.match(html, /if \(entityType === "0" && symbolMapFile\) codeSymbolMapFiles\.set\(code, symbolMapFile\);/, 'FLD symbol rendering should map point codes through symbol-to-SVG mappings');
   assert.match(html, /function\s+getPointSymbolMapFile\(pointCode = ""\)\s*\{[\s\S]*codeSymbolMapFiles\.get\(token\)/, 'point marker rendering should resolve mapped symbol files from point code tokens');
   assert.match(html, /function\s+getSymbolMarkerImage\(symbolMapFile = ""\)\s*\{[\s\S]*image\.src = `\/assets\/survey-symbols\/\$\{encodeURIComponent\(file\)\}`;/, 'marker renderer should load symbol SVG assets from the survey-symbols library');

@@ -45,6 +45,11 @@ import {
 
 import { loadFldConfig } from './fld-config.js';
 import {
+  getFieldToFinishSettings,
+  upsertFieldToFinishSettings,
+  clearFieldToFinishSettings,
+} from './field-to-finish-store.js';
+import {
   getCrewProfiles,
   getEquipmentInventory,
   getEquipmentLogs,
@@ -755,6 +760,16 @@ export function createSurveyServer({
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
+  const resolveFieldToFinishSettings = async () => {
+    const existing = await getFieldToFinishSettings(localStorageSyncStore);
+    if (existing) return existing;
+    const config = await loadFldConfig(path.resolve(staticDir, 'config/MLS.fld'));
+    const created = await upsertFieldToFinishSettings(localStorageSyncStore, {
+      config,
+      symbolSvgOverrides: {},
+    });
+    return created.settings;
+  };
 
   // optional reuse: if your localStorage sync store exposes the ioredis client, BEW will share it
   const existingRedis = null // localStorageSyncStore?.redis || localStorageSyncStore?.client || null;
@@ -935,6 +950,46 @@ export function createSurveyServer({
           return;
         }
         sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+        return;
+      }
+
+
+      if (urlObj.pathname === '/api/field-to-finish') {
+        if (req.method === 'GET') {
+          const settings = await resolveFieldToFinishSettings();
+          sendJson(res, 200, { settings });
+          return;
+        }
+
+        if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+          const body = await readJsonBody(req);
+          const result = await upsertFieldToFinishSettings(localStorageSyncStore, {
+            config: body?.config,
+            symbolSvgOverrides: body?.symbolSvgOverrides,
+          });
+          lineforgeCollab.broadcastToAllRooms({
+            type: 'field-to-finish-updated',
+            updatedAt: result.settings.updatedAt,
+          });
+          sendJson(res, result.created ? 201 : 200, { settings: result.settings });
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          const deleted = await clearFieldToFinishSettings(localStorageSyncStore);
+          if (!deleted) {
+            sendJson(res, 404, { error: 'Field-to-finish settings not found.' });
+            return;
+          }
+          lineforgeCollab.broadcastToAllRooms({
+            type: 'field-to-finish-updated',
+            updatedAt: new Date().toISOString(),
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
         return;
       }
 

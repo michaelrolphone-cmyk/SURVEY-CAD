@@ -2206,6 +2206,93 @@
           }
         }
       }
+    },
+    "/api/field-to-finish": {
+      "get": {
+        "tags": [
+          "FLD"
+        ],
+        "summary": "Get shared LineSmith field-to-finish settings",
+        "responses": {
+          "200": {
+            "description": "Shared settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldToFinishSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "FLD"
+        ],
+        "summary": "Create or update shared LineSmith field-to-finish settings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldToFinishSettingsMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldToFinishSettingsResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldToFinishSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "FLD"
+        ],
+        "summary": "Reset shared LineSmith field-to-finish settings to server defaults",
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No shared settings record to delete"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4983,6 +5070,69 @@
           "start",
           "basis",
           "calls"
+        ]
+      },
+      "FieldToFinishSettings": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "symbolSvgOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "config",
+          "symbolSvgOverrides"
+        ]
+      },
+      "FieldToFinishSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/FieldToFinishSettings"
+          }
+        },
+        "required": [
+          "settings"
+        ]
+      },
+      "FieldToFinishSettingsMutationRequest": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "symbolSvgOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "config"
         ]
       },
       "ProjectWorkbenchSyncRequest": {

@@ -2021,7 +2021,7 @@
       <div class="tableWrap">
         <div class="tableTools">
           <input id="fldFilter" placeholder="Filter codes" />
-          <span class="pill"><b>Tip</b> <span class="clip">Edits are stored in browser localStorage until reset.</span></span>
+          <span class="pill"><b>Tip</b> <span class="clip">Edits are shared across all users and projects.</span></span>
         </div>
         <div class="scrollBody">
           <table>
@@ -2069,8 +2069,6 @@
   const PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = "lineSmithProjectBrowserDrawingImport";
   const PROJECT_LAST_DRAWING_STORAGE_PREFIX = "surveyfoundryLastLineSmithDrawing";
   const ARROWHEAD_IMPORT_STORAGE_KEY = "lineSmithArrowHeadImport";
-  const FLD_CONFIG_LOCAL_STORAGE_KEY = "lineSmithFldConfigLocal";
-  const FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY = "lineSmithFldSymbolSvgOverrides";
   const ARROWHEAD_SYNC_INTERVAL_MS = 1000;
   let lastArrowHeadPayloadJson = "";
   let lastArrowHeadPayloadSyncAt = 0;
@@ -4131,6 +4129,16 @@
         collab.applyingRemoteState = false;
         flushCollabStateSync();
       }
+      if (message.type === "field-to-finish-updated") {
+        loadFieldToFinishRulesFromFld(defaultFldConfigPath).then((loaded) => {
+          if (!loaded) return;
+          syncFieldToFinishLinework();
+          draw();
+          setStatus("Field-to-finish settings updated from collaborator.", "ok");
+        });
+        return;
+      }
+
       if (message.type === "pointforge-import" && message.exportId) {
         loadPointforgeExportFromApi(message.exportId);
         return;
@@ -4352,6 +4360,7 @@ function paintBackground(ctx, w, h){
     serverConfig: null,
     activeConfig: null,
     source: "server",
+    symbolSvgOverrides: new Map(),
   };
   const fldSymbolLibraryState = {
     symbols: [],
@@ -4527,34 +4536,53 @@ function paintBackground(ctx, w, h){
     return String(symbolName || "").trim().toUpperCase();
   }
 
-  function loadFldSymbolMapOverrides() {
-    try {
-      const raw = localStorage.getItem(FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY);
-      if (!raw) return new Map();
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return new Map();
-      const overrides = new Map();
-      for (const [symbol, file] of Object.entries(parsed)) {
-        const symbolKey = normalizeSymbolOverrideKey(symbol);
-        const mappedFile = String(file || "").trim();
-        if (!symbolKey || !mappedFile) continue;
-        overrides.set(symbolKey, mappedFile);
-      }
-      return overrides;
-    } catch (_err) {
-      return new Map();
+  function normalizeFldSymbolMapOverrides(input = {}) {
+    const source = input && typeof input === "object" ? input : {};
+    const overrides = new Map();
+    for (const [symbol, file] of Object.entries(source)) {
+      const symbolKey = normalizeSymbolOverrideKey(symbol);
+      const mappedFile = String(file || "").trim();
+      if (!symbolKey || !mappedFile) continue;
+      overrides.set(symbolKey, mappedFile);
     }
+    return overrides;
   }
 
-  function saveFldSymbolMapOverrides(overrides) {
-    const obj = {};
+  function serializeFldSymbolMapOverrides(overrides) {
+    const out = {};
     for (const [symbol, file] of (overrides instanceof Map ? overrides.entries() : [])) {
       const symbolKey = normalizeSymbolOverrideKey(symbol);
       const mappedFile = String(file || "").trim();
       if (!symbolKey || !mappedFile) continue;
-      obj[symbolKey] = mappedFile;
+      out[symbolKey] = mappedFile;
     }
-    localStorage.setItem(FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY, JSON.stringify(obj));
+    return out;
+  }
+
+  async function fetchFieldToFinishSettingsFromApi() {
+    const response = await fetch('/api/field-to-finish');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    return payload?.settings || null;
+  }
+
+  async function saveFieldToFinishSettingsToApi(config) {
+    const response = await fetch('/api/field-to-finish', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        config,
+        symbolSvgOverrides: serializeFldSymbolMapOverrides(fieldToFinishRuleState.symbolSvgOverrides),
+      }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  }
+
+  async function resetFieldToFinishSettingsToServerDefaults() {
+    const response = await fetch('/api/field-to-finish', { method: 'DELETE' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
   }
 
   function getSymbolMapFileForRule(rule) {
@@ -4576,7 +4604,7 @@ function paintBackground(ctx, w, h){
     setRuleSymbolMapFile(rule?.raw, mappedFile);
     if (mappedFile) fieldToFinishRuleState.symbolSvgOverrides.set(symbolName, mappedFile);
     else fieldToFinishRuleState.symbolSvgOverrides.delete(symbolName);
-    saveFldSymbolMapOverrides(fieldToFinishRuleState.symbolSvgOverrides);
+    fldEditorState.symbolSvgOverrides = new Map(fieldToFinishRuleState.symbolSvgOverrides);
     return true;
   }
 
@@ -4627,26 +4655,6 @@ function paintBackground(ctx, w, h){
     return JSON.parse(JSON.stringify(config));
   }
 
-  function loadLocalFldOverride() {
-    try {
-      const raw = localStorage.getItem(FLD_CONFIG_LOCAL_STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed?.columns) || !Array.isArray(parsed?.rules)) return null;
-      return parsed;
-    } catch (_err) {
-      return null;
-    }
-  }
-
-  function saveLocalFldOverride(config) {
-    localStorage.setItem(FLD_CONFIG_LOCAL_STORAGE_KEY, JSON.stringify(config));
-  }
-
-  function clearLocalFldOverride() {
-    localStorage.removeItem(FLD_CONFIG_LOCAL_STORAGE_KEY);
-  }
-
   function serializeFieldToFinishConfig(config) {
     const columns = Array.isArray(config?.columns) ? config.columns : [];
     const rules = Array.isArray(config?.rules) ? config.rules : [];
@@ -4673,7 +4681,7 @@ function paintBackground(ctx, w, h){
   }
 
   function applyFieldToFinishConfig(config, sourceLabel = defaultFldConfigPath) {
-    fieldToFinishRuleState.symbolSvgOverrides = loadFldSymbolMapOverrides();
+    fieldToFinishRuleState.symbolSvgOverrides = new Map(fldEditorState.symbolSvgOverrides);
     const { lineworkCodes, symbolCodes, codeLayers, codeSymbolMapFiles, lineworkCompanionCodes, companionToLineworkCodes } = deriveFieldToFinishCodeSetsFromConfig(config);
     fieldToFinishRuleState.lineworkCodes = lineworkCodes;
     fieldToFinishRuleState.symbolCodes = symbolCodes;
@@ -4689,14 +4697,14 @@ function paintBackground(ctx, w, h){
   async function loadFieldToFinishRulesFromFld(path = defaultFldConfigPath) {
     fieldToFinishRuleState.attempted = true;
     try {
-      const response = await fetch(`/api/fld-config?file=${encodeURIComponent(path)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const serverConfig = await response.json();
-      fldEditorState.serverConfig = cloneFldConfig(serverConfig);
-      const localOverride = loadLocalFldOverride();
-      fldEditorState.activeConfig = cloneFldConfig(localOverride || serverConfig);
-      fldEditorState.source = localOverride ? "local" : "server";
-      applyFieldToFinishConfig(fldEditorState.activeConfig, localOverride ? "localStorage" : path);
+      const settings = await fetchFieldToFinishSettingsFromApi();
+      const activeConfig = cloneFldConfig(settings?.config);
+      if (!activeConfig) throw new Error('Missing field-to-finish config payload.');
+      fldEditorState.serverConfig = cloneFldConfig(activeConfig);
+      fldEditorState.activeConfig = activeConfig;
+      fldEditorState.symbolSvgOverrides = normalizeFldSymbolMapOverrides(settings?.symbolSvgOverrides);
+      fldEditorState.source = settings?.id ? "api" : "server";
+      applyFieldToFinishConfig(fldEditorState.activeConfig, "api");
       await loadSurveySymbolLibrary();
       return true;
     } catch (_err) {
@@ -4707,7 +4715,7 @@ function paintBackground(ctx, w, h){
       fieldToFinishRuleState.codeSymbolMapFiles = new Map();
       fieldToFinishRuleState.lineworkCompanionCodes = new Map();
       fieldToFinishRuleState.companionToLineworkCodes = new Map();
-      fieldToFinishRuleState.symbolSvgOverrides = loadFldSymbolMapOverrides();
+      fieldToFinishRuleState.symbolSvgOverrides = new Map();
       return false;
     }
   }
@@ -11815,7 +11823,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
             const applied = setSymbolMapFileForRule(rule, value);
             if (!applied) return;
             syncFldRuleDerivedFields(rule);
-            applyFieldToFinishConfig(fldEditorState.activeConfig, fldEditorState.source === "local" ? "localStorage" : defaultFldConfigPath);
+            applyFieldToFinishConfig(fldEditorState.activeConfig, "api");
             renderFldEditorTable();
           },
         });
@@ -11888,32 +11896,36 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
 
   function saveFldEditorLocalOverride() {
     if (!fldEditorState.activeConfig) return;
-    fldEditorState.source = "local";
-    saveLocalFldOverride(fldEditorState.activeConfig);
-    applyFieldToFinishConfig(fldEditorState.activeConfig, "localStorage");
-    syncFieldToFinishLinework();
-    setStatus("Saved FLD local override.", "ok");
-    renderFldEditorTable();
+    saveFieldToFinishSettingsToApi(fldEditorState.activeConfig)
+      .then(() => {
+        fldEditorState.source = "api";
+        fldEditorState.serverConfig = cloneFldConfig(fldEditorState.activeConfig);
+        applyFieldToFinishConfig(fldEditorState.activeConfig, "api");
+        syncFieldToFinishLinework();
+        setStatus("Saved shared FLD settings.", "ok");
+        renderFldEditorTable();
+      })
+      .catch(() => setStatus("Unable to save FLD settings.", "err"));
   }
 
   function resetFldEditorToServer() {
-    if (!fldEditorState.serverConfig) return;
-    clearLocalFldOverride();
-    fldEditorState.activeConfig = cloneFldConfig(fldEditorState.serverConfig);
-    fldEditorState.source = "server";
-    applyFieldToFinishConfig(fldEditorState.activeConfig, defaultFldConfigPath);
-    syncFieldToFinishLinework();
-    setStatus("Reset FLD config to server version.", "ok");
-    renderFldEditorTable();
+    resetFieldToFinishSettingsToServerDefaults()
+      .then(() => loadFieldToFinishRulesFromFld(defaultFldConfigPath))
+      .then((loaded) => {
+        if (!loaded) throw new Error("load failed");
+        syncFieldToFinishLinework();
+        setStatus("Reset FLD config to server version.", "ok");
+        renderFldEditorTable();
+      })
+      .catch(() => setStatus("Unable to reset FLD settings.", "err"));
   }
 
   function downloadFldLocalOverride() {
-    const local = loadLocalFldOverride();
-    if (!local) {
-      setStatus("No local FLD override found to download.", "warn");
+    if (!fldEditorState.activeConfig) {
+      setStatus("No shared FLD settings found to download.", "warn");
       return;
     }
-    downloadTextFile("LineSmith-LocalOverride.fld", serializeFieldToFinishConfig(local));
+    downloadTextFile("LineSmith-Shared.fld", serializeFieldToFinishConfig(fldEditorState.activeConfig));
   }
 
   function downloadFldCurrentConfig() {

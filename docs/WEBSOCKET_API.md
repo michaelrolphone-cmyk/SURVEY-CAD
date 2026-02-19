@@ -1314,3 +1314,13 @@ Confirmation that a request was cancelled.
 | `/ws/lmproxy?token=<t>` | `ws` (npm) | Bidirectional | Optional token |
 
 **Note on implementation:** The first four WebSocket services (`lineforge`, `localstorage-sync`, `crew-presence`, `worker`) use a hand-rolled WebSocket implementation with manual frame encoding/decoding on raw TCP sockets. The LM Proxy Hub (`lmproxy`) uses the `ws` npm package with `noServer: true` mode.
+
+### `field-to-finish-updated`
+Server broadcast on `/ws/lineforge` after shared Field-to-Finish settings are changed via CRUD API.
+
+```json
+{
+  "type": "field-to-finish-updated",
+  "updatedAt": "2026-01-01T00:00:00.000Z"
+}
+```
