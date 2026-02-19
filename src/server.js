@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { access, readdir, readFile, mkdir, writeFile, stat } from 'node:fs/promises';
+import { access, readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import SurveyCadClient from './survey-api.js';
@@ -15,6 +15,7 @@ import { createCrewPresenceWsService } from './crew-presence-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
 import { createLmProxyHubWsService } from "./lmstudio-proxy-control-ws.js";
 import { createRedisClient as createBewRedisClient } from "./bew-redis.js";
+import { createEvidenceDeskFileStore } from './evidence-desk-file-store.js';
 import {
   listProjectDrawings,
   getProjectDrawing,
@@ -740,6 +741,7 @@ export function createSurveyServer({
   rosOcrHandler,
   staticMapFetcher = fetch,
   localStorageSyncStore = new LocalStorageSyncStore(),
+  evidenceDeskFileStore,
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
@@ -757,6 +759,16 @@ export function createSurveyServer({
   });
 
   const pointforgeExportStore = new Map();
+  let evidenceDeskStorePromise = evidenceDeskFileStore
+    ? Promise.resolve({ store: evidenceDeskFileStore, redisClient: null, type: 'custom' })
+    : null;
+
+  async function resolveEvidenceDeskStore() {
+    if (!evidenceDeskStorePromise) {
+      evidenceDeskStorePromise = createEvidenceDeskFileStore();
+    }
+    return evidenceDeskStorePromise;
+  }
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
@@ -776,6 +788,7 @@ export function createSurveyServer({
 
   // ensure BEW redis closes on server close (only if we created it)
   let bewCloseHookInstalled = false;
+  let evidenceDeskCloseHookInstalled = false;
 
   const server = createServer(async (req, res) => {
     if (!req.url) {
@@ -786,6 +799,14 @@ export function createSurveyServer({
     const urlObj = new URL(req.url, 'http://localhost');
 
     try {
+      if (!evidenceDeskCloseHookInstalled && evidenceDeskStorePromise) {
+        evidenceDeskCloseHookInstalled = true;
+        const runtime = await evidenceDeskStorePromise.catch(() => null);
+        if (runtime?.type === 'redis' && runtime.redisClient && typeof runtime.redisClient.quit === 'function') {
+          server.on('close', () => { Promise.resolve(runtime.redisClient.quit()).catch(() => {}); });
+        }
+      }
+
       if (urlObj.pathname === '/extract') {
         if (req.method !== 'POST') {
           sendJson(res, 405, { error: 'Only POST is supported.' });
@@ -1585,13 +1606,14 @@ export function createSurveyServer({
       }
 
       if (urlObj.pathname === '/api/project-files/upload') {
-        if (req.method !== 'POST') {
-          sendJson(res, 405, { error: 'Only POST is supported.' });
+        if (req.method !== 'POST' && req.method !== 'PUT') {
+          sendJson(res, 405, { error: 'Only POST and PUT are supported.' });
           return;
         }
         const { fields, fileBuffer, fileName } = await parseMultipartUpload(req);
         const projectId = fields.projectId;
         const folderKey = fields.folderKey;
+        const targetFileName = fields.fileName;
         if (!projectId || !folderKey) {
           sendJson(res, 400, { error: 'projectId and folderKey are required fields.' });
           return;
@@ -1608,35 +1630,39 @@ export function createSurveyServer({
           sendJson(res, 400, { error: `File exceeds maximum size of ${MAX_UPLOAD_FILE_BYTES} bytes.` });
           return;
         }
+        const ext = path.extname(sanitizeFileName(fileName)).replace(/^\./, '').toLowerCase() || 'bin';
+        const { store } = await resolveEvidenceDeskStore();
 
-        const sanitized = sanitizeFileName(fileName);
-        const timestamp = Date.now();
-        const storedName = `${timestamp}-${sanitized}`;
-        const folderPath = path.join(UPLOADS_DIR, projectId, folderKey);
-        await mkdir(folderPath, { recursive: true });
-        const filePath = path.join(folderPath, storedName);
-        await writeFile(filePath, fileBuffer);
+        if (req.method === 'PUT') {
+          if (!targetFileName) {
+            sendJson(res, 400, { error: 'fileName is required when updating an existing upload.' });
+            return;
+          }
+          const resource = await store.updateFile({
+            projectId,
+            folderKey,
+            fileName: path.basename(targetFileName),
+            originalFileName: fileName,
+            buffer: fileBuffer,
+            extension: ext,
+            mimeType: req.headers['content-type'] || 'application/octet-stream',
+          });
+          if (!resource) {
+            sendJson(res, 404, { error: 'File not found.' });
+            return;
+          }
+          sendJson(res, 200, { resource });
+          return;
+        }
 
-        const ext = path.extname(sanitized).replace(/^\./, '').toLowerCase() || 'bin';
-        const resourceId = `upload-${sanitized.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '-')}-${timestamp}`;
-
-        const resource = {
-          id: resourceId,
-          folder: folderKey,
-          title: fileName,
-          exportFormat: ext,
-          reference: {
-            type: 'server-upload',
-            value: `/api/project-files/download?projectId=${encodeURIComponent(projectId)}&folderKey=${encodeURIComponent(folderKey)}&fileName=${encodeURIComponent(storedName)}`,
-            resolverHint: 'evidence-desk-upload',
-            metadata: {
-              fileName,
-              storedName,
-              uploadedAt: new Date(timestamp).toISOString(),
-              sizeBytes: fileBuffer.length,
-            },
-          },
-        };
+        const resource = await store.createFile({
+          projectId,
+          folderKey,
+          originalFileName: fileName,
+          buffer: fileBuffer,
+          extension: ext,
+          mimeType: req.headers['content-type'] || 'application/octet-stream',
+        });
 
         sendJson(res, 201, { resource });
         return;
@@ -1659,23 +1685,44 @@ export function createSurveyServer({
           return;
         }
         const safeName = path.basename(requestedFileName);
-        const filePath = path.join(UPLOADS_DIR, projectId, folderKey, safeName);
-        if (!filePath.startsWith(path.join(UPLOADS_DIR, projectId, folderKey))) {
-          sendJson(res, 403, { error: 'Forbidden path.' });
-          return;
-        }
-        try { await access(filePath); }
-        catch {
+        const { store } = await resolveEvidenceDeskStore();
+        const file = await store.getFile(projectId, folderKey, safeName);
+        if (!file) {
           sendJson(res, 404, { error: 'File not found.' });
           return;
         }
-        const body = await readFile(filePath);
         const ext = path.extname(safeName).toLowerCase();
         res.statusCode = 200;
         res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
         res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
         res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.end(body);
+        res.end(file.buffer);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-files/file') {
+        if (req.method !== 'DELETE') {
+          sendJson(res, 405, { error: 'Only DELETE is supported.' });
+          return;
+        }
+        const projectId = urlObj.searchParams.get('projectId');
+        const folderKey = urlObj.searchParams.get('folderKey');
+        const requestedFileName = urlObj.searchParams.get('fileName');
+        if (!projectId || !folderKey || !requestedFileName) {
+          sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
+          return;
+        }
+        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+          sendJson(res, 400, { error: 'Invalid folderKey.' });
+          return;
+        }
+        const { store } = await resolveEvidenceDeskStore();
+        const deleted = await store.deleteFile(projectId, folderKey, path.basename(requestedFileName));
+        if (!deleted) {
+          sendJson(res, 404, { error: 'File not found.' });
+          return;
+        }
+        sendJson(res, 200, { deleted: true });
         return;
       }
 
@@ -1689,17 +1736,9 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId is required.' });
           return;
         }
-        const projectDir = path.join(UPLOADS_DIR, projectId);
-        const files = [];
-        try {
-          const folders = await readdir(projectDir, { withFileTypes: true });
-          for (const folder of folders) {
-            if (!folder.isDirectory() || !VALID_FOLDER_KEYS.has(folder.name)) continue;
-            const folderFiles = await readdir(path.join(projectDir, folder.name));
-            for (const f of folderFiles) files.push({ folderKey: folder.name, fileName: f });
-          }
-        } catch { /* empty */ }
-        sendJson(res, 200, { files });
+        const { store } = await resolveEvidenceDeskStore();
+        const listing = await store.listFiles(projectId, [...VALID_FOLDER_KEYS]);
+        sendJson(res, 200, listing);
         return;
       }
 

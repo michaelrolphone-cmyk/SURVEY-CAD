@@ -376,7 +376,7 @@ If `projectFile` is omitted, one is auto-generated from `project`.
 
 ### `POST /api/project-files/upload`
 
-Upload a file to a project folder on the server.
+Create a new uploaded file in EvidenceDesk project storage.
 
 **Content-Type:** `multipart/form-data`
 
@@ -388,50 +388,61 @@ Upload a file to a project folder on the server.
 
 **Valid `folderKey` values:** `drawings`, `ros`, `cpfs`, `point-files`, `deeds`, `plats`, `invoices`, `other`
 
-**Response `201`:**
-```json
-{
-  "resource": {
-    "id": "upload-my-drawing-1739664000000",
-    "folder": "drawings",
-    "title": "my-drawing.dxf",
-    "exportFormat": "dxf",
-    "reference": {
-      "type": "server-upload",
-      "value": "/api/project-files/download?projectId=proj-1&folderKey=drawings&fileName=1739664000000-my-drawing_dxf",
-      "resolverHint": "evidence-desk-upload",
-      "metadata": {
-        "fileName": "my-drawing.dxf",
-        "storedName": "1739664000000-my-drawing_dxf",
-        "uploadedAt": "2026-02-16T00:00:00.000Z",
-        "sizeBytes": 1024
-      }
-    }
-  }
-}
-```
+**Response `201`:** Returns `resource` metadata with `reference.value` download URL.
+
+---
+
+### `PUT /api/project-files/upload`
+
+Update an existing uploaded file (replace file contents in Redis).
+
+**Content-Type:** `multipart/form-data`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `projectId` | `string` | Yes | Target project ID |
+| `folderKey` | `string` | Yes | Folder containing the file |
+| `fileName` | `string` | Yes | Stored filename to update |
+| `file` | `binary` | Yes | New file content |
+
+**Response `200`:** Returns updated `resource` metadata.
 
 ---
 
 ### `GET /api/project-files/download`
 
-Download a previously uploaded file.
+Download a previously uploaded file from Redis.
 
 | Query Param | Type | Required | Description |
 |-------------|------|----------|-------------|
 | `projectId` | `string` | Yes | Project ID |
 | `folderKey` | `string` | Yes | Folder key |
-| `fileName` | `string` | Yes | Stored filename (from upload response) |
+| `fileName` | `string` | Yes | Stored filename |
 
 **Response `200`:** Raw file content with appropriate MIME type and `Content-Disposition: inline`.
 
-**Response `404`:** `{ "error": "File not found." }`
+---
+
+### `DELETE /api/project-files/file`
+
+Delete a previously uploaded file.
+
+| Query Param | Type | Required | Description |
+|-------------|------|----------|-------------|
+| `projectId` | `string` | Yes | Project ID |
+| `folderKey` | `string` | Yes | Folder key |
+| `fileName` | `string` | Yes | Stored filename |
+
+**Response `200`:**
+```json
+{ "deleted": true }
+```
 
 ---
 
 ### `GET /api/project-files/list`
 
-List all uploaded files for a project.
+List uploaded files for a project, grouped by folder.
 
 | Query Param | Type | Required | Description |
 |-------------|------|----------|-------------|
@@ -443,9 +454,25 @@ List all uploaded files for a project.
   "files": [
     {
       "folderKey": "drawings",
-      "fileName": "1739664000000-my-drawing_dxf"
+      "fileName": "1739664000000-my-drawing.dxf",
+      "title": "my-drawing.dxf",
+      "sizeBytes": 1024,
+      "uploadedAt": "2026-02-16T00:00:00.000Z",
+      "updatedAt": "2026-02-16T00:00:00.000Z"
     }
-  ]
+  ],
+  "filesByFolder": {
+    "drawings": [
+      {
+        "folderKey": "drawings",
+        "fileName": "1739664000000-my-drawing.dxf",
+        "title": "my-drawing.dxf",
+        "sizeBytes": 1024,
+        "uploadedAt": "2026-02-16T00:00:00.000Z",
+        "updatedAt": "2026-02-16T00:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
 
