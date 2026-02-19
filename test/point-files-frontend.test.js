@@ -26,3 +26,16 @@ test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and 
   assert.match(html, /fetch\(buildProjectDrawingApiUrl\(projectId, drawingId\)\)/, 'EvidenceDesk should fetch drawing record by id before launch');
   assert.match(html, /localStorage\.setItem\(storageKey, JSON\.stringify\(drawing\)\)/, 'EvidenceDesk should hydrate localStorage with API drawing payload for LineSmith import');
 });
+
+
+test('PointForge renders code-group explorer with thumbnails and BoundaryLab handoff', async () => {
+  const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
+  assert.match(html, /Point Groups by Code/, 'PointForge should render a point-group explorer section.');
+  assert.match(html, /<h2><span class="sig"><\/span> Spatial HUD<\/h2>[\s\S]*<section class="pointGroupExplorer"[\s\S]*<div id="map">/, 'PointForge should render the point-group explorer above the map in Spatial HUD.');
+  assert.match(html, /function\s+buildPointGroupsFromRecords\(/, 'PointForge should build visual point groups from output records.');
+  assert.match(html, /function\s+buildLineworkThumbnailDataUrl\(/, 'PointForge should generate linework thumbnail previews for grouped codes.');
+  assert.match(html, /data:image\/svg\+xml;utf8,\$\{encodeURIComponent\(svg\)\}/, 'PointForge thumbnails should URL-encode SVG data URLs so preview <img> tags remain valid HTML.');
+  assert.match(html, /function\s+parseFieldToFinishDirective\(/, 'PointForge should parse field-to-finish directives to identify linework groupings.');
+  assert.match(html, /function\s+buildBoundaryLabCsvFromSegments\(/, 'PointForge should build BoundaryLab handoff payloads from selected groups/subgroups.');
+  assert.match(html, /openLinkedApp\(`\/BoundaryLab\.html\?source=pointforge/, 'PointForge group explorer should offer opening selected linework in BoundaryLab.');
+});
