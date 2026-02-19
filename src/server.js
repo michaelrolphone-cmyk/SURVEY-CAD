@@ -228,11 +228,15 @@ export function createSurveyServer({
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
   const lineforgeCollab = createLineforgeCollabService();
+  const fieldToFinishOverridePath = process.env.FIELD_TO_FINISH_OVERRIDE_PATH
+    ? path.resolve(process.env.FIELD_TO_FINISH_OVERRIDE_PATH)
+    : path.resolve(staticDir, 'data/field-to-finish-override.json');
   const fieldToFinishStore = new FieldToFinishStore({
     loadDefaultConfig: async () => {
       const absolutePath = path.resolve(staticDir, 'config/MLS.fld');
       return loadFldConfig(absolutePath);
     },
+    overrideFilePath: fieldToFinishOverridePath,
   });
   const localStorageSyncStoresByContext = new Map();
 

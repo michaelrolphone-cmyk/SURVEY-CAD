@@ -436,6 +436,8 @@ Base URL (local): `http://localhost:3000`
   - Upserts shared API override from JSON body `{ "config": { "columns": [...], "rules": [...] } }`.
 - `DELETE /api/field-to-finish`
   - Clears shared override and reverts all users/projects to the server default FLD file.
+- Shared API overrides are persisted to `data/field-to-finish-override.json` by default so saves survive restarts and remain visible to all users on subsequent sessions.
+- Set `FIELD_TO_FINISH_OVERRIDE_PATH=/absolute/path/to/override.json` before `npm start` to customize where shared FLD API overrides are stored.
 
 Returns parsed FLD data:
 

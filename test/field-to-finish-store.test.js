@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 import { FieldToFinishStore } from '../src/field-to-finish-store.js';
 
 const defaultConfig = {
@@ -36,4 +39,36 @@ test('FieldToFinishStore supports shared override CRUD lifecycle', async () => {
   assert.equal(cleared.source, 'server-default');
   assert.equal(cleared.hasOverride, false);
   assert.equal(cleared.config.rules[0].code, 'BDY');
+});
+
+
+test('FieldToFinishStore persists shared overrides to disk for cross-session visibility', async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'fld-store-'));
+  const overrideFilePath = path.join(tempDir, 'field-to-finish-override.json');
+
+  const firstStore = new FieldToFinishStore({
+    loadDefaultConfig: async () => defaultConfig,
+    overrideFilePath,
+  });
+
+  const putState = await firstStore.putOverride({
+    columns: [{ key: 'code', name: 'Code' }],
+    rules: [{ raw: { code: 'ROW' }, code: 'ROW', processingOn: true }],
+  });
+  assert.equal(putState.source, 'api-override');
+
+  const persistedRaw = await readFile(overrideFilePath, 'utf8');
+  const persisted = JSON.parse(persistedRaw);
+  assert.equal(persisted.overrideConfig.rules[0].code, 'ROW');
+
+  const secondStore = new FieldToFinishStore({
+    loadDefaultConfig: async () => defaultConfig,
+    overrideFilePath,
+  });
+  const loadedState = await secondStore.getState();
+  assert.equal(loadedState.hasOverride, true);
+  assert.equal(loadedState.config.rules[0].code, 'ROW');
+
+  await secondStore.deleteOverride();
+  await assert.rejects(stat(overrideFilePath), /ENOENT/);
 });
