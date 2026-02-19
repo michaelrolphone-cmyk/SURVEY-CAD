@@ -5650,9 +5650,15 @@ function paintBackground(ctx, w, h){
 
       const nextUpper = String(tokens[i + 1] ?? "").toUpperCase();
       if (nextUpper && directives.has(nextUpper) && !directives.has(tokenUpper)) {
-        const existing = sequentialByBaseCode.get(tokenUpper);
+        let directiveBaseCode = tokenUpper;
+        if (isCurveMarkerToken(tokenUpper)) {
+          const tokensUpper = tokens.map((token) => String(token ?? "").toUpperCase());
+          directiveBaseCode = resolveSequentialDirectiveBaseCode(tokensUpper, i + 1) || "";
+        }
+        if (!directiveBaseCode || isCurveMarkerToken(directiveBaseCode)) continue;
+        const existing = sequentialByBaseCode.get(directiveBaseCode);
         if (!existing || (directivePriority.get(nextUpper) ?? 99) < (directivePriority.get(existing.action) ?? 99)) {
-          sequentialByBaseCode.set(tokenUpper, { baseCode: tokenUpper, action: nextUpper });
+          sequentialByBaseCode.set(directiveBaseCode, { baseCode: directiveBaseCode, action: nextUpper });
         }
         i += 1;
         continue;
