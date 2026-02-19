@@ -875,6 +875,9 @@ test('VIEWPORT.HTML exposes an FLD editor with shared API save/reset, websocket 
 
   assert.match(html, /id="openFldEditor"/, 'LineSmith should expose a toolbar section button for opening the FLD editor');
   assert.match(html, /id="fldModal"/, 'LineSmith should render an FLD editor modal container');
+  assert.match(html, />Save to API<|Save to API/, 'FLD editor should label persistence actions as API saves, not local saves');
+  assert.match(html, />Download API FLD<|Download API FLD/, 'FLD editor downloads should be labeled as API FLD exports');
+  assert.doesNotMatch(html, />Save Local<|Save Local/, 'FLD editor should not present the legacy Save Local copy');
   assert.match(html, /const\s+FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY\s*=\s*"lineSmithFldSymbolSvgOverrides";/, 'LineSmith should keep symbol-to-SVG overrides in dedicated localStorage state');
   assert.doesNotMatch(html, /id="fldSymbolGallery"/, 'FLD editor should not include a separate symbol gallery region');
   assert.match(html, /function\s+loadSurveySymbolLibrary\(\)\s*\{[\s\S]*fetch\("\/assets\/survey-symbols\/index\.json"\)/, 'FLD editor should load survey SVG symbol manifest data for symbol mapping choices');
