@@ -53,6 +53,7 @@ import {
   findEquipmentLogById,
   saveCrewMember,
   saveEquipmentItem,
+  deleteEquipmentItem,
   saveEquipmentLog,
 } from './crew-equipment-api.js';
 
@@ -1444,8 +1445,29 @@ export function createSurveyServer({
           sendJson(res, 201, { equipment: item });
           return;
         }
+        if (req.method === 'DELETE') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id is required.' });
+            return;
+          }
+          const result = await deleteEquipmentItem(localStorageSyncStore, id);
+          if (!result) {
+            sendJson(res, 404, { error: 'Equipment not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true, id });
+          return;
+        }
         if (req.method !== 'GET') {
-          sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+          sendJson(res, 405, { error: 'Only GET, POST, and DELETE are supported.' });
           return;
         }
         const state = await resolveStoreState();

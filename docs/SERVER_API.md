@@ -631,6 +631,28 @@ Create or update an equipment item.
 
 ---
 
+### `DELETE /api/equipment?id=<equipmentId>`
+
+Delete a persisted equipment item by ID.
+
+| Query Param | Type | Required | Description |
+|-------------|------|----------|-------------|
+| `id` | `string` | Yes | Equipment item ID to remove |
+
+**Response `200`:**
+```json
+{
+  "deleted": true,
+  "id": "550e8400-e29b-41d4-a716-446655440001"
+}
+```
+
+**Response `400`:** `{ "error": "id is required." }`
+
+**Response `404`:** `{ "error": "Equipment not found." }`
+
+---
+
 ## Equipment Logs
 
 ### `GET /api/equipment-logs`
