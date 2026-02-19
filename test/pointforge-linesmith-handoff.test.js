@@ -25,15 +25,21 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.match(html, /recordsForOutput\s*=\s*localized\.recordsSorted;/, 'PointForge processing should substitute localized records when localization is enabled');
   assert.match(html, /function\s+transformPoints\(text\)/, 'PointForge processing pipeline should keep its original transform signature');
   assert.match(html, /function\s+renumberOutputFromStart\(startValue\)/, 'PointForge should define explicit output renumber helper');
+  assert.match(html, /id="outputActions"\s+class="row"\s+style="margin-top:10px;"\s+hidden/, 'PointForge should keep renumber controls hidden until output has been generated.');
+  assert.match(html, /<section class="panel outputArea" id="outputPanel">[\s\S]*id="outputActions"[\s\S]*id="btnRenumber"[\s\S]*id="renumberStart"/, 'PointForge should place renumber controls in the output stream panel.');
   assert.match(html, /elRenumber\.addEventListener\("click",\s*\(\)=>renumberOutputFromStart\(elRenumberStart\.value\)\);/, 'PointForge should only renumber when the renumber button is clicked');
+  assert.match(html, /function\s+updateOutputActionVisibility\(\)\s*\{[\s\S]*elOutputActions\.hidden\s*=\s*!hasOutput;/, 'PointForge should toggle output renumber action visibility based on processed output state.');
   assert.doesNotMatch(html, /transformPoints\(input,\s*\{\s*renumberStart\s*\}\)/, 'PointForge should not apply sequential renumbering during normal processing');
   assert.doesNotMatch(html, /sortable\.forEach\(\(r,\s*index\)=>\{[\s\S]*renumberStart/, 'PointForge transform should not force sequential renumbering by default');
   assert.match(html, /id="btnOpenLineSmith"/, 'PointForge should render the LineSmith handoff button');
+  assert.match(html, /id="btnDownload"/, 'PointForge should render a download action button');
   assert.match(html, /<div class="statusbar">[\s\S]*id="btnOpenLineSmith"\s+class="btn workflowPrimary workflowHeaderAction"/, 'PointForge should place the LineSmith workflow button in the upper-right status area as a primary action');
+  assert.match(html, /<div class="statusbar">[\s\S]*id="btnDownload"\s+class="btn secondary"[\s\S]*id="btnOpenLineSmith"/, 'PointForge should place Download in the top status bar next to Open in LineSmith.');
   assert.doesNotMatch(html, /G\/REF RENUMB \+ MAP PREVIEW/, 'PointForge should remove long header subtitle text so the mobile workflow action remains visible');
   assert.doesNotMatch(html, /NAD83 Idaho West map preview and point renumbering\./, 'PointForge should remove the secondary header copy that pushes the workflow action below the fold on mobile');
   assert.match(html, /@media \(max-width: 700px\)\{[\s\S]*\.workflowHeaderAction\{ margin-left: 0; width: 100%; \}/, 'PointForge mobile layout should stretch the workflow header action to remain visible');
   assert.doesNotMatch(html, /<div class="row" style="margin-top:10px;">[\s\S]*id="btnOpenLineSmith"/, 'PointForge should not keep the LineSmith handoff button in the lower ingest controls row');
+  assert.doesNotMatch(html, /<div class="row" style="margin-top:10px;">[\s\S]*id="btnDownload"/, 'PointForge should not keep the Download button in lower ingest controls row.');
   assert.match(html, /const\s+SURVEY_SKETCH_IMPORT_STORAGE_KEY\s*=\s*"lineSmithPointforgeImport"/, 'PointForge should use a stable localStorage key for handoff');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'PointForge should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*"survey-cad:navigate-app"[\s\S]*path,/, 'PointForge should notify launcher iframe host to navigate embedded app');
@@ -139,7 +145,8 @@ test('POINT_TRANSFORMER.HTML moves datum and pipeline chips below the map and re
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
 
   assert.doesNotMatch(html, /SYSTEM:\s*ONLINE/, 'PointForge should not render the system online status chip');
-  assert.match(html, /<div id="map"><\/div>[\s\S]*?<div class="hint" id="mapHint">[\s\S]*?<div class="mapMetaRow">[\s\S]*?DATUM:\s*<span class="mono">NAD83 \(NO_TRANS\)<\/span>[\s\S]*?PIPELINE:\s*<span class="mono">PARSE → RENUMB → SORT → PLOT<\/span>/, 'PointForge should render datum and pipeline chips below the map');
+  assert.match(html, /<div id="map"><\/div>[\s\S]*?<div class="hint" id="mapHint">[\s\S]*?<div class="mapMetaRow">[\s\S]*?DATUM:\s*<span class="mono">NAD83 \(NO_TRANS\)<\/span>[\s\S]*?BASEMAP:[\s\S]*?id="basemap"[\s\S]*?PIPELINE:\s*<span class="mono">PARSE → RENUMB → SORT → PLOT<\/span>/, 'PointForge should render datum, basemap selector, and pipeline chips below the map');
+  assert.doesNotMatch(html, /Map defaults:/, 'PointForge should hide the map-defaults pill from ingest controls.');
 });
 test('POINT_TRANSFORMER.HTML omits internal default-lock and passthrough commentary copy', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
