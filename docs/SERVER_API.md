@@ -388,7 +388,7 @@ Create a new uploaded file in EvidenceDesk project storage.
 
 **Valid `folderKey` values:** `drawings`, `ros`, `cpfs`, `point-files`, `deeds`, `plats`, `invoices`, `other`
 
-**Response `201`:** Returns `resource` metadata with `reference.value` download URL.
+**Response `201`:** Returns `resource` metadata with `reference.value` download URL. Image uploads also include `reference.metadata.thumbnailUrl`, pointing to a generated 512px-wide PNG preview.
 
 **Response `413`:** Returned immediately when `Content-Length` exceeds the 50 MB upload limit.
 
@@ -407,7 +407,7 @@ Update an existing uploaded file (replace file contents in Redis).
 | `fileName` | `string` | Yes | Stored filename to update |
 | `file` | `binary` | Yes | New file content |
 
-**Response `200`:** Returns updated `resource` metadata.
+**Response `200`:** Returns updated `resource` metadata. Image updates regenerate `reference.metadata.thumbnailUrl` previews.
 
 **Response `413`:** Returned immediately when `Content-Length` exceeds the 50 MB upload limit.
 
@@ -424,6 +424,23 @@ Download a previously uploaded file from Redis.
 | `fileName` | `string` | Yes | Stored filename |
 
 **Response `200`:** Raw file content with appropriate MIME type and `Content-Disposition: inline`.
+
+
+---
+
+### `GET /api/project-files/image-thumbnail`
+
+Download a generated thumbnail for an uploaded image file.
+
+| Query Param | Type | Required | Description |
+|-------------|------|----------|-------------|
+| `projectId` | `string` | Yes | Project ID |
+| `folderKey` | `string` | Yes | Folder key |
+| `fileName` | `string` | Yes | Stored filename |
+
+**Response `200`:** PNG thumbnail (`image/png`) generated at upload/update time with a 512px width target.
+
+**Response `404`:** Thumbnail not found (non-image upload or missing file).
 
 ---
 

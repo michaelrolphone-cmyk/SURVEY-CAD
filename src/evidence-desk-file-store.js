@@ -4,6 +4,10 @@ function sanitizeSegment(value = '') {
   return String(value || '').replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
+function buildImageThumbnailPath(projectId, folderKey, storedName) {
+  return `/api/project-files/image-thumbnail?projectId=${encodeURIComponent(projectId)}&folderKey=${encodeURIComponent(folderKey)}&fileName=${encodeURIComponent(storedName)}`;
+}
+
 function buildResource({ projectId, folderKey, record }) {
   return {
     id: record.id,
@@ -20,6 +24,7 @@ function buildResource({ projectId, folderKey, record }) {
         uploadedAt: record.createdAt,
         updatedAt: record.updatedAt,
         sizeBytes: record.sizeBytes,
+        thumbnailUrl: record.thumbnailBase64 ? buildImageThumbnailPath(projectId, folderKey, record.storedName) : null,
       },
     },
   };
@@ -34,7 +39,7 @@ export class InMemoryEvidenceDeskFileStore {
     return `${projectId}::${folderKey}::${fileName}`;
   }
 
-  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType }) {
+  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
     const timestamp = Date.now();
     const storedName = `${timestamp}-${sanitizeSegment(originalFileName)}`;
     const id = `upload-${sanitizeSegment(originalFileName.replace(/\.[^.]+$/, '')).replace(/_/g, '-')}-${timestamp}`;
@@ -51,6 +56,8 @@ export class InMemoryEvidenceDeskFileStore {
       createdAt: now,
       updatedAt: now,
       dataBase64: Buffer.from(buffer).toString('base64'),
+      thumbnailBase64: thumbnailBuffer ? Buffer.from(thumbnailBuffer).toString('base64') : null,
+      thumbnailMimeType: thumbnailMimeType || null,
     };
     this.records.set(this.key(projectId, folderKey, storedName), record);
     return buildResource({ projectId, folderKey, record });
@@ -62,10 +69,11 @@ export class InMemoryEvidenceDeskFileStore {
     return {
       ...record,
       buffer: Buffer.from(record.dataBase64, 'base64'),
+      thumbnailBuffer: record.thumbnailBase64 ? Buffer.from(record.thumbnailBase64, 'base64') : null,
     };
   }
 
-  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType }) {
+  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
     const existing = await this.getFile(projectId, folderKey, fileName);
     if (!existing) return null;
     const updatedAt = new Date().toISOString();
@@ -77,7 +85,10 @@ export class InMemoryEvidenceDeskFileStore {
       sizeBytes: buffer.length,
       updatedAt,
       dataBase64: Buffer.from(buffer).toString('base64'),
+      thumbnailBase64: thumbnailBuffer ? Buffer.from(thumbnailBuffer).toString('base64') : null,
+      thumbnailMimeType: thumbnailMimeType || null,
     };
+    delete record.thumbnailBuffer;
     this.records.set(this.key(projectId, folderKey, fileName), record);
     return buildResource({ projectId, folderKey, record });
   }
@@ -121,11 +132,15 @@ export class RedisEvidenceDeskFileStore {
     return `${this.prefix}:bin:${projectId}:${folderKey}:${fileName}`;
   }
 
+  thumbnailBinaryKey(projectId, folderKey, fileName) {
+    return `${this.prefix}:thumb:${projectId}:${folderKey}:${fileName}`;
+  }
+
   folderIndexKey(projectId, folderKey) {
     return `${this.prefix}:index:${projectId}:${folderKey}`;
   }
 
-  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType }) {
+  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
     const timestamp = Date.now();
     const storedName = `${timestamp}-${sanitizeSegment(originalFileName)}`;
     const id = `upload-${sanitizeSegment(originalFileName.replace(/\.[^.]+$/, '')).replace(/_/g, '-')}-${timestamp}`;
@@ -141,31 +156,36 @@ export class RedisEvidenceDeskFileStore {
       sizeBytes: buffer.length,
       createdAt: now,
       updatedAt: now,
+      thumbnailMimeType: thumbnailMimeType || null,
     };
 
-    await this.redis.multi()
+    const write = this.redis.multi()
       .set(this.metadataKey(projectId, folderKey, storedName), JSON.stringify(record))
       .set(this.binaryKey(projectId, folderKey, storedName), Buffer.from(buffer).toString('base64'))
-      .sAdd(this.folderIndexKey(projectId, folderKey), storedName)
-      .exec();
+      .sAdd(this.folderIndexKey(projectId, folderKey), storedName);
+    if (thumbnailBuffer) write.set(this.thumbnailBinaryKey(projectId, folderKey, storedName), Buffer.from(thumbnailBuffer).toString('base64'));
+    await write.exec();
 
     return buildResource({ projectId, folderKey, record });
   }
 
   async getFile(projectId, folderKey, fileName) {
-    const [meta, dataBase64] = await Promise.all([
+    const [meta, dataBase64, thumbnailBase64] = await Promise.all([
       this.redis.get(this.metadataKey(projectId, folderKey, fileName)),
       this.redis.get(this.binaryKey(projectId, folderKey, fileName)),
+      this.redis.get(this.thumbnailBinaryKey(projectId, folderKey, fileName)),
     ]);
     if (!meta || !dataBase64) return null;
     const record = JSON.parse(meta);
     return {
       ...record,
       buffer: Buffer.from(dataBase64, 'base64'),
+      thumbnailBuffer: thumbnailBase64 ? Buffer.from(thumbnailBase64, 'base64') : null,
+      thumbnailBase64: thumbnailBase64 || null,
     };
   }
 
-  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType }) {
+  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
     const existing = await this.getFile(projectId, folderKey, fileName);
     if (!existing) return null;
     const record = {
@@ -175,14 +195,22 @@ export class RedisEvidenceDeskFileStore {
       mimeType: mimeType || existing.mimeType,
       sizeBytes: buffer.length,
       updatedAt: new Date().toISOString(),
+      thumbnailMimeType: thumbnailMimeType || null,
     };
     delete record.buffer;
+    delete record.thumbnailBuffer;
+    delete record.thumbnailBase64;
 
-    await this.redis.multi()
+    const write = this.redis.multi()
       .set(this.metadataKey(projectId, folderKey, fileName), JSON.stringify(record))
       .set(this.binaryKey(projectId, folderKey, fileName), Buffer.from(buffer).toString('base64'))
-      .sAdd(this.folderIndexKey(projectId, folderKey), fileName)
-      .exec();
+      .sAdd(this.folderIndexKey(projectId, folderKey), fileName);
+    if (thumbnailBuffer) {
+      write.set(this.thumbnailBinaryKey(projectId, folderKey, fileName), Buffer.from(thumbnailBuffer).toString('base64'));
+    } else {
+      write.del(this.thumbnailBinaryKey(projectId, folderKey, fileName));
+    }
+    await write.exec();
 
     return buildResource({ projectId, folderKey, record: { ...record, storedName: fileName } });
   }
@@ -191,6 +219,7 @@ export class RedisEvidenceDeskFileStore {
     const removed = await this.redis.multi()
       .del(this.metadataKey(projectId, folderKey, fileName))
       .del(this.binaryKey(projectId, folderKey, fileName))
+      .del(this.thumbnailBinaryKey(projectId, folderKey, fileName))
       .sRem(this.folderIndexKey(projectId, folderKey), fileName)
       .exec();
     return Array.isArray(removed) && removed.some((entry) => Number(entry?.[1] || 0) > 0);
