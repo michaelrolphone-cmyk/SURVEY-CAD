@@ -683,10 +683,13 @@
 
     function openPdfInNewWindow(pdfUrl) {
       if (!pdfUrl) return;
-      const popup = window.open(pdfUrl, '_blank', 'popup=yes,width=1200,height=900,noopener,noreferrer');
+      const popup = window.open('', '_blank', 'popup=yes,width=1200,height=900');
       if (!popup) {
         renderError('Your browser blocked the PDF window. Please allow pop-ups and try again.');
+        return;
       }
+      popup.opener = null;
+      popup.location.replace(pdfUrl);
     }
 
     function getPdfPreviewUrl(folder, entry) {

@@ -255,7 +255,8 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /function\s+getCpfPdfUrl\s*\(/, 'Project Browser should include a CP&F PDF URL resolver helper');
   assert.match(projectBrowserHtml, /const\s+proxyUrl\s*=\s*new URL\('\/api\/ros-pdf', window\.location\.origin\)/, 'Project Browser should route CP&F opens through the PDF proxy endpoint');
   assert.match(projectBrowserHtml, /function\s+openCpfPdfFromResource\s*\(/, 'Project Browser should include a CP&F open handler');
-  assert.match(projectBrowserHtml, /window\.open\(pdfUrl, '_blank', 'popup=yes,width=1200,height=900,noopener,noreferrer'\)/, 'Project Browser should open CP&F PDFs in a new tab/window');
+  assert.match(projectBrowserHtml, /window\.open\('', '_blank', 'popup=yes,width=1200,height=900'\)/, 'Project Browser should open CP&F PDFs in a dedicated popup window shell before navigating to the PDF');
+  assert.match(projectBrowserHtml, /popup\.location\.replace\(pdfUrl\)/, 'Project Browser should navigate popup windows using location.replace to avoid stale about:blank history entries');
   assert.match(projectBrowserHtml, /const\s+canOpenCpfPdf\s*=\s*folder\.key\s*===\s*'cpfs'\s*&&\s*entry\?\.exportFormat\s*===\s*'pdf'/, 'Project Browser should detect CP&F pdf entries as openable');
   assert.match(projectBrowserHtml, /async\s+function\s+attachPdfPreview\s*\(/, 'Project Browser should lazily load PDF thumbnails asynchronously');
   assert.match(projectBrowserHtml, /\/api\/project-files\/pdf-thumbnail/, 'Project Browser should request server-cached PDF thumbnails');
