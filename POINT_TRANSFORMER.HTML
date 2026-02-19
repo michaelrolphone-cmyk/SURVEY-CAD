@@ -311,49 +311,7 @@
       .workflowHeaderAction{ margin-left: 0; width: 100%; }
     }
 
-    .stats{
-      margin-top: 10px;
-      border-top: 1px solid var(--line2);
-      padding-top: 10px;
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .stat{
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(8,10,16,.55);
-      padding: 10px 12px;
-      box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
-    }
-    .stat .k{
-      font-size: 11px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .8px;
-      margin-bottom: 6px;
-    }
-    .stat .v{
-      font-family: var(--mono);
-      font-size: 14px;
-      color: var(--text);
-      display:flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .stat .v .glow{ color: #dbe5ff; }
-
-    .log{
-      margin-top: 10px;
-      border-top: 1px solid var(--line2);
-      padding-top: 10px;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: rgba(138,164,194,.95);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
+    .log{ display:none; }
     .ok{ color: var(--c3); }
     .warn{ color: var(--warn); }
     .bad{ color: var(--bad); }
@@ -387,6 +345,9 @@
       gap: 14px;
     }
     .outputArea{ min-height: 320px; }
+    main.pointEditorFocusOutput .right{ grid-template-rows: 1fr; }
+    main.pointEditorFocusOutput .right > .panel:first-child{ display:none; }
+    main.pointEditorFocusOutput .outputArea{ min-height: 700px; }
 
     .kbd{
       font-family: var(--mono);
@@ -551,34 +512,7 @@
           </div>
         </div>
 
-        <div class="stats" hidden>
-          <div class="stat">
-            <div class="k">Input lines</div>
-            <div class="v"><span id="st_lines" class="glow">—</span><span class="mono">ln</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">Parsed points</div>
-            <div class="v"><span id="st_parsed" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">G renumbered</div>
-            <div class="v"><span id="st_g" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">REF renumbered</div>
-            <div class="v"><span id="st_ref" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">Map plotted</div>
-            <div class="v"><span id="st_map" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">Active zone</div>
-            <div class="v"><span id="st_zone" class="glow">W</span><span class="mono">ID</span></div>
-          </div>
-        </div>
-
-        <div class="log" id="log" hidden></div>
+        <div class="log" id="log"></div>
       </div>
     </section>
 
@@ -1750,6 +1684,7 @@
     }
 
     function setStats(stats, plottedCount){
+      if (!st_lines || !st_parsed || !st_g || !st_ref || !st_map || !st_zone) return;
       st_lines.textContent = String(stats.totalLines ?? 0);
       st_parsed.textContent = String(stats.parsedCount ?? 0);
       st_g.textContent = String(stats.gCount ?? 0);
