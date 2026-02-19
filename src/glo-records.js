@@ -142,10 +142,12 @@ export function parseGloDocumentListHtml(html = '', originUrl = 'https://gloreco
     const absolute = new URL(href, origin);
     if (!['http:', 'https:'].includes(absolute.protocol)) continue;
     if (absolute.hostname !== origin.hostname) continue;
+    if (/(?:\bhelp\b|\boverview\b|\bglossary\b|referencecenter|reference\/)/i.test(absolute.pathname)) continue;
 
     const title = stripHtml(rawTitle);
     if (!title) continue;
     if (/^search\b/i.test(title)) continue;
+    if (/(?:\bhelp\b|\boverview\b|\bglossary\b|reference\s+center)/i.test(title)) continue;
 
     const absoluteUrl = absolute.toString();
     if (!/(details|document|image|patent|survey|tract|serial|plat)/i.test(absoluteUrl)) continue;
@@ -155,7 +157,6 @@ export function parseGloDocumentListHtml(html = '', originUrl = 'https://gloreco
     const contextEnd = Math.min(normalizedHtml.length, matchIndex + String(match[0] || '').length + 180);
     const details = stripHtml(normalizedHtml.slice(contextStart, contextEnd));
     const rowText = details || title;
-
     if (!/(patent|survey|tract|plat|serial|land|document|record)/i.test(rowText)) continue;
 
     const key = `${title}|${absoluteUrl}`;

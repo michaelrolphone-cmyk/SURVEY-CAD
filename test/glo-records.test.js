@@ -108,3 +108,22 @@ test('parseGloDocumentListHtml ignores javascript and off-site links from search
   assert.equal(docs[0].title, 'Patent 123');
   assert.equal(docs[0].url, 'https://glorecords.blm.gov/details/patent/default.aspx?id=123');
 });
+
+test('parseGloDocumentListHtml excludes reference center overview links and keeps record details links', () => {
+  const html = `
+    <div>
+      <p>Available documents</p>
+      <p>Found 3 documents.</p>
+      <a href="/referencecenter/patentsearch">Patent Search Overview</a>
+      <a href="/referencecenter/surveysearch">Survey Search Overview</a>
+      <a href="/referencecenter/tractbooksearch">Tract Book Search Overview</a>
+      <a href="/details/survey/default.aspx?id=789">Survey Plat 789</a>
+      <span>Land survey record for township and range.</span>
+    </div>
+  `;
+
+  const docs = parseGloDocumentListHtml(html, 'https://glorecords.blm.gov/search/default.aspx');
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].title, 'Survey Plat 789');
+  assert.equal(docs[0].url, 'https://glorecords.blm.gov/details/survey/default.aspx?id=789');
+});
