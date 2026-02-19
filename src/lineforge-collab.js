@@ -454,4 +454,4 @@ export function createLineforgeCollabService() {
   };
 }
 
-export const lineforgeCollabInternals = { decodeFrame, encodeTextFrame, createWebSocketAccept, USER_COLORS, LOCK_TIMEOUT_MS, LOCK_SWEEP_INTERVAL_MS };
+export const lineforgeCollabInternals = { decodeFrame, decodeNextFrame, encodeTextFrame, createWebSocketAccept, USER_COLORS, LOCK_TIMEOUT_MS, LOCK_SWEEP_INTERVAL_MS };

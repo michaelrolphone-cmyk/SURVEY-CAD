@@ -46,6 +46,24 @@ function clientFrame(payload) {
   return Buffer.concat([header, mask, masked]);
 }
 
+
+function clientTextFrame(text) {
+  const data = Buffer.from(String(text), 'utf8');
+  const mask = Buffer.from([9, 8, 7, 6]);
+  let header;
+  if (data.length < 126) {
+    header = Buffer.from([0x81, 0x80 | data.length]);
+  } else {
+    header = Buffer.allocUnsafe(4);
+    header[0] = 0x81;
+    header[1] = 0x80 | 126;
+    header.writeUInt16BE(data.length, 2);
+  }
+  const masked = Buffer.allocUnsafe(data.length);
+  for (let i = 0; i < data.length; i += 1) masked[i] = data[i] ^ mask[i % 4];
+  return Buffer.concat([header, mask, masked]);
+}
+
 function parseServerTextMessage(socket, index = -1) {
   const chunk = index < 0 ? socket.writes.at(index) : socket.writes[index];
   const frame = lineforgeCollabInternals.decodeFrame(chunk);
@@ -197,3 +215,50 @@ test('localstorage sync websocket supports async store methods', async () => {
   assert.equal(applied.state.version, 2);
   assert.equal(applied.state.checksum, 'next');
 });
+
+test('localstorage sync websocket buffers fragmented websocket frames', async () => {
+  const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
+  const service = createLocalStorageSyncWsService({ store });
+  const socket = new FakeSocket();
+
+  service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'kf==' } }, socket);
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const welcome = parseServerTextMessage(socket, 1);
+
+  const frame = clientFrame({
+    type: 'sync-differential',
+    requestId: 'frag-1',
+    baseChecksum: welcome.state.checksum,
+    operations: [{ type: 'set', key: 'beta', value: '2' }],
+  });
+
+  socket.emit('data', frame.subarray(0, 3));
+  socket.emit('data', frame.subarray(3));
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const applied = parseServerTextMessage(socket);
+  assert.equal(applied.type, 'sync-differential-applied');
+  assert.equal(store.getState().snapshot.beta, '2');
+});
+
+
+test('localstorage sync websocket ignores non-JSON text frames', async () => {
+  const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
+  const service = createLocalStorageSyncWsService({ store });
+  const socket = new FakeSocket();
+
+  service.handleUpgrade({ url: '/ws/localstorage-sync', headers: { upgrade: 'websocket', 'sec-websocket-key': 'kg==' } }, socket);
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const writesBefore = socket.writes.length;
+
+  socket.emit('data', clientTextFrame('------multipart-boundary\r\nContent-Type: application/octet-stream'));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(socket.destroyed, false);
+  assert.equal(socket.writable, true);
+  assert.equal(socket.writes.length, writesBefore);
+  assert.deepEqual(store.getState().snapshot, { alpha: '1' });
+});
+
