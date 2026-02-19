@@ -19,6 +19,8 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /async function\s+renameResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a rename helper for project resources');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
+  assert.match(html, /const\s+isPointFileFormat\s*=\s*pointFileFormat\s*===\s*'csv'\s*\|\|\s*pointFileFormat\s*===\s*'txt';/, 'EvidenceDesk should only launch PointForge for point-file formats.');
+  assert.match(html, /const\s+canLaunchPointForge\s*=\s*folder\.key\s*===\s*'point-files'[\s\S]*isPointFileFormat/, 'EvidenceDesk should gate PointForge launch behavior behind point-file format checks.');
 });
 
 test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and launch hydration', async () => {
@@ -37,7 +39,15 @@ test('EvidenceDesk file rows prioritize configured names and truncate actual fil
   const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
   assert.match(html, /\.file-name-configured\s*\{[\s\S]*color:\s*#f8fafc;[\s\S]*font-weight:\s*600;/, 'EvidenceDesk should render configured names in brighter text.');
   assert.match(html, /\.file-name-actual\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/, 'EvidenceDesk should truncate long actual file names with ellipsis.');
+  assert.match(html, /const\s+leadingIcon\s*=\s*isPdfResource\s*\?\s*'<span class="pdf-preview-icon" aria-label="PDF preview icon">PDF<\/span>'\s*:\s*'<span class="icon">📄<\/span>';/, 'EvidenceDesk should render a visible PDF preview icon for PDF resources.');
   assert.match(html, /<span class="file-name-configured">\$\{configuredFileName\}<\/span><span class="file-name-actual" title="\$\{actualFileName\}">— \$\{actualFileName\}<\/span>/, 'EvidenceDesk should display configured file name first and actual file name after it.');
+});
+
+test('EvidenceDesk opens PDFs in dedicated browser windows', async () => {
+  const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+  assert.match(html, /function\s+openPdfInNewWindow\(pdfUrl\)\s*\{[\s\S]*window\.open\(pdfUrl,\s*'_blank',\s*'popup=yes,width=1200,height=900,noopener,noreferrer'\)/, 'EvidenceDesk should open PDFs in a popup-sized browser window rather than generic tab behavior.');
+  assert.match(html, /openPdfInNewWindow\(pdfUrl\);/, 'EvidenceDesk CP&F open actions should route through shared PDF window helper.');
+  assert.match(html, /if\s*\(isServerPdf\)\s*\{[\s\S]*openPdfInNewWindow\(downloadUrl\);/, 'EvidenceDesk uploaded PDF resources should also open in a new browser window.');
 });
 
 
