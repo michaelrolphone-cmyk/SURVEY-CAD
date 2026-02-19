@@ -223,7 +223,7 @@ LineSmith parses field-to-finish tokens from point codes and can auto-generate g
 
 LineSmith now renders configured survey symbol SVGs directly as map point markers when a point code maps to an FLD symbol rule (`entity_type = 0`) with `symbol_name_2` set. SVG markers are tinted to the active point layer color using the SVG symbol footprint (so the symbol shape is shaded without flooding the full marker square). To keep symbol linework readable, LineSmith now draws a bolded symbol pass and renders SVG markers at a corrected 30px footprint (right-sized from the prior oversized 60px render). When no SVG mapping is found (or while the SVG is still loading), LineSmith falls back to the existing `x` marker. LineSmith now also re-renders automatically as soon as each SVG symbol asset finishes loading, so mapped symbols appear on the first drawing open without requiring a manual pan/zoom refresh. Symbol assets are proactively preloaded when FLD rules are applied, and failed symbol image cache entries are retried on later draws to avoid intermittent missing markers after opening LineSmith.
 
-FLD Manager local edits now persist SVG mapping selections both as symbol-name overrides and in the active FLD row mapping columns, so **Save Local** keeps new code mappings stable and point markers update immediately after saving.
+FLD Manager edits now persist SVG mapping selections both as symbol-name overrides and in the active FLD row mapping columns, so **Save to API** keeps new code mappings stable and point markers update immediately after saving.
 
 Mapped symbol previews are now reused across editing/search surfaces so the same SVG shows up in quick search results, Points Manager rows (next to point numbers), Add/Edit point panel preview row, point-cluster tooltip rows, and as a profile-style badge in the point inspector for the selected point.
 
@@ -451,8 +451,8 @@ LineSmith (`VIEWPORT.HTML`) now also includes an FLD editor workflow:
 - For each row, choose **Entity** as **Linework**, **2D Polyline (Linework)**, or **Symbol**.
   - **Linework** and **2D Polyline** rows can pick a FLD `Linetype` value from existing line types in the loaded config; line entities default to FLD `Symbol` = `SPT10` and do not expose symbol SVG options.
   - **Symbol** rows can set FLD `Symbol` to the symbol name used by your code set (for example `SPT10`), then choose the mapped SVG from a dropdown + preview picker so you can visually confirm the symbol before saving, and set FLD `Symbol Size` scale. SVG mappings are stored separately in browser local storage as `Symbol -> SVG` overrides and are not written back into FLD columns.
-- Click **Save Local** to push a shared API override that applies to every user/project and immediately apply those rules to auto linework/layer behavior.
-- Click **Download Local FLD** (panel button or modal button) to export the active shared override/effective FLD config as an `.fld` file.
+- Click **Save to API** to push a shared API override that applies to every user/project and immediately apply those rules to auto linework/layer behavior.
+- Click **Download API FLD** (panel button or modal button) to export the active shared override/effective FLD config as an `.fld` file.
 - Click **Download Current FLD** to export the currently-loaded editor state.
 - Click **Reset to Server** to clear the shared API override and restore the server-sourced FLD file for everyone.
 
