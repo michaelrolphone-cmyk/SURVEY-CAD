@@ -37,6 +37,11 @@ import {
   listProjectTraverses,
   upsertProjectTraverseRecord,
 } from './project-workbench.js';
+import {
+  hydrateBoundaryLabTraverseCalls,
+  normalizeBoundaryLabCalls,
+  persistBoundaryLabTraverseCalls,
+} from './project-workbench-traverse-calls.js';
 
 import { loadFldConfig } from './fld-config.js';
 import {
@@ -1099,7 +1104,12 @@ export function createSurveyServer({
             return;
           }
           const casefile = await bew.store.getCasefile(selected.casefileId);
-          const traverse = await bew.store.getTraverseConfig(selected.casefileId);
+          const rawTraverse = await bew.store.getTraverseConfig(selected.casefileId);
+          const traverse = await hydrateBoundaryLabTraverseCalls({
+            store: bew.store,
+            casefileId: selected.casefileId,
+            traverse: rawTraverse,
+          });
           sendJson(res, 200, {
             projectId,
             traverseId: selected.traverseId,
@@ -1123,12 +1133,7 @@ export function createSurveyServer({
             : Array.isArray(body?.traverse?.calls)
               ? body.traverse.calls
               : [];
-          const normalizedCalls = inputCalls
-            .map((call) => ({
-              bearing: String(call?.bearing || ''),
-              distance: Number(call?.distance),
-            }))
-            .filter((call) => call.bearing && Number.isFinite(call.distance));
+          const normalizedCalls = normalizeBoundaryLabCalls(inputCalls);
 
           const traversePayload = {
             start: {
@@ -1156,6 +1161,13 @@ export function createSurveyServer({
             casefileId = casefile.id;
           }
 
+          const traverseCallIds = await persistBoundaryLabTraverseCalls({
+            store: bew.store,
+            casefileId,
+            calls: normalizedCalls,
+          });
+          traversePayload.calls = traverseCallIds;
+
           await bew.store.updateTraverseConfig(casefileId, traversePayload);
           const result = await upsertProjectTraverseRecord(localStorageSyncStore, projectId, {
             traverseId: String(body?.traverseId || casefileId),
@@ -1173,7 +1185,12 @@ export function createSurveyServer({
             requestId: null,
           });
 
-          const traverse = await bew.store.getTraverseConfig(casefileId);
+          const rawTraverse = await bew.store.getTraverseConfig(casefileId);
+          const traverse = await hydrateBoundaryLabTraverseCalls({
+            store: bew.store,
+            casefileId,
+            traverse: rawTraverse,
+          });
           sendJson(res, body?.casefileId ? 200 : 201, {
             projectId,
             traverseId: result.traverse?.traverseId,

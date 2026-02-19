@@ -226,6 +226,7 @@ BoundaryLab can now save and reopen named traverses for a project by using proje
 - `GET /api/projects/:projectId/workbench/traverses` – list saved traverses in the project.
 - `GET /api/projects/:projectId/workbench/traverses/:traverseId` – load one saved traverse for editing.
 - `POST /api/projects/:projectId/workbench/traverses` – create or update a named traverse.
+- Traverse calls are now persisted into BEW extraction-backed storage and rehydrated as `{ bearing, distance }` objects when loading a traverse, so saved BoundaryLab call rows reopen intact.
 
 CLI/server commands for this workflow:
 
