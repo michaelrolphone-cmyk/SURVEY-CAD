@@ -20,6 +20,10 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
   assert.match(html, /const\s+isPointFileFormat\s*=\s*pointFileFormat\s*===\s*'csv'\s*\|\|\s*pointFileFormat\s*===\s*'txt';/, 'EvidenceDesk should only launch PointForge for point-file formats.');
+  assert.match(html, /import\s*\{\s*renderPointFileThumbnailDataUrl\s*\}\s*from\s*'\.\/src\/point-thumbnail-client\.js'/, 'EvidenceDesk should import the shared point thumbnail client.');
+  assert.match(html, /async function\s+attachPointFilePreview\(/, 'EvidenceDesk should define a point-file preview hydration helper.');
+  assert.match(html, /renderPointFileThumbnailDataUrl\(text,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render point file thumbnails through the shared client library.');
+  assert.match(html, /className\s*=\s*'point-file-preview-thumb'/, 'EvidenceDesk should render point file thumbnail images in file rows.');
   assert.match(html, /const\s+canLaunchPointForge\s*=\s*folder\.key\s*===\s*'point-files'[\s\S]*isPointFileFormat/, 'EvidenceDesk should gate PointForge launch behavior behind point-file format checks.');
 });
 
@@ -60,6 +64,8 @@ test('PointForge renders code-group explorer with thumbnails and BoundaryLab han
   assert.match(html, /const\s+codeToken\s*=\s*getPointGroupCodeToken\(codeRaw\);[\s\S]*const\s+codeKey\s*=\s*codeToken\s*\|\|\s*"UNCODED";/, 'PointForge code grouping should use the first code token and fallback uncoded records.');
   assert.match(html, /function\s+buildLineworkThumbnailDataUrl\(/, 'PointForge should generate linework thumbnail previews for grouped codes.');
   assert.match(html, /data:image\/svg\+xml;utf8,\$\{encodeURIComponent\(svg\)\}/, 'PointForge thumbnails should URL-encode SVG data URLs so preview <img> tags remain valid HTML.');
+  assert.match(html, /const\s+pointThumbnailClient\s*=\s*window\.SurveyCadPointThumbnailClient\s*\|\|\s*null;/, 'PointForge should initialize the shared thumbnail client from window scope.');
+  assert.match(html, /if\s*\(pointThumbnailClient\?\.parseFieldToFinishDirective\)/, 'PointForge should delegate field-to-finish directive parsing to the shared client.');
   assert.match(html, /function\s+parseFieldToFinishDirective\(/, 'PointForge should parse field-to-finish directives to identify linework groupings.');
   assert.match(html, /function\s+buildBoundaryLabCsvFromSegments\(/, 'PointForge should build BoundaryLab handoff payloads from selected groups/subgroups.');
   assert.match(html, /openLinkedApp\(`\/BoundaryLab\.html\?source=pointforge/, 'PointForge group explorer should offer opening selected linework in BoundaryLab.');
@@ -71,7 +77,7 @@ test('PointForge auto-focuses transformed point editor accordion and hides stats
   assert.match(html, /<section class="leftStack">[\s\S]*<div class="localizationPanel">[\s\S]*<section class="panel" id="ingestPanel">/, 'PointForge should place localization controls above the ingest console panel.');
   assert.match(html, /<section class="leftStack">[\s\S]*<div class="accordionStack">[\s\S]*<section class="panel" id="ingestPanel">[\s\S]*<section class="panel outputArea" id="outputPanel">/, 'PointForge should place ingest and output panels in a dedicated accordion stack below localization controls.');
   assert.match(html, /\.accordionStack\{\s*position:relative;\s*min-height:\s*780px;\s*\}/, 'PointForge should anchor accordion overlays inside a relative accordion stack container.');
-  assert.match(html, /#outputPanel\{[\s\S]*position:absolute;[\s\S]*opacity:0;[\s\S]*transform:\s*translateX\(24px\);/, 'PointForge should keep output panel hidden and offset until accordion output mode activates.');
+  assert.match(html, /#outputPanel\{[\s\S]*position:relative;[\s\S]*transition:\s*transform \.25s ease, opacity \.2s ease;/, 'PointForge should define the output panel base state for accordion transitions.');
   assert.match(html, /main\.pointEditorFocusOutput\s+#outputPanel\{[\s\S]*opacity:1;[\s\S]*left:\s*56px;/, 'PointForge should slide output panel in over input points when output accordion is active.');
   assert.match(html, /main\.pointEditorFocusOutput\s+#ingestPanel\s*\{[\s\S]*width:56px;/, 'PointForge should collapse ingest panel to a narrow accordion rail when output is shown.');
   assert.match(html, /main\.pointEditorFocusInput\s+#outputPanel\s*\{[\s\S]*width:56px;/, 'PointForge should keep output as a narrow rail when input stream is active so users can switch back.');
@@ -84,4 +90,12 @@ test('PointForge auto-focuses transformed point editor accordion and hides stats
   assert.doesNotMatch(html, /<div class="stats"/, 'PointForge should remove ingest stats panel below localization controls.');
   assert.match(html, /<div class="log" id="log"><\/div>/, 'PointForge should keep a log node for existing logic while hiding the visible logs section.');
   assert.match(html, /\.log\{\s*display:none;\s*\}/, 'PointForge should hide ingest logs section below localization controls.');
+});
+
+
+test('LineSmith reuses shared field-to-finish parsing engine for sequential directives', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+  assert.match(html, /<script type="module" src="\/src\/point-thumbnail-client\.js"><\/script>/, 'LineSmith should load the shared thumbnail and field-to-finish client bundle.');
+  assert.match(html, /const\s+pointThumbnailClient\s*=\s*window\.SurveyCadPointThumbnailClient\s*\|\|\s*null;/, 'LineSmith should read shared field-to-finish helpers from window scope.');
+  assert.match(html, /if\s*\(pointThumbnailClient\?\.resolveSequentialDirectiveBaseCode\)/, 'LineSmith should delegate directive base-code resolution to the shared rules engine.');
 });

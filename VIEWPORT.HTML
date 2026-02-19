@@ -2052,6 +2052,7 @@
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
   crossorigin=""
 ></script>
+<script type="module" src="/src/point-thumbnail-client.js"></script>
 <script>
 (() => {
   // -------------------------
@@ -4856,6 +4857,8 @@ function paintBackground(ctx, w, h){
     return false;
   }
 
+  const pointThumbnailClient = window.SurveyCadPointThumbnailClient || null;
+
   const fieldToFinishCommandParsers = [
     {
       type: "join-point-number",
@@ -4913,6 +4916,7 @@ function paintBackground(ctx, w, h){
   ];
 
   function tokenizePointCode(rawCode = "") {
+    if (pointThumbnailClient?.tokenizePointCode) return pointThumbnailClient.tokenizePointCode(rawCode);
     const raw = String(rawCode ?? "");
     return raw
       .split(/[^A-Za-z0-9]+/)
@@ -4921,11 +4925,15 @@ function paintBackground(ctx, w, h){
   }
 
   function isCurveMarkerToken(token = "") {
+    if (pointThumbnailClient?.isCurveMarkerToken) return pointThumbnailClient.isCurveMarkerToken(token);
     const normalized = String(token ?? "").trim().toUpperCase();
     return normalized === "PC" || normalized === "PT";
   }
 
   function resolveSequentialDirectiveBaseCode(tokensUpper = [], directiveIndex = -1) {
+    if (pointThumbnailClient?.resolveSequentialDirectiveBaseCode) {
+      return pointThumbnailClient.resolveSequentialDirectiveBaseCode(tokensUpper, directiveIndex);
+    }
     if (!Array.isArray(tokensUpper)) return "";
     if (!Number.isInteger(directiveIndex) || directiveIndex < 0 || directiveIndex >= tokensUpper.length) return "";
     const directives = new Set(["BEG", "END", "CLO"]);

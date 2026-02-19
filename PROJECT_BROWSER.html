@@ -147,6 +147,16 @@
       min-width: 0;
     }
 
+    .point-file-preview-thumb {
+      width: 86px;
+      height: 50px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+      background: rgba(2, 6, 23, 0.7);
+      flex: none;
+    }
+
     .pdf-preview-icon {
       width: 1.35rem;
       height: 1.35rem;
@@ -244,6 +254,7 @@
 
   <script type="module">
     import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, renameResourceTitle, findCpfPointLinksAsync } from './src/project-browser-state.js';
+    import { renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
@@ -408,6 +419,20 @@
       return null;
     }
 
+
+
+    async function attachPointFilePreview(resource, entry) {
+      if (!resource || !entry) return;
+      const text = await resolvePointFileText(entry);
+      if (!text || !text.trim()) return;
+      const previewUrl = renderPointFileThumbnailDataUrl(text, { width: 86, height: 50 });
+      if (!previewUrl) return;
+      const thumb = document.createElement('img');
+      thumb.className = 'point-file-preview-thumb';
+      thumb.src = previewUrl;
+      thumb.alt = `${entry?.title || entry?.id || 'Point file'} preview`;
+      resource.querySelector('.file-meta')?.appendChild(thumb);
+    }
 
     async function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
       let storageKey = resource?.reference?.value;
@@ -970,6 +995,10 @@
           const configuredFileName = entry?.title || actualFileName;
           const leadingIcon = isPdfResource ? '<span class="pdf-preview-icon" aria-label="PDF preview icon">PDF</span>' : '<span class="icon">📄</span>';
           resource.innerHTML = `<span class="file-meta">${leadingIcon}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
+
+          if (canLaunchPointForge) {
+            attachPointFilePreview(resource, entry).catch(() => {});
+          }
 
           if (canLaunchPointForge) {
             resource.classList.add('pointforge-openable');
