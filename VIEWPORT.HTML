@@ -4834,12 +4834,7 @@ function paintBackground(ctx, w, h){
     if (!parsed.sequenceKey) return false;
     if (tokenSet.has(parsed.sequenceKey)) return true;
 
-    if (!parsed.numericSuffix) {
-      for (const token of tokenSet) {
-        const tokenParsed = splitLineworkSequenceCodeToken(token);
-        if (tokenParsed.numericSuffix && tokenParsed.baseCode === parsed.baseCode) return true;
-      }
-    } else {
+    if (parsed.numericSuffix) {
       return false;
     }
 
