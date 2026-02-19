@@ -4733,7 +4733,7 @@
             "type": "string"
           },
           "traverse": {
-            "$ref": "#/components/schemas/TraverseConfig"
+            "$ref": "#/components/schemas/BoundaryLabTraverseConfig"
           }
         },
         "required": [
@@ -4760,7 +4760,7 @@
             "$ref": "#/components/schemas/Casefile"
           },
           "traverse": {
-            "$ref": "#/components/schemas/TraverseConfig"
+            "$ref": "#/components/schemas/BoundaryLabTraverseConfig"
           }
         },
         "required": [
@@ -4769,6 +4769,73 @@
           "name",
           "casefile",
           "traverse"
+        ]
+      },
+      "BoundaryLabTraverseCall": {
+        "type": "object",
+        "properties": {
+          "bearing": {
+            "type": "string"
+          },
+          "distance": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bearing",
+          "distance"
+        ]
+      },
+      "BoundaryLabTraverseConfig": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "object",
+            "properties": {
+              "N": {
+                "type": "number"
+              },
+              "E": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "N",
+              "E"
+            ]
+          },
+          "basis": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "rotationDeg": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "label",
+              "rotationDeg"
+            ]
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoundaryLabTraverseCall"
+            }
+          },
+          "lastRun": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "start",
+          "basis",
+          "calls"
         ]
       }
     }
