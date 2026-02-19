@@ -1031,6 +1031,7 @@
     out.getContext("2d").drawImage(canvasTex, 0, 0, out.width, out.height);
 
     const tex = new THREE.CanvasTexture(out);
+    tex.flipY = false;
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -1202,7 +1203,7 @@
       const p = points[i];
       const x = (p.E - offE);
       const y = (p.Z - offZ) * zEx;
-      const z = (p.N - offN);
+      const z = -(p.N - offN);
 
       positions[i*3+0] = x;
       positions[i*3+1] = y;
