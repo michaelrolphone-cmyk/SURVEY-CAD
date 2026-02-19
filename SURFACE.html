@@ -782,7 +782,8 @@
 
     const rows = parsed.data;
 
-    // Optional header skip
+    // Optional header skip + header-driven column mapping
+    const columnIndex = { point: 0, north: 1, east: 2, elev: 3, descStart: 4 };
     let startIndex = 0;
     if (rows.length && rows[0].length >= 4) {
       const r0 = rows[0].map(v => String(v).trim().toLowerCase());
@@ -791,7 +792,29 @@
         r0.includes("n") || r0.includes("northing") ||
         r0.includes("e") || r0.includes("easting") ||
         r0.includes("z") || r0.includes("elev") || r0.includes("elevation") || r0.includes("alt") || r0.includes("altitude");
-      if (looksLikeHeader) startIndex = 1;
+      if (looksLikeHeader) {
+        startIndex = 1;
+
+        const findIndex = (...aliases) => {
+          for (let i = 0; i < r0.length; i++) {
+            const token = r0[i].replace(/[^a-z0-9]+/g, "");
+            if (aliases.includes(token)) return i;
+          }
+          return -1;
+        };
+
+        const pointIdx = findIndex("p", "pt", "point", "pointnumber", "name");
+        const northIdx = findIndex("n", "north", "northing", "y");
+        const eastIdx = findIndex("e", "east", "easting", "x");
+        const elevIdx = findIndex("z", "elev", "elevation", "alt", "altitude");
+        const descIdx = findIndex("d", "desc", "description", "notes", "note", "code");
+
+        if (pointIdx >= 0) columnIndex.point = pointIdx;
+        if (northIdx >= 0) columnIndex.north = northIdx;
+        if (eastIdx >= 0) columnIndex.east = eastIdx;
+        if (elevIdx >= 0) columnIndex.elev = elevIdx;
+        if (descIdx >= 0) columnIndex.descStart = descIdx;
+      }
     }
 
     let excludedZeroZ = 0;
@@ -812,11 +835,13 @@
       if (!row || row.length < 4) continue;
       rawUsed++;
 
-      const P = String(row[0] ?? "").trim();
-      const N = toNum(row[1]);
-      const E = toNum(row[2]);
-      const Z = toNum(row[3]);
-      const D = row.length >= 5 ? String(row.slice(4).join(",")).trim() : "";
+      const P = String(row[columnIndex.point] ?? "").trim();
+      const N = toNum(row[columnIndex.north]);
+      const E = toNum(row[columnIndex.east]);
+      const Z = toNum(row[columnIndex.elev]);
+      const D = row.length > columnIndex.descStart
+        ? String(row.slice(columnIndex.descStart).join(",")).trim()
+        : "";
 
       if (!Number.isFinite(N) || !Number.isFinite(E) || !Number.isFinite(Z)) continue;
       if (Z === 0) { excludedZeroZ++; continue; }
