@@ -92,6 +92,7 @@ const SMALL_ASSET_CACHE_MAX_BYTES = 4 * 1024;
 const smallStaticAssetCache = new Map();
 const PDF_THUMBNAIL_TARGET_WIDTH = 1024;
 const PDF_THUMBNAIL_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
+const PDF_THUMBNAIL_FAILURE_COOLDOWN_MS = 30 * 1000;
 
 function runCommand(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -812,6 +813,7 @@ export function createSurveyServer({
   const pointforgeExportStore = new Map();
   const inMemoryPdfThumbnailCache = new Map();
   const inFlightPdfThumbnailGenerations = new Map();
+  const pdfThumbnailFailures = new Map();
   let evidenceDeskStorePromise = evidenceDeskFileStore
     ? Promise.resolve({ store: evidenceDeskFileStore, redisClient: null, type: 'custom' })
     : null;
@@ -1861,6 +1863,7 @@ export function createSurveyServer({
         const cacheKey = buildPdfThumbnailCacheKey(sourceUrl);
         const cachedPng = await readCachedPdfThumbnail(cacheKey, runtime);
         if (cachedPng?.length) {
+          pdfThumbnailFailures.delete(cacheKey);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'image/png');
           res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -1868,16 +1871,33 @@ export function createSurveyServer({
           return;
         }
 
+        const failure = pdfThumbnailFailures.get(cacheKey);
+        if (failure && (Date.now() - failure.at) < PDF_THUMBNAIL_FAILURE_COOLDOWN_MS) {
+          sendJson(res, 502, {
+            error: 'Thumbnail generation failed.',
+            status: 'failed',
+            source: sourceUrl,
+            detail: failure.message,
+          });
+          return;
+        }
+
         if (!inFlightPdfThumbnailGenerations.has(cacheKey)) {
           const generationPromise = (async () => {
-            const pdfBuffer = await fetchPdfSourceBuffer(sourceUrl, runtime);
-            const pngBuffer = await pdfThumbnailRenderer(pdfBuffer, { width: PDF_THUMBNAIL_TARGET_WIDTH });
-            await writeCachedPdfThumbnail(cacheKey, pngBuffer, runtime);
-          })()
-            .catch(() => {})
-            .finally(() => {
-              inFlightPdfThumbnailGenerations.delete(cacheKey);
-            });
+            try {
+              const pdfBuffer = await fetchPdfSourceBuffer(sourceUrl, runtime);
+              const pngBuffer = await pdfThumbnailRenderer(pdfBuffer, { width: PDF_THUMBNAIL_TARGET_WIDTH });
+              await writeCachedPdfThumbnail(cacheKey, pngBuffer, runtime);
+              pdfThumbnailFailures.delete(cacheKey);
+            } catch (error) {
+              pdfThumbnailFailures.set(cacheKey, {
+                at: Date.now(),
+                message: error?.message || 'Unknown thumbnail generation error.',
+              });
+            }
+          })().finally(() => {
+            inFlightPdfThumbnailGenerations.delete(cacheKey);
+          });
           inFlightPdfThumbnailGenerations.set(cacheKey, generationPromise);
         }
 

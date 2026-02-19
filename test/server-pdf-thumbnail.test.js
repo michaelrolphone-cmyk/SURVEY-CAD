@@ -95,3 +95,36 @@ test('PDF thumbnail endpoint accepts absolute source URLs and normalizes to API 
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+test('PDF thumbnail endpoint reports generation failures instead of returning 202 forever', async () => {
+  const evidenceDeskFileStore = {
+    async getFile() {
+      return { buffer: Buffer.from('%PDF-1.4\nmock\n', 'utf8') };
+    },
+  };
+
+  const { server, baseUrl } = await startServer({
+    evidenceDeskFileStore,
+    pdfThumbnailRenderer: async () => {
+      throw new Error('renderer unavailable');
+    },
+  });
+
+  try {
+    const source = encodeURIComponent('/api/project-files/download?projectId=p1&folderKey=cpfs&fileName=file.pdf');
+    const thumbnailUrl = `${baseUrl}/api/project-files/pdf-thumbnail?source=${source}`;
+
+    const first = await fetch(thumbnailUrl);
+    assert.equal(first.status, 202);
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const failed = await fetch(thumbnailUrl);
+    assert.equal(failed.status, 502);
+    const payload = await failed.json();
+    assert.equal(payload.status, 'failed');
+    assert.match(payload.detail, /renderer unavailable/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

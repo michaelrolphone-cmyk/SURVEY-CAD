@@ -206,6 +206,13 @@
       flex: none;
     }
 
+    .pdf-preview-placeholder.pdf-preview-failed {
+      border-style: solid;
+      border-color: rgba(248, 113, 113, 0.5);
+      background: linear-gradient(145deg, rgba(127, 29, 29, 0.45) 0%, rgba(69, 10, 10, 0.6) 100%);
+      color: #fecaca;
+    }
+
     .file-name {
       display: flex;
       align-items: baseline;
@@ -299,8 +306,6 @@
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
     const PROJECT_DRAWING_STORAGE_PREFIX = 'surveyfoundryLineSmithDrawing';
     const ADA_CPF_PDF_BASE = 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/';
-    const pendingPdfThumbnailLoads = new Map();
-
     const projectLabel = document.getElementById('projectLabel');
     const treeContainer = document.getElementById('treeContainer');
 
@@ -719,23 +724,20 @@
         slot.replaceChildren(thumb);
         return true;
       };
-
-      if (!pendingPdfThumbnailLoads.has(thumbnailKey)) {
-        pendingPdfThumbnailLoads.set(thumbnailKey, (async () => {
-          const maxAttempts = 20;
-          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-            const done = await applyThumbnail();
-            if (done) return true;
-            await new Promise((resolve) => setTimeout(resolve, Math.min(3000, 250 + (attempt * 200))));
-          }
-          return false;
-        })().finally(() => pendingPdfThumbnailLoads.delete(thumbnailKey)));
-      }
-
       try {
-        await pendingPdfThumbnailLoads.get(thumbnailKey);
+        const maxAttempts = 60;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          const done = await applyThumbnail();
+          if (done) return;
+          await new Promise((resolve) => setTimeout(resolve, Math.min(4000, 350 + (attempt * 200))));
+        }
+        placeholder.classList.add('pdf-preview-failed');
+        placeholder.textContent = 'Unavailable';
+        placeholder.title = 'Thumbnail preview is unavailable right now. Open the PDF to view it.';
       } catch {
-        // keep placeholder when preview generation fails
+        placeholder.classList.add('pdf-preview-failed');
+        placeholder.textContent = 'Unavailable';
+        placeholder.title = 'Thumbnail preview failed to load. Open the PDF to view it.';
       }
     }
 

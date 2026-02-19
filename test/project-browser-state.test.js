@@ -261,6 +261,10 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /async\s+function\s+attachPdfPreview\s*\(/, 'Project Browser should lazily load PDF thumbnails asynchronously');
   assert.match(projectBrowserHtml, /\/api\/project-files\/pdf-thumbnail/, 'Project Browser should request server-cached PDF thumbnails');
   assert.match(projectBrowserHtml, /pdf-preview-placeholder/, 'Project Browser should render a placeholder while PDF thumbnail generation is pending');
+  assert.match(projectBrowserHtml, /maxAttempts\s*=\s*60/, 'Project Browser should keep polling long-running PDF thumbnail jobs before giving up.');
+  assert.match(projectBrowserHtml, /placeholder\.classList\.add\('pdf-preview-failed'\)/, 'Project Browser should mark PDF preview placeholders as failed when generation never completes.');
+  assert.match(projectBrowserHtml, /placeholder\.textContent\s*=\s*'Unavailable'/, 'Project Browser should replace perpetual generating placeholders with an unavailable label when thumbnail loading fails.');
+  assert.doesNotMatch(projectBrowserHtml, /pendingPdfThumbnailLoads/, 'Project Browser should not share slot-bound thumbnail promises that leave new rows stuck in generating state.');
   assert.match(projectBrowserHtml, /resource\.addEventListener\('click',\s*\(\)\s*=>\s*openCpfPdfFromResource\(entry\)\)/, 'CP&F row tap should open the PDF link');
   assert.match(projectBrowserHtml, /openButton\.textContent\s*=\s*'Open PDF'/, 'Project Browser should render an Open PDF button for CP&F entries');
   assert.match(projectBrowserHtml, /deleteButton\.textContent\s*=\s*'Delete'/, 'Project Browser should render a delete button for CP&F entries');
