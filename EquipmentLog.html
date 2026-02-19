@@ -104,13 +104,7 @@
           <div class="form-group">
             <label for="equipmentType">Equipment Type</label>
             <select id="equipmentType">
-              <option value="">Select…</option>
-              <option value="GPS Rover">GPS Rover</option>
-              <option value="Total Station">Total Station</option>
-              <option value="Robotic Total Station">Robotic Total Station</option>
-              <option value="Level">Level</option>
-              <option value="GNSS Base">GNSS Base</option>
-              <option value="Other">Other</option>
+              <option value="">Select equipment…</option>
             </select>
           </div>
           <div class="form-group full-width">
@@ -137,12 +131,16 @@
   </div>
 
   <script type="module">
+    import { buildEquipmentLogOptions } from './src/equipment-log-options.js';
+
     const STORAGE_KEY = 'surveyfoundryEquipmentLogs';
     const CREW_PROFILES_STORAGE_KEY = 'surveyfoundryCrewProfiles';
+    const EQUIPMENT_STORAGE_KEY = 'surveyfoundryEquipmentInventory';
 
     // API config
     const EQUIPMENT_LOGS_API_URL = '/api/equipment-logs';
     const CREW_API_URL = '/api/crew';
+    const EQUIPMENT_API_URL = '/api/equipment';
 
     const fields = {
       rodman: document.getElementById('rodman'),
@@ -167,6 +165,7 @@
 
     let logs = [];
     let crew = [];
+    let equipment = [];
     let editingId = null;
 
     function renderCrewList() {
@@ -188,7 +187,28 @@
       } catch {
         crew = [];
       }
-    }      
+    }
+
+    function loadEquipment() {
+      try {
+        const raw = localStorage.getItem(EQUIPMENT_STORAGE_KEY);
+        equipment = raw ? JSON.parse(raw) : [];
+      } catch {
+        equipment = [];
+      }
+    }
+
+    function renderEquipmentOptions(selectedValue = fields.equipmentType.value || '') {
+      const options = buildEquipmentLogOptions(equipment);
+      const hasSelectedValue = !!selectedValue;
+      const selectedMissing = hasSelectedValue && !options.includes(selectedValue);
+      const values = selectedMissing ? [...options, selectedValue] : options;
+      fields.equipmentType.innerHTML = [
+        '<option value="">Select equipment…</option>',
+        ...values.map((value) => `<option value="${esc(value)}">${esc(value)}</option>`),
+      ].join('');
+      if (hasSelectedValue) fields.equipmentType.value = selectedValue;
+    }
 
     function saveLogs() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
@@ -270,6 +290,7 @@
       fields.setupTime.value = log.setupTime || '';
       fields.teardownTime.value = log.teardownTime || '';
       fields.jobFileName.value = log.jobFileName || '';
+      renderEquipmentOptions(log.equipmentType || '');
       fields.equipmentType.value = log.equipmentType || '';
       fields.notes.value = log.notes || '';
       editingId = log.id;
@@ -280,6 +301,7 @@
     function renderLogs() {
       
       renderCrewList();
+      renderEquipmentOptions();
       if (logs.length === 0) {
         logListEl.innerHTML = '';
         emptyStateEl.classList.remove('hidden');
@@ -489,14 +511,16 @@
     window.addEventListener('surveyfoundry-localstorage-sync', () => {
       loadCrew();
       loadLogs();
+      loadEquipment();
       renderLogs();
     });
 
     async function fetchLatestFromApi() {
       try {
-        const [crewRes, logsRes] = await Promise.all([
+        const [crewRes, logsRes, equipmentRes] = await Promise.all([
           fetch(CREW_API_URL),
           fetch(EQUIPMENT_LOGS_API_URL),
+          fetch(EQUIPMENT_API_URL),
         ]);
         let updated = false;
         if (crewRes.ok) {
@@ -519,6 +543,15 @@
             updated = true;
           }
         }
+        if (equipmentRes.ok) {
+          const equipmentData = await equipmentRes.json();
+          const serverEquipment = Array.isArray(equipmentData?.equipment) ? equipmentData.equipment : [];
+          if (serverEquipment.length > 0) {
+            equipment = mergeById(equipment, serverEquipment);
+            localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(equipment));
+            updated = true;
+          }
+        }
         if (updated) renderLogs();
       } catch {
         // API unavailable, continue with localStorage data.
@@ -527,6 +560,7 @@
 
     loadCrew();
     loadLogs();
+    loadEquipment();
     renderLogs();
     fetchLatestFromApi();
   </script>
