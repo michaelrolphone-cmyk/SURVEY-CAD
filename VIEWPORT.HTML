@@ -5372,26 +5372,35 @@ function paintBackground(ctx, w, h){
     });
 
     const lineCommands = [];
-    let activeCurve = null;
+    const activeCurves = new Map();
     for (const point of pointsInOrder) {
-      if (pointHasCurveStartToken(point.code)) {
-        activeCurve = { startPointId: point.id, middlePointId: null };
-        continue;
-      }
-      if (!activeCurve) continue;
-      if (!activeCurve.middlePointId && point.id !== activeCurve.startPointId) {
-        activeCurve.middlePointId = point.id;
-      }
-      if (pointHasCurveEndToken(point.code)) {
-        if (activeCurve.startPointId && activeCurve.middlePointId && point.id !== activeCurve.startPointId && point.id !== activeCurve.middlePointId) {
-          lineCommands.push({
-            a: activeCurve.startPointId,
-            b: point.id,
-            middlePointId: activeCurve.middlePointId,
-            baseCode: "CURVE"
-          });
+      const curveLineworkCodes = extractCurveLineworkCodes(point.code);
+      if (!curveLineworkCodes.size) continue;
+
+      const hasCurveStart = pointHasCurveStartToken(point.code);
+      const hasCurveEnd = pointHasCurveEndToken(point.code);
+
+      for (const baseCode of curveLineworkCodes) {
+        const activeCurve = activeCurves.get(baseCode) || null;
+        if (activeCurve && !activeCurve.middlePointId && point.id !== activeCurve.startPointId) {
+          activeCurve.middlePointId = point.id;
         }
-        activeCurve = null;
+
+        if (hasCurveEnd && activeCurve) {
+          if (activeCurve.startPointId && activeCurve.middlePointId && point.id !== activeCurve.startPointId && point.id !== activeCurve.middlePointId) {
+            lineCommands.push({
+              a: activeCurve.startPointId,
+              b: point.id,
+              middlePointId: activeCurve.middlePointId,
+              baseCode
+            });
+          }
+          activeCurves.delete(baseCode);
+        }
+
+        if (hasCurveStart) {
+          activeCurves.set(baseCode, { startPointId: point.id, middlePointId: null });
+        }
       }
     }
     return lineCommands;
