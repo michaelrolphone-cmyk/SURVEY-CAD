@@ -1085,17 +1085,19 @@ This prevents PointForge-to-LineSmith imports from transposing easting/northing,
 - CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 
-## API and CLI notes for EvidenceDesk file rename support
+## API and CLI notes for EvidenceDesk file rename + delete support
 
-EvidenceDesk now supports renaming files directly from the file rows.
+EvidenceDesk now supports renaming and deleting files from any folder/group in the file tree.
 
-- Point files are renamed through project point-file APIs so the updated name propagates to project-backed references:
+- Point files use project point-file APIs so rename/delete operations propagate to project-backed references:
   - `GET /api/projects/{projectId}/point-files/{pointFileId}`
   - `PATCH /api/projects/{projectId}/point-files/{pointFileId}`
-- Drawings are renamed through project drawing APIs so the updated name propagates to project-backed references:
+  - `DELETE /api/projects/{projectId}/point-files/{pointFileId}`
+- Drawings use project drawing APIs so rename/delete operations propagate to project-backed references:
   - `GET /api/projects/{projectId}/drawings/{drawingId}`
   - `PATCH /api/projects/{projectId}/drawings/{drawingId}`
-- Uploaded EvidenceDesk files in non-API folders are renamed in the stored project-file index so folder references remain consistent in the app.
+  - `DELETE /api/projects/{projectId}/drawings/{drawingId}`
+- Other EvidenceDesk folders continue to persist rename/delete changes in the stored `project-file` index.
 - CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
 ## API and CLI notes for project-linked Workbench persistence

@@ -644,6 +644,48 @@
       }
     }
 
+    async function deleteResourceFromEvidenceDesk(folder, entry, projectContext = {}) {
+      const currentTitle = String(entry?.title || entry?.id || '').trim() || 'file';
+
+      if (folder?.key === 'cpfs') {
+        await deleteCpfResource(folder, entry, projectContext);
+        return;
+      }
+
+      if (!window.confirm(`Remove "${currentTitle}" from the project?`)) return;
+
+      const projectId = projectContext?.activeProjectId;
+      if (!projectId) {
+        renderError('Cannot delete resources without an active project.');
+        return;
+      }
+
+      try {
+        if (entry?.reference?.type === 'project-point-file') {
+          const pointFileId = entry?.reference?.metadata?.pointFileId || entry?.reference?.value || entry?.id;
+          if (!pointFileId) throw new Error('Point file id was missing.');
+          const response = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId), { method: 'DELETE' });
+          if (!response.ok) throw new Error(`Unable to delete point file (${response.status}).`);
+          await syncProjectPointFilesFromApi(projectContext);
+        } else if (entry?.reference?.type === 'project-drawing') {
+          const drawingId = entry?.reference?.metadata?.drawingId || entry?.reference?.value || entry?.id;
+          if (!drawingId) throw new Error('Drawing id was missing.');
+          const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId), { method: 'DELETE' });
+          if (!response.ok) throw new Error(`Unable to delete drawing (${response.status}).`);
+          await syncProjectDrawingsFromApi(projectContext);
+        } else {
+          const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
+          if (!removed) throw new Error('File delete could not be applied.');
+        }
+
+        saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+        projectContext.setUploadStatus(`Removed ${currentTitle}.`);
+        renderTree(projectContext.projectFile, projectContext);
+      } catch (err) {
+        renderError(`Could not remove ${currentTitle}. ${err.message}`);
+      }
+    }
+
     function getCpfPdfUrl(resource) {
       const reference = resource?.reference || {};
       const metadata = reference.metadata || {};
@@ -1330,21 +1372,7 @@
             deletePointFileButton.title = 'Remove this point file from the project';
             deletePointFileButton.addEventListener('click', async (event) => {
               event.stopPropagation();
-              if (!window.confirm(`Remove "${entry.title}" from the project?`)) return;
-              const projectId = projectContext?.activeProjectId;
-              const pointFileId = entry?.reference?.metadata?.pointFileId || entry?.id;
-              if (!projectId || !pointFileId) {
-                renderError(`Could not remove ${entry?.title || entry?.id || 'point file'}.`);
-                return;
-              }
-              const response = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId), { method: 'DELETE' });
-              if (!response.ok) {
-                renderError(`Could not remove ${entry?.title || entry?.id || 'point file'}.`);
-                return;
-              }
-              await syncProjectPointFilesFromApi(projectContext);
-              projectContext.setUploadStatus(`Removed ${entry.title}.`);
-              renderTree(projectContext.projectFile, projectContext);
+              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             resource.appendChild(deletePointFileButton);
 
@@ -1393,6 +1421,17 @@
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             resource.appendChild(renameDrawingButton);
+
+            const deleteDrawingButton = document.createElement('button');
+            deleteDrawingButton.type = 'button';
+            deleteDrawingButton.className = 'launch-btn';
+            deleteDrawingButton.textContent = 'Delete';
+            deleteDrawingButton.title = 'Remove this drawing from the project';
+            deleteDrawingButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            resource.appendChild(deleteDrawingButton);
           }
 
           if (canOpenCpfPdf) {
@@ -1425,7 +1464,7 @@
             deleteButton.title = 'Delete this CP&F from the project file';
             deleteButton.addEventListener('click', (event) => {
               event.stopPropagation();
-              deleteCpfResource(folder, entry, projectContext);
+              deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             resource.appendChild(deleteButton);
 
@@ -1488,19 +1527,46 @@
             deleteButton.className = 'launch-btn';
             deleteButton.textContent = 'Delete';
             deleteButton.title = 'Remove this file from the project';
-            deleteButton.addEventListener('click', (event) => {
+            deleteButton.addEventListener('click', async (event) => {
               event.stopPropagation();
-              if (!window.confirm(`Remove "${entry.title}" from the project?`)) return;
-              const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
-              if (!removed) {
-                renderError(`Could not remove ${entry?.title || entry?.id || 'file'}.`);
-                return;
-              }
-              saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-              projectContext.setUploadStatus(`Removed ${entry.title}.`);
-              renderTree(projectContext.projectFile, projectContext);
+              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             resource.appendChild(deleteButton);
+
+            const renameButton = document.createElement('button');
+            renameButton.type = 'button';
+            renameButton.className = 'launch-btn';
+            renameButton.textContent = 'Rename';
+            renameButton.title = 'Rename this file in the project EvidenceDesk index';
+            renameButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            resource.appendChild(renameButton);
+          }
+
+          if (!canLaunchPointForge && !canOpenLineSmithDrawing && !canOpenCpfPdf && !isServerUpload) {
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'launch-btn';
+            deleteButton.textContent = 'Delete';
+            deleteButton.title = 'Remove this file from the project';
+            deleteButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            resource.appendChild(deleteButton);
+
+            const renameButton = document.createElement('button');
+            renameButton.type = 'button';
+            renameButton.className = 'launch-btn';
+            renameButton.textContent = 'Rename';
+            renameButton.title = 'Rename this file in the project EvidenceDesk index';
+            renameButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            resource.appendChild(renameButton);
           }
 
           treeContainer.appendChild(resource);
