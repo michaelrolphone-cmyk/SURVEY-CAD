@@ -412,6 +412,14 @@
       padding:6px;
       font-size:12px;
     }
+    .pointGroupExplorer{ margin-top:10px; border:1px solid var(--line2); border-radius:12px; padding:10px; display:grid; gap:8px; background: rgba(8,10,16,.3); }
+    .pointGroupList{ display:grid; gap:8px; max-height:280px; overflow:auto; padding-right:4px; }
+    .pointGroupCard{ display:grid; gap:6px; border:1px solid var(--line2); border-radius:10px; padding:8px; background: rgba(15,23,42,.55); }
+    .pointGroupButton{ width:100%; text-align:left; background:transparent; border:1px solid transparent; color:var(--text); border-radius:10px; padding:6px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .pointGroupButton.active{ border-color: rgba(116,140,255,.85); background: rgba(42,61,255,.2); }
+    .pointGroupMeta{ font-size:11px; color: var(--muted); }
+    .pointGroupThumb{ width:88px; height:52px; border-radius:8px; border:1px solid var(--line2); object-fit:cover; background: rgba(2,6,23,.5); }
+    .pointGroupChildren{ display:grid; gap:6px; margin-left:10px; border-left:1px solid var(--line2); padding-left:8px; }
   </style>
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
@@ -573,6 +581,15 @@
           <div class="chip">Projection: <span class="mono">Idaho SP (US-ft)</span></div>
         </div>
         <div class="panelbody">
+          <section class="pointGroupExplorer" aria-live="polite">
+            <div class="row" style="justify-content:space-between;">
+              <strong style="font-size:12px; letter-spacing:.4px;">Point Groups by Code</strong>
+              <span id="pointGroupSummary" class="pointGroupMeta">No groups yet.</span>
+            </div>
+            <div id="pointGroupList" class="pointGroupList"></div>
+            <div id="pointGroupAction" class="hint" style="margin:0;">Select a group to open linework in BoundaryLab.</div>
+          </section>
+
           <div id="map"></div>
           <div class="hint" id="mapHint">Load a file or paste points to plot.</div>
           <div class="mapMetaRow">
@@ -1000,6 +1017,9 @@
     const elAnchorLat = document.getElementById("anchorLat");
     const elAnchorLon = document.getElementById("anchorLon");
     const elLocalizationHint = document.getElementById("localizationHint");
+    const elPointGroupList = document.getElementById("pointGroupList");
+    const elPointGroupSummary = document.getElementById("pointGroupSummary");
+    const elPointGroupAction = document.getElementById("pointGroupAction");
 
     const elPointFileSelect = document.getElementById("pointFileSelect");
 
@@ -1020,6 +1040,8 @@
 
     let latestOutputText = "";
     let latestTransformed = null;
+    let latestPointGroups = [];
+    let selectedGroupSelection = null;
     let currentImportContext = null;
     let usePointEditorView = false;
     let projectPointFilesCache = [];
@@ -1029,6 +1051,225 @@
     const elInputPointsBody = document.getElementById("inputPointsBody");
     const elOutputPointsBody = document.getElementById("outputPointsBody");
     const elToggleInputView = document.getElementById("btnToggleInputView");
+
+    function normalizeCodeToken(token = ""){
+      return String(token || "").trim().toUpperCase();
+    }
+
+    function parseFieldToFinishDirective(code = ""){
+      const tokens = String(code || "")
+        .split(/[\s;|,/]+/)
+        .map(normalizeCodeToken)
+        .filter(Boolean);
+      if (!tokens.length) return null;
+      const directives = new Set(["BEG", "END", "CLO"]);
+      let action = "MID";
+      let baseCode = "";
+      for (const token of tokens){
+        if (directives.has(token)){
+          action = token;
+          continue;
+        }
+        if (!baseCode && /[A-Z]/.test(token)) baseCode = token;
+      }
+      if (!baseCode) return null;
+      return { action, baseCode };
+    }
+
+    function buildLineworkSegments(points = []){
+      const segmentsByBase = new Map();
+      const activeByBase = new Map();
+      for (const point of points){
+        const directive = parseFieldToFinishDirective(point.code);
+        if (!directive) continue;
+        const baseCode = directive.baseCode;
+        const action = directive.action;
+        if (!segmentsByBase.has(baseCode)) segmentsByBase.set(baseCode, []);
+        let active = activeByBase.get(baseCode) || null;
+
+        if (action === "BEG"){
+          active = [point];
+          segmentsByBase.get(baseCode).push(active);
+          activeByBase.set(baseCode, active);
+          continue;
+        }
+
+        if (!active){
+          active = [point];
+          segmentsByBase.get(baseCode).push(active);
+          activeByBase.set(baseCode, active);
+          continue;
+        }
+
+        if (active[active.length - 1] !== point) active.push(point);
+        if (action === "CLO" && active.length > 2) active.push(active[0]);
+        if (action === "END" || action === "CLO") activeByBase.delete(baseCode);
+      }
+
+      return [...segmentsByBase.entries()]
+        .map(([baseCode, segments])=>({ baseCode, segments: segments.filter((segment)=>segment.length > 1) }))
+        .filter((item)=>item.segments.length);
+    }
+
+    function buildLineworkThumbnailDataUrl(segments = []){
+      const points = segments.flat()
+        .map((point)=>({ x: Number(point.x), y: Number(point.y) }))
+        .filter((coord)=>Number.isFinite(coord.x) && Number.isFinite(coord.y));
+      if (points.length < 2) return "";
+
+      const minX = Math.min(...points.map((coord)=>coord.x));
+      const maxX = Math.max(...points.map((coord)=>coord.x));
+      const minY = Math.min(...points.map((coord)=>coord.y));
+      const maxY = Math.max(...points.map((coord)=>coord.y));
+      const width = Math.max(maxX - minX, 1);
+      const height = Math.max(maxY - minY, 1);
+      const pad = 6;
+      const w = 88;
+      const h = 52;
+      const mapPoint = (x, y)=>{
+        const nx = ((x - minX) / width) * (w - pad * 2) + pad;
+        const ny = h - (((y - minY) / height) * (h - pad * 2) + pad);
+        return `${nx.toFixed(1)},${ny.toFixed(1)}`;
+      };
+
+      const polylines = segments.map((segment)=>{
+        const segmentPoints = segment
+          .map((point)=>mapPoint(Number(point.x), Number(point.y)))
+          .join(" ");
+        return `<polyline points="${segmentPoints}" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />`;
+      }).join("");
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" rx="8" fill="#0b1220"/>${polylines}</svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
+
+    function buildPointGroupsFromRecords(recordsSorted = []){
+      const byCode = new Map();
+      for (const record of recordsSorted){
+        const codeRaw = trimOrEmpty(record.fields?.[4]);
+        const codeKey = normalizeCodeToken(codeRaw || "UNCODED");
+        if (!byCode.has(codeKey)) byCode.set(codeKey, { codeKey, codeLabel: codeRaw || "(No code)", points: [] });
+        byCode.get(codeKey).points.push({
+          number: trimOrEmpty(record.fields?.[0]),
+          code: codeRaw,
+          x: Number(record.fields?.[1]),
+          y: Number(record.fields?.[2]),
+        });
+      }
+
+      return [...byCode.values()]
+        .map((group)=>{
+          const lineworks = buildLineworkSegments(group.points);
+          const subgroups = lineworks
+            .filter((linework)=>linework.segments.length > 1)
+            .map((linework, index)=>({
+              id: `${group.codeKey}-${linework.baseCode}-${index}`,
+              label: `${linework.baseCode} (${linework.segments.length} lines)`,
+              linework,
+              thumbnail: buildLineworkThumbnailDataUrl(linework.segments),
+            }));
+          return {
+            ...group,
+            thumbnail: lineworks.length ? buildLineworkThumbnailDataUrl(lineworks.flatMap((item)=>item.segments)) : "",
+            lineworks,
+            subgroups,
+          };
+        })
+        .sort((a,b)=>a.codeLabel.localeCompare(b.codeLabel));
+    }
+
+    function buildBoundaryLabCsvFromSegments(segments = []){
+      const unique = [];
+      const seen = new Set();
+      for (const segment of segments){
+        for (const point of segment){
+          const key = `${point.number}|${point.x}|${point.y}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          unique.push(point);
+        }
+      }
+      if (unique.length < 2) return "";
+      const rows = [["point","x","y"]];
+      unique.forEach((point, index)=>rows.push([point.number || String(index + 1), point.x, point.y]));
+      return rows.map((row)=>row.map(csvEscape).join(",")).join("\n");
+    }
+
+    function selectPointGroupSelection(selection){
+      selectedGroupSelection = selection;
+      const buttons = elPointGroupList.querySelectorAll(".pointGroupButton");
+      buttons.forEach((button)=>button.classList.toggle("active", button.dataset.selectionId === selection?.id));
+      if (!selection){
+        elPointGroupAction.textContent = "Select a group to open linework in BoundaryLab.";
+        return;
+      }
+      elPointGroupAction.innerHTML = `<button id="openBoundaryLabFromGroup" class="btn secondary" type="button">Open ${escapeHtml(selection.label)} in BoundaryLab</button>`;
+      const actionButton = document.getElementById("openBoundaryLabFromGroup");
+      actionButton?.addEventListener("click", ()=>{
+        const csv = buildBoundaryLabCsvFromSegments(selection.segments || []);
+        if (!csv) return;
+        localStorage.setItem(BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY, JSON.stringify({
+          csv,
+          exportedAt: new Date().toISOString(),
+          source: "pointforge-group-explorer",
+          label: selection.label,
+        }));
+        const projectContext = getProjectContext();
+        const projectParams = projectContext.projectId ? `&activeProjectId=${encodeURIComponent(projectContext.projectId)}&activeProjectName=${encodeURIComponent(projectContext.projectName || "")}` : "";
+        openLinkedApp(`/BoundaryLab.html?source=pointforge${projectParams}`);
+      });
+    }
+
+    function renderPointGroups(groups = []){
+      latestPointGroups = groups;
+      elPointGroupList.innerHTML = "";
+      if (!groups.length){
+        elPointGroupSummary.textContent = "No groups yet.";
+        selectPointGroupSelection(null);
+        return;
+      }
+
+      elPointGroupSummary.textContent = `${groups.length} groups`;
+      groups.forEach((group)=>{
+        const card = document.createElement("article");
+        card.className = "pointGroupCard";
+
+        const groupSelectionId = `group-${group.codeKey}`;
+        const groupButton = document.createElement("button");
+        groupButton.type = "button";
+        groupButton.className = "pointGroupButton";
+        groupButton.dataset.selectionId = groupSelectionId;
+        const thumb = group.thumbnail ? `<img class="pointGroupThumb" src="${group.thumbnail}" alt="${escapeHtml(group.codeLabel)} line preview" />` : "";
+        groupButton.innerHTML = `<span><strong>${escapeHtml(group.codeLabel)}</strong><br/><span class="pointGroupMeta">${group.points.length} pts · ${group.lineworks.length} line code(s)</span></span>${thumb}`;
+        groupButton.addEventListener("click", ()=>{
+          const firstLinework = group.lineworks[0];
+          if (!firstLinework) return selectPointGroupSelection(null);
+          selectPointGroupSelection({ id: groupSelectionId, label: `group ${group.codeLabel}`, segments: firstLinework.segments });
+        });
+        card.appendChild(groupButton);
+
+        if (group.subgroups.length){
+          const children = document.createElement("div");
+          children.className = "pointGroupChildren";
+          group.subgroups.forEach((subgroup)=>{
+            const subgroupButton = document.createElement("button");
+            subgroupButton.type = "button";
+            subgroupButton.className = "pointGroupButton";
+            subgroupButton.dataset.selectionId = subgroup.id;
+            subgroupButton.innerHTML = `<span>${escapeHtml(subgroup.label)}</span>${subgroup.thumbnail ? `<img class="pointGroupThumb" src="${subgroup.thumbnail}" alt="${escapeHtml(subgroup.label)} line preview" />` : ""}`;
+            subgroupButton.addEventListener("click", ()=>{
+              selectPointGroupSelection({ id: subgroup.id, label: `subgroup ${subgroup.label}`, segments: subgroup.linework.segments });
+            });
+            children.appendChild(subgroupButton);
+          });
+          card.appendChild(children);
+        }
+
+        elPointGroupList.appendChild(card);
+      });
+
+      selectPointGroupSelection(null);
+    }
 
     function parsePointEditorDocument(text){
       const lines = String(text || "").split(/\r?\n/);
@@ -1719,6 +1960,7 @@
         if (layer) layer.clearLayers();
         elMapHint.textContent = "Load a file or paste points to plot.";
         setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
+        renderPointGroups([]);
         return;
       }
 
@@ -1743,12 +1985,14 @@
         elRenumber.disabled = true;
         elDownload.disabled = true;
         elOpenLineSmith.disabled = true;
+        renderPointGroups([]);
         return;
       }
 
       const outputText = recordsForOutput.map((record)=>record.fields.map(csvEscape).join(",")).join("\n");
       latestTransformed = { ...res, recordsSorted: recordsForOutput };
       latestOutputText = outputText;
+      renderPointGroups(buildPointGroupsFromRecords(recordsForOutput));
 
       elOut.value = outputText;
       elLog.textContent = localizationSummary ? `${res.logText}\n\n${localizationSummary}` : res.logText;
