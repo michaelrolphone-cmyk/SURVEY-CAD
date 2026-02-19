@@ -127,7 +127,8 @@
       main{ grid-template-columns: 1fr; }
     }
 
-    .leftStack{ position:relative; min-height: 780px; }
+    .leftStack{ display:grid; gap:10px; }
+    .accordionStack{ position:relative; min-height: 780px; }
 
     .panel{
       border-radius: var(--r);
@@ -466,6 +467,7 @@
       </div>
       <div class="hint" id="localizationHint" style="margin:0;">Optional: select an existing point number as the local anchor and pair it with one known GPS anchor.</div>
     </div>
+    <div class="accordionStack">
     <section class="panel" id="ingestPanel">
       <div class="panelhead">
         <h2><span class="sig"></span> Ingest Console</h2>
@@ -564,6 +566,7 @@
         <div class="hint">Download saves exactly what you see here.</div>
       </div>
     </section>
+    </div>
     </section>
 
     <!-- Right: Map -->

@@ -50,7 +50,8 @@ test('PointForge renders code-group explorer with thumbnails and BoundaryLab han
 test('PointForge auto-focuses transformed point editor accordion and hides stats/log panels', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
   assert.match(html, /<section class="leftStack">[\s\S]*<div class="localizationPanel">[\s\S]*<section class="panel" id="ingestPanel">/, 'PointForge should place localization controls above the ingest console panel.');
-  assert.match(html, /<section class="leftStack">[\s\S]*<section class="panel" id="ingestPanel">[\s\S]*<section class="panel outputArea" id="outputPanel">/, 'PointForge should place ingest and output panels in the same left accordion stack.');
+  assert.match(html, /<section class="leftStack">[\s\S]*<div class="accordionStack">[\s\S]*<section class="panel" id="ingestPanel">[\s\S]*<section class="panel outputArea" id="outputPanel">/, 'PointForge should place ingest and output panels in a dedicated accordion stack below localization controls.');
+  assert.match(html, /\.accordionStack\{\s*position:relative;\s*min-height:\s*780px;\s*\}/, 'PointForge should anchor accordion overlays inside a relative accordion stack container.');
   assert.match(html, /#outputPanel\{[\s\S]*position:absolute;[\s\S]*opacity:0;[\s\S]*transform:\s*translateX\(24px\);/, 'PointForge should keep output panel hidden and offset until accordion output mode activates.');
   assert.match(html, /main\.pointEditorFocusOutput\s+#outputPanel\{[\s\S]*opacity:1;[\s\S]*left:\s*56px;/, 'PointForge should slide output panel in over input points when output accordion is active.');
   assert.match(html, /main\.pointEditorFocusOutput\s+#ingestPanel\s*\{[\s\S]*width:56px;/, 'PointForge should collapse ingest panel to a narrow accordion rail when output is shown.');
