@@ -16,3 +16,9 @@ test('server includes project workbench traverse API routes', async () => {
   assert.match(src, /req\.method === 'GET' && action\.startsWith\('traverses\/'\) && traverseId/);
   assert.match(src, /req\.method === 'POST' && action === 'traverses'/);
 });
+
+test('project traverse save duplicates linked casefile when no casefileId is provided', async () => {
+  const src = await readFile(serverPath, 'utf8');
+  assert.match(src, /getProjectWorkbenchLink\(localStorageSyncStore, projectId\)/);
+  assert.match(src, /bew\.store\.duplicateCasefile\(linkedCasefileId, \{ name \}\)/);
+});
