@@ -58,3 +58,40 @@ test('PDF thumbnail endpoint validates source parameter', async () => {
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('PDF thumbnail endpoint accepts absolute source URLs and normalizes to API paths', async () => {
+  let renderCalls = 0;
+  const evidenceDeskFileStore = {
+    async getFile(projectId, folderKey, fileName) {
+      if (projectId === 'p1' && folderKey === 'cpfs' && fileName === 'file.pdf') {
+        return { buffer: Buffer.from('%PDF-1.4\nmock\n', 'utf8') };
+      }
+      return null;
+    },
+  };
+
+  const { server, baseUrl } = await startServer({
+    evidenceDeskFileStore,
+    pdfThumbnailRenderer: async () => {
+      renderCalls += 1;
+      return Buffer.from('PNGDATA-ABS', 'utf8');
+    },
+  });
+
+  try {
+    const source = encodeURIComponent(`${baseUrl}/api/project-files/download?projectId=p1&folderKey=cpfs&fileName=file.pdf`);
+    const thumbnailUrl = `${baseUrl}/api/project-files/pdf-thumbnail?source=${source}`;
+
+    const first = await fetch(thumbnailUrl);
+    assert.equal(first.status, 202);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const cached = await fetch(thumbnailUrl);
+    assert.equal(cached.status, 200);
+    const body = Buffer.from(await cached.arrayBuffer()).toString('utf8');
+    assert.equal(body, 'PNGDATA-ABS');
+    assert.equal(renderCalls, 1);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

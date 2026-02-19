@@ -850,10 +850,23 @@ export function createSurveyServer({
   function parsePdfThumbnailSource(urlObj) {
     const source = String(urlObj.searchParams.get('source') || '').trim();
     if (!source) throw new Error('source query parameter is required.');
-    if (!source.startsWith('/api/project-files/download') && !source.startsWith('/api/ros-pdf')) {
+    const normalizedSource = (() => {
+      if (source.startsWith('/')) return source;
+      let parsed;
+      try {
+        parsed = new URL(source);
+      } catch {
+        throw new Error('source must be a relative /api URL or an absolute http(s) URL.');
+      }
+      if (!/^https?:$/i.test(parsed.protocol)) {
+        throw new Error('source absolute URL protocol must be http or https.');
+      }
+      return `${parsed.pathname}${parsed.search}`;
+    })();
+    if (!normalizedSource.startsWith('/api/project-files/download') && !normalizedSource.startsWith('/api/ros-pdf')) {
       throw new Error('source must target /api/project-files/download or /api/ros-pdf.');
     }
-    return source;
+    return normalizedSource;
   }
 
   async function fetchPdfSourceBuffer(sourceUrl, runtime) {
