@@ -85,6 +85,7 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
+  '.pdf': 'application/pdf',
 };
 
 const SMALL_ASSET_CACHE_MAX_BYTES = 4 * 1024;
@@ -273,6 +274,7 @@ async function parseMultipartUpload(req) {
   const fields = {};
   let fileBuffer = null;
   let fileName = '';
+  let fileMimeType = null;
 
   let start = body.indexOf(delimiter);
   while (start !== -1) {
@@ -296,6 +298,8 @@ async function parseMultipartUpload(req) {
       if (filenameMatch) {
         fileBuffer = partBody;
         fileName = filenameMatch[1];
+        const partTypeMatch = headerBlock.match(/(?:^|\r\n)Content-Type:\s*([^\r\n]+)/i);
+        fileMimeType = partTypeMatch ? partTypeMatch[1].trim() : null;
       } else {
         fields[nameMatch[1]] = partBody.toString('utf8');
       }
@@ -304,9 +308,8 @@ async function parseMultipartUpload(req) {
     start = nextDelimiter !== -1 ? nextDelimiter : -1;
   }
 
-  return { fields, fileBuffer, fileName };
+  return { fields, fileBuffer, fileName, fileMimeType };
 }
-
 async function readJsonBody(req) {
   const chunks = [];
   let totalBytes = 0;
@@ -1737,7 +1740,7 @@ export function createSurveyServer({
           sendJson(res, 413, { error: `File exceeds maximum size of ${MAX_UPLOAD_FILE_BYTES} bytes.` });
           return;
         }
-        const { fields, fileBuffer, fileName } = await parseMultipartUpload(req);
+        const { fields, fileBuffer, fileName, fileMimeType } = await parseMultipartUpload(req);
         const projectId = fields.projectId;
         const folderKey = fields.folderKey;
         const targetFileName = fields.fileName;
@@ -1772,7 +1775,7 @@ export function createSurveyServer({
             originalFileName: fileName,
             buffer: fileBuffer,
             extension: ext,
-            mimeType: req.headers['content-type'] || 'application/octet-stream',
+            mimeType: fileMimeType || 'application/octet-stream',
           });
           if (!resource) {
             sendJson(res, 404, { error: 'File not found.' });
@@ -1788,7 +1791,7 @@ export function createSurveyServer({
           originalFileName: fileName,
           buffer: fileBuffer,
           extension: ext,
-          mimeType: req.headers['content-type'] || 'application/octet-stream',
+          mimeType: fileMimeType || 'application/octet-stream',
         });
 
         sendJson(res, 201, { resource });

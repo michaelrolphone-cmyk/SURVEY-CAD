@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSurveyServer, startServer } from '../src/server.js';
 import SurveyCadClient from '../src/survey-api.js';
+import { RedisEvidenceDeskFileStore } from '../src/evidence-desk-file-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -161,6 +162,62 @@ function createMockServer(options = {}) {
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
   });
+}
+
+
+class FakeRedis {
+  constructor() {
+    this.values = new Map();
+    this.sets = new Map();
+  }
+
+  async get(key) {
+    return this.values.get(key) ?? null;
+  }
+
+  async set(key, value) {
+    this.values.set(key, value);
+    return 'OK';
+  }
+
+  async sAdd(key, value) {
+    const set = this.sets.get(key) || new Set();
+    set.add(value);
+    this.sets.set(key, set);
+    return 1;
+  }
+
+  async sRem(key, value) {
+    const set = this.sets.get(key);
+    if (!set) return 0;
+    const removed = set.delete(value);
+    if (!set.size) this.sets.delete(key);
+    return removed ? 1 : 0;
+  }
+
+  async sMembers(key) {
+    return [...(this.sets.get(key) || new Set())];
+  }
+
+  async del(key) {
+    return this.values.delete(key) ? 1 : 0;
+  }
+
+  multi() {
+    const ops = [];
+    const tx = {
+      set: (key, value) => { ops.push(() => this.set(key, value)); return tx; },
+      sAdd: (key, value) => { ops.push(() => this.sAdd(key, value)); return tx; },
+      sRem: (key, value) => { ops.push(() => this.sRem(key, value)); return tx; },
+      del: (key) => { ops.push(() => this.del(key)); return tx; },
+      exec: async () => {
+        const out = [];
+        for (const op of ops) out.push([null, await op()]);
+        return out;
+      },
+    };
+    return tx;
+  }
 }
 
 async function startApiServer(client, opts = {}) {
@@ -878,7 +935,6 @@ test('server file upload CRUD and list endpoints', async () => {
       method: 'DELETE',
     });
     assert.equal(deleteRes.status, 200);
-
     // Download non-existent file
     const missingRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=${testProjectId}&folderKey=drawings&fileName=nonexistent.txt`);
     assert.equal(missingRes.status, 404);
@@ -892,6 +948,46 @@ test('server file upload CRUD and list endpoints', async () => {
     await new Promise((resolve) => app.server.close(resolve));
     // Clean up test uploads
     await fs.rm(testProjectDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+
+test('server file upload and download endpoints work with redis-backed EvidenceDesk store', async () => {
+  const redisStore = new RedisEvidenceDeskFileStore(new FakeRedis());
+  const app = await startApiServer(new SurveyCadClient(), { evidenceDeskFileStore: redisStore });
+  const testProjectId = `redis-project-${Date.now()}`;
+  const boundary = '----RedisUploadBoundary';
+  const body = [
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="projectId"',
+    '',
+    testProjectId,
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="folderKey"',
+    '',
+    'deeds',
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="file"; filename="redis-proof.pdf"',
+    'Content-Type: application/pdf',
+    '',
+    '%PDF-1.4 redis proof',
+    `--${boundary}--`,
+  ].join('\r\n');
+
+  try {
+    const uploadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    assert.equal(uploadRes.status, 201);
+    const uploaded = await uploadRes.json();
+    const downloadRes = await fetch(`http://127.0.0.1:${app.port}${uploaded.resource.reference.value}`);
+    assert.equal(downloadRes.status, 200);
+    assert.equal(downloadRes.headers.get('content-type'), 'application/pdf');
+    assert.equal(await downloadRes.text(), '%PDF-1.4 redis proof');
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
   }
 });
 
