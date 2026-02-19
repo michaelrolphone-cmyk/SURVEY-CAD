@@ -647,8 +647,18 @@
     function getCpfPdfUrl(resource) {
       const reference = resource?.reference || {};
       const metadata = reference.metadata || {};
+      const referenceType = String(reference.type || '').trim();
+      const referenceValue = String(reference.value || '').trim();
       const metadataPdf = typeof metadata.pdfUrl === 'string' ? metadata.pdfUrl.trim() : '';
-      const instrument = String(reference.value || metadata.instrument || '').trim();
+      const instrument = String(metadata.instrument || referenceValue).trim();
+
+      if (referenceType === 'server-upload' && referenceValue) {
+        return new URL(referenceValue, window.location.origin).toString();
+      }
+
+      if (metadataPdf.startsWith('/')) {
+        return new URL(metadataPdf, window.location.origin).toString();
+      }
 
       let remoteUrl = '';
       if (/^https?:\/\//i.test(metadataPdf)) {
