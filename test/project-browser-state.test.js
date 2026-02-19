@@ -253,6 +253,9 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
 
   assert.match(projectBrowserHtml, /const\s+ADA_CPF_PDF_BASE\s*=\s*'https:\/\/gisprod\.adacounty\.id\.gov\/apps\/acdscpf\/CpfPdfs\/'/, 'Project Browser should define Ada CP&F PDF base URL for instrument lookup links');
   assert.match(projectBrowserHtml, /function\s+getCpfPdfUrl\s*\(/, 'Project Browser should include a CP&F PDF URL resolver helper');
+  assert.match(projectBrowserHtml, /referenceType\s*===\s*'server-upload'\s*&&\s*referenceValue/, 'CP&F resolver should treat uploaded server files differently from referenced instruments');
+  assert.match(projectBrowserHtml, /return\s+new URL\(referenceValue, window\.location\.origin\)\.toString\(\)/, 'Uploaded CP&F entries should resolve to same-origin download URLs for preview/open actions');
+  assert.match(projectBrowserHtml, /if\s*\(metadataPdf\.startsWith\('\/'\)\)/, 'CP&F resolver should support relative metadata pdf URLs without forcing county lookup fallback');
   assert.match(projectBrowserHtml, /const\s+proxyUrl\s*=\s*new URL\('\/api\/ros-pdf', window\.location\.origin\)/, 'Project Browser should route CP&F opens through the PDF proxy endpoint');
   assert.match(projectBrowserHtml, /function\s+openCpfPdfFromResource\s*\(/, 'Project Browser should include a CP&F open handler');
   assert.match(projectBrowserHtml, /window\.open\('', '_blank', 'popup=yes,width=1200,height=900'\)/, 'Project Browser should open CP&F PDFs in a dedicated popup window shell before navigating to the PDF');
