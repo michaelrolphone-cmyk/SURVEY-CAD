@@ -24,16 +24,33 @@
     }
   ],
   "tags": [
-    { "name": "LineForge", "description": "Real-time collaborative drawing, cursors, locks, AR presence." },
-    { "name": "LocalStorageSync", "description": "Differential key-value state synchronization." },
-    { "name": "CrewPresence", "description": "Online crew member tracking." },
-    { "name": "Worker", "description": "Distributed background worker task queue." },
-    { "name": "LMProxy", "description": "LM Studio proxy hub for AI chat relay." }
+    {
+      "name": "LineForge",
+      "description": "Real-time collaborative drawing, cursors, locks, AR presence."
+    },
+    {
+      "name": "LocalStorageSync",
+      "description": "Differential key-value state synchronization."
+    },
+    {
+      "name": "CrewPresence",
+      "description": "Online crew member tracking."
+    },
+    {
+      "name": "Worker",
+      "description": "Distributed background worker task queue."
+    },
+    {
+      "name": "LMProxy",
+      "description": "LM Studio proxy hub for AI chat relay."
+    }
   ],
   "paths": {
     "/ws/lineforge": {
       "get": {
-        "tags": ["LineForge"],
+        "tags": [
+          "LineForge"
+        ],
         "summary": "LineForge collaboration WebSocket",
         "description": "Upgrade to a WebSocket for real-time multi-user collaboration.\n\n- Query param: room (default \"default\")\n- Auth: none\n- Unrecognized paths return 404\n\nServer sends `welcome` immediately after connect (full room state).",
         "parameters": [
@@ -41,14 +58,23 @@
             "name": "room",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "default" },
+            "schema": {
+              "type": "string",
+              "default": "default"
+            },
             "description": "Collaboration room identifier."
           }
         ],
         "responses": {
-          "101": { "description": "Switching Protocols (WebSocket upgrade)." },
-          "400": { "description": "Bad Request (invalid upgrade / invalid query params)." },
-          "404": { "description": "Not Found (unrecognized WebSocket path)." }
+          "101": {
+            "description": "Switching Protocols (WebSocket upgrade)."
+          },
+          "400": {
+            "description": "Bad Request (invalid upgrade / invalid query params)."
+          },
+          "404": {
+            "description": "Not Found (unrecognized WebSocket path)."
+          }
         },
         "x-websocket": {
           "encoding": "json-text",
@@ -68,28 +94,44 @@
             ]
           },
           "messages": {
-            "serverToClient": { "$ref": "#/components/schemas/LineForgeServerMessage" },
-            "clientToServer": { "$ref": "#/components/schemas/LineForgeClientMessage" }
+            "serverToClient": {
+              "$ref": "#/components/schemas/LineForgeServerMessage"
+            },
+            "clientToServer": {
+              "$ref": "#/components/schemas/LineForgeClientMessage"
+            }
           }
         }
       }
     },
     "/ws/localstorage-sync": {
       "get": {
-        "tags": ["LocalStorageSync"],
+        "tags": [
+          "LocalStorageSync"
+        ],
         "summary": "LocalStorage sync WebSocket",
         "description": "Upgrade to a WebSocket for differential key-value store synchronization.\n\n- Auth: none\n- Server sends `sync-welcome` immediately after connect (full state snapshot).",
         "responses": {
-          "101": { "description": "Switching Protocols (WebSocket upgrade)." },
-          "400": { "description": "Bad Request (invalid upgrade)." },
-          "404": { "description": "Not Found (unrecognized WebSocket path)." }
+          "101": {
+            "description": "Switching Protocols (WebSocket upgrade)."
+          },
+          "400": {
+            "description": "Bad Request (invalid upgrade)."
+          },
+          "404": {
+            "description": "Not Found (unrecognized WebSocket path)."
+          }
         },
         "x-websocket": {
           "encoding": "json-text",
           "direction": "bidirectional",
           "messages": {
-            "serverToClient": { "$ref": "#/components/schemas/LocalStorageSyncServerMessage" },
-            "clientToServer": { "$ref": "#/components/schemas/LocalStorageSyncClientMessage" }
+            "serverToClient": {
+              "$ref": "#/components/schemas/LocalStorageSyncServerMessage"
+            },
+            "clientToServer": {
+              "$ref": "#/components/schemas/LocalStorageSyncClientMessage"
+            }
           },
           "wellKnownKeys": [
             "surveyfoundryCrewProfiles",
@@ -106,27 +148,41 @@
     },
     "/ws/crew-presence": {
       "get": {
-        "tags": ["CrewPresence"],
+        "tags": [
+          "CrewPresence"
+        ],
         "summary": "Crew presence WebSocket",
         "description": "Upgrade to a WebSocket that tracks which crew members are currently online.\n\n- Auth: none\n- Server sends `crew-presence-welcome` immediately after connect.\n- Client should send `crew-presence-identify` to associate the connection with a crew member id (can change identity later).",
         "responses": {
-          "101": { "description": "Switching Protocols (WebSocket upgrade)." },
-          "400": { "description": "Bad Request (invalid upgrade)." },
-          "404": { "description": "Not Found (unrecognized WebSocket path)." }
+          "101": {
+            "description": "Switching Protocols (WebSocket upgrade)."
+          },
+          "400": {
+            "description": "Bad Request (invalid upgrade)."
+          },
+          "404": {
+            "description": "Not Found (unrecognized WebSocket path)."
+          }
         },
         "x-websocket": {
           "encoding": "json-text",
           "direction": "bidirectional",
           "messages": {
-            "serverToClient": { "$ref": "#/components/schemas/CrewPresenceServerMessage" },
-            "clientToServer": { "$ref": "#/components/schemas/CrewPresenceClientMessage" }
+            "serverToClient": {
+              "$ref": "#/components/schemas/CrewPresenceServerMessage"
+            },
+            "clientToServer": {
+              "$ref": "#/components/schemas/CrewPresenceClientMessage"
+            }
           }
         }
       }
     },
     "/ws/worker": {
       "get": {
-        "tags": ["Worker"],
+        "tags": [
+          "Worker"
+        ],
         "summary": "Worker task scheduler WebSocket",
         "description": "Upgrade to a WebSocket for distributed task dispatch to background workers.\n\nHandshake:\n1) Worker connects\n2) Worker MUST send `hello` as the first message\n3) Server replies `welcome`\n4) Server sends `ping` heartbeats; worker replies `pong`\n5) Server dispatches `task` messages; worker replies `task-result`\n\n- Query param: pool (default \"default\")\n- Auth: none",
         "parameters": [
@@ -134,14 +190,23 @@
             "name": "pool",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "default" },
+            "schema": {
+              "type": "string",
+              "default": "default"
+            },
             "description": "Worker pool identifier."
           }
         ],
         "responses": {
-          "101": { "description": "Switching Protocols (WebSocket upgrade)." },
-          "400": { "description": "Bad Request (invalid upgrade / invalid pool)." },
-          "404": { "description": "Not Found (unrecognized WebSocket path)." }
+          "101": {
+            "description": "Switching Protocols (WebSocket upgrade)."
+          },
+          "400": {
+            "description": "Bad Request (invalid upgrade / invalid pool)."
+          },
+          "404": {
+            "description": "Not Found (unrecognized WebSocket path)."
+          }
         },
         "x-websocket": {
           "encoding": "json-text",
@@ -151,8 +216,12 @@
             "offlineAfterMs": 30000
           },
           "messages": {
-            "serverToClient": { "$ref": "#/components/schemas/WorkerServerMessage" },
-            "clientToServer": { "$ref": "#/components/schemas/WorkerClientMessage" }
+            "serverToClient": {
+              "$ref": "#/components/schemas/WorkerServerMessage"
+            },
+            "clientToServer": {
+              "$ref": "#/components/schemas/WorkerClientMessage"
+            }
           },
           "x-write-guard": {
             "description": "Implementation detail: socket write guard wraps raw JSON writes into WS text frames and closes with 1002 on apparent HTTP writes."
@@ -162,7 +231,9 @@
     },
     "/ws/lmproxy": {
       "get": {
-        "tags": ["LMProxy"],
+        "tags": [
+          "LMProxy"
+        ],
         "summary": "LM proxy hub WebSocket",
         "description": "Upgrade to a WebSocket hub that routes UI chat requests to connected proxy backends.\n\nAuth:\n- Optional token via `token` query param or `x-control-token` header.\n- Required only if server CONTROL_TOKEN is configured.\n\nHandshake:\n1) Server sends `server_hello`\n2) Client MUST send `hello` with `client_id` (and role/capabilities)\n3) Server replies `hello_ack`\n4) Messages sent before `hello` receive `error`.\n\nMessage routing:\n- UI client sends `chat`/`models`/`cancel`.\n- Proxy client emits `started`/`delta`/`chunk`/`done`/`error`/`models`/`cancelled` with matching `id`; hub forwards to originating UI.",
         "parameters": [
@@ -170,20 +241,34 @@
             "name": "token",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Control token (required only if server CONTROL_TOKEN is set)."
           }
         ],
         "security": [
-          { "ControlTokenQuery": [] },
-          { "ControlTokenHeader": [] },
+          {
+            "ControlTokenQuery": []
+          },
+          {
+            "ControlTokenHeader": []
+          },
           {}
         ],
         "responses": {
-          "101": { "description": "Switching Protocols (WebSocket upgrade)." },
-          "401": { "description": "Unauthorized (token required/invalid when CONTROL_TOKEN is enabled)." },
-          "403": { "description": "Forbidden (token invalid)." },
-          "404": { "description": "Not Found (unrecognized WebSocket path)." }
+          "101": {
+            "description": "Switching Protocols (WebSocket upgrade)."
+          },
+          "401": {
+            "description": "Unauthorized (token required/invalid when CONTROL_TOKEN is enabled)."
+          },
+          "403": {
+            "description": "Forbidden (token invalid)."
+          },
+          "404": {
+            "description": "Not Found (unrecognized WebSocket path)."
+          }
         },
         "x-websocket": {
           "encoding": "json-text",
@@ -194,8 +279,12 @@
             "maxPayloadBytes": 10485760
           },
           "messages": {
-            "serverToClient": { "$ref": "#/components/schemas/LMProxyServerMessage" },
-            "clientToServer": { "$ref": "#/components/schemas/LMProxyClientMessage" }
+            "serverToClient": {
+              "$ref": "#/components/schemas/LMProxyServerMessage"
+            },
+            "clientToServer": {
+              "$ref": "#/components/schemas/LMProxyClientMessage"
+            }
           }
         }
       }
@@ -220,22 +309,33 @@
       "Uuid": {
         "type": "string",
         "description": "UUID string.",
-        "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+        "examples": [
+          "550e8400-e29b-41d4-a716-446655440000"
+        ]
       },
       "TimestampMs": {
         "type": "integer",
         "description": "Milliseconds since epoch.",
-        "examples": [1739664000000]
+        "examples": [
+          1739664000000
+        ]
       },
       "JsonValue": {
         "description": "Arbitrary JSON value."
       },
       "Peer": {
         "type": "object",
-        "required": ["clientId", "color"],
+        "required": [
+          "clientId",
+          "color"
+        ],
         "properties": {
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "color": { "$ref": "#/components/schemas/HexColor" }
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "color": {
+            "$ref": "#/components/schemas/HexColor"
+          }
         },
         "additionalProperties": false
       },
@@ -243,397 +343,854 @@
         "type": "string",
         "description": "Hex color string.",
         "pattern": "^#[0-9a-fA-F]{6}$",
-        "examples": ["#40a9ff"]
+        "examples": [
+          "#40a9ff"
+        ]
       },
-
       "CursorPosition": {
         "type": "object",
-        "required": ["x", "y"],
+        "required": [
+          "x",
+          "y"
+        ],
         "properties": {
-          "x": { "type": "number" },
-          "y": { "type": "number" }
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
         },
         "additionalProperties": false
       },
-
       "LockEntityType": {
         "type": "string",
-        "enum": ["point", "line"]
+        "enum": [
+          "point",
+          "line"
+        ]
       },
       "LockAction": {
         "type": "string",
-        "enum": ["locked", "released"]
+        "enum": [
+          "locked",
+          "released"
+        ]
       },
       "LockDeniedReason": {
         "type": "string",
-        "enum": ["already-locked", "invalid-entity"]
+        "enum": [
+          "already-locked",
+          "invalid-entity"
+        ]
       },
       "Lock": {
         "type": "object",
-        "required": ["entityType", "entityId", "ownerClientId", "ownerColor"],
+        "required": [
+          "entityType",
+          "entityId",
+          "ownerClientId",
+          "ownerColor"
+        ],
         "properties": {
-          "entityType": { "$ref": "#/components/schemas/LockEntityType" },
-          "entityId": { "type": "string", "minLength": 1 },
-          "ownerClientId": { "$ref": "#/components/schemas/Uuid" },
-          "ownerColor": { "$ref": "#/components/schemas/HexColor" }
+          "entityType": {
+            "$ref": "#/components/schemas/LockEntityType"
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ownerClientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ownerColor": {
+            "$ref": "#/components/schemas/HexColor"
+          }
         },
         "additionalProperties": false
       },
-
       "ARPresence": {
         "type": "object",
         "description": "AR presence payload. All fields are optional; non-finite numeric fields are omitted from broadcasts.",
         "properties": {
-          "x": { "type": "number" },
-          "y": { "type": "number" },
-          "lat": { "type": "number" },
-          "lon": { "type": "number" },
-          "altFeet": { "type": "number" },
-          "headingRad": { "type": "number" },
-          "pitchRad": { "type": "number" },
-          "rollRad": { "type": "number" }
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "altFeet": {
+            "type": "number"
+          },
+          "headingRad": {
+            "type": "number"
+          },
+          "pitchRad": {
+            "type": "number"
+          },
+          "rollRad": {
+            "type": "number"
+          }
         },
         "additionalProperties": false
       },
-
       "LineForgeServerMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/LineForgeWelcome" },
-          { "$ref": "#/components/schemas/LineForgePeerJoined" },
-          { "$ref": "#/components/schemas/LineForgePeerLeft" },
-          { "$ref": "#/components/schemas/LineForgeCursorBroadcast" },
-          { "$ref": "#/components/schemas/LineForgeStateBroadcast" },
-          { "$ref": "#/components/schemas/LineForgeStateAck" },
-          { "$ref": "#/components/schemas/LineForgeStateRejected" },
-          { "$ref": "#/components/schemas/LineForgeLockGranted" },
-          { "$ref": "#/components/schemas/LineForgeLockDenied" },
-          { "$ref": "#/components/schemas/LineForgeLockUpdated" },
-          { "$ref": "#/components/schemas/LineForgeARPresenceBroadcast" },
-          { "$ref": "#/components/schemas/LineForgePointForgeImport" }
+          {
+            "$ref": "#/components/schemas/LineForgeWelcome"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgePeerJoined"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgePeerLeft"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeCursorBroadcast"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeStateBroadcast"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeStateAck"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeStateRejected"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeLockGranted"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeLockDenied"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeLockUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeARPresenceBroadcast"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgePointForgeImport"
+          },
+          {
+            "$ref": "#/components/schemas/LineforgeFieldToFinishUpdatedMessage"
+          }
         ],
-        "discriminator": { "propertyName": "type" },
-        "description": "Server → client messages for /ws/lineforge."
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "description": "Server \u2192 client messages for /ws/lineforge."
       },
-
       "LineForgeClientMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/LineForgeCursorSend" },
-          { "$ref": "#/components/schemas/LineForgeStateSend" },
-          { "$ref": "#/components/schemas/LineForgeLockRequest" },
-          { "$ref": "#/components/schemas/LineForgeLockRelease" },
-          { "$ref": "#/components/schemas/LineForgeARPresenceSend" }
+          {
+            "$ref": "#/components/schemas/LineForgeCursorSend"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeStateSend"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeLockRequest"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeLockRelease"
+          },
+          {
+            "$ref": "#/components/schemas/LineForgeARPresenceSend"
+          }
         ],
-        "discriminator": { "propertyName": "type" },
-        "description": "Client → server messages for /ws/lineforge."
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "description": "Client \u2192 server messages for /ws/lineforge."
       },
-
       "LineForgeWelcome": {
         "type": "object",
-        "required": ["type", "clientId", "color", "peers", "state", "revision", "locks"],
+        "required": [
+          "type",
+          "clientId",
+          "color",
+          "peers",
+          "state",
+          "revision",
+          "locks"
+        ],
         "properties": {
-          "type": { "const": "welcome" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "color": { "$ref": "#/components/schemas/HexColor" },
+          "type": {
+            "const": "welcome"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "color": {
+            "$ref": "#/components/schemas/HexColor"
+          },
           "peers": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/Peer" }
+            "items": {
+              "$ref": "#/components/schemas/Peer"
+            }
           },
-          "state": { "$ref": "#/components/schemas/JsonValue" },
-          "revision": { "type": "integer", "minimum": 0 },
+          "state": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
           "locks": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/Lock" }
+            "items": {
+              "$ref": "#/components/schemas/Lock"
+            }
           }
         },
         "additionalProperties": true
       },
       "LineForgePeerJoined": {
         "type": "object",
-        "required": ["type", "clientId", "color"],
+        "required": [
+          "type",
+          "clientId",
+          "color"
+        ],
         "properties": {
-          "type": { "const": "peer-joined" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "color": { "$ref": "#/components/schemas/HexColor" }
+          "type": {
+            "const": "peer-joined"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "color": {
+            "$ref": "#/components/schemas/HexColor"
+          }
         },
         "additionalProperties": true
       },
       "LineForgePeerLeft": {
         "type": "object",
-        "required": ["type", "clientId"],
+        "required": [
+          "type",
+          "clientId"
+        ],
         "properties": {
-          "type": { "const": "peer-left" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" }
+          "type": {
+            "const": "peer-left"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeCursorBroadcast": {
         "type": "object",
-        "required": ["type", "clientId", "color", "cursor", "at"],
+        "required": [
+          "type",
+          "clientId",
+          "color",
+          "cursor",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "cursor" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "color": { "$ref": "#/components/schemas/HexColor" },
-          "cursor": { "$ref": "#/components/schemas/CursorPosition" },
-          "crewMemberId": { "type": ["string", "null"] },
-          "crewName": { "type": ["string", "null"] },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "cursor"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "color": {
+            "$ref": "#/components/schemas/HexColor"
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/CursorPosition"
+          },
+          "crewMemberId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crewName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeStateBroadcast": {
         "type": "object",
-        "required": ["type", "clientId", "state", "revision", "at"],
+        "required": [
+          "type",
+          "clientId",
+          "state",
+          "revision",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "state" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "state": { "$ref": "#/components/schemas/JsonValue" },
-          "revision": { "type": "integer", "minimum": 0 },
-          "requestId": { "type": "string" },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "state"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeStateAck": {
         "type": "object",
-        "required": ["type", "requestId", "revision", "state", "at"],
+        "required": [
+          "type",
+          "requestId",
+          "revision",
+          "state",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "state-ack" },
-          "requestId": { "type": "string" },
-          "revision": { "type": "integer", "minimum": 0 },
-          "state": { "$ref": "#/components/schemas/JsonValue" },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "state-ack"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeStateRejected": {
         "type": "object",
-        "required": ["type", "requestId", "reason", "expectedRevision", "state", "revision", "at"],
+        "required": [
+          "type",
+          "requestId",
+          "reason",
+          "expectedRevision",
+          "state",
+          "revision",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "state-rejected" },
-          "requestId": { "type": "string" },
-          "reason": { "const": "revision-mismatch" },
-          "expectedRevision": { "type": "integer", "minimum": 0 },
-          "state": { "$ref": "#/components/schemas/JsonValue" },
-          "revision": { "type": "integer", "minimum": 0 },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "state-rejected"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "reason": {
+            "const": "revision-mismatch"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeLockGranted": {
         "type": "object",
-        "required": ["type", "requestId", "entityType", "entityId", "ownerClientId", "ownerColor", "at"],
+        "required": [
+          "type",
+          "requestId",
+          "entityType",
+          "entityId",
+          "ownerClientId",
+          "ownerColor",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "lock-granted" },
-          "requestId": { "type": "string" },
-          "entityType": { "$ref": "#/components/schemas/LockEntityType" },
-          "entityId": { "type": "string", "minLength": 1 },
-          "ownerClientId": { "$ref": "#/components/schemas/Uuid" },
-          "ownerColor": { "$ref": "#/components/schemas/HexColor" },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "lock-granted"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/LockEntityType"
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ownerClientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ownerColor": {
+            "$ref": "#/components/schemas/HexColor"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeLockDenied": {
         "type": "object",
-        "required": ["type", "requestId", "reason", "entityType", "entityId", "ownerClientId", "ownerColor", "at"],
+        "required": [
+          "type",
+          "requestId",
+          "reason",
+          "entityType",
+          "entityId",
+          "ownerClientId",
+          "ownerColor",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "lock-denied" },
-          "requestId": { "type": "string" },
-          "reason": { "$ref": "#/components/schemas/LockDeniedReason" },
-          "entityType": { "$ref": "#/components/schemas/LockEntityType" },
-          "entityId": { "type": "string", "minLength": 1 },
-          "ownerClientId": { "$ref": "#/components/schemas/Uuid" },
-          "ownerColor": { "$ref": "#/components/schemas/HexColor" },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "lock-denied"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/LockDeniedReason"
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/LockEntityType"
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ownerClientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ownerColor": {
+            "$ref": "#/components/schemas/HexColor"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeLockUpdated": {
         "type": "object",
-        "required": ["type", "action", "entityType", "entityId", "ownerClientId", "ownerColor", "at"],
+        "required": [
+          "type",
+          "action",
+          "entityType",
+          "entityId",
+          "ownerClientId",
+          "ownerColor",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "lock-updated" },
-          "action": { "$ref": "#/components/schemas/LockAction" },
-          "reason": { "type": "string", "description": "Present when released due to timeout (reason: \"timeout\")." },
-          "entityType": { "$ref": "#/components/schemas/LockEntityType" },
-          "entityId": { "type": "string", "minLength": 1 },
-          "ownerClientId": { "$ref": "#/components/schemas/Uuid" },
-          "ownerColor": { "$ref": "#/components/schemas/HexColor" },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "lock-updated"
+          },
+          "action": {
+            "$ref": "#/components/schemas/LockAction"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Present when released due to timeout (reason: \"timeout\")."
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/LockEntityType"
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ownerClientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ownerColor": {
+            "$ref": "#/components/schemas/HexColor"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeARPresenceBroadcast": {
         "type": "object",
-        "required": ["type", "clientId", "color", "presence", "at"],
+        "required": [
+          "type",
+          "clientId",
+          "color",
+          "presence",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "ar-presence" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "color": { "$ref": "#/components/schemas/HexColor" },
-          "presence": { "$ref": "#/components/schemas/ARPresence" },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "ar-presence"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "color": {
+            "$ref": "#/components/schemas/HexColor"
+          },
+          "presence": {
+            "$ref": "#/components/schemas/ARPresence"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LineForgePointForgeImport": {
         "type": "object",
-        "required": ["type", "exportId", "at"],
+        "required": [
+          "type",
+          "exportId",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "pointforge-import" },
-          "exportId": { "type": "string" },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "pointforge-import"
+          },
+          "exportId": {
+            "type": "string"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
-
       "LineForgeCursorSend": {
         "type": "object",
-        "required": ["type", "cursor"],
+        "required": [
+          "type",
+          "cursor"
+        ],
         "properties": {
-          "type": { "const": "cursor" },
-          "cursor": { "$ref": "#/components/schemas/CursorPosition" },
-          "crewMemberId": { "type": "string" },
-          "crewName": { "type": "string" }
+          "type": {
+            "const": "cursor"
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/CursorPosition"
+          },
+          "crewMemberId": {
+            "type": "string"
+          },
+          "crewName": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeStateSend": {
         "type": "object",
-        "required": ["type", "state", "baseRevision"],
+        "required": [
+          "type",
+          "state",
+          "baseRevision"
+        ],
         "properties": {
-          "type": { "const": "state" },
-          "state": { "$ref": "#/components/schemas/JsonValue" },
-          "baseRevision": { "type": "integer", "minimum": 0 },
-          "requestId": { "type": "string" }
+          "type": {
+            "const": "state"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "baseRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "requestId": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeLockRequest": {
         "type": "object",
-        "required": ["type", "entityType", "entityId"],
+        "required": [
+          "type",
+          "entityType",
+          "entityId"
+        ],
         "properties": {
-          "type": { "const": "lock-request" },
-          "entityType": { "$ref": "#/components/schemas/LockEntityType" },
-          "entityId": { "type": "string", "minLength": 1 },
-          "requestId": { "type": "string" }
+          "type": {
+            "const": "lock-request"
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/LockEntityType"
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestId": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "LineForgeLockRelease": {
         "type": "object",
-        "required": ["type", "entityType", "entityId"],
+        "required": [
+          "type",
+          "entityType",
+          "entityId"
+        ],
         "properties": {
-          "type": { "const": "lock-release" },
-          "entityType": { "$ref": "#/components/schemas/LockEntityType" },
-          "entityId": { "type": "string", "minLength": 1 }
+          "type": {
+            "const": "lock-release"
+          },
+          "entityType": {
+            "$ref": "#/components/schemas/LockEntityType"
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": true
       },
       "LineForgeARPresenceSend": {
         "type": "object",
-        "required": ["type", "presence"],
+        "required": [
+          "type",
+          "presence"
+        ],
         "properties": {
-          "type": { "const": "ar-presence" },
-          "presence": { "$ref": "#/components/schemas/ARPresence" }
+          "type": {
+            "const": "ar-presence"
+          },
+          "presence": {
+            "$ref": "#/components/schemas/ARPresence"
+          }
         },
         "additionalProperties": true
       },
-
       "LocalStorageSyncServerMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/SyncWelcome" },
-          { "$ref": "#/components/schemas/SyncAck" },
-          { "$ref": "#/components/schemas/SyncChecksumMismatch" },
-          { "$ref": "#/components/schemas/SyncDifferentialApplied" }
+          {
+            "$ref": "#/components/schemas/SyncWelcome"
+          },
+          {
+            "$ref": "#/components/schemas/SyncAck"
+          },
+          {
+            "$ref": "#/components/schemas/SyncChecksumMismatch"
+          },
+          {
+            "$ref": "#/components/schemas/SyncDifferentialApplied"
+          }
         ],
-        "discriminator": { "propertyName": "type" },
-        "description": "Server → client messages for /ws/localstorage-sync."
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "description": "Server \u2192 client messages for /ws/localstorage-sync."
       },
       "LocalStorageSyncClientMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/SyncDifferential" },
-          { "$ref": "#/components/schemas/SyncDifferentialBatch" }
+          {
+            "$ref": "#/components/schemas/SyncDifferential"
+          },
+          {
+            "$ref": "#/components/schemas/SyncDifferentialBatch"
+          }
         ],
-        "discriminator": { "propertyName": "type" },
-        "description": "Client → server messages for /ws/localstorage-sync."
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "description": "Client \u2192 server messages for /ws/localstorage-sync."
       },
       "SyncStateFull": {
         "type": "object",
-        "required": ["version", "snapshot", "checksum", "updatedAt"],
+        "required": [
+          "version",
+          "snapshot",
+          "checksum",
+          "updatedAt"
+        ],
         "properties": {
-          "version": { "type": "integer", "minimum": 0 },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
           "snapshot": {
             "type": "object",
             "description": "Key-value snapshot; values are strings.",
-            "additionalProperties": { "type": "string" }
+            "additionalProperties": {
+              "type": "string"
+            }
           },
-          "checksum": { "type": "string" },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "checksum": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
         "additionalProperties": false
       },
       "SyncStateBrief": {
         "type": "object",
-        "required": ["version", "checksum"],
+        "required": [
+          "version",
+          "checksum"
+        ],
         "properties": {
-          "version": { "type": "integer", "minimum": 0 },
-          "checksum": { "type": "string" }
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "checksum": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "SyncWelcome": {
         "type": "object",
-        "required": ["type", "clientId", "state"],
+        "required": [
+          "type",
+          "clientId",
+          "state"
+        ],
         "properties": {
-          "type": { "const": "sync-welcome" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "state": { "$ref": "#/components/schemas/SyncStateFull" }
+          "type": {
+            "const": "sync-welcome"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SyncStateFull"
+          }
         },
         "additionalProperties": true
       },
       "SyncAck": {
         "type": "object",
-        "required": ["type", "requestId", "state"],
+        "required": [
+          "type",
+          "requestId",
+          "state"
+        ],
         "properties": {
-          "type": { "const": "sync-ack" },
-          "requestId": { "type": "string" },
-          "state": { "$ref": "#/components/schemas/SyncStateFull" }
+          "type": {
+            "const": "sync-ack"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SyncStateFull"
+          }
         },
         "additionalProperties": true
       },
       "SyncChecksumMismatch": {
         "type": "object",
-        "required": ["type", "requestId", "state"],
+        "required": [
+          "type",
+          "requestId",
+          "state"
+        ],
         "properties": {
-          "type": { "const": "sync-checksum-mismatch" },
-          "requestId": { "type": "string" },
-          "state": { "$ref": "#/components/schemas/SyncStateFull" }
+          "type": {
+            "const": "sync-checksum-mismatch"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SyncStateFull"
+          }
         },
         "additionalProperties": true
       },
       "SyncDifferentialApplied": {
         "type": "object",
-        "required": ["type", "requestId", "operations", "state"],
+        "required": [
+          "type",
+          "requestId",
+          "operations",
+          "state"
+        ],
         "properties": {
-          "type": { "const": "sync-differential-applied" },
-          "requestId": { "type": "string" },
-          "originClientId": { "type": ["string", "null"] },
+          "type": {
+            "const": "sync-differential-applied"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "originClientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "operations": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/SyncOperation" }
+            "items": {
+              "$ref": "#/components/schemas/SyncOperation"
+            }
           },
-          "state": { "$ref": "#/components/schemas/SyncStateBrief" }
+          "state": {
+            "$ref": "#/components/schemas/SyncStateBrief"
+          }
         },
         "additionalProperties": true
       },
       "SyncDifferential": {
         "type": "object",
-        "required": ["type", "operations"],
+        "required": [
+          "type",
+          "operations"
+        ],
         "properties": {
-          "type": { "const": "sync-differential" },
+          "type": {
+            "const": "sync-differential"
+          },
           "operations": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/SyncOperation" },
+            "items": {
+              "$ref": "#/components/schemas/SyncOperation"
+            },
             "minItems": 1
           },
           "baseChecksum": {
@@ -641,17 +1198,23 @@
             "description": "Expected server checksum for conflict detection; empty string to skip.",
             "default": ""
           },
-          "requestId": { "type": "string" }
+          "requestId": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "SyncDiff": {
         "type": "object",
-        "required": ["operations"],
+        "required": [
+          "operations"
+        ],
         "properties": {
           "operations": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/SyncOperation" },
+            "items": {
+              "$ref": "#/components/schemas/SyncOperation"
+            },
             "minItems": 1
           }
         },
@@ -659,249 +1222,543 @@
       },
       "SyncDifferentialBatch": {
         "type": "object",
-        "required": ["type", "diffs"],
+        "required": [
+          "type",
+          "diffs"
+        ],
         "properties": {
-          "type": { "const": "sync-differential-batch" },
+          "type": {
+            "const": "sync-differential-batch"
+          },
           "diffs": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/SyncDiff" },
+            "items": {
+              "$ref": "#/components/schemas/SyncDiff"
+            },
             "minItems": 1
           },
-          "requestId": { "type": "string" }
+          "requestId": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "SyncOperation": {
         "oneOf": [
-          { "$ref": "#/components/schemas/SyncSetOperation" },
-          { "$ref": "#/components/schemas/SyncRemoveOperation" },
-          { "$ref": "#/components/schemas/SyncClearOperation" }
+          {
+            "$ref": "#/components/schemas/SyncSetOperation"
+          },
+          {
+            "$ref": "#/components/schemas/SyncRemoveOperation"
+          },
+          {
+            "$ref": "#/components/schemas/SyncClearOperation"
+          }
         ],
-        "discriminator": { "propertyName": "type" },
+        "discriminator": {
+          "propertyName": "type"
+        },
         "description": "Operation = set | remove | clear"
       },
       "SyncSetOperation": {
         "type": "object",
-        "required": ["type", "key", "value"],
+        "required": [
+          "type",
+          "key",
+          "value"
+        ],
         "properties": {
-          "type": { "const": "set" },
-          "key": { "type": "string", "minLength": 1 },
-          "value": { "type": "string" }
+          "type": {
+            "const": "set"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "string"
+          }
         },
         "additionalProperties": false
       },
       "SyncRemoveOperation": {
         "type": "object",
-        "required": ["type", "key"],
+        "required": [
+          "type",
+          "key"
+        ],
         "properties": {
-          "type": { "const": "remove" },
-          "key": { "type": "string", "minLength": 1 }
+          "type": {
+            "const": "remove"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": false
       },
       "SyncClearOperation": {
         "type": "object",
-        "required": ["type"],
+        "required": [
+          "type"
+        ],
         "properties": {
-          "type": { "const": "clear" }
+          "type": {
+            "const": "clear"
+          }
         },
         "additionalProperties": false
       },
-
       "CrewPresenceServerMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/CrewPresenceWelcome" },
-          { "$ref": "#/components/schemas/CrewPresenceUpdate" }
+          {
+            "$ref": "#/components/schemas/CrewPresenceWelcome"
+          },
+          {
+            "$ref": "#/components/schemas/CrewPresenceUpdate"
+          }
         ],
-        "discriminator": { "propertyName": "type" }
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "CrewPresenceClientMessage": {
-        "oneOf": [{ "$ref": "#/components/schemas/CrewPresenceIdentify" }],
-        "discriminator": { "propertyName": "type" }
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CrewPresenceIdentify"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "CrewPresenceWelcome": {
         "type": "object",
-        "required": ["type", "clientId", "online"],
+        "required": [
+          "type",
+          "clientId",
+          "online"
+        ],
         "properties": {
-          "type": { "const": "crew-presence-welcome" },
-          "clientId": { "$ref": "#/components/schemas/Uuid" },
-          "online": { "type": "array", "items": { "type": "string" } }
+          "type": {
+            "const": "crew-presence-welcome"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "online": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "additionalProperties": true
       },
       "CrewPresenceUpdate": {
         "type": "object",
-        "required": ["type", "online"],
+        "required": [
+          "type",
+          "online"
+        ],
         "properties": {
-          "type": { "const": "crew-presence-update" },
-          "online": { "type": "array", "items": { "type": "string" } }
+          "type": {
+            "const": "crew-presence-update"
+          },
+          "online": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "additionalProperties": true
       },
       "CrewPresenceIdentify": {
         "type": "object",
-        "required": ["type", "crewMemberId"],
+        "required": [
+          "type",
+          "crewMemberId"
+        ],
         "properties": {
-          "type": { "const": "crew-presence-identify" },
-          "crewMemberId": { "type": ["string", "null"], "description": "Falsy (null/empty) to de-identify." }
+          "type": {
+            "const": "crew-presence-identify"
+          },
+          "crewMemberId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Falsy (null/empty) to de-identify."
+          }
         },
         "additionalProperties": true
       },
-
       "WorkerServerMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/WorkerWelcome" },
-          { "$ref": "#/components/schemas/WorkerPing" },
-          { "$ref": "#/components/schemas/WorkerTask" }
+          {
+            "$ref": "#/components/schemas/WorkerWelcome"
+          },
+          {
+            "$ref": "#/components/schemas/WorkerPing"
+          },
+          {
+            "$ref": "#/components/schemas/WorkerTask"
+          }
         ],
-        "discriminator": { "propertyName": "type" }
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "WorkerClientMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/WorkerHello" },
-          { "$ref": "#/components/schemas/WorkerPong" },
-          { "$ref": "#/components/schemas/WorkerTaskResult" }
+          {
+            "$ref": "#/components/schemas/WorkerHello"
+          },
+          {
+            "$ref": "#/components/schemas/WorkerPong"
+          },
+          {
+            "$ref": "#/components/schemas/WorkerTaskResult"
+          }
         ],
-        "discriminator": { "propertyName": "type" }
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "WorkerWelcome": {
         "type": "object",
-        "required": ["type", "workerId", "poolId", "heartbeatMs", "offlineAfterMs", "now"],
+        "required": [
+          "type",
+          "workerId",
+          "poolId",
+          "heartbeatMs",
+          "offlineAfterMs",
+          "now"
+        ],
         "properties": {
-          "type": { "const": "welcome" },
-          "workerId": { "type": "string" },
-          "poolId": { "type": "string" },
-          "heartbeatMs": { "type": "integer", "minimum": 1 },
-          "offlineAfterMs": { "type": "integer", "minimum": 1 },
-          "now": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "welcome"
+          },
+          "workerId": {
+            "type": "string"
+          },
+          "poolId": {
+            "type": "string"
+          },
+          "heartbeatMs": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "offlineAfterMs": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "now": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "WorkerPing": {
         "type": "object",
-        "required": ["type", "seq", "at"],
+        "required": [
+          "type",
+          "seq",
+          "at"
+        ],
         "properties": {
-          "type": { "const": "ping" },
-          "seq": { "type": "integer", "minimum": 0 },
-          "at": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "ping"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "at": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "WorkerTask": {
         "type": "object",
-        "required": ["type", "taskId", "kind", "payload", "createdAt"],
+        "required": [
+          "type",
+          "taskId",
+          "kind",
+          "payload",
+          "createdAt"
+        ],
         "properties": {
-          "type": { "const": "task" },
-          "taskId": { "$ref": "#/components/schemas/Uuid" },
-          "kind": { "type": "string" },
-          "payload": { "$ref": "#/components/schemas/JsonValue" },
-          "createdAt": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "task"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "WorkerHello": {
         "type": "object",
-        "required": ["type"],
+        "required": [
+          "type"
+        ],
         "properties": {
-          "type": { "const": "hello" },
-          "workerId": { "type": "string", "description": "Desired worker id for reconnection support." },
-          "name": { "type": ["string", "null"], "maxLength": 120 },
-          "concurrency": { "type": "integer", "minimum": 1, "default": 1 },
-          "capabilities": { "type": ["object", "null"], "additionalProperties": true }
+          "type": {
+            "const": "hello"
+          },
+          "workerId": {
+            "type": "string",
+            "description": "Desired worker id for reconnection support."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120
+          },
+          "concurrency": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "capabilities": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          }
         },
         "additionalProperties": true
       },
       "WorkerPong": {
         "type": "object",
-        "required": ["type", "seq"],
+        "required": [
+          "type",
+          "seq"
+        ],
         "properties": {
-          "type": { "const": "pong" },
-          "seq": { "type": "integer", "minimum": 0 }
+          "type": {
+            "const": "pong"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "additionalProperties": true
       },
       "WorkerTaskResult": {
         "type": "object",
-        "required": ["type", "taskId", "ok"],
+        "required": [
+          "type",
+          "taskId",
+          "ok"
+        ],
         "properties": {
-          "type": { "const": "task-result" },
-          "taskId": { "$ref": "#/components/schemas/Uuid" },
-          "ok": { "type": "boolean" },
-          "result": { "$ref": "#/components/schemas/JsonValue" },
+          "type": {
+            "const": "task-result"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "result": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
           "error": {
             "description": "Error details (object with message preferred) or string.",
-            "oneOf": [{ "type": "string" }, { "type": "object", "additionalProperties": true }]
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
           }
         },
         "allOf": [
           {
-            "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
-            "then": { "required": ["result"] }
+            "if": {
+              "properties": {
+                "ok": {
+                  "const": true
+                }
+              },
+              "required": [
+                "ok"
+              ]
+            },
+            "then": {
+              "required": [
+                "result"
+              ]
+            }
           },
           {
-            "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] },
-            "then": { "required": ["error"] }
+            "if": {
+              "properties": {
+                "ok": {
+                  "const": false
+                }
+              },
+              "required": [
+                "ok"
+              ]
+            },
+            "then": {
+              "required": [
+                "error"
+              ]
+            }
           }
         ],
         "additionalProperties": true
       },
-
       "LMProxyServerMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/LMProxyServerHello" },
-          { "$ref": "#/components/schemas/LMProxyHelloAck" },
-          { "$ref": "#/components/schemas/LMProxyError" },
-          { "$ref": "#/components/schemas/LMProxyPong" },
-          { "$ref": "#/components/schemas/LMProxyProxyEventForwarded" }
+          {
+            "$ref": "#/components/schemas/LMProxyServerHello"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyHelloAck"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyError"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyPong"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyProxyEventForwarded"
+          }
         ],
-        "discriminator": { "propertyName": "type" },
-        "description": "Server → client messages for /ws/lmproxy. Includes forwarded proxy events to UI."
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "description": "Server \u2192 client messages for /ws/lmproxy. Includes forwarded proxy events to UI."
       },
       "LMProxyClientMessage": {
         "oneOf": [
-          { "$ref": "#/components/schemas/LMProxyHello" },
-          { "$ref": "#/components/schemas/LMProxyPing" },
-          { "$ref": "#/components/schemas/LMProxyChat" },
-          { "$ref": "#/components/schemas/LMProxyModelsRequest" },
-          { "$ref": "#/components/schemas/LMProxyCancel" },
-          { "$ref": "#/components/schemas/LMProxyProxyEventUpstream" }
+          {
+            "$ref": "#/components/schemas/LMProxyHello"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyPing"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyChat"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyModelsRequest"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyCancel"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyProxyEventUpstream"
+          }
         ],
-        "discriminator": { "propertyName": "type" },
-        "description": "Client → server messages for /ws/lmproxy. UI sends chat/models/cancel; proxy sends started/delta/chunk/done/error/models/cancelled."
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "description": "Client \u2192 server messages for /ws/lmproxy. UI sends chat/models/cancel; proxy sends started/delta/chunk/done/error/models/cancelled."
       },
-
       "LMProxyServerHello": {
         "type": "object",
-        "required": ["type", "want", "ts"],
+        "required": [
+          "type",
+          "want",
+          "ts"
+        ],
         "properties": {
-          "type": { "const": "server_hello" },
-          "want": { "type": "array", "items": { "type": "string" }, "examples": [["hello"]] },
-          "ts": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "server_hello"
+          },
+          "want": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "hello"
+              ]
+            ]
+          },
+          "ts": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyHelloAck": {
         "type": "object",
-        "required": ["type", "client_id", "role", "ts"],
+        "required": [
+          "type",
+          "client_id",
+          "role",
+          "ts"
+        ],
         "properties": {
-          "type": { "const": "hello_ack" },
-          "client_id": { "type": "string", "minLength": 1 },
-          "role": { "type": "string", "description": "Typically 'ui' for UI clients; proxy clients may omit explicit role." },
-          "ts": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "hello_ack"
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "description": "Typically 'ui' for UI clients; proxy clients may omit explicit role."
+          },
+          "ts": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyError": {
         "type": "object",
-        "required": ["type", "error"],
+        "required": [
+          "type",
+          "error"
+        ],
         "properties": {
-          "type": { "const": "error" },
-          "id": { "type": "string", "description": "Request id if applicable." },
+          "type": {
+            "const": "error"
+          },
+          "id": {
+            "type": "string",
+            "description": "Request id if applicable."
+          },
           "error": {
             "type": "object",
-            "required": ["message"],
+            "required": [
+              "message"
+            ],
             "properties": {
-              "message": { "type": "string" }
+              "message": {
+                "type": "string"
+              }
             },
             "additionalProperties": true
           }
@@ -910,172 +1767,353 @@
       },
       "LMProxyPong": {
         "type": "object",
-        "required": ["type", "ts"],
+        "required": [
+          "type",
+          "ts"
+        ],
         "properties": {
-          "type": { "const": "pong" },
-          "ts": { "$ref": "#/components/schemas/TimestampMs" }
+          "type": {
+            "const": "pong"
+          },
+          "ts": {
+            "$ref": "#/components/schemas/TimestampMs"
+          }
         },
         "additionalProperties": true
       },
-
       "LMProxyHello": {
         "type": "object",
-        "required": ["type", "client_id"],
+        "required": [
+          "type",
+          "client_id"
+        ],
         "properties": {
-          "type": { "const": "hello" },
-          "client_id": { "type": "string", "minLength": 1 },
-          "role": { "type": "string", "description": "Set to 'ui' for UI clients." },
-          "capabilities": { "type": "object", "additionalProperties": true },
-          "lm_base_url": { "type": "string" }
+          "type": {
+            "const": "hello"
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "description": "Set to 'ui' for UI clients."
+          },
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "lm_base_url": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyPing": {
         "type": "object",
-        "required": ["type"],
+        "required": [
+          "type"
+        ],
         "properties": {
-          "type": { "const": "ping" }
+          "type": {
+            "const": "ping"
+          }
         },
         "additionalProperties": true
       },
-
       "LMProxyChatBodyMessage": {
         "type": "object",
-        "required": ["role", "content"],
+        "required": [
+          "role",
+          "content"
+        ],
         "properties": {
-          "role": { "type": "string", "enum": ["system", "user", "assistant"] },
-          "content": { "type": "string" }
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyChatBody": {
         "type": "object",
-        "required": ["messages"],
+        "required": [
+          "messages"
+        ],
         "properties": {
           "messages": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/LMProxyChatBodyMessage" },
+            "items": {
+              "$ref": "#/components/schemas/LMProxyChatBodyMessage"
+            },
             "minItems": 1
           },
-          "temperature": { "type": "number" },
-          "max_tokens": { "type": "integer", "minimum": 1 },
-          "model": { "type": "string" },
-          "stream": { "type": "boolean" }
+          "temperature": {
+            "type": "number"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "model": {
+            "type": "string"
+          },
+          "stream": {
+            "type": "boolean"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyChat": {
         "type": "object",
-        "required": ["type", "id", "body"],
+        "required": [
+          "type",
+          "id",
+          "body"
+        ],
         "properties": {
-          "type": { "const": "chat" },
-          "id": { "type": "string", "minLength": 1 },
-          "body": { "$ref": "#/components/schemas/LMProxyChatBody" }
+          "type": {
+            "const": "chat"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "$ref": "#/components/schemas/LMProxyChatBody"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyModelsRequest": {
         "type": "object",
-        "required": ["type", "id"],
+        "required": [
+          "type",
+          "id"
+        ],
         "properties": {
-          "type": { "const": "models" },
-          "id": { "type": "string", "minLength": 1 }
+          "type": {
+            "const": "models"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": true
       },
       "LMProxyCancel": {
         "type": "object",
-        "required": ["type", "id"],
+        "required": [
+          "type",
+          "id"
+        ],
         "properties": {
-          "type": { "const": "cancel" },
-          "id": { "type": "string", "minLength": 1 }
+          "type": {
+            "const": "cancel"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": true
       },
-
       "LMProxyProxyEventForwarded": {
-        "description": "Events forwarded from proxy to UI (server → client).",
+        "description": "Events forwarded from proxy to UI (server \u2192 client).",
         "oneOf": [
-          { "$ref": "#/components/schemas/LMProxyStarted" },
-          { "$ref": "#/components/schemas/LMProxyDelta" },
-          { "$ref": "#/components/schemas/LMProxyChunk" },
-          { "$ref": "#/components/schemas/LMProxyDone" },
-          { "$ref": "#/components/schemas/LMProxyError" },
-          { "$ref": "#/components/schemas/LMProxyModelsResponse" },
-          { "$ref": "#/components/schemas/LMProxyCancelled" }
+          {
+            "$ref": "#/components/schemas/LMProxyStarted"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyDelta"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyChunk"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyDone"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyError"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyModelsResponse"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyCancelled"
+          }
         ],
-        "discriminator": { "propertyName": "type" }
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
       "LMProxyProxyEventUpstream": {
-        "description": "Proxy → hub messages that are routed/forwarded as appropriate (client → server).",
+        "description": "Proxy \u2192 hub messages that are routed/forwarded as appropriate (client \u2192 server).",
         "oneOf": [
-          { "$ref": "#/components/schemas/LMProxyStarted" },
-          { "$ref": "#/components/schemas/LMProxyDelta" },
-          { "$ref": "#/components/schemas/LMProxyChunk" },
-          { "$ref": "#/components/schemas/LMProxyDone" },
-          { "$ref": "#/components/schemas/LMProxyError" },
-          { "$ref": "#/components/schemas/LMProxyModelsResponse" },
-          { "$ref": "#/components/schemas/LMProxyCancelled" }
+          {
+            "$ref": "#/components/schemas/LMProxyStarted"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyDelta"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyChunk"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyDone"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyError"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyModelsResponse"
+          },
+          {
+            "$ref": "#/components/schemas/LMProxyCancelled"
+          }
         ],
-        "discriminator": { "propertyName": "type" }
+        "discriminator": {
+          "propertyName": "type"
+        }
       },
-
       "LMProxyStarted": {
         "type": "object",
-        "required": ["type", "id"],
+        "required": [
+          "type",
+          "id"
+        ],
         "properties": {
-          "type": { "const": "started" },
-          "id": { "type": "string", "minLength": 1 }
+          "type": {
+            "const": "started"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": true
       },
       "LMProxyDelta": {
         "type": "object",
-        "required": ["type", "id", "data"],
+        "required": [
+          "type",
+          "id",
+          "data"
+        ],
         "properties": {
-          "type": { "const": "delta" },
-          "id": { "type": "string", "minLength": 1 },
-          "data": { "type": "string" }
+          "type": {
+            "const": "delta"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "data": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyChunk": {
         "type": "object",
-        "required": ["type", "id", "data"],
+        "required": [
+          "type",
+          "id",
+          "data"
+        ],
         "properties": {
-          "type": { "const": "chunk" },
-          "id": { "type": "string", "minLength": 1 },
-          "data": { "$ref": "#/components/schemas/JsonValue" }
+          "type": {
+            "const": "chunk"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "data": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyDone": {
         "type": "object",
-        "required": ["type", "id"],
+        "required": [
+          "type",
+          "id"
+        ],
         "properties": {
-          "type": { "const": "done" },
-          "id": { "type": "string", "minLength": 1 }
+          "type": {
+            "const": "done"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": true
       },
       "LMProxyModelsResponse": {
         "type": "object",
-        "required": ["type", "id", "data"],
+        "required": [
+          "type",
+          "id",
+          "data"
+        ],
         "properties": {
-          "type": { "const": "models" },
-          "id": { "type": "string", "minLength": 1 },
-          "data": { "$ref": "#/components/schemas/JsonValue" }
+          "type": {
+            "const": "models"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "data": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
         },
         "additionalProperties": true
       },
       "LMProxyCancelled": {
         "type": "object",
-        "required": ["type", "id"],
+        "required": [
+          "type",
+          "id"
+        ],
         "properties": {
-          "type": { "const": "cancelled" },
-          "id": { "type": "string", "minLength": 1 }
+          "type": {
+            "const": "cancelled"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": true
+      },
+      "LineforgeFieldToFinishUpdatedMessage": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "field-to-finish-updated"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "type",
+          "updatedAt"
+        ],
+        "additionalProperties": false
       }
     }
   },

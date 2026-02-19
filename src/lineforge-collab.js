@@ -441,9 +441,14 @@ export function createLineforgeCollabService() {
     broadcast(room, payload);
   }
 
+  function broadcastToAllRooms(payload) {
+    for (const room of rooms.values()) broadcast(room, payload);
+  }
+
   return {
     handleUpgrade,
     broadcastToRoom,
+    broadcastToAllRooms,
     _rooms: rooms,
     _internals: { decodeFrame, encodeTextFrame, createWebSocketAccept },
   };

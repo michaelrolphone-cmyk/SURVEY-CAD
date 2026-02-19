@@ -264,3 +264,27 @@ test('lineforge processes fragmented and coalesced websocket frames', () => {
   const presenceMessage = parseServerTextMessage(s2);
   assert.equal(presenceMessage.type, 'ar-presence');
 });
+
+
+test('lineforge can broadcast payloads to every active room', () => {
+  const collab = createLineforgeCollabService();
+  const s1 = new FakeSocket();
+  const s2 = new FakeSocket();
+
+  collab.handleUpgrade({
+    url: '/ws/lineforge?room=room-a',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'all-a==' },
+  }, s1, Buffer.alloc(0));
+  collab.handleUpgrade({
+    url: '/ws/lineforge?room=room-b',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'all-b==' },
+  }, s2, Buffer.alloc(0));
+
+  parseServerTextMessage(s1, 1);
+  parseServerTextMessage(s2, 1);
+
+  collab.broadcastToAllRooms({ type: 'field-to-finish-updated', updatedAt: new Date().toISOString() });
+
+  assert.equal(parseServerTextMessage(s1).type, 'field-to-finish-updated');
+  assert.equal(parseServerTextMessage(s2).type, 'field-to-finish-updated');
+});

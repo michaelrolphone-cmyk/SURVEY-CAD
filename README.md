@@ -1123,3 +1123,11 @@ LineSmith now resolves sequential `END`/`CLO` directives from the nearest valid 
 
 - API endpoints: `GET /health`, `GET /api/apps`, `GET /api/lookup`, `GET /api/aliquots`, `GET /api/localstorage-sync`, websocket upgrade `GET /ws/localstorage-sync`.
 - CLI/server commands: `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+## API and CLI endpoints for shared Field-to-Finish settings
+
+### API endpoints
+- `GET /api/field-to-finish` – fetch the global/shared Field-to-Finish config and symbol SVG overrides used by all projects/users.
+- `PUT /api/field-to-finish` – create/update the shared Field-to-Finish config and overrides.
+- `DELETE /api/field-to-finish` – clear the shared record so server defaults are reloaded.
+
