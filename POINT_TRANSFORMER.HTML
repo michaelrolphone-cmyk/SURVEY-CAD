@@ -123,11 +123,11 @@
       gap: 14px;
       transition: grid-template-columns .25s ease;
     }
-    main.pointEditorFocusOutput{ grid-template-columns: 120px 1fr; }
     @media (max-width: 1020px){
       main{ grid-template-columns: 1fr; }
-      main.pointEditorFocusOutput{ grid-template-columns: 1fr; }
     }
+
+    .leftStack{ position:relative; min-height: 780px; }
 
     .panel{
       border-radius: var(--r);
@@ -140,12 +140,33 @@
     .panel::before{
       content:none;
     }
+    #outputPanel{
+      position:absolute;
+      inset:0;
+      z-index: 2;
+      opacity:0;
+      pointer-events:none;
+      transform: translateX(24px);
+      transition: transform .25s ease, opacity .2s ease;
+    }
+    main.pointEditorFocusOutput #outputPanel{
+      opacity:1;
+      pointer-events:auto;
+      transform: translateX(0);
+      left: 56px;
+    }
+    main.pointEditorFocusOutput #ingestPanel{
+      position:absolute;
+      inset:0 auto 0 0;
+      width:56px;
+      z-index:3;
+    }
     main.pointEditorFocusOutput #ingestPanel .panelbody{ display:none; }
-    main.pointEditorFocusOutput #ingestPanel .panelhead{ cursor:pointer; }
+    main.pointEditorFocusOutput #ingestPanel .panelhead{ cursor:pointer; min-height:100%; justify-content:center; }
     main.pointEditorFocusOutput #ingestPanel .panelhead h2{ writing-mode:vertical-rl; text-orientation:mixed; }
-    main.pointEditorFocusOutput #ingestPanel .panelhead{ min-height: 420px; justify-content: center; }
+    main.pointEditorFocusOutput #ingestPanel #ingestControls{ display:none; }
     main.pointEditorFocusOutput #outputPanel .panelbody textarea,
-    main.pointEditorFocusOutput #outputPanel .panelbody .pointsTableWrap.active{ min-height: 460px; }
+    main.pointEditorFocusOutput #outputPanel .panelbody .pointsTableWrap.active{ min-height: 640px; }
     .panelhead{
       position: relative;
       padding: 12px 12px;
@@ -345,9 +366,6 @@
       gap: 14px;
     }
     .outputArea{ min-height: 320px; }
-    main.pointEditorFocusOutput .right{ grid-template-rows: 1fr; }
-    main.pointEditorFocusOutput .right > .panel:first-child{ display:none; }
-    main.pointEditorFocusOutput .outputArea{ min-height: 700px; }
 
     .kbd{
       font-family: var(--mono);
@@ -413,7 +431,8 @@
   </header>
 
   <main>
-    <!-- Left: Input + Controls -->
+    <!-- Left: Input + Output accordion -->
+    <section class="leftStack">
     <section class="panel" id="ingestPanel">
       <div class="panelhead">
         <h2><span class="sig"></span> Ingest Console</h2>
@@ -516,7 +535,30 @@
       </div>
     </section>
 
-    <!-- Right: Map + Output -->
+    <section class="panel outputArea" id="outputPanel">
+      <div class="panelhead">
+        <h2><span class="sig"></span> Output Stream</h2>
+        <div class="chip">Sorted: <span class="mono">numeric point id</span></div>
+      </div>
+      <div class="panelbody">
+        <label for="outText">Transformed points</label>
+        <textarea id="outText" spellcheck="false" readonly></textarea>
+        <div id="outputTableWrap" class="pointsTableWrap" aria-hidden="true">
+          <div class="pointsTableScroll">
+            <table class="pointsTable">
+              <thead>
+                <tr><th>#</th><th>X</th><th>Y</th><th>Z</th><th>Code</th><th>Notes</th></tr>
+              </thead>
+              <tbody id="outputPointsBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="hint">Download saves exactly what you see here.</div>
+      </div>
+    </section>
+    </section>
+
+    <!-- Right: Map -->
     <section class="right">
       <section class="panel">
         <div class="panelhead">
@@ -542,27 +584,6 @@
         </div>
       </section>
 
-      <section class="panel outputArea" id="outputPanel">
-        <div class="panelhead">
-          <h2><span class="sig"></span> Output Stream</h2>
-          <div class="chip">Sorted: <span class="mono">numeric point id</span></div>
-        </div>
-        <div class="panelbody">
-          <label for="outText">Transformed points</label>
-          <textarea id="outText" spellcheck="false" readonly></textarea>
-          <div id="outputTableWrap" class="pointsTableWrap" aria-hidden="true">
-            <div class="pointsTableScroll">
-              <table class="pointsTable">
-                <thead>
-                  <tr><th>#</th><th>X</th><th>Y</th><th>Z</th><th>Code</th><th>Notes</th></tr>
-                </thead>
-                <tbody id="outputPointsBody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="hint">Download saves exactly what you see here.</div>
-        </div>
-      </section>
     </section>
   </main>
 
