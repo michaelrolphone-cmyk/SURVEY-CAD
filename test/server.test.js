@@ -833,6 +833,47 @@ test('server file upload CRUD and list endpoints', async () => {
     });
     assert.equal(badFolderRes.status, 400);
 
+    const oversizedBoundary = '----OversizedBoundary789';
+    const oversizedPrefix = [
+      `--${oversizedBoundary}`,
+      'Content-Disposition: form-data; name="projectId"',
+      '',
+      testProjectId,
+      `--${oversizedBoundary}`,
+      'Content-Disposition: form-data; name="folderKey"',
+      '',
+      'drawings',
+      `--${oversizedBoundary}`,
+      'Content-Disposition: form-data; name="file"; filename="huge.txt"',
+      'Content-Type: text/plain',
+      '',
+    ].join('\r\n');
+    const oversizedSuffix = `\r\n--${oversizedBoundary}--`;
+    const declaredBytes = 52 * 1024 * 1024;
+    const payloadBody = oversizedPrefix + 'x'.repeat(Math.max(0, declaredBytes - Buffer.byteLength(oversizedPrefix) - Buffer.byteLength(oversizedSuffix))) + oversizedSuffix;
+
+    const oversizedRes = await new Promise((resolve, reject) => {
+      const req = http.request({
+        hostname: '127.0.0.1',
+        port: app.port,
+        path: '/api/project-files/upload',
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${oversizedBoundary}`,
+          'Content-Length': String(Buffer.byteLength(payloadBody)),
+        },
+      }, (res) => {
+        let payload = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { payload += chunk; });
+        res.on('end', () => resolve({ statusCode: res.statusCode, payload }));
+      });
+      req.on('error', reject);
+      req.end(payloadBody);
+    });
+    assert.equal(oversizedRes.statusCode, 413);
+    assert.match(oversizedRes.payload, /File exceeds maximum size/);
+
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/file?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`, {
       method: 'DELETE',
     });

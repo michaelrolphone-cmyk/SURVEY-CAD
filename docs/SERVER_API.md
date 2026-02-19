@@ -390,6 +390,8 @@ Create a new uploaded file in EvidenceDesk project storage.
 
 **Response `201`:** Returns `resource` metadata with `reference.value` download URL.
 
+**Response `413`:** Returned immediately when `Content-Length` exceeds the 50 MB upload limit.
+
 ---
 
 ### `PUT /api/project-files/upload`
@@ -406,6 +408,8 @@ Update an existing uploaded file (replace file contents in Redis).
 | `file` | `binary` | Yes | New file content |
 
 **Response `200`:** Returns updated `resource` metadata.
+
+**Response `413`:** Returned immediately when `Content-Length` exceeds the 50 MB upload limit.
 
 ---
 
