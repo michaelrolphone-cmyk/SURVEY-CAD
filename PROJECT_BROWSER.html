@@ -780,8 +780,12 @@
       }
 
       let uploadedCount = 0;
-      for (const file of accepted) {
+      const totalFiles = accepted.length;
+      for (let index = 0; index < accepted.length; index += 1) {
+        const file = accepted[index];
+        const currentFileNumber = index + 1;
         try {
+          context.setUploadStatus(`Uploading point file ${currentFileNumber}/${totalFiles}: ${file.name}…`);
           const text = await file.text();
           const response = await fetch(buildProjectPointFileApiUrl(context.activeProjectId), {
             method: 'POST',
@@ -799,6 +803,7 @@
             continue;
           }
           uploadedCount += 1;
+          context.setUploadStatus(`Uploaded point file ${uploadedCount}/${totalFiles}: ${file.name}`);
         } catch (err) {
           context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
         }
@@ -812,6 +817,38 @@
       await syncProjectPointFilesFromApi(context);
       context.setUploadStatus(`Uploaded ${uploadedCount} point file${uploadedCount === 1 ? '' : 's'} to this project.`);
       renderTree(context.projectFile, context);
+    }
+
+    function uploadFileViaXhr(formData, onProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/project-files/upload');
+
+        xhr.upload.addEventListener('progress', (event) => {
+          if (typeof onProgress === 'function') {
+            onProgress(event);
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          let payload = null;
+          try {
+            payload = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+          } catch {
+            payload = null;
+          }
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ ok: true, payload });
+            return;
+          }
+
+          resolve({ ok: false, payload });
+        });
+
+        xhr.addEventListener('error', () => reject(new Error('Network request failed.')));
+        xhr.send(formData);
+      });
     }
 
     async function uploadFilesToServer(files, folderKey, context) {
@@ -830,25 +867,35 @@
       }
 
       let uploadedCount = 0;
-      for (const file of fileList) {
+      const totalFiles = fileList.length;
+      for (let index = 0; index < fileList.length; index += 1) {
+        const file = fileList[index];
+        const currentFileNumber = index + 1;
         const formData = new FormData();
         formData.append('projectId', context.activeProjectId);
         formData.append('folderKey', folderKey);
         formData.append('file', file, file.name);
 
         try {
-          const response = await fetch('/api/project-files/upload', {
-            method: 'POST',
-            body: formData,
+          const response = await uploadFileViaXhr(formData, (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              context.setUploadStatus(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name} (${progress}%)`);
+              return;
+            }
+            context.setUploadStatus(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name}…`);
           });
           if (!response.ok) {
-            const err = await response.json().catch(() => ({ error: 'Upload failed.' }));
+            const err = response.payload || { error: 'Upload failed.' };
             context.setUploadStatus(`Failed to upload ${file.name}: ${err.error}`);
             continue;
           }
-          const { resource } = await response.json();
+          const { resource } = response.payload || {};
           const appended = appendResourceToFolder(context.projectFile, folderKey, resource);
-          if (appended) uploadedCount += 1;
+          if (appended) {
+            uploadedCount += 1;
+            context.setUploadStatus(`Uploaded ${uploadedCount}/${totalFiles}: ${file.name}`);
+          }
         } catch (err) {
           context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
         }
