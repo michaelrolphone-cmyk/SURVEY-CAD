@@ -141,6 +141,29 @@ test('createEvidenceDeskFileStore falls back to in-memory when redis connect sta
   assert.equal(quitCalled, true);
 });
 
+test('createEvidenceDeskFileStore returns quickly when redis quit hangs after connect timeout', async () => {
+  let disconnectCalled = false;
+  const hangingClient = {
+    on() {},
+    connect: () => new Promise(() => {}),
+    disconnect: () => { disconnectCalled = true; },
+    quit: () => new Promise(() => {}),
+  };
+
+  const startedAt = Date.now();
+  const result = await createEvidenceDeskFileStore({
+    redisUrl: 'redis://example.invalid:6379',
+    connectTimeoutMs: 5,
+    disconnectTimeoutMs: 10,
+    createRedisClient: () => hangingClient,
+  });
+  const elapsedMs = Date.now() - startedAt;
+
+  assert.equal(result.type, 'memory');
+  assert.equal(disconnectCalled, true);
+  assert.ok(elapsedMs < 500, `fallback should return quickly, got ${elapsedMs}ms`);
+});
+
 test('createEvidenceDeskFileStore uses redis when connection succeeds', async () => {
   const redis = new FakeRedis();
   let connected = false;

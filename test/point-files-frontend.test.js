@@ -28,6 +28,9 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /querySelector\('\.file-preview-slot'\)\?\.replaceChildren\(thumb\)/, 'EvidenceDesk should place point file thumbnails in the dedicated preview slot before file names.');
   assert.match(html, /function\s+uploadFileViaXhr\(formData,\s*onProgress\)\s*\{[\s\S]*xhr\.upload\.addEventListener\('progress'/, 'EvidenceDesk should use XHR upload progress events for project file uploads.');
   assert.match(html, /Uploading \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\} \(\$\{progress\}%\)/, 'EvidenceDesk should include percentage progress updates for uploaded files.');
+  assert.match(html, /className\s*=\s*'upload-progress'/, 'EvidenceDesk should render a dedicated upload progress bar element.');
+  assert.match(html, /context\.setUploadProgress\(progress\);/, 'EvidenceDesk should drive upload progress updates from XHR progress events.');
+  assert.match(html, /addUploadStatusListener\(listener\)\s*\{[\s\S]*listener\(this\.uploadStatus,\s*this\.uploadProgress\);/, 'EvidenceDesk should immediately hydrate upload status/progress listeners so indicators update live.');
   assert.match(html, /const\s+canLaunchPointForge\s*=\s*folder\.key\s*===\s*'point-files'[\s\S]*isPointFileFormat/, 'EvidenceDesk should gate PointForge launch behavior behind point-file format checks.');
 });
 
