@@ -99,6 +99,16 @@
       min-height: 1.1rem;
     }
 
+    .upload-progress {
+      width: 100%;
+      height: 0.4rem;
+      accent-color: #38bdf8;
+    }
+
+    .upload-progress[hidden] {
+      display: none;
+    }
+
     .tree-root,
     .folder-row {
       background: var(--panel);
@@ -785,6 +795,7 @@
         const file = accepted[index];
         const currentFileNumber = index + 1;
         try {
+          context.setUploadProgress(null);
           context.setUploadStatus(`Uploading point file ${currentFileNumber}/${totalFiles}: ${file.name}…`);
           const text = await file.text();
           const response = await fetch(buildProjectPointFileApiUrl(context.activeProjectId), {
@@ -810,11 +821,13 @@
       }
 
       if (!uploadedCount) {
+        context.setUploadProgress(null);
         context.setUploadStatus('No point files were uploaded successfully.');
         return;
       }
 
       await syncProjectPointFilesFromApi(context);
+      context.setUploadProgress(null);
       context.setUploadStatus(`Uploaded ${uploadedCount} point file${uploadedCount === 1 ? '' : 's'} to this project.`);
       renderTree(context.projectFile, context);
     }
@@ -877,9 +890,11 @@
         formData.append('file', file, file.name);
 
         try {
+          context.setUploadProgress(null);
           const response = await uploadFileViaXhr(formData, (event) => {
             if (event.lengthComputable) {
               const progress = Math.round((event.loaded / event.total) * 100);
+              context.setUploadProgress(progress);
               context.setUploadStatus(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name} (${progress}%)`);
               return;
             }
@@ -902,11 +917,13 @@
       }
 
       if (!uploadedCount) {
+        context.setUploadProgress(null);
         context.setUploadStatus('No files were uploaded successfully.');
         return;
       }
 
       saveStoredProjectFile(window.localStorage, context.activeProjectId, context.projectFile);
+      context.setUploadProgress(null);
       context.setUploadStatus(`Uploaded ${uploadedCount} file${uploadedCount === 1 ? '' : 's'} to project.`);
       renderTree(context.projectFile, context);
     }
@@ -971,6 +988,25 @@
       status.textContent = context.uploadStatus || '';
       panel.appendChild(status);
 
+      const progress = document.createElement('progress');
+      progress.className = 'upload-progress';
+      progress.max = 100;
+      progress.hidden = true;
+      panel.appendChild(progress);
+
+      if (context?.addUploadStatusListener) {
+        context.addUploadStatusListener((message, percent) => {
+          status.textContent = message || '';
+          if (typeof percent === 'number' && Number.isFinite(percent)) {
+            progress.hidden = false;
+            progress.value = Math.max(0, Math.min(100, percent));
+          } else {
+            progress.hidden = true;
+            progress.removeAttribute('value');
+          }
+        });
+      }
+
       panel.addEventListener('dragover', (event) => {
         event.preventDefault();
         panel.classList.add('drag-active');
@@ -1024,6 +1060,25 @@
       status.textContent = context.uploadStatus || '';
       panel.appendChild(status);
 
+      const progress = document.createElement('progress');
+      progress.className = 'upload-progress';
+      progress.max = 100;
+      progress.hidden = true;
+      panel.appendChild(progress);
+
+      if (context?.addUploadStatusListener) {
+        context.addUploadStatusListener((message, percent) => {
+          status.textContent = message || '';
+          if (typeof percent === 'number' && Number.isFinite(percent)) {
+            progress.hidden = false;
+            progress.value = Math.max(0, Math.min(100, percent));
+          } else {
+            progress.hidden = true;
+            progress.removeAttribute('value');
+          }
+        });
+      }
+
       panel.addEventListener('dragover', (event) => {
         event.preventDefault();
         panel.classList.add('drag-active');
@@ -1040,6 +1095,9 @@
 
     function renderTree(projectFile, projectContext = {}) {
       treeContainer.innerHTML = '';
+      if (Array.isArray(projectContext.uploadStatusListeners)) {
+        projectContext.uploadStatusListeners = [];
+      }
 
       const root = document.createElement('div');
       root.className = 'tree-root';
@@ -1344,9 +1402,25 @@
         projectName,
         projectFile: null,
         uploadStatus: '',
+        uploadProgress: null,
+        uploadStatusListeners: [],
         setUploadStatus(message) {
           uploadStatus = message;
           this.uploadStatus = message;
+          for (const listener of this.uploadStatusListeners) {
+            listener(this.uploadStatus, this.uploadProgress);
+          }
+        },
+        setUploadProgress(percent) {
+          this.uploadProgress = typeof percent === 'number' && Number.isFinite(percent) ? percent : null;
+          for (const listener of this.uploadStatusListeners) {
+            listener(this.uploadStatus, this.uploadProgress);
+          }
+        },
+        addUploadStatusListener(listener) {
+          if (typeof listener !== 'function') return;
+          this.uploadStatusListeners.push(listener);
+          listener(this.uploadStatus, this.uploadProgress);
         },
       };
 

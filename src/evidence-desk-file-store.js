@@ -226,6 +226,7 @@ export async function createEvidenceDeskFileStore({
   redisClient = null,
   createRedisClient = createClient,
   connectTimeoutMs = Number(process.env.EVIDENCE_DESK_REDIS_CONNECT_TIMEOUT_MS || 3000),
+  disconnectTimeoutMs = Number(process.env.EVIDENCE_DESK_REDIS_DISCONNECT_TIMEOUT_MS || 250),
 } = {}) {
   if (redisClient) {
     return { store: new RedisEvidenceDeskFileStore(redisClient), redisClient, type: 'redis-shared' };
@@ -234,10 +235,10 @@ export async function createEvidenceDeskFileStore({
     return { store: new InMemoryEvidenceDeskFileStore(), redisClient: null, type: 'memory' };
   }
 
-  const client = createRedisClient({ url: redisUrl });
-  client.on?.('error', () => {});
-
+  let client = null;
   try {
+    client = createRedisClient({ url: redisUrl });
+    client.on?.('error', () => {});
     if (Number.isFinite(connectTimeoutMs) && connectTimeoutMs > 0) {
       await Promise.race([
         client.connect(),
@@ -250,9 +251,30 @@ export async function createEvidenceDeskFileStore({
     }
     return { store: new RedisEvidenceDeskFileStore(client), redisClient: client, type: 'redis' };
   } catch {
+    const safeDisconnect = async () => {
+      if (!client) return;
+      if (typeof client.disconnect === 'function') {
+        client.disconnect();
+        return;
+      }
+      if (typeof client.quit === 'function') {
+        await client.quit();
+      }
+    };
+
     try {
-      await client.quit?.();
+      if (Number.isFinite(disconnectTimeoutMs) && disconnectTimeoutMs > 0) {
+        await Promise.race([
+          safeDisconnect(),
+          new Promise((resolve) => {
+            setTimeout(resolve, disconnectTimeoutMs);
+          }),
+        ]);
+      } else {
+        await safeDisconnect();
+      }
     } catch {}
+
     return { store: new InMemoryEvidenceDeskFileStore(), redisClient: null, type: 'memory' };
   }
 }
