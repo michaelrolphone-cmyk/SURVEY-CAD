@@ -447,6 +447,8 @@
     getProjectWorkbench: (projectId) => apiRequest("GET",`/api/projects/${encodeURIComponent(projectId)}/workbench`),
     createProjectCasefile: (projectId, body={}) => apiRequest("POST",`/api/projects/${encodeURIComponent(projectId)}/workbench/casefile`,{ json: body }),
     syncProjectWorkbench: (projectId, body={}) => apiRequest("POST",`/api/projects/${encodeURIComponent(projectId)}/workbench/sync`,{ json: body }),
+    listProjectTraverses: (projectId) => apiRequest("GET",`/api/projects/${encodeURIComponent(projectId)}/workbench/traverses`),
+    getProjectTraverse: (projectId, traverseId) => apiRequest("GET",`/api/projects/${encodeURIComponent(projectId)}/workbench/traverses/${encodeURIComponent(traverseId)}`),
 
     // Outputs
     getPrintablePackage: (casefileId) => apiRequest("GET",`/casefiles/${casefileId}/outputs/package`)
@@ -465,6 +467,7 @@
     traverse: null,      // TraverseConfig
     traverseResults: null, // {lastRun, results}
     printable: null,     // PrintablePackage
+    projectTraverses: [],
     lastWarnings: [],
     renderSeq: 0
   };
@@ -623,7 +626,25 @@
   function setTab(tab){
     state.tab = tab;
     $$(".nav .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
+    if (tab === "traverse" && activeProjectId){
+      refreshProjectTraverses().catch((err) => {
+        console.warn("[WORKBENCH] project traverse list refresh failed", err);
+        toast("Warning", "Could not load project traverse list.", "warn");
+      }).finally(() => {
+        render();
+      });
+      return;
+    }
     render();
+  }
+
+  async function refreshProjectTraverses(){
+    if (!activeProjectId){
+      state.projectTraverses = [];
+      return;
+    }
+    const payload = await api.listProjectTraverses(activeProjectId);
+    state.projectTraverses = Array.isArray(payload?.traverses) ? payload.traverses : [];
   }
 
   function viewDashboard(){
@@ -1008,6 +1029,13 @@ N 00°00'27&quot; W 267.69
   function viewTraverse(){
     const tr = state.traverse || state.active.traverse || { start:{N:10000,E:10000}, basis:{label:"",rotationDeg:0}, calls:[], lastRun:null };
     const results = state.traverseResults?.results || null;
+    const traverseOptions = activeProjectId
+      ? `<option value="">Current casefile traverse</option>${(state.projectTraverses || []).map((item) => {
+          const label = item?.name || item?.casefileName || item?.traverseId || "Untitled Traverse";
+          const updated = item?.updatedAt ? ` · ${fmtDateTime(item.updatedAt)}` : "";
+          return `<option value="${esc(item.traverseId || "")}" ${item.casefileId === state.activeId ? "selected" : ""}>${esc(label + updated)}</option>`;
+        }).join("")}`
+      : "";
 
     const calls = tr.calls || [];
     const callRows = calls.map((id, i) => {
@@ -1038,6 +1066,19 @@ N 00°00'27&quot; W 267.69
     return `
       <div class="pad">
         <div class="grid2">
+          ${activeProjectId ? `
+          <div class="card" style="grid-column:1/-1;">
+            <div class="hd">Project Traverses</div>
+            <div class="bd">
+              <div class="small muted">Select a saved traverse from this project to load it into the Workbench.</div>
+              <div class="row" style="margin-top:10px;">
+                <select id="projectTraverseSelect" style="min-width:320px;flex:1;">${traverseOptions}</select>
+                <button class="btn" data-act="refreshProjectTraverses">Refresh List</button>
+                <button class="btn" data-act="loadProjectTraverse">Load Selected Traverse</button>
+              </div>
+            </div>
+          </div>
+          ` : ""}
           <div class="card">
             <div class="hd">Traverse Configuration</div>
             <div class="bd">
@@ -1571,6 +1612,28 @@ N 00°00'27&quot; W 267.69
     }
   }
 
+  async function loadSelectedProjectTraverse(){
+    if (!activeProjectId) return;
+    const selected = $("#projectTraverseSelect")?.value || "";
+    if (!selected){
+      toast("Info", "Select a traverse to load.", "warn");
+      return;
+    }
+    try{
+      const payload = await api.getProjectTraverse(activeProjectId, selected);
+      const casefileId = payload?.casefile?.id || payload?.casefileId || "";
+      if (!casefileId) throw new Error("Traverse casefile id missing.");
+      await setActiveCasefile(casefileId);
+      await refreshProjectTraverses();
+      state.tab = "traverse";
+      await ensureTabData("traverse");
+      render();
+      toast("Loaded", `Traverse "${payload?.name || selected}" loaded.`, "good");
+    }catch(err){
+      toast("Error", err?.message || String(err), "bad");
+    }
+  }
+
   async function editCall(extractionId){
     await ensureExtractions();
     const c = exById(extractionId);
@@ -2075,6 +2138,13 @@ N 00°00'27&quot; W 267.69
 
     if (act === "moveTraverseUp"){ moveTraverseCall(Number(t.dataset.idx), -1); return; }
     if (act === "moveTraverseDown"){ moveTraverseCall(Number(t.dataset.idx), +1); return; }
+    if (act === "refreshProjectTraverses"){
+      refreshProjectTraverses().then(()=>render()).catch((err)=>{
+        toast("Error", err?.message || String(err), "bad");
+      });
+      return;
+    }
+    if (act === "loadProjectTraverse"){ loadSelectedProjectTraverse(); return; }
   });
 
   document.addEventListener("change", (e) => {
@@ -2242,6 +2312,13 @@ N 00°00'27&quot; W 267.69
       const activated = await ensureActiveCasefile([pick, pickDefault, state.casefiles[0]?.id || ""]);
       if (!activated){
         await createAndActivateFallbackCasefile();
+      }
+    }
+    if (activeProjectId){
+      try{
+        await refreshProjectTraverses();
+      }catch(err){
+        console.warn("[WORKBENCH] initial project traverse list refresh failed", err);
       }
     }
     await ensureTabData(state.tab);

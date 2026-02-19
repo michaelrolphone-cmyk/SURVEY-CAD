@@ -11,6 +11,8 @@ test('WORKBENCH bootstraps active project casefile linkage via API', async () =>
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
   assert.match(html, /const activeProjectId = pageParams\.get\("activeProjectId"\) \|\| pageParams\.get\("projectId"\) \|\| "";/);
   assert.match(html, /syncProjectWorkbench: \(projectId, body=\{\}\) => apiRequest\("POST",`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/workbench\/sync`/);
+  assert.match(html, /listProjectTraverses: \(projectId\) => apiRequest\("GET",`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/workbench\/traverses`/);
+  assert.match(html, /getProjectTraverse: \(projectId, traverseId\) => apiRequest\("GET",`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/workbench\/traverses\/\$\{encodeURIComponent\(traverseId\)\}`/);
   assert.match(html, /function resolveCasefileId\(payload\)\{[\s\S]*payload\?\.id \|\| payload\?\.casefile\?\.id \|\| payload\?\.link\?\.casefileId \|\| "";[\s\S]*\}/);
   assert.match(html, /async function ensureActiveCasefile\(candidateIds = \[]\)\{[\s\S]*await setActiveCasefile\(id\);[\s\S]*return true;[\s\S]*\}/);
   assert.match(html, /async function createAndActivateFallbackCasefile\(\)\{[\s\S]*if \(activeProjectId\)\{[\s\S]*cf = await api\.createProjectCasefile\(activeProjectId, \{\}\);[\s\S]*const synced = await api\.syncProjectWorkbench\(activeProjectId, \{ forceNewCasefile: true \}\);[\s\S]*if \(!activated\)\{[\s\S]*Unable to create or activate a project-linked casefile\.[\s\S]*\}[\s\S]*\}[\s\S]*cf = await api\.createCasefile\("New Boundary Casefile", "Idaho", "", true\);[\s\S]*\}/);
@@ -61,4 +63,14 @@ test('WORKBENCH initData degrades gracefully when casefile listing API is unavai
 test('WORKBENCH render guards against missing active casefile to avoid null meta access', async () => {
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
   assert.match(html, /if \(!haveActive\(\)\)\{[\s\S]*No active casefile[\s\S]*return;/);
+});
+
+
+test('WORKBENCH project traverse tab exposes selectable traverse list and loader actions', async () => {
+  const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
+  assert.match(html, /function refreshProjectTraverses\(\)\{[\s\S]*state\.projectTraverses = Array\.isArray\(payload\?\.traverses\) \? payload\.traverses : \[\];[\s\S]*\}/);
+  assert.match(html, /<select id="projectTraverseSelect"[\s\S]*data-act="refreshProjectTraverses"[\s\S]*data-act="loadProjectTraverse"/);
+  assert.match(html, /async function loadSelectedProjectTraverse\(\)\{[\s\S]*await api\.getProjectTraverse\(activeProjectId, selected\);[\s\S]*await setActiveCasefile\(casefileId\);[\s\S]*toast\("Loaded", `Traverse \"\$\{payload\?\.name \|\| selected\}\" loaded\.`, "good"\);[\s\S]*\}/);
+  assert.match(html, /if \(act === "refreshProjectTraverses"\)\{[\s\S]*refreshProjectTraverses\(\)\.then\(\(\)=>render\(\)\)/);
+  assert.match(html, /if \(act === "loadProjectTraverse"\)\{ loadSelectedProjectTraverse\(\); return; \}/);
 });
