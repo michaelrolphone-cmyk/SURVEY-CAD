@@ -1229,7 +1229,7 @@
           const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing || isPdfResource;
           const actualFileName = `${entry.id}.${entry.exportFormat}`;
           const configuredFileName = entry?.title || actualFileName;
-          const leadingIcon = isPdfResource ? '' : '<span class="icon">📄</span>';
+          const leadingIcon = showThumbnailSlot ? '' : '<span class="icon">📄</span>';
           const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
           resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
 

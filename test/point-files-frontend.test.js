@@ -54,7 +54,7 @@ test('EvidenceDesk file rows prioritize configured names and truncate actual fil
   const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
   assert.match(html, /\.file-name-configured\s*\{[\s\S]*color:\s*#f8fafc;[\s\S]*font-weight:\s*600;/, 'EvidenceDesk should render configured names in brighter text.');
   assert.match(html, /\.file-name-actual\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/, 'EvidenceDesk should truncate long actual file names with ellipsis.');
-  assert.match(html, /const\s+leadingIcon\s*=\s*isPdfResource\s*\?\s*''\s*:\s*'<span class="icon">📄<\/span>';/, 'EvidenceDesk should omit the extra PDF icon when a PDF thumbnail is shown.');
+  assert.match(html, /const\s+leadingIcon\s*=\s*showThumbnailSlot\s*\?\s*''\s*:\s*'<span class="icon">📄<\/span>';/, 'EvidenceDesk should omit the extra PDF icon when a PDF thumbnail is shown.');
   assert.match(html, /const\s+showThumbnailSlot\s*=\s*canLaunchPointForge\s*\|\|\s*canOpenLineSmithDrawing\s*\|\|\s*isPdfResource;/, 'EvidenceDesk should reserve thumbnail space only for rows that support generated previews.');
   assert.match(html, /const\s+thumbnailSlotMarkup\s*=\s*showThumbnailSlot\s*\?\s*'<span class="file-preview-slot" aria-hidden="true"><\/span>'\s*:\s*'';/, 'EvidenceDesk should avoid adding thumbnail markup to non-preview folders.');
   assert.doesNotMatch(html, /pdf-preview-icon/, 'EvidenceDesk should not render the legacy PDF icon badge markup in file rows.');
