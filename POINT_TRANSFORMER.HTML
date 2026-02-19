@@ -167,6 +167,19 @@
     main.pointEditorFocusOutput #ingestPanel #ingestControls{ display:none; }
     main.pointEditorFocusOutput #outputPanel .panelbody textarea,
     main.pointEditorFocusOutput #outputPanel .panelbody .pointsTableWrap.active{ min-height: 640px; }
+    main.pointEditorFocusInput #ingestPanel{ margin-right:56px; }
+    main.pointEditorFocusInput #outputPanel{
+      opacity:1;
+      pointer-events:auto;
+      transform: translateX(0);
+      inset:0 0 0 auto;
+      width:56px;
+      z-index:3;
+    }
+    main.pointEditorFocusInput #outputPanel .panelbody{ display:none; }
+    main.pointEditorFocusInput #outputPanel .panelhead{ cursor:pointer; min-height:100%; justify-content:center; }
+    main.pointEditorFocusInput #outputPanel .panelhead h2{ writing-mode:vertical-lr; text-orientation:mixed; }
+    main.pointEditorFocusInput #outputPanel .chip{ display:none; }
     .panelhead{
       position: relative;
       padding: 12px 12px;
@@ -228,6 +241,9 @@
       background: rgba(8,10,16,.42);
       display:grid;
       gap: 8px;
+    }
+    .leftStack > .localizationPanel{
+      margin: 0 0 10px;
     }
     .localizationRow{
       display:flex;
@@ -378,11 +394,13 @@
     }
     .toggleRow{ margin-top: 10px; display:flex; justify-content:flex-end; }
     .pointsTableWrap{
+      --point-table-line-item-height: 30px;
+      --point-table-visible-line-items: 25;
       border:1px solid rgba(255,255,255,.14);
       border-radius:12px;
       overflow:hidden;
       background: rgba(5,7,11,.75);
-      max-height: 300px;
+      max-height: calc((var(--point-table-visible-line-items) + 1) * var(--point-table-line-item-height));
       display:none;
       flex-direction:column;
     }
@@ -425,6 +443,7 @@
         <select id="pointFileSelect" style="min-width:200px; max-width:320px;">
           <option value="">Select point file…</option>
         </select>
+        <button id="btnDownload" class="btn secondary" disabled>Download</button>
         <button id="btnOpenLineSmith" class="btn workflowPrimary workflowHeaderAction" disabled>Open in LineSmith</button>
       </div>
     </div>
@@ -433,6 +452,20 @@
   <main>
     <!-- Left: Input + Output accordion -->
     <section class="leftStack">
+    <div class="localizationPanel">
+      <div class="localizationRow">
+        <input id="enableLocalization" type="checkbox" />
+        <label for="enableLocalization" style="color:var(--text); margin:0;">Localize points with anchor GPS</label>
+      </div>
+      <div class="localizationRow">
+        <label for="anchorPointNumber" style="color:var(--text); margin:0;">Anchor point #</label>
+        <input id="anchorPointNumber" class="coordInput" type="number" min="1" step="1" placeholder="100" disabled />
+        <label for="anchorLat" style="color:var(--text); margin:0;">Lat/Lon</label>
+        <input id="anchorLat" class="coordInput" type="number" step="0.000001" placeholder="43.610000" disabled />
+        <input id="anchorLon" class="coordInput" type="number" step="0.000001" placeholder="-116.200000" disabled />
+      </div>
+      <div class="hint" id="localizationHint" style="margin:0;">Optional: select an existing point number as the local anchor and pair it with one known GPS anchor.</div>
+    </div>
     <section class="panel" id="ingestPanel">
       <div class="panelhead">
         <h2><span class="sig"></span> Ingest Console</h2>
@@ -468,38 +501,6 @@
 
         <div class="row" style="margin-top:10px;">
           <button id="btnProcess" class="btn">Process</button>
-          <button id="btnRenumber" class="btn secondary" disabled>Renumber Output</button>
-          <button id="btnDownload" class="btn secondary" disabled>Download</button>
-
-          <span class="pill">
-            <label for="renumberStart" style="color:var(--text); margin:0;">Renumber start</label>
-            <input id="renumberStart" type="number" min="1" step="1" value="1" />
-          </span>
-
-          <span class="pill">
-            <span class="mono">Basemap</span>
-            <select id="basemap" style="min-width: 170px;">
-              <option value="street" selected>Street</option>
-              <option value="satellite">Satellite</option>
-            </select>
-          </span>
-
-          <span class="pill">Map defaults: <span class="mono">US-ft</span> · <span class="mono">West</span> · <span class="mono">SwapXY</span></span>
-        </div>
-
-        <div class="localizationPanel">
-          <div class="localizationRow">
-            <input id="enableLocalization" type="checkbox" />
-            <label for="enableLocalization" style="color:var(--text); margin:0;">Localize points with anchor GPS</label>
-          </div>
-          <div class="localizationRow">
-            <label for="anchorPointNumber" style="color:var(--text); margin:0;">Anchor point #</label>
-            <input id="anchorPointNumber" class="coordInput" type="number" min="1" step="1" placeholder="100" disabled />
-            <label for="anchorLat" style="color:var(--text); margin:0;">Lat/Lon</label>
-            <input id="anchorLat" class="coordInput" type="number" step="0.000001" placeholder="43.610000" disabled />
-            <input id="anchorLon" class="coordInput" type="number" step="0.000001" placeholder="-116.200000" disabled />
-          </div>
-          <div class="hint" id="localizationHint" style="margin:0;">Optional: select an existing point number as the local anchor and pair it with one known GPS anchor.</div>
         </div>
 
         <div class="grid2" style="margin-top: 10px; display:none;">
@@ -543,6 +544,13 @@
       <div class="panelbody">
         <label for="outText">Transformed points</label>
         <textarea id="outText" spellcheck="false" readonly></textarea>
+        <div id="outputActions" class="row" style="margin-top:10px;" hidden>
+          <button id="btnRenumber" class="btn secondary" disabled>Renumber Output</button>
+          <span class="pill">
+            <label for="renumberStart" style="color:var(--text); margin:0;">Renumber start</label>
+            <input id="renumberStart" type="number" min="1" step="1" value="1" />
+          </span>
+        </div>
         <div id="outputTableWrap" class="pointsTableWrap" aria-hidden="true">
           <div class="pointsTableScroll">
             <table class="pointsTable">
@@ -579,6 +587,12 @@
           <div class="hint" id="mapHint">Load a file or paste points to plot.</div>
           <div class="mapMetaRow">
             <span class="chip">DATUM: <span class="mono">NAD83 (NO_TRANS)</span></span>
+            <span class="chip">BASEMAP:
+              <select id="basemap" style="min-width: 170px;">
+                <option value="street" selected>Street</option>
+                <option value="satellite">Satellite</option>
+              </select>
+            </span>
             <span class="chip">PIPELINE: <span class="mono">PARSE → RENUMB → SORT → PLOT</span></span>
           </div>
         </div>
@@ -968,6 +982,7 @@
     const elFile = document.getElementById("file");
     const elIn = document.getElementById("inText");
     const elOut = document.getElementById("outText");
+    const elOutputActions = document.getElementById("outputActions");
     const elLog = document.getElementById("log");
     const elDownload = document.getElementById("btnDownload");
     const elProcess = document.getElementById("btnProcess");
@@ -1374,7 +1389,11 @@
     function setPointEditorAccordionMode(mode = "input"){
       pointEditorAccordionMode = mode === "output" ? "output" : "input";
       const outputFocused = usePointEditorView && pointEditorAccordionMode === "output";
-      if (elMain) elMain.classList.toggle("pointEditorFocusOutput", outputFocused);
+      const inputFocused = usePointEditorView && pointEditorAccordionMode === "input";
+      if (elMain) {
+        elMain.classList.toggle("pointEditorFocusOutput", outputFocused);
+        elMain.classList.toggle("pointEditorFocusInput", inputFocused);
+      }
       if (elIngestPanel) elIngestPanel.setAttribute("aria-expanded", outputFocused ? "false" : "true");
       if (elOutputPanel) elOutputPanel.setAttribute("aria-expanded", outputFocused ? "true" : "false");
     }
@@ -1383,6 +1402,11 @@
       setPointEditorView(true);
       setPointEditorAccordionMode("output");
       refreshPointEditorTables();
+    }
+
+    function updateOutputActionVisibility(){
+      const hasOutput = !!String(latestOutputText || "").trim();
+      if (elOutputActions) elOutputActions.hidden = !hasOutput;
     }
 
     let map = null;
@@ -1937,6 +1961,7 @@
         elLog.textContent = "";
         latestOutputText = "";
         latestTransformed = null;
+        updateOutputActionVisibility();
         elRenumber.disabled = true;
         elDownload.disabled = true;
         elOpenLineSmith.disabled = true;
@@ -1960,6 +1985,7 @@
         elOut.value = "";
         latestOutputText = "";
         latestTransformed = null;
+        updateOutputActionVisibility();
         elLog.textContent = `${res.logText}\n\n${String(error?.message || error)}`;
         refreshPointEditorTables();
         if (layer) layer.clearLayers();
@@ -1975,6 +2001,7 @@
       const outputText = recordsForOutput.map((record)=>record.fields.map(csvEscape).join(",")).join("\n");
       latestTransformed = { ...res, recordsSorted: recordsForOutput };
       latestOutputText = outputText;
+      updateOutputActionVisibility();
       renderPointGroups(buildPointGroupsFromRecords(recordsForOutput));
 
       elOut.value = outputText;
@@ -2020,6 +2047,7 @@
 
       latestOutputText = renumberedLines.join("\n");
       elOut.value = latestOutputText;
+      updateOutputActionVisibility();
 
       const rows = parsePointRows(latestOutputText);
       if (latestTransformed?.recordsSorted?.length){
@@ -2395,6 +2423,7 @@
     elIn.value = "";
     setPointEditorView(false);
     setPointEditorAccordionMode("input");
+    updateOutputActionVisibility();
     setBasemap("street");
     setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
     elMapHint.textContent = "Load a file or paste points to plot. Basemap toggle: Street / Satellite.";
