@@ -10,6 +10,7 @@ import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { loadFldConfig } from './fld-config.js';
+import { FieldToFinishStore } from './field-to-finish-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -227,6 +228,12 @@ export function createSurveyServer({
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
   const lineforgeCollab = createLineforgeCollabService();
+  const fieldToFinishStore = new FieldToFinishStore({
+    loadDefaultConfig: async () => {
+      const absolutePath = path.resolve(staticDir, 'config/MLS.fld');
+      return loadFldConfig(absolutePath);
+    },
+  });
   const localStorageSyncStoresByContext = new Map();
 
   function normalizeSyncContextValue(value = '') {
@@ -330,6 +337,40 @@ export function createSurveyServer({
         }
         const config = await loadFldConfig(absolutePath);
         sendJson(res, 200, config);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/field-to-finish') {
+        if (req.method === 'GET') {
+          const state = await fieldToFinishStore.getState();
+          sendJson(res, 200, state);
+          return;
+        }
+
+        if (req.method === 'POST') {
+          const body = await readJsonBody(req);
+          const state = await fieldToFinishStore.createOverride(body?.config);
+          lineforgeCollab.broadcastGlobal({ type: 'field-to-finish-updated', revision: state.revision, source: state.source, at: Date.now() });
+          sendJson(res, 201, state);
+          return;
+        }
+
+        if (req.method === 'PUT') {
+          const body = await readJsonBody(req);
+          const state = await fieldToFinishStore.putOverride(body?.config);
+          lineforgeCollab.broadcastGlobal({ type: 'field-to-finish-updated', revision: state.revision, source: state.source, at: Date.now() });
+          sendJson(res, 200, state);
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          const state = await fieldToFinishStore.deleteOverride();
+          lineforgeCollab.broadcastGlobal({ type: 'field-to-finish-updated', revision: state.revision, source: state.source, at: Date.now() });
+          sendJson(res, 200, state);
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Only GET, POST, PUT, and DELETE are supported.' });
         return;
       }
 

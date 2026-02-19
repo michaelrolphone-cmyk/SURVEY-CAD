@@ -402,6 +402,7 @@ Base URL (local): `http://localhost:3000`
 - `GET /api/apps`
 - `GET /api/crew-members` (returns `{ crewMembers: [{ id, name }] }` from configured Crew API directory source for launcher identity selection)
 - `GET /ws/lineforge?crewMemberId=...&projectId=...&room=<roomId>` (WebSocket upgrade endpoint used by LineSmith + ArrowHead collaboration; `crewMemberId` is required, room state is isolated per crew/project context, and the channel includes `state-ack`/`state-rejected` optimistic concurrency plus object lock handshake messages: `lock-request`, `lock-granted`, `lock-denied`, `lock-release`, `lock-updated`)
+  - Server-originated `field-to-finish-updated` messages are broadcast to all connected LineSmith collaboration sockets whenever shared FLD settings change so each client reloads rules and redraws code-driven geometry.
 - `GET /ws/localstorage-sync?crewMemberId=...&projectId=...` (WebSocket upgrade endpoint used for launcher/app localStorage differential synchronization; `crewMemberId` is required and `projectId` scopes sync channels)
 - Static asset delivery: `/assets/icons/*` and `/assets/survey-symbols/*` now return long-lived immutable caching headers (`Cache-Control: public, max-age=31536000, immutable`) for faster repeat icon/SVG loads.
 
@@ -427,6 +428,14 @@ Base URL (local): `http://localhost:3000`
 ### Field-to-Finish (FLD)
 
 - `GET /api/fld-config?file=config/MLS.fld`
+- `GET /api/field-to-finish`
+  - Returns shared effective configuration: `{ config, hasOverride, source, revision, updatedAt }`.
+- `POST /api/field-to-finish`
+  - Creates the shared API override from JSON body `{ "config": { "columns": [...], "rules": [...] } }`.
+- `PUT /api/field-to-finish`
+  - Upserts shared API override from JSON body `{ "config": { "columns": [...], "rules": [...] } }`.
+- `DELETE /api/field-to-finish`
+  - Clears shared override and reverts all users/projects to the server default FLD file.
 
 Returns parsed FLD data:
 
@@ -442,10 +451,10 @@ LineSmith (`VIEWPORT.HTML`) now also includes an FLD editor workflow:
 - For each row, choose **Entity** as **Linework**, **2D Polyline (Linework)**, or **Symbol**.
   - **Linework** and **2D Polyline** rows can pick a FLD `Linetype` value from existing line types in the loaded config; line entities default to FLD `Symbol` = `SPT10` and do not expose symbol SVG options.
   - **Symbol** rows can set FLD `Symbol` to the symbol name used by your code set (for example `SPT10`), then choose the mapped SVG from a dropdown + preview picker so you can visually confirm the symbol before saving, and set FLD `Symbol Size` scale. SVG mappings are stored separately in browser local storage as `Symbol -> SVG` overrides and are not written back into FLD columns.
-- Click **Save Local** to store a browser-local override (`localStorage` key: `lineSmithFldConfigLocal`) and immediately apply those rules to auto linework/layer behavior.
-- Click **Download Local FLD** (panel button or modal button) to export your saved local override as an `.fld` file.
+- Click **Save Local** to push a shared API override that applies to every user/project and immediately apply those rules to auto linework/layer behavior.
+- Click **Download Local FLD** (panel button or modal button) to export the active shared override/effective FLD config as an `.fld` file.
 - Click **Download Current FLD** to export the currently-loaded editor state.
-- Click **Reset to Server** to clear local override storage and restore the server-sourced FLD file.
+- Click **Reset to Server** to clear the shared API override and restore the server-sourced FLD file for everyone.
 
 When saving/downloading, unknown columns from the FLD header are preserved and new entries are created using template-backed raw fields so extra properties are retained.
 
@@ -477,6 +486,11 @@ curl "http://localhost:3000/health"
 curl "http://localhost:3000/api/lookup?address=1600%20W%20Front%20St%2C%20Boise"
 curl "http://localhost:3000/api/section?lon=-116.20&lat=43.61"
 curl "http://localhost:3000/api/fld-config?file=config/MLS.fld"
+curl "http://localhost:3000/api/field-to-finish"
+curl -X PUT "http://localhost:3000/api/field-to-finish" \
+  -H "Content-Type: application/json" \
+  -d '{"config":{"columns":[{"key":"code","name":"Code"}],"rules":[{"rowNumber":2,"raw":{"code":"ROW","entity_type":"2","processing_on":"1"},"code":"ROW","entityType":"2","processingOn":true}]}}'
+curl -X DELETE "http://localhost:3000/api/field-to-finish"
 curl -X POST "http://localhost:3000/api/localstorage-sync?crewMemberId=crew-1&projectId=project-1" \
   -H "Content-Type: application/json" \
   -d '{"version":1730000000000,"snapshot":{"surveyfoundryProjects":"[]"}}'
@@ -505,7 +519,3 @@ heroku create <your-app-name>
 git push heroku <your-branch>:main
 heroku open
 ```
-
-## API and CLI Notes for this change
-
-LineSmith map-layer and loading-modal animation polish is a visual UX update in `VIEWPORT.HTML` only. No API endpoints or CLI commands changed in this release; use the existing endpoint and command references in this README.
