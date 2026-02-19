@@ -157,6 +157,16 @@
       flex: none;
     }
 
+    .drawing-preview-thumb {
+      width: 86px;
+      height: 50px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+      background: rgba(2, 6, 23, 0.7);
+      flex: none;
+    }
+
     .pdf-preview-icon {
       width: 1.35rem;
       height: 1.35rem;
@@ -254,7 +264,7 @@
 
   <script type="module">
     import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, renameResourceTitle, findCpfPointLinksAsync } from './src/project-browser-state.js';
-    import { renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
+    import { renderLineworkThumbnailDataUrl, renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
@@ -431,6 +441,43 @@
       thumb.className = 'point-file-preview-thumb';
       thumb.src = previewUrl;
       thumb.alt = `${entry?.title || entry?.id || 'Point file'} preview`;
+      resource.querySelector('.file-meta')?.appendChild(thumb);
+    }
+
+    async function resolveDrawingPoints(resource) {
+      const ref = resource?.reference;
+      if (!ref) return [];
+
+      if (ref.type === 'local-storage') {
+        const raw = localStorage.getItem(ref.value);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed?.currentState?.points) ? parsed.currentState.points : [];
+      }
+
+      if (ref.type === 'project-drawing') {
+        const projectId = ref.metadata?.projectId || '';
+        const drawingId = ref.metadata?.drawingId || ref.value || '';
+        if (!projectId || !drawingId) return [];
+        const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId));
+        if (!response.ok) return [];
+        const payload = await response.json();
+        return Array.isArray(payload?.drawing?.currentState?.points) ? payload.drawing.currentState.points : [];
+      }
+
+      return [];
+    }
+
+    async function attachDrawingPreview(resource, entry) {
+      if (!resource || !entry) return;
+      const points = await resolveDrawingPoints(entry);
+      if (!Array.isArray(points) || !points.length) return;
+      const previewUrl = renderLineworkThumbnailDataUrl(points, { width: 86, height: 50 });
+      if (!previewUrl) return;
+      const thumb = document.createElement('img');
+      thumb.className = 'drawing-preview-thumb';
+      thumb.src = previewUrl;
+      thumb.alt = `${entry?.title || entry?.id || 'Drawing'} preview`;
       resource.querySelector('.file-meta')?.appendChild(thumb);
     }
 
@@ -998,6 +1045,10 @@
 
           if (canLaunchPointForge) {
             attachPointFilePreview(resource, entry).catch(() => {});
+          }
+
+          if (canOpenLineSmithDrawing) {
+            attachDrawingPreview(resource, entry).catch(() => {});
           }
 
           if (canLaunchPointForge) {

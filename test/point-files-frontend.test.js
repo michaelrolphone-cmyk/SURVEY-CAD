@@ -20,7 +20,7 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
   assert.match(html, /const\s+isPointFileFormat\s*=\s*pointFileFormat\s*===\s*'csv'\s*\|\|\s*pointFileFormat\s*===\s*'txt';/, 'EvidenceDesk should only launch PointForge for point-file formats.');
-  assert.match(html, /import\s*\{\s*renderPointFileThumbnailDataUrl\s*\}\s*from\s*'\.\/src\/point-thumbnail-client\.js'/, 'EvidenceDesk should import the shared point thumbnail client.');
+  assert.match(html, /import\s*\{\s*renderLineworkThumbnailDataUrl,\s*renderPointFileThumbnailDataUrl\s*\}\s*from\s*'\.\/src\/point-thumbnail-client\.js'/, 'EvidenceDesk should import the shared point thumbnail client.');
   assert.match(html, /async function\s+attachPointFilePreview\(/, 'EvidenceDesk should define a point-file preview hydration helper.');
   assert.match(html, /renderPointFileThumbnailDataUrl\(text,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render point file thumbnails through the shared client library.');
   assert.match(html, /className\s*=\s*'point-file-preview-thumb'/, 'EvidenceDesk should render point file thumbnail images in file rows.');
@@ -36,6 +36,9 @@ test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and 
   assert.match(html, /localStorage\.setItem\(storageKey, JSON\.stringify\(drawing\)\)/, 'EvidenceDesk should hydrate localStorage with API drawing payload for LineSmith import');
   assert.match(html, /fetch\(buildProjectDrawingApiUrl\(projectId, drawingId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*drawingName:\s*nextTitle[\s\S]*drawingState:\s*currentState/, 'EvidenceDesk should rename drawings through PATCH drawing API while preserving state');
   assert.match(html, /renameDrawingButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk drawing rows should expose a Rename button');
+  assert.match(html, /async function\s+attachDrawingPreview\(/, 'EvidenceDesk should define a drawing preview hydration helper.');
+  assert.match(html, /renderLineworkThumbnailDataUrl\(points,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render drawing thumbnails through the shared field-to-finish thumbnail library.');
+  assert.match(html, /className\s*=\s*'drawing-preview-thumb'/, 'EvidenceDesk should render drawing thumbnail images in drawing rows.');
   assert.match(html, /renameResourceTitle\(projectContext\?\.projectFile, folder\?\.key, entry\?\.id, nextTitle\)/, 'EvidenceDesk should rename non-API resources in project-file index state');
 });
 

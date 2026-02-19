@@ -206,19 +206,21 @@ Request body for create/update:
 ```
 
 
-## API and CLI notes for shared point thumbnail rendering
+## API and CLI notes for shared FieldToFinish thumbnail rendering
 
-Point previews in **EvidenceDesk** and **PointForge** now use a shared JavaScript client library (`src/point-thumbnail-client.js`) that renders SVG thumbnails from point file text. The library uses a shared field-to-finish rules engine (`src/field-to-finish-rules-engine.js`) so sequential BEG/END/CLO parsing logic is reused by both thumbnail rendering and LineSmith field-to-finish processing.
+Point and drawing previews in **EvidenceDesk** (plus point previews in **PointForge**) now use a shared JavaScript client library (`src/point-thumbnail-client.js`) that renders SVG thumbnails with the FieldToFinish linework pipeline. The library uses a shared field-to-finish rules engine (`src/field-to-finish-rules-engine.js`) so sequential BEG/END/CLO parsing logic is reused by both thumbnail rendering and LineSmith field-to-finish processing.
 
 ### API endpoints used by thumbnail-enabled workflows
 
 - `GET /api/projects/:projectId/point-files`
 - `GET /api/projects/:projectId/point-files/:pointFileId`
+- `GET /api/projects/:projectId/drawings/:drawingId`
 
 ### CLI/test commands for this feature
 
 - `npm test`
 - `node --test test/point-thumbnail-client.test.js`
+- `node --test test/point-files-frontend.test.js`
 
 ### CLI / server commands
 
