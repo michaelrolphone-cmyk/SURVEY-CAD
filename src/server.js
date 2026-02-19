@@ -94,6 +94,12 @@ const PDF_THUMBNAIL_TARGET_WIDTH = 1024;
 const PDF_THUMBNAIL_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PDF_THUMBNAIL_FAILURE_COOLDOWN_MS = 30 * 1000;
 
+function createHttpError(status, message) {
+  const error = new Error(message);
+  error.status = Number(status) || 500;
+  return error;
+}
+
 function runCommand(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], ...opts });
@@ -116,7 +122,7 @@ async function renderPdfThumbnailFromBuffer(pdfBuffer, { width = PDF_THUMBNAIL_T
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'surveycad-pdf-thumb-'));
   const pdfPath = path.join(tempDir, 'input.pdf');
   const pngPrefix = path.join(tempDir, 'page');
-  const pageOnePng = `${pngPrefix}-1.png`;
+  const pageOnePng = `${pngPrefix}.png`;
   try {
     await writeFile(pdfPath, pdfBuffer);
     await runCommand('pdftoppm', ['-f', '1', '-singlefile', '-png', pdfPath, pngPrefix]);
@@ -877,9 +883,9 @@ export function createSurveyServer({
       const projectId = sourceObj.searchParams.get('projectId');
       const folderKey = sourceObj.searchParams.get('folderKey');
       const requestedFileName = sourceObj.searchParams.get('fileName');
-      if (!projectId || !folderKey || !requestedFileName) throw new Error('Invalid project file download source URL.');
+      if (!projectId || !folderKey || !requestedFileName) throw createHttpError(400, 'Invalid project file download source URL.');
       const file = await runtime.store.getFile(projectId, folderKey, path.basename(requestedFileName));
-      if (!file?.buffer) throw new Error('PDF source file not found.');
+      if (!file?.buffer) throw createHttpError(404, 'PDF source file not found.');
       return file.buffer;
     }
 
@@ -891,11 +897,13 @@ export function createSurveyServer({
           'User-Agent': 'SurveyCAD-ProjectBrowser/1.0 (+thumbnail)',
         },
       });
-      if (!pdfResponse.ok) throw new Error(`Could not fetch remote PDF for thumbnail generation: HTTP ${pdfResponse.status}`);
+      if (!pdfResponse.ok) {
+        throw createHttpError(502, `Could not fetch remote PDF for thumbnail generation: HTTP ${pdfResponse.status}`);
+      }
       return Buffer.from(await pdfResponse.arrayBuffer());
     }
 
-    throw new Error('Unsupported PDF thumbnail source path.');
+    throw createHttpError(400, 'Unsupported PDF thumbnail source path.');
   }
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
@@ -1873,7 +1881,7 @@ export function createSurveyServer({
 
         const failure = pdfThumbnailFailures.get(cacheKey);
         if (failure && (Date.now() - failure.at) < PDF_THUMBNAIL_FAILURE_COOLDOWN_MS) {
-          sendJson(res, 502, {
+          sendJson(res, failure.status, {
             error: 'Thumbnail generation failed.',
             status: 'failed',
             source: sourceUrl,
@@ -1892,6 +1900,7 @@ export function createSurveyServer({
             } catch (error) {
               pdfThumbnailFailures.set(cacheKey, {
                 at: Date.now(),
+                status: Number(error?.status) || 502,
                 message: error?.message || 'Unknown thumbnail generation error.',
               });
             }

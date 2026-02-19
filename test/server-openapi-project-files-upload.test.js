@@ -25,6 +25,7 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   assert.ok(thumbPath?.get, 'spec should include PDF thumbnail endpoint');
   assert.ok(thumbPath.get.responses?.['200'], 'PDF thumbnail endpoint should document image response');
   assert.ok(thumbPath.get.responses?.['202'], 'PDF thumbnail endpoint should document generation-in-progress response');
+  assert.ok(thumbPath.get.responses?.['404'], 'PDF thumbnail endpoint should document source-not-found failures');
   assert.ok(thumbPath.get.responses?.['502'], 'PDF thumbnail endpoint should document generation failure response');
 
   const listSchema = spec?.components?.schemas?.ProjectFilesListResponse;
