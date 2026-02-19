@@ -1887,8 +1887,10 @@
         throw new Error(`Anchor point #${settings.anchorPointNumber} was not found in the processed point set.`);
       }
 
-      const anchorLocalHandoffX = anchorRecord.x;
-      const anchorLocalHandoffY = anchorRecord.y;
+      // records store source ordering (northing,easting) as x,y.
+      // Convert to LineSmith handoff order (x=easting,y=northing) for offset math.
+      const anchorLocalHandoffX = anchorRecord.y;
+      const anchorLocalHandoffY = anchorRecord.x;
       const eastOffset = anchorEast - anchorLocalHandoffX;
       const northOffset = anchorNorth - anchorLocalHandoffY;
 
@@ -1899,14 +1901,15 @@
           throw new Error(`Point ${i + 1} is missing numeric X/Y coordinates and cannot be localized.`);
         }
 
-        const localHandoffX = record.x;
-        const localHandoffY = record.y;
+        const localHandoffX = record.y;
+        const localHandoffY = record.x;
         const localizedHandoffX = localHandoffX + eastOffset;
         const localizedHandoffY = localHandoffY + northOffset;
 
         const localizedRecord = cloneRecordWithFields(record);
-        localizedRecord.x = localizedHandoffX;
-        localizedRecord.y = localizedHandoffY;
+        // keep PointForge internal/source ordering in fields[1]=northing, fields[2]=easting
+        localizedRecord.x = localizedHandoffY;
+        localizedRecord.y = localizedHandoffX;
         localizedRecord.fields[1] = String(localizedRecord.x);
         localizedRecord.fields[2] = String(localizedRecord.y);
         localized.push(localizedRecord);
