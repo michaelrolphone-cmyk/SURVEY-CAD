@@ -872,6 +872,7 @@ test('VIEWPORT.HTML normalizes point code token ordering and deduplicates linewo
   assert.match(html, /for \(const target of parsedJpnTargets\) pushUnique\(`JPN\$\{target\}`\);[\s\S]*for \(const token of passthroughTokens\) pushUnique\(token\);/, 'point-code normalization should keep JPN directives ahead of unknown passthrough tokens like ad-hoc utility IDs');
   assert.match(html, /function\s+appendTokensToPointCode\(pointId, tokens = \[\]\)\s*\{[\s\S]*return\s+setPointCode\(point, joinCodeTokens\(\[\.\.\.currentTokens, \.\.\.tokens\]\)\);/, 'line-edit token appends should flow through point-code normalization so duplicates are removed and ordering stays consistent');
   assert.match(html, /if \(field === "code"\) setPointCode\(p, String\(inp\.value\)\);/, 'point editor code typing should normalize BEG\/END\/JPN token layout immediately on edit');
+  assert.match(html, /if \(nextUpper && directives\.has\(nextUpper\) && !directives\.has\(tokenUpper\)\) \{[\s\S]*if \(isCurveMarkerToken\(tokenUpper\)\) \{[\s\S]*directiveBaseCode = resolveSequentialDirectiveBaseCode\(tokensUpper, i \+ 1\) \|\| "";[\s\S]*if \(!directiveBaseCode \|\| isCurveMarkerToken\(directiveBaseCode\)\) continue;/, 'point-code normalization should resolve CLO\/END directives after PT\/PC markers back to the adjacent linework base code');
 });
 
 
