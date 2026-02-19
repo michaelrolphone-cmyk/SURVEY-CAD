@@ -5383,14 +5383,35 @@ function paintBackground(ctx, w, h){
 
     const lineCommands = [];
     const activeCurves = new Map();
+    const explicitSequentialBaseCodes = new Set();
     for (const point of pointsInOrder) {
+      const { tokensUpper, commands } = parseFieldToFinishCommands(point.code);
+      const tokenSet = new Set(tokensUpper);
+      for (const cmd of commands) {
+        if (cmd.type !== "sequential-line") continue;
+        const sequenceKey = resolveLineworkSequenceKey(cmd.baseCode, explicitSequentialBaseCodes);
+        if (!sequenceKey) continue;
+        const parsedSequence = splitLineworkSequenceCodeToken(sequenceKey);
+        explicitSequentialBaseCodes.add(sequenceKey);
+        explicitSequentialBaseCodes.add(parsedSequence.baseCode);
+      }
+
       const curveLineworkCodes = extractCurveLineworkCodes(point.code);
-      if (!curveLineworkCodes.size) continue;
+      const pointSequenceCandidates = new Set(curveLineworkCodes);
+      for (const token of tokenSet) {
+        const sequenceKey = resolveLineworkSequenceKey(token, explicitSequentialBaseCodes);
+        if (!sequenceKey) continue;
+        pointSequenceCandidates.add(sequenceKey);
+      }
+      for (const baseCode of activeCurves.keys()) {
+        if (pointSupportsLineworkSequenceToken(tokenSet, baseCode)) pointSequenceCandidates.add(baseCode);
+      }
+      if (!pointSequenceCandidates.size) continue;
 
       const hasCurveStart = pointHasCurveStartToken(point.code);
       const hasCurveEnd = pointHasCurveEndToken(point.code);
 
-      for (const baseCode of curveLineworkCodes) {
+      for (const baseCode of pointSequenceCandidates) {
         const activeCurve = activeCurves.get(baseCode) || null;
         if (activeCurve && !activeCurve.middlePointId && point.id !== activeCurve.startPointId) {
           activeCurve.middlePointId = point.id;
