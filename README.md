@@ -133,6 +133,14 @@ The BEW casefile backend now supports `REDIS_TLS_REJECT_UNAUTHORIZED` (preferred
 - API endpoints (unchanged): `GET /casefiles`, `POST /casefiles`, `GET /casefiles/:casefileId`, `PATCH /casefiles/:casefileId`, `DELETE /casefiles/:casefileId`, plus the equivalent `/api/bew/*` prefixed routes.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
 
+### BEW Redis connection retry controls
+
+BEW casefile endpoints now retry Redis initialization before returning service-unavailable errors, which helps absorb transient Redis startup/network failures.
+
+- API endpoints: `GET /casefiles`, `POST /casefiles`, `GET /casefiles/:casefileId`, `PATCH /casefiles/:casefileId`, `DELETE /casefiles/:casefileId`, and `/api/bew/*` prefixed equivalents.
+- Environment variables: `BEW_REDIS_CONNECT_MAX_WAIT_MS` (or `REDIS_CONNECT_MAX_WAIT_MS`) and `BEW_REDIS_CONNECT_RETRY_DELAY_MS` (or `REDIS_CONNECT_RETRY_DELAY_MS`).
+- CLI/server commands: `npm start`, `npm test`.
+
 ### API endpoints (state sync)
 
 - `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum.
@@ -312,6 +320,14 @@ The BEW casefile backend now supports `REDIS_TLS_REJECT_UNAUTHORIZED` (preferred
 
 - API endpoints (unchanged): `GET /casefiles`, `POST /casefiles`, `GET /casefiles/:casefileId`, `PATCH /casefiles/:casefileId`, `DELETE /casefiles/:casefileId`, plus the equivalent `/api/bew/*` prefixed routes.
 - CLI/server commands (unchanged): `npm start`, `npm test`, `npm run cli -- --help`, `npm run ros:cli -- --help`.
+
+### BEW Redis connection retry controls
+
+BEW casefile endpoints now retry Redis initialization before returning service-unavailable errors, which helps absorb transient Redis startup/network failures.
+
+- API endpoints: `GET /casefiles`, `POST /casefiles`, `GET /casefiles/:casefileId`, `PATCH /casefiles/:casefileId`, `DELETE /casefiles/:casefileId`, and `/api/bew/*` prefixed equivalents.
+- Environment variables: `BEW_REDIS_CONNECT_MAX_WAIT_MS` (or `REDIS_CONNECT_MAX_WAIT_MS`) and `BEW_REDIS_CONNECT_RETRY_DELAY_MS` (or `REDIS_CONNECT_RETRY_DELAY_MS`).
+- CLI/server commands: `npm start`, `npm test`.
 
 ### API endpoints (state sync)
 
