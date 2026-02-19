@@ -67,6 +67,10 @@ test('PointForge renders code-group explorer with thumbnails and BoundaryLab han
   assert.match(html, /const\s+pointThumbnailClient\s*=\s*window\.SurveyCadPointThumbnailClient\s*\|\|\s*null;/, 'PointForge should initialize the shared thumbnail client from window scope.');
   assert.match(html, /if\s*\(pointThumbnailClient\?\.parseFieldToFinishDirective\)/, 'PointForge should delegate field-to-finish directive parsing to the shared client.');
   assert.match(html, /function\s+parseFieldToFinishDirective\(/, 'PointForge should parse field-to-finish directives to identify linework groupings.');
+  assert.match(html, /const\s+FIELD_TO_FINISH_STORAGE_KEY\s*=\s*"linesmith:field-to-finish:global";/, 'PointForge should read the shared field-to-finish storage key for thumbnail line-type filtering.');
+  assert.match(html, /function\s+getThumbnailLineworkCodes\(\)\s*\{[\s\S]*deriveLineworkCodesFromFldConfig/, 'PointForge should derive thumbnail linework codes from shared field-to-finish settings.');
+  assert.match(html, /lineworks\.flatMap\(\(linework\)=>linework\.segments\.map\(\(segment, index\)=>\(\{[\s\S]*label:\s*`\$\{linework\.baseCode\} line \$\{index \+ 1\}`/, 'PointForge should break grouped linework into per-line subgroup entries.');
+  assert.match(html, /const\s+allSegments\s*=\s*group\.lineworks\.flatMap\(\(linework\)=>linework\.segments\s*\|\|\s*\[\]\);/, 'PointForge group selection should open all lines in the group instead of only the first line code.');
   assert.match(html, /function\s+buildBoundaryLabCsvFromSegments\(/, 'PointForge should build BoundaryLab handoff payloads from selected groups/subgroups.');
   assert.match(html, /openLinkedApp\(`\/BoundaryLab\.html\?source=pointforge/, 'PointForge group explorer should offer opening selected linework in BoundaryLab.');
 });

@@ -72,8 +72,16 @@ export function deriveLineworkCodesFromFldConfig(config = {}) {
   for (const rule of rules) {
     const code = String(rule?.code || '').trim().toUpperCase();
     const entityType = String(rule?.entityType || '').trim().toUpperCase();
+    const entityTypeNumeric = Number.parseInt(entityType, 10);
     if (!code) continue;
-    if (entityType === 'LINE' || entityType === 'LINEWORK' || entityType === 'LWPOLYLINE' || entityType === 'POLYLINE') {
+    if (
+      entityType === 'LINE'
+      || entityType === 'LINEWORK'
+      || entityType === 'LWPOLYLINE'
+      || entityType === 'POLYLINE'
+      || entityTypeNumeric === 1
+      || entityTypeNumeric === 2
+    ) {
       codes.add(code);
     }
   }
