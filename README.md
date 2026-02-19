@@ -211,6 +211,7 @@ Request body for create/update:
 Point and drawing previews in **EvidenceDesk** (plus point previews in **PointForge**) now use a shared JavaScript client library (`src/point-thumbnail-client.js`) that renders SVG thumbnails with the FieldToFinish linework pipeline. The library uses a shared field-to-finish rules engine (`src/field-to-finish-rules-engine.js`) so sequential BEG/END/CLO parsing logic is reused by both thumbnail rendering and LineSmith field-to-finish processing.
 Point previews in **EvidenceDesk** and **PointForge** now use a shared JavaScript client library (`src/point-thumbnail-client.js`) that renders SVG thumbnails from point file text. The library uses a shared field-to-finish rules engine (`src/field-to-finish-rules-engine.js`) so sequential BEG/END/CLO parsing logic is reused by both thumbnail rendering and LineSmith field-to-finish processing.
 PointForge point-group thumbnails now honor shared Field-to-Finish `entity_type` filtering so symbol rules (`0`) do not draw linework, while line/polyline rules (`1`/`2`, `LINE`, `POLYLINE`, `LWPOLYLINE`) continue to render. Group explorer sub-items are also split per detected line segment (`<base code> line N`) instead of a single aggregate count row.
+PointForge group cards now render mapped FLD symbol SVGs for symbol-type code groups and fall back to a filled white circle preview when a symbol code has no SVG mapping.
 
 ### API endpoints used by thumbnail-enabled workflows
 

@@ -1038,6 +1038,7 @@
     let pointEditorAccordionMode = "input";
     let projectPointFilesCache = [];
     let cachedThumbnailLineworkCodes = null;
+    let cachedThumbnailSymbolRules = null;
 
     const elInputTableWrap = document.getElementById("inputTableWrap");
     const elOutputTableWrap = document.getElementById("outputTableWrap");
@@ -1186,6 +1187,36 @@
       return cachedThumbnailLineworkCodes;
     }
 
+    function getThumbnailSymbolRules(){
+      if (cachedThumbnailSymbolRules instanceof Map) return cachedThumbnailSymbolRules;
+      cachedThumbnailSymbolRules = new Map();
+      try {
+        const raw = localStorage.getItem(FIELD_TO_FINISH_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        const rules = Array.isArray(parsed?.config?.rules) ? parsed.config.rules : [];
+        rules.forEach((rule)=>{
+          const code = normalizeCodeToken(rule?.code || "");
+          if (!code) return;
+          const entityType = normalizeCodeToken(rule?.entityType ?? rule?.entity_type ?? rule?.raw?.entityType ?? rule?.raw?.entity_type ?? "");
+          if (entityType !== "0") return;
+          const symbolMapFile = String(rule?.symbolMapFile || rule?.symbol_name_2 || rule?.symbol_map_file || rule?.symbol_block_id || rule?.raw?.symbol_name_2 || rule?.raw?.symbol_map_file || rule?.raw?.symbol_block_id || "").trim();
+          cachedThumbnailSymbolRules.set(code, symbolMapFile);
+        });
+      } catch {
+        cachedThumbnailSymbolRules = new Map();
+      }
+      return cachedThumbnailSymbolRules;
+    }
+
+    function buildPointGroupSymbolThumbnail(codeKey = ""){
+      const symbolRules = getThumbnailSymbolRules();
+      if (!symbolRules.has(codeKey)) return "";
+      const symbolMapFile = String(symbolRules.get(codeKey) || "").trim();
+      if (symbolMapFile) return `/assets/survey-symbols/${encodeURIComponent(symbolMapFile)}`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="88" height="52" viewBox="0 0 88 52"><rect width="88" height="52" rx="8" fill="#0b1220"/><circle cx="44" cy="26" r="10" fill="#ffffff"/></svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
+
     function buildPointGroupsFromRecords(recordsSorted = []){
       const byCode = new Map();
       for (const record of recordsSorted){
@@ -1211,9 +1242,10 @@
             segments: [segment],
             thumbnail: buildLineworkThumbnailDataUrl([segment]),
           })));
+          const symbolThumbnail = buildPointGroupSymbolThumbnail(group.codeKey);
           return {
             ...group,
-            thumbnail: lineworks.length ? buildLineworkThumbnailDataUrl(lineworks.flatMap((item)=>item.segments)) : "",
+            thumbnail: symbolThumbnail || (lineworks.length ? buildLineworkThumbnailDataUrl(lineworks.flatMap((item)=>item.segments)) : ""),
             lineworks,
             subgroups,
           };
