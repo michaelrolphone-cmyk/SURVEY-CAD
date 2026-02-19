@@ -1157,8 +1157,8 @@ LineSmith now resolves sequential `END`/`CLO` directives from the nearest valid 
 EvidenceDesk uploads now support Redis-backed CRUD operations and folder-level listing.
 
 ### API endpoints
-- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`).
-- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`).
+- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`); returns `413` when declared payload size exceeds 50 MB.
+- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`); returns `413` when declared payload size exceeds 50 MB.
 - `GET /api/project-files/download?projectId=...&folderKey=...&fileName=...` — read/download a stored file.
 - `DELETE /api/project-files/file?projectId=...&folderKey=...&fileName=...` — delete a stored file.
 - `GET /api/project-files/list?projectId=...` — list files and grouped `filesByFolder` entries.

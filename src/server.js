@@ -204,6 +204,13 @@ function sanitizeFileName(name) {
     .slice(0, 200);
 }
 
+function parseContentLength(req) {
+  const rawLength = req.headers['content-length'];
+  const parsed = Number(rawLength);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
 async function parseMultipartUpload(req) {
   const contentType = req.headers['content-type'] || '';
   const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^\s;]+))/);
@@ -1608,6 +1615,11 @@ export function createSurveyServer({
       if (urlObj.pathname === '/api/project-files/upload') {
         if (req.method !== 'POST' && req.method !== 'PUT') {
           sendJson(res, 405, { error: 'Only POST and PUT are supported.' });
+          return;
+        }
+        const declaredBytes = parseContentLength(req);
+        if (declaredBytes !== null && declaredBytes > MAX_UPLOAD_FILE_BYTES + 1024 * 1024) {
+          sendJson(res, 413, { error: `File exceeds maximum size of ${MAX_UPLOAD_FILE_BYTES} bytes.` });
           return;
         }
         const { fields, fileBuffer, fileName } = await parseMultipartUpload(req);
