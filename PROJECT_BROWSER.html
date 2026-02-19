@@ -190,6 +190,12 @@
       min-width: 0;
     }
 
+    .file-preview-slot {
+      display: inline-flex;
+      align-items: center;
+      flex: none;
+    }
+
     .file-name-configured {
       color: #f8fafc;
       font-weight: 600;
@@ -441,7 +447,7 @@
       thumb.className = 'point-file-preview-thumb';
       thumb.src = previewUrl;
       thumb.alt = `${entry?.title || entry?.id || 'Point file'} preview`;
-      resource.querySelector('.file-meta')?.appendChild(thumb);
+      resource.querySelector('.file-preview-slot')?.replaceChildren(thumb);
     }
 
     async function resolveDrawingPoints(resource) {
@@ -478,7 +484,7 @@
       thumb.className = 'drawing-preview-thumb';
       thumb.src = previewUrl;
       thumb.alt = `${entry?.title || entry?.id || 'Drawing'} preview`;
-      resource.querySelector('.file-meta')?.appendChild(thumb);
+      resource.querySelector('.file-preview-slot')?.replaceChildren(thumb);
     }
 
     async function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
@@ -1038,10 +1044,12 @@
             && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           const isPdfResource = entry?.exportFormat === 'pdf';
+          const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing;
           const actualFileName = `${entry.id}.${entry.exportFormat}`;
           const configuredFileName = entry?.title || actualFileName;
           const leadingIcon = isPdfResource ? '<span class="pdf-preview-icon" aria-label="PDF preview icon">PDF</span>' : '<span class="icon">📄</span>';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
+          const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
 
           if (canLaunchPointForge) {
             attachPointFilePreview(resource, entry).catch(() => {});

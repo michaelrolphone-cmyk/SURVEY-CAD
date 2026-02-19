@@ -24,6 +24,7 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /async function\s+attachPointFilePreview\(/, 'EvidenceDesk should define a point-file preview hydration helper.');
   assert.match(html, /renderPointFileThumbnailDataUrl\(text,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render point file thumbnails through the shared client library.');
   assert.match(html, /className\s*=\s*'point-file-preview-thumb'/, 'EvidenceDesk should render point file thumbnail images in file rows.');
+  assert.match(html, /querySelector\('\.file-preview-slot'\)\?\.replaceChildren\(thumb\)/, 'EvidenceDesk should place point file thumbnails in the dedicated preview slot before file names.');
   assert.match(html, /const\s+canLaunchPointForge\s*=\s*folder\.key\s*===\s*'point-files'[\s\S]*isPointFileFormat/, 'EvidenceDesk should gate PointForge launch behavior behind point-file format checks.');
 });
 
@@ -39,6 +40,7 @@ test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and 
   assert.match(html, /async function\s+attachDrawingPreview\(/, 'EvidenceDesk should define a drawing preview hydration helper.');
   assert.match(html, /renderLineworkThumbnailDataUrl\(points,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render drawing thumbnails through the shared field-to-finish thumbnail library.');
   assert.match(html, /className\s*=\s*'drawing-preview-thumb'/, 'EvidenceDesk should render drawing thumbnail images in drawing rows.');
+  assert.match(html, /querySelector\('\.file-preview-slot'\)\?\.replaceChildren\(thumb\)/, 'EvidenceDesk should place drawing thumbnails in the dedicated preview slot before file names.');
   assert.match(html, /renameResourceTitle\(projectContext\?\.projectFile, folder\?\.key, entry\?\.id, nextTitle\)/, 'EvidenceDesk should rename non-API resources in project-file index state');
 });
 
@@ -47,6 +49,9 @@ test('EvidenceDesk file rows prioritize configured names and truncate actual fil
   assert.match(html, /\.file-name-configured\s*\{[\s\S]*color:\s*#f8fafc;[\s\S]*font-weight:\s*600;/, 'EvidenceDesk should render configured names in brighter text.');
   assert.match(html, /\.file-name-actual\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/, 'EvidenceDesk should truncate long actual file names with ellipsis.');
   assert.match(html, /const\s+leadingIcon\s*=\s*isPdfResource\s*\?\s*'<span class="pdf-preview-icon" aria-label="PDF preview icon">PDF<\/span>'\s*:\s*'<span class="icon">📄<\/span>';/, 'EvidenceDesk should render a visible PDF preview icon for PDF resources.');
+  assert.match(html, /const\s+showThumbnailSlot\s*=\s*canLaunchPointForge\s*\|\|\s*canOpenLineSmithDrawing;/, 'EvidenceDesk should reserve thumbnail space only for rows that support generated previews.');
+  assert.match(html, /const\s+thumbnailSlotMarkup\s*=\s*showThumbnailSlot\s*\?\s*'<span class="file-preview-slot" aria-hidden="true"><\/span>'\s*:\s*'';/, 'EvidenceDesk should avoid adding thumbnail markup to non-preview folders.');
+  assert.match(html, /<span class="file-meta">\$\{leadingIcon\}\$\{thumbnailSlotMarkup\}<span class="file-name">/, 'EvidenceDesk should inject the preview slot before file names when thumbnail rows are rendered.');
   assert.match(html, /<span class="file-name-configured">\$\{configuredFileName\}<\/span><span class="file-name-actual" title="\$\{actualFileName\}">— \$\{actualFileName\}<\/span>/, 'EvidenceDesk should display configured file name first and actual file name after it.');
 });
 
