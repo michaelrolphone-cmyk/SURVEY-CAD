@@ -258,3 +258,27 @@ test('lineforge websocket requires crew member identity context', () => {
   assert.equal(handled, false);
   assert.equal(socket.destroyed, true);
 });
+
+test('lineforge can broadcast shared Field-to-Finish updates to all connected clients', () => {
+  const collab = createLineforgeCollabService();
+  const scopedA = new FakeSocket();
+  const scopedB = new FakeSocket();
+
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?crewMemberId=crew-a&projectId=proj-1&room=room-a',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'global-a==' },
+  }, scopedA, Buffer.alloc(0)), true);
+  assert.equal(collab.handleUpgrade({
+    url: '/ws/lineforge?crewMemberId=crew-b&projectId=proj-2&room=room-b',
+    headers: { upgrade: 'websocket', 'sec-websocket-key': 'global-b==' },
+  }, scopedB, Buffer.alloc(0)), true);
+
+  collab.broadcastGlobal({ type: 'field-to-finish-updated', revision: 3 });
+
+  const aMessage = parseServerTextMessage(scopedA);
+  const bMessage = parseServerTextMessage(scopedB);
+  assert.equal(aMessage.type, 'field-to-finish-updated');
+  assert.equal(bMessage.type, 'field-to-finish-updated');
+  assert.equal(aMessage.revision, 3);
+  assert.equal(bMessage.revision, 3);
+});

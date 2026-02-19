@@ -71,6 +71,14 @@ const LOCK_SWEEP_INTERVAL_MS = 60 * 1000;
 export function createLineforgeCollabService() {
   const rooms = new Map();
 
+  function forEachClient(callback) {
+    for (const room of rooms.values()) {
+      for (const client of room.clients.values()) {
+        callback(client, room);
+      }
+    }
+  }
+
   function getOrCreateRoom(roomId) {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, {
@@ -121,6 +129,10 @@ export function createLineforgeCollabService() {
       if (peer.id === excludeClientId) continue;
       send(peer, payload);
     }
+  }
+
+  function broadcastGlobal(payload) {
+    forEachClient((client) => send(client, payload));
   }
 
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
@@ -411,6 +423,7 @@ export function createLineforgeCollabService() {
 
   return {
     handleUpgrade,
+    broadcastGlobal,
     _rooms: rooms,
     _internals: { decodeFrame, encodeTextFrame, createWebSocketAccept },
   };

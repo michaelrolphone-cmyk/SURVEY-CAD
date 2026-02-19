@@ -288,6 +288,43 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(fldConfig.rulesByCode.WL.entityType, '2');
     assert.equal(fldConfig.rulesByCode.WM.entityType, '0');
 
+    const fieldToFinishInitialRes = await fetch(`http://127.0.0.1:${app.port}/api/field-to-finish`);
+    assert.equal(fieldToFinishInitialRes.status, 200);
+    const fieldToFinishInitial = await fieldToFinishInitialRes.json();
+    assert.equal(fieldToFinishInitial.source, 'server-default');
+    assert.equal(fieldToFinishInitial.hasOverride, false);
+    assert.equal(Array.isArray(fieldToFinishInitial.config.rules), true);
+
+    const fieldToFinishUpdatedRes = await fetch(`http://127.0.0.1:${app.port}/api/field-to-finish`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        config: {
+          columns: fieldToFinishInitial.config.columns,
+          rules: [
+            {
+              rowNumber: 2,
+              raw: { code: 'ROW', entity_type: '2', processing_on: '1' },
+              code: 'ROW',
+              entityType: '2',
+              processingOn: true,
+            },
+          ],
+        },
+      }),
+    });
+    assert.equal(fieldToFinishUpdatedRes.status, 200);
+    const fieldToFinishUpdated = await fieldToFinishUpdatedRes.json();
+    assert.equal(fieldToFinishUpdated.source, 'api-override');
+    assert.equal(fieldToFinishUpdated.hasOverride, true);
+    assert.equal(fieldToFinishUpdated.config.rules[0].code, 'ROW');
+
+    const fieldToFinishResetRes = await fetch(`http://127.0.0.1:${app.port}/api/field-to-finish`, { method: 'DELETE' });
+    assert.equal(fieldToFinishResetRes.status, 200);
+    const fieldToFinishReset = await fieldToFinishResetRes.json();
+    assert.equal(fieldToFinishReset.source, 'server-default');
+    assert.equal(fieldToFinishReset.hasOverride, false);
+
     const staticRes = await fetch(`http://127.0.0.1:${app.port}/RecordQuarry.html`);
     assert.equal(staticRes.status, 200);
     const html = await staticRes.text();

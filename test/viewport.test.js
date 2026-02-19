@@ -474,7 +474,7 @@ test('VIEWPORT.HTML parses generic field-to-finish commands for sequential BEG/E
   assert.match(html, /function\s+isLineworkEntityType\(entityType\)\s*\{[\s\S]*normalized === "2" \|\| normalized === "1";/, 'LineSmith should classify both standard linework and 2D polyline entity types as linework');
   assert.match(html, /function\s+deriveFieldToFinishCodeSetsFromConfig\(config\)\s*\{[\s\S]*if \(isLineworkEntityType\(entityType\)\) lineworkCodes\.add\(code\);[\s\S]*if \(entityType === "0"\) symbolCodes\.add\(code\);[\s\S]*lineworkCompanionCodes\.set\(code, new Set\(normalizedCompanions\)\);[\s\S]*companionToLineworkCodes\.get\(companionCode\)\.add\(code\);/, 'LineSmith should derive linework, symbol, and companion-code classes from FLD entity definitions instead of hardcoded point-code values');
   assert.match(html, /await\s+loadFieldToFinishRulesFromFld\(defaultFldConfigPath\);/, 'LineSmith boot should load FLD field-to-finish rules before import workflows run');
-  assert.match(html, /function\s+loadFieldToFinishRulesFromFld\(path\s*=\s*defaultFldConfigPath\)\s*\{[\s\S]*fetch\(`\/api\/fld-config\?file=\$\{encodeURIComponent\(path\)\}`\)/, 'LineSmith should fetch FLD parser output from the server API so different FLD files can drive drawing behavior');
+  assert.match(html, /function\s+loadFieldToFinishRulesFromFld\(path\s*=\s*defaultFldConfigPath\)\s*\{[\s\S]*fetchFieldToFinishConfigFromApi\(\)/, 'LineSmith should fetch shared FLD parser output from the server API before applying field-to-finish behavior');
   assert.match(html, /\{\s*type:\s*"sequential-line",[\s\S]*const\s+directives\s*=\s*new\s+Set\(\["BEG",\s*"END",\s*"CLO"\]\)/, 'field-to-finish parser should recognize sequential line directives BEG, END, and CLO');
   assert.match(html, /function\s+parseFieldToFinishCommands\(code\s*=\s*""\)\s*\{[\s\S]*for \(const parser of fieldToFinishCommandParsers\)/, 'LineSmith should parse point-code tokens through the command-parser registry so new directives can be added without rewriting import logic');
   assert.match(html, /const\s+fieldToFinishStandardLayerColorRules\s*=\s*\[[\s\S]*water[\s\S]*gas[\s\S]*sewer[\s\S]*power/, 'LineSmith should map common utility layer names to standard colors (water/gas/sewer/power) when creating Field-to-Finish layers');
@@ -870,12 +870,11 @@ test('VIEWPORT.HTML points manager supports grouping and layer-tinted rows', asy
 });
 
 
-test('VIEWPORT.HTML exposes an FLD editor with local override save/reset and downloads', async () => {
+test('VIEWPORT.HTML exposes an FLD editor with shared API save/reset, websocket refresh, and downloads', async () => {
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /id="openFldEditor"/, 'LineSmith should expose a toolbar section button for opening the FLD editor');
   assert.match(html, /id="fldModal"/, 'LineSmith should render an FLD editor modal container');
-  assert.match(html, /const\s+FLD_CONFIG_LOCAL_STORAGE_KEY\s*=\s*"lineSmithFldConfigLocal";/, 'LineSmith should keep local FLD overrides in localStorage');
   assert.match(html, /const\s+FLD_SYMBOL_MAP_OVERRIDES_LOCAL_STORAGE_KEY\s*=\s*"lineSmithFldSymbolSvgOverrides";/, 'LineSmith should keep symbol-to-SVG overrides in dedicated localStorage state');
   assert.doesNotMatch(html, /id="fldSymbolGallery"/, 'FLD editor should not include a separate symbol gallery region');
   assert.match(html, /function\s+loadSurveySymbolLibrary\(\)\s*\{[\s\S]*fetch\("\/assets\/survey-symbols\/index\.json"\)/, 'FLD editor should load survey SVG symbol manifest data for symbol mapping choices');
@@ -889,9 +888,11 @@ test('VIEWPORT.HTML exposes an FLD editor with local override save/reset and dow
   assert.match(html, /lineTypeSelect\.addEventListener\("change", \(\) => \{[\s\S]*rule\.raw\.linetype\s*=\s*lineTypeSelect\.value;/, 'FLD editor should expose linetype selection for linework entity rows');
   assert.match(html, /function\s+normalizeLineworkRuleDefaults\(rule\)\s*\{[\s\S]*rule\.raw\.symbol = "SPT10";[\s\S]*setRuleSymbolMapFile\(rule\.raw, ""\);/, 'FLD editor should enforce default linework symbols and remove symbol SVG mappings for line entities');
   assert.match(html, /function\s+setSymbolMapFileForRule\(rule, value\)\s*\{[\s\S]*setRuleSymbolMapFile\(rule\?\.raw, mappedFile\);[\s\S]*fieldToFinishRuleState\.symbolSvgOverrides\.set\(symbolName, mappedFile\);/, 'FLD editor SVG picker should persist symbol-to-SVG overrides and mirror the selected mapping into FLD row columns');
-  assert.match(html, /function\s+saveFldEditorLocalOverride\(\)\s*\{[\s\S]*saveLocalFldOverride\(fldEditorState\.activeConfig\);[\s\S]*applyFieldToFinishConfig\(fldEditorState\.activeConfig, "localStorage"\);/, 'FLD editor save action should persist local overrides and apply them to active linework rules');
-  assert.match(html, /function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*clearLocalFldOverride\(\);[\s\S]*fldEditorState\.activeConfig = cloneFldConfig\(fldEditorState\.serverConfig\);/, 'FLD editor reset action should clear local override and restore the server FLD rules');
-  assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-LocalOverride\.fld", serializeFieldToFinishConfig\(local\)\);/, 'FLD editor should support downloading local override FLD files');
+  assert.match(html, /async\s+function\s+fetchFieldToFinishConfigFromApi\(\)\s*\{[\s\S]*fetch\("\/api\/field-to-finish"\)/, 'FLD editor should read shared Field-to-Finish config through the CRUD API');
+  assert.match(html, /async\s+function\s+saveFldEditorLocalOverride\(\)\s*\{[\s\S]*method:\s*"PUT"[\s\S]*\/api\/field-to-finish/, 'FLD editor save action should update shared Field-to-Finish config through API PUT');
+  assert.match(html, /async\s+function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*fetch\("\/api\/field-to-finish",\s*\{\s*method:\s*"DELETE"/, 'FLD editor reset action should clear shared override via API DELETE and restore server defaults');
+  assert.match(html, /if \(message\.type === "field-to-finish-updated"\) \{[\s\S]*syncFieldToFinishLinework\(\);/, 'LineSmith collaboration websocket should refresh FLD config and redraw field-to-finish linework after shared updates');
+  assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-SharedOverride\.fld", serializeFieldToFinishConfig\(fldEditorState\.activeConfig\)\);/, 'FLD editor should support downloading the active shared override FLD file');
 });
 
 
