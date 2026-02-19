@@ -611,6 +611,7 @@
   <!-- libs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/proj4@2.10.0/dist/proj4.js"></script>
+  <script type="module" src="/src/point-thumbnail-client.js"></script>
 
   <script>
     // -----------------------------
@@ -1041,6 +1042,7 @@
     const elInputPointsBody = document.getElementById("inputPointsBody");
     const elOutputPointsBody = document.getElementById("outputPointsBody");
     const elToggleInputView = document.getElementById("btnToggleInputView");
+    const pointThumbnailClient = window.SurveyCadPointThumbnailClient || null;
 
     function normalizeCodeToken(token = ""){
       return String(token || "").trim().toUpperCase();
@@ -1055,6 +1057,9 @@
     }
 
     function parseFieldToFinishDirective(code = ""){
+      if (pointThumbnailClient?.parseFieldToFinishDirective) {
+        return pointThumbnailClient.parseFieldToFinishDirective(code);
+      }
       const tokens = String(code || "")
         .split(/[\s;|,/]+/)
         .map(normalizeCodeToken)
@@ -1075,6 +1080,9 @@
     }
 
     function buildLineworkSegments(points = []){
+      if (pointThumbnailClient?.buildLineworkSegments) {
+        return pointThumbnailClient.buildLineworkSegments(points);
+      }
       const segmentsByBase = new Map();
       const activeByBase = new Map();
       for (const point of points){
@@ -1110,6 +1118,10 @@
     }
 
     function buildLineworkThumbnailDataUrl(segments = []){
+      if (pointThumbnailClient?.renderLineworkThumbnailDataUrl) {
+        const points = segments.flat().map((point)=>({ x: Number(point.x), y: Number(point.y), code: String(point.code || "") }));
+        return pointThumbnailClient.renderLineworkThumbnailDataUrl(points, { width: 88, height: 52, stroke: "#4ade80" });
+      }
       const points = segments.flat()
         .map((point)=>({ x: Number(point.x), y: Number(point.y) }))
         .filter((coord)=>Number.isFinite(coord.x) && Number.isFinite(coord.y));
