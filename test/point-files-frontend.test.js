@@ -18,6 +18,7 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /pointFileState:\s*\{\s*text,\s*exportFormat:\s*'csv'\s*\}/, 'EvidenceDesk upload should post point file state payloads to API');
   assert.match(html, /context\.setUploadStatus\(`Uploading point file \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\}…`\)/, 'EvidenceDesk should show per-file progress while point files upload.');
   assert.match(html, /async function\s+renameResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a rename helper for project resources');
+  assert.match(html, /async function\s+deleteResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a shared delete helper for project resources');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
   assert.match(html, /const\s+isPointFileFormat\s*=\s*pointFileFormat\s*===\s*'csv'\s*\|\|\s*pointFileFormat\s*===\s*'txt';/, 'EvidenceDesk should only launch PointForge for point-file formats.');
@@ -46,6 +47,8 @@ test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and 
   assert.match(html, /localStorage\.setItem\(storageKey, JSON\.stringify\(drawing\)\)/, 'EvidenceDesk should hydrate localStorage with API drawing payload for LineSmith import');
   assert.match(html, /fetch\(buildProjectDrawingApiUrl\(projectId, drawingId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*drawingName:\s*nextTitle[\s\S]*drawingState:\s*currentState/, 'EvidenceDesk should rename drawings through PATCH drawing API while preserving state');
   assert.match(html, /renameDrawingButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk drawing rows should expose a Rename button');
+  assert.match(html, /deleteDrawingButton\.textContent\s*=\s*'Delete'/, 'EvidenceDesk drawing rows should expose a Delete button');
+  assert.match(html, /fetch\(buildProjectDrawingApiUrl\(projectId, drawingId\),\s*\{ method: 'DELETE' \}\)/, 'EvidenceDesk should delete drawings through DELETE drawing API endpoint');
   assert.match(html, /async function\s+attachDrawingPreview\(/, 'EvidenceDesk should define a drawing preview hydration helper.');
   assert.match(html, /renderLineworkThumbnailDataUrl\(points,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render drawing thumbnails through the shared field-to-finish thumbnail library.');
   assert.match(html, /className\s*=\s*'drawing-preview-thumb'/, 'EvidenceDesk should render drawing thumbnail images in drawing rows.');
@@ -66,6 +69,8 @@ test('EvidenceDesk file rows prioritize configured names and truncate actual fil
   assert.match(html, /if\s*\(isPdfResource\)\s*\{[\s\S]*attachPdfPreview\(resource,\s*folder,\s*entry\);/, 'EvidenceDesk should attach PDF previews when rendering PDF resources.');
   assert.match(html, /<span class="file-meta">\$\{leadingIcon\}\$\{thumbnailSlotMarkup\}<span class="file-name">/, 'EvidenceDesk should inject the preview slot before file names when thumbnail rows are rendered.');
   assert.match(html, /<span class="file-name-configured">\$\{configuredFileName\}<\/span><span class="file-name-actual" title="\$\{actualFileName\}">— \$\{actualFileName\}<\/span>/, 'EvidenceDesk should display configured file name first and actual file name after it.');
+  assert.match(html, /if \(!canLaunchPointForge && !canOpenLineSmithDrawing && !canOpenCpfPdf && !isServerUpload\)\s*\{[\s\S]*deleteButton\.textContent\s*=\s*'Delete'[\s\S]*renameButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk should expose rename and delete controls for files in any non-specialized folder.');
+  assert.match(html, /if \(isServerUpload\)\s*\{[\s\S]*renameButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk should expose rename controls for uploaded files in every folder.');
 });
 
 test('EvidenceDesk opens PDFs in dedicated browser windows', async () => {
