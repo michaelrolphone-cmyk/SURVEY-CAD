@@ -883,6 +883,9 @@ Base URL (local): `http://localhost:3000`
 - `GET /api/utilities?address=...&outSR=2243&sources=power`
   - `sources` accepts a comma-separated list (for example `power,water`) so utility providers can be added incrementally. Current implementation returns Idaho Power records for `power`.
 - `GET /api/glo-records?address=...`
+  - Resolves township/range/section for the address and scrapes BLM GLO `results/default.aspx` document links using `searchCriteria` (with fallback to the legacy `search/default.aspx` page when needed).
+- `GET /api/glo-records?lon=...&lat=...`
+  - Resolves township/range/section from GPS coordinates when an address is unavailable and then scrapes the same BLM GLO results/search pages.
 - `GET /api/parcel?lon=...&lat=...&outSR=4326&searchMeters=40`
 - `GET /api/section?lon=...&lat=...`
 - `GET /api/aliquots?lon=...&lat=...&outSR=4326`

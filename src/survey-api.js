@@ -1,5 +1,5 @@
 import { translateLocalPointsToStatePlane } from './georeference-transform.js';
-import { buildGloSearchUrl, extractTrsMetadataFromLookup, parseGloDocumentListHtml } from './glo-records.js';
+import { buildGloResultsUrl, buildGloSearchUrl, extractGloSearchCriteriaFromLookup, extractTrsMetadataFromLookup, parseGloDocumentListHtml } from './glo-records.js';
 
 const DEFAULTS = {
   adaMapServer: "https://adacountyassessor.org/arcgis/rest/services/External/ExternalMap/MapServer",
@@ -1068,28 +1068,72 @@ export class SurveyCadClient {
     };
   }
 
-  async lookupGloRecordsByAddress(address) {
-    const trimmedAddress = String(address || '').trim();
-    if (!trimmedAddress) throw new Error('address is required.');
+  async lookupPlssByCoordinates(lon, lat, options = {}) {
+    const numericLon = Number(lon);
+    const numericLat = Number(lat);
+    if (!Number.isFinite(numericLon) || !Number.isFinite(numericLat)) {
+      throw new Error('lon and lat are required numeric values.');
+    }
 
-    const lookupPayload = await this.lookupByAddress(trimmedAddress);
+    const section = await this.findContainingPolygon(this.config.layers.sections, numericLon, numericLat, 2500);
+    const township = await this.findContainingPolygon(this.config.layers.townships, numericLon, numericLat, 2500);
+
+    return {
+      geocode: options.geocode || null,
+      addressFeature: options.addressFeature || null,
+      location: { lon: numericLon, lat: numericLat },
+      township,
+      section,
+    };
+  }
+
+  async lookupGloRecords(input = {}) {
+    const rawAddress = typeof input === 'string' ? input : input?.address;
+    const trimmedAddress = String(rawAddress || '').trim();
+    const hasLon = input?.lon !== undefined && input?.lon !== null && String(input.lon).trim() !== '';
+    const hasLat = input?.lat !== undefined && input?.lat !== null && String(input.lat).trim() !== '';
+
+    let lookupPayload;
+    if (trimmedAddress) {
+      lookupPayload = await this.lookupByAddress(trimmedAddress);
+    } else if (hasLon && hasLat) {
+      lookupPayload = await this.lookupPlssByCoordinates(input.lon, input.lat);
+    } else {
+      throw new Error('Either address or both lon and lat are required.');
+    }
+
     const trs = extractTrsMetadataFromLookup(lookupPayload);
+    const criteria = extractGloSearchCriteriaFromLookup(lookupPayload);
     const searchUrl = buildGloSearchUrl(this.config.gloRecordsSearchUrl, trs);
+    const resultsUrl = buildGloResultsUrl(this.config.gloRecordsSearchUrl, trs, criteria);
 
-    let searchHtml = '';
+    const requestHeaders = {
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'User-Agent': this.config.nominatimUserAgent,
+    };
+
+    let resultsHtml = '';
     try {
-      searchHtml = await this.fetchText(searchUrl, {
-        headers: {
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'User-Agent': this.config.nominatimUserAgent,
-        },
-      });
+      resultsHtml = await this.fetchText(resultsUrl, { headers: requestHeaders });
     } catch {
-      searchHtml = '';
+      resultsHtml = '';
+    }
+
+    let documents = parseGloDocumentListHtml(resultsHtml, this.config.gloRecordsSearchUrl);
+
+    if (!documents.length) {
+      let searchHtml = '';
+      try {
+        searchHtml = await this.fetchText(searchUrl, { headers: requestHeaders });
+      } catch {
+        searchHtml = '';
+      }
+      documents = parseGloDocumentListHtml(searchHtml, this.config.gloRecordsSearchUrl);
     }
 
     return {
       address: trimmedAddress,
+      location: lookupPayload?.location || null,
       township: trs.township,
       townshipDir: trs.townshipDir,
       range: trs.range,
@@ -1097,9 +1141,15 @@ export class SurveyCadClient {
       section: trs.section,
       townshipRange: trs.townshipRange,
       searchUrl,
-      documents: parseGloDocumentListHtml(searchHtml, this.config.gloRecordsSearchUrl),
+      resultsUrl,
+      documents,
     };
   }
+
+  async lookupGloRecordsByAddress(address) {
+    return this.lookupGloRecords({ address });
+  }
+
 }
 
 export default SurveyCadClient;

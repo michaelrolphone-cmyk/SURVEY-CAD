@@ -30,9 +30,15 @@ function createMockServer(options = {}) {
     }
 
 
+    if (url.pathname === '/results/default.aspx') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end('<div><a href="/details/survey/default.aspx?id=abc">Survey ABC</a><span>Survey record</span></div>');
+      return;
+    }
+
     if (url.pathname === '/glo-search/default.aspx') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.end('<table><tr><td><a href="/details/patent/default.aspx?id=abc">Patent ABC</a></td><td>land patent</td></tr></table>');
+      res.end('<table><tr><td><a href="/details/patent/default.aspx?id=fallback">Patent Fallback</a></td><td>land patent</td></tr></table>');
       return;
     }
 
@@ -266,7 +272,16 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(gloRes.status, 200);
     const gloPayload = await gloRes.json();
     assert.equal(Array.isArray(gloPayload.documents), true);
-    assert.equal(gloPayload.documents[0].title, 'Patent ABC');
+    assert.equal(gloPayload.documents[0].title, 'Survey ABC');
+    assert.match(gloPayload.resultsUrl, /\/results\/default\.aspx\?searchCriteria=/);
+
+    const gloCoordsRes = await fetch(`http://127.0.0.1:${app.port}/api/glo-records?lon=-116.2&lat=43.61`);
+    assert.equal(gloCoordsRes.status, 200);
+    const gloCoordsPayload = await gloCoordsRes.json();
+    assert.equal(gloCoordsPayload.address, '');
+    assert.equal(gloCoordsPayload.location.lon, -116.2);
+    assert.equal(gloCoordsPayload.location.lat, 43.61);
+    assert.equal(Array.isArray(gloCoordsPayload.documents), true);
 
     const rosPdfRes = await fetch(`http://127.0.0.1:${app.port}/api/ros-pdf?url=${encodeURIComponent(`${base}/sample.pdf`)}`);
     assert.equal(rosPdfRes.status, 200);
@@ -509,6 +524,20 @@ test('server returns validation error when lookup cannot resolve coordinates', a
     assert.equal(res.status, 400);
     const body = await res.json();
     assert.match(body.error, /Unable to locate this address/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+
+test('server validates GLO records query input', async () => {
+  const app = await startApiServer(new SurveyCadClient());
+  try {
+    const res = await fetch(`http://127.0.0.1:${app.port}/api/glo-records`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /address or both lon and lat/i);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }

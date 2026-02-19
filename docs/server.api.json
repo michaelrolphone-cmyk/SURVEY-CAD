@@ -1943,14 +1943,33 @@
         "tags": [
           "Lookup"
         ],
-        "summary": "Fetch BLM GLO documents for an address",
+        "summary": "Fetch BLM GLO documents by address or coordinates",
         "parameters": [
           {
             "in": "query",
             "name": "address",
-            "required": true,
+            "required": false,
+            "description": "Project address used to resolve township/range/section metadata.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lon",
+            "required": false,
+            "description": "Longitude in WGS84. Provide with lat when address is omitted.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "description": "Latitude in WGS84. Provide with lon when address is omitted.",
+            "schema": {
+              "type": "number"
             }
           }
         ],
@@ -4598,6 +4617,7 @@
         "required": [
           "address",
           "searchUrl",
+          "resultsUrl",
           "documents"
         ],
         "properties": {
@@ -4630,6 +4650,22 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/GloDocument"
+            }
+          },
+          "resultsUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "location": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "lon": {
+                "type": "number"
+              },
+              "lat": {
+                "type": "number"
+              }
             }
           }
         }

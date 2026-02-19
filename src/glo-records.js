@@ -34,6 +34,23 @@ function normalizeDirection(value = '') {
   return /^(N|S|E|W)$/.test(normalized) ? normalized : '';
 }
 
+function normalizeStateAbbr(value = '') {
+  const normalized = String(value || '').trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : '';
+}
+
+function normalizeCountyCode(value = '') {
+  const numeric = normalizeNumberToken(value);
+  if (!numeric) return '';
+  return numeric.padStart(3, '0');
+}
+
+function normalizeMeridianCode(value = '') {
+  const numeric = normalizeNumberToken(value);
+  if (!numeric) return '';
+  return numeric.padStart(2, '0');
+}
+
 export function extractTrsMetadataFromLookup(lookupPayload = {}) {
   const townshipAttrs = lookupPayload?.township?.attributes || {};
   const sectionAttrs = lookupPayload?.section?.attributes || {};
@@ -58,6 +75,26 @@ export function extractTrsMetadataFromLookup(lookupPayload = {}) {
   };
 }
 
+export function extractGloSearchCriteriaFromLookup(lookupPayload = {}) {
+  const townshipAttrs = lookupPayload?.township?.attributes || {};
+  const sectionAttrs = lookupPayload?.section?.attributes || {};
+  const geocode = Array.isArray(lookupPayload?.geocode) ? lookupPayload.geocode[0] : null;
+
+  const stateAbbr = normalizeStateAbbr(firstAttr(townshipAttrs, ['STATEABBR', 'STATE_ABBR', 'ST', 'STATE']))
+    || normalizeStateAbbr(firstAttr(sectionAttrs, ['STATEABBR', 'STATE_ABBR', 'ST', 'STATE']))
+    || normalizeStateAbbr(firstAttr(geocode || {}, ['state', 'state_code']))
+    || 'ID';
+
+  const countyCode = normalizeCountyCode(firstAttr(townshipAttrs, ['COUNTYFP', 'COUNTYFIPS', 'CNTYCODE', 'COUNTY_CODE', 'COUNTYNO', 'COUNTY']))
+    || normalizeCountyCode(firstAttr(sectionAttrs, ['COUNTYFP', 'COUNTYFIPS', 'CNTYCODE', 'COUNTY_CODE', 'COUNTYNO', 'COUNTY']));
+
+  const meridian = normalizeMeridianCode(firstAttr(townshipAttrs, ['MERIDIAN', 'MERIDIANNO', 'MERIDIAN_NO', 'PM']))
+    || normalizeMeridianCode(firstAttr(sectionAttrs, ['MERIDIAN', 'MERIDIANNO', 'MERIDIAN_NO', 'PM']))
+    || '08';
+
+  return { stateAbbr, countyCode, meridian };
+}
+
 export function buildGloSearchUrl(baseUrl, trs = {}) {
   const url = new URL(String(baseUrl || 'https://glorecords.blm.gov/search/default.aspx'));
   url.hash = 'searchTabIndex=0&searchByTypeIndex=1';
@@ -71,26 +108,55 @@ export function buildGloSearchUrl(baseUrl, trs = {}) {
   return url.toString();
 }
 
+export function buildGloResultsUrl(baseUrl, trs = {}, criteria = {}) {
+  const base = new URL(String(baseUrl || 'https://glorecords.blm.gov/search/default.aspx'));
+  const url = new URL('/results/default.aspx', `${base.protocol}//${base.host}`);
+  const parts = ['type=survey'];
+
+  if (criteria.stateAbbr) parts.push(`st=${criteria.stateAbbr}`);
+  if (criteria.countyCode) parts.push(`cty=${criteria.countyCode}`);
+  if (trs.township) parts.push(`twp_nr=${trs.township}`);
+  if (trs.townshipDir) parts.push(`twp_dir=${trs.townshipDir}`);
+  if (trs.range) parts.push(`rng_nr=${trs.range}`);
+  if (trs.rangeDir) parts.push(`rng_dir=${trs.rangeDir}`);
+  if (trs.section) parts.push(`sec_nr=${trs.section}`);
+  if (criteria.meridian) parts.push(`m=${criteria.meridian}`);
+
+  url.searchParams.set('searchCriteria', parts.join('|'));
+  return url.toString();
+}
+
 export function parseGloDocumentListHtml(html = '', originUrl = 'https://glorecords.blm.gov/search/default.aspx') {
   const normalizedHtml = String(html || '');
-  const rowMatches = normalizedHtml.match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
+  const origin = new URL(String(originUrl || 'https://glorecords.blm.gov/search/default.aspx'));
   const documents = [];
   const seen = new Set();
+  const anchorRegex = /<a\b[^>]*href\s*=\s*['\"]([^'\"]+)['\"][^>]*>([\s\S]*?)<\/a>/gi;
 
-  for (const rowHtml of rowMatches) {
-    const linkMatch = rowHtml.match(/<a\b[^>]*href\s*=\s*['\"]([^'\"]+)['\"][^>]*>([\s\S]*?)<\/a>/i);
-    if (!linkMatch) continue;
-
-    const [, rawHref, rawTitle] = linkMatch;
-    const href = String(rawHref || '').trim();
+  for (const match of normalizedHtml.matchAll(anchorRegex)) {
+    const rawHref = match[1] || '';
+    const rawTitle = match[2] || '';
+    const href = String(rawHref).trim();
     if (!href) continue;
 
-    const absoluteUrl = new URL(href, originUrl).toString();
+    const absolute = new URL(href, origin);
+    if (!['http:', 'https:'].includes(absolute.protocol)) continue;
+    if (absolute.hostname !== origin.hostname) continue;
+
     const title = stripHtml(rawTitle);
-    const rowText = stripHtml(rowHtml);
+    if (!title) continue;
+    if (/^search\b/i.test(title)) continue;
+
+    const absoluteUrl = absolute.toString();
+    if (!/(details|document|image|patent|survey|tract|serial|plat)/i.test(absoluteUrl)) continue;
+
+    const matchIndex = Number(match.index || 0);
+    const contextStart = Math.max(0, matchIndex - 180);
+    const contextEnd = Math.min(normalizedHtml.length, matchIndex + String(match[0] || '').length + 180);
+    const details = stripHtml(normalizedHtml.slice(contextStart, contextEnd));
+    const rowText = details || title;
 
     if (!/(patent|survey|tract|plat|serial|land|document|record)/i.test(rowText)) continue;
-    if (!title) continue;
 
     const key = `${title}|${absoluteUrl}`;
     if (seen.has(key)) continue;
