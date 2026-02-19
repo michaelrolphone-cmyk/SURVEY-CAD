@@ -71,6 +71,7 @@ test('PointForge renders code-group explorer with thumbnails and BoundaryLab han
   assert.match(html, /function\s+getThumbnailLineworkCodes\(\)\s*\{[\s\S]*deriveLineworkCodesFromFldConfig/, 'PointForge should derive thumbnail linework codes from shared field-to-finish settings.');
   assert.match(html, /lineworks\.flatMap\(\(linework\)=>linework\.segments\.map\(\(segment, index\)=>\(\{[\s\S]*label:\s*`\$\{linework\.baseCode\} line \$\{index \+ 1\}`/, 'PointForge should break grouped linework into per-line subgroup entries.');
   assert.match(html, /const\s+allSegments\s*=\s*group\.lineworks\.flatMap\(\(linework\)=>linework\.segments\s*\|\|\s*\[\]\);/, 'PointForge group selection should open all lines in the group instead of only the first line code.');
+  assert.match(html, /if\s*\(group\.subgroups\.length\s*>\s*1\)/, 'PointForge should only render individual subgroup lines when a code has more than one independent line.');
   assert.match(html, /function\s+buildBoundaryLabCsvFromSegments\(/, 'PointForge should build BoundaryLab handoff payloads from selected groups/subgroups.');
   assert.match(html, /openLinkedApp\(`\/BoundaryLab\.html\?source=pointforge/, 'PointForge group explorer should offer opening selected linework in BoundaryLab.');
 });
