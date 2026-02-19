@@ -1146,9 +1146,16 @@
       const pad = 6;
       const w = 88;
       const h = 52;
+      const viewW = Math.max(1, w - pad * 2);
+      const viewH = Math.max(1, h - pad * 2);
+      const scale = Math.min(viewW / width, viewH / height);
+      const usedW = width * scale;
+      const usedH = height * scale;
+      const offsetX = pad + (viewW - usedW) / 2;
+      const offsetY = pad + (viewH - usedH) / 2;
       const mapPoint = (x, y)=>{
-        const nx = ((x - minX) / width) * (w - pad * 2) + pad;
-        const ny = h - (((y - minY) / height) * (h - pad * 2) + pad);
+        const nx = offsetX + (x - minX) * scale;
+        const ny = h - (offsetY + (y - minY) * scale);
         return `${nx.toFixed(1)},${ny.toFixed(1)}`;
       };
 
@@ -1285,7 +1292,7 @@
         });
         card.appendChild(groupButton);
 
-        if (group.subgroups.length){
+        if (group.subgroups.length > 1){
           const children = document.createElement("div");
           children.className = "pointGroupChildren";
           group.subgroups.forEach((subgroup)=>{

@@ -74,3 +74,27 @@ test('thumbnail renderer skips symbol-only field-to-finish codes when linework c
   assert.match(dataUrl, /^data:image\/svg\+xml;utf8,/);
 });
 
+
+
+test('thumbnail renderer preserves 1:1 northing/easting aspect ratio', () => {
+  const points = [
+    { x: 0, y: 0, code: 'LOT BEG' },
+    { x: 20, y: 0, code: 'LOT END' },
+    { x: 0, y: 0, code: 'LEG BEG' },
+    { x: 0, y: 20, code: 'LEG END' },
+  ];
+  const dataUrl = renderLineworkThumbnailDataUrl(points, {
+    width: 88,
+    height: 52,
+    lineworkCodes: new Set(['LOT', 'LEG']),
+  });
+  const svg = decodeURIComponent(dataUrl.replace('data:image/svg+xml;utf8,', ''));
+  const lines = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"\s*\/>/g)];
+  assert.equal(lines.length, 2);
+
+  const lengths = lines.map((match) => {
+    const [, x1, y1, x2, y2] = match;
+    return Math.hypot(Number(x2) - Number(x1), Number(y2) - Number(y1));
+  });
+  assert.ok(Math.abs(lengths[0] - lengths[1]) < 0.01, 'equal ground lengths should render as equal pixel lengths');
+});

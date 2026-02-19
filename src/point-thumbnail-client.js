@@ -49,12 +49,17 @@ export function renderLineworkThumbnailDataUrl(points = [], options = {}) {
   const pad = 6;
   const viewW = Math.max(1, width - pad * 2);
   const viewH = Math.max(1, height - pad * 2);
+  const scale = Math.min(viewW / spanX, viewH / spanY);
+  const usedW = spanX * scale;
+  const usedH = spanY * scale;
+  const offsetX = pad + (viewW - usedW) / 2;
+  const offsetY = pad + (viewH - usedH) / 2;
 
   const lines = segments.map(([a, b]) => {
-    const ax = pad + ((a.x - minX) / spanX) * viewW;
-    const ay = height - pad - ((a.y - minY) / spanY) * viewH;
-    const bx = pad + ((b.x - minX) / spanX) * viewW;
-    const by = height - pad - ((b.y - minY) / spanY) * viewH;
+    const ax = offsetX + (a.x - minX) * scale;
+    const ay = height - (offsetY + (a.y - minY) * scale);
+    const bx = offsetX + (b.x - minX) * scale;
+    const by = height - (offsetY + (b.y - minY) * scale);
     return `<line x1="${ax.toFixed(2)}" y1="${ay.toFixed(2)}" x2="${bx.toFixed(2)}" y2="${by.toFixed(2)}" />`;
   }).join('');
 
