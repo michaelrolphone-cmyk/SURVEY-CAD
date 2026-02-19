@@ -189,6 +189,17 @@
       background: #ffffff;
     }
 
+    .image-preview-thumb {
+      width: 86px;
+      height: 50px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      pointer-events: none;
+      flex: none;
+      object-fit: cover;
+      background: rgba(2, 6, 23, 0.7);
+    }
+
     .pdf-preview-placeholder {
       width: 86px;
       height: 50px;
@@ -684,6 +695,31 @@
         return String(entry.reference.value || '').trim();
       }
       return '';
+    }
+
+    function isImageResource(entry) {
+      const format = String(entry?.exportFormat || '').toLowerCase();
+      return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(format);
+    }
+
+    function attachImagePreview(resource, entry) {
+      if (entry?.reference?.type !== 'server-upload') return;
+      if (!isImageResource(entry)) return;
+
+      const previewUrl = String(entry?.reference?.value || '').trim();
+      if (!previewUrl) return;
+
+      const slot = resource.querySelector('.file-preview-slot');
+      if (!slot) return;
+
+      const thumb = document.createElement('img');
+      thumb.className = 'image-preview-thumb';
+      thumb.src = previewUrl;
+      thumb.alt = `${entry?.title || entry?.id || 'Image'} preview`;
+      thumb.title = `${entry?.title || entry?.id || 'Image'} preview`;
+      thumb.decoding = 'async';
+      thumb.loading = 'lazy';
+      slot.replaceChildren(thumb);
     }
 
     async function attachPdfPreview(resource, folder, entry) {
@@ -1229,7 +1265,8 @@
             && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
           const isPdfResource = entry?.exportFormat === 'pdf';
-          const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing || isPdfResource;
+          const isImageUpload = isImageResource(entry);
+          const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing || isPdfResource || isImageUpload;
           const actualFileName = `${entry.id}.${entry.exportFormat}`;
           const configuredFileName = entry?.title || actualFileName;
           const leadingIcon = showThumbnailSlot ? '' : '<span class="icon">📄</span>';
@@ -1246,6 +1283,10 @@
 
           if (isPdfResource) {
             attachPdfPreview(resource, folder, entry);
+          }
+
+          if (isImageUpload) {
+            attachImagePreview(resource, entry);
           }
 
           if (canLaunchPointForge) {
