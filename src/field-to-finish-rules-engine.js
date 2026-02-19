@@ -71,7 +71,8 @@ export function deriveLineworkCodesFromFldConfig(config = {}) {
   const codes = new Set();
   for (const rule of rules) {
     const code = String(rule?.code || '').trim().toUpperCase();
-    const entityType = String(rule?.entityType || '').trim().toUpperCase();
+    const rawEntityType = rule?.entityType ?? rule?.entity_type ?? rule?.raw?.entity_type ?? rule?.raw?.entityType ?? '';
+    const entityType = String(rawEntityType).trim().toUpperCase();
     const entityTypeNumeric = Number.parseInt(entityType, 10);
     if (!code) continue;
     if (

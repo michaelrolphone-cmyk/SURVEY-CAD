@@ -53,6 +53,20 @@ test('linework code derivation excludes symbol codes and includes line/polyline 
   assert.equal(lineworkCodes.has('ROW'), true);
 });
 
+test('linework code derivation supports snake_case entity_type values from persisted FLD config payloads', () => {
+  const lineworkCodes = deriveLineworkCodesFromFldConfig({
+    rules: [
+      { code: 'EP', entity_type: '0' },
+      { code: 'WALL', entity_type: '1' },
+      { code: 'LOT', raw: { entity_type: '2' } },
+    ],
+  });
+
+  assert.equal(lineworkCodes.has('EP'), false);
+  assert.equal(lineworkCodes.has('WALL'), true);
+  assert.equal(lineworkCodes.has('LOT'), true);
+});
+
 test('thumbnail renderer skips symbol-only field-to-finish codes when linework codes are provided', () => {
   const symbolPoints = [
     { x: 0, y: 0, code: 'EP BEG' },
