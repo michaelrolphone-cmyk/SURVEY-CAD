@@ -121,10 +121,13 @@
       display:grid;
       grid-template-columns: 460px 1fr;
       gap: 14px;
+      transition: grid-template-columns .25s ease;
     }
     @media (max-width: 1020px){
       main{ grid-template-columns: 1fr; }
     }
+
+    .leftStack{ position:relative; min-height: 780px; }
 
     .panel{
       border-radius: var(--r);
@@ -137,6 +140,33 @@
     .panel::before{
       content:none;
     }
+    #outputPanel{
+      position:absolute;
+      inset:0;
+      z-index: 2;
+      opacity:0;
+      pointer-events:none;
+      transform: translateX(24px);
+      transition: transform .25s ease, opacity .2s ease;
+    }
+    main.pointEditorFocusOutput #outputPanel{
+      opacity:1;
+      pointer-events:auto;
+      transform: translateX(0);
+      left: 56px;
+    }
+    main.pointEditorFocusOutput #ingestPanel{
+      position:absolute;
+      inset:0 auto 0 0;
+      width:56px;
+      z-index:3;
+    }
+    main.pointEditorFocusOutput #ingestPanel .panelbody{ display:none; }
+    main.pointEditorFocusOutput #ingestPanel .panelhead{ cursor:pointer; min-height:100%; justify-content:center; }
+    main.pointEditorFocusOutput #ingestPanel .panelhead h2{ writing-mode:vertical-rl; text-orientation:mixed; }
+    main.pointEditorFocusOutput #ingestPanel #ingestControls{ display:none; }
+    main.pointEditorFocusOutput #outputPanel .panelbody textarea,
+    main.pointEditorFocusOutput #outputPanel .panelbody .pointsTableWrap.active{ min-height: 640px; }
     .panelhead{
       position: relative;
       padding: 12px 12px;
@@ -302,49 +332,7 @@
       .workflowHeaderAction{ margin-left: 0; width: 100%; }
     }
 
-    .stats{
-      margin-top: 10px;
-      border-top: 1px solid var(--line2);
-      padding-top: 10px;
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .stat{
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(8,10,16,.55);
-      padding: 10px 12px;
-      box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
-    }
-    .stat .k{
-      font-size: 11px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .8px;
-      margin-bottom: 6px;
-    }
-    .stat .v{
-      font-family: var(--mono);
-      font-size: 14px;
-      color: var(--text);
-      display:flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .stat .v .glow{ color: #dbe5ff; }
-
-    .log{
-      margin-top: 10px;
-      border-top: 1px solid var(--line2);
-      padding-top: 10px;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: rgba(138,164,194,.95);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
+    .log{ display:none; }
     .ok{ color: var(--c3); }
     .warn{ color: var(--warn); }
     .bad{ color: var(--bad); }
@@ -443,11 +431,12 @@
   </header>
 
   <main>
-    <!-- Left: Input + Controls -->
-    <section class="panel">
+    <!-- Left: Input + Output accordion -->
+    <section class="leftStack">
+    <section class="panel" id="ingestPanel">
       <div class="panelhead">
         <h2><span class="sig"></span> Ingest Console</h2>
-        <div class="pill">
+        <div class="pill" id="ingestControls">
           <input id="autoProcess" type="checkbox" checked />
           <label for="autoProcess" style="color:var(--text); margin:0;">Auto-process</label>
         </div>
@@ -542,38 +531,34 @@
           </div>
         </div>
 
-        <div class="stats">
-          <div class="stat">
-            <div class="k">Input lines</div>
-            <div class="v"><span id="st_lines" class="glow">—</span><span class="mono">ln</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">Parsed points</div>
-            <div class="v"><span id="st_parsed" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">G renumbered</div>
-            <div class="v"><span id="st_g" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">REF renumbered</div>
-            <div class="v"><span id="st_ref" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">Map plotted</div>
-            <div class="v"><span id="st_map" class="glow">—</span><span class="mono">pts</span></div>
-          </div>
-          <div class="stat">
-            <div class="k">Active zone</div>
-            <div class="v"><span id="st_zone" class="glow">W</span><span class="mono">ID</span></div>
-          </div>
-        </div>
-
         <div class="log" id="log"></div>
       </div>
     </section>
 
-    <!-- Right: Map + Output -->
+    <section class="panel outputArea" id="outputPanel">
+      <div class="panelhead">
+        <h2><span class="sig"></span> Output Stream</h2>
+        <div class="chip">Sorted: <span class="mono">numeric point id</span></div>
+      </div>
+      <div class="panelbody">
+        <label for="outText">Transformed points</label>
+        <textarea id="outText" spellcheck="false" readonly></textarea>
+        <div id="outputTableWrap" class="pointsTableWrap" aria-hidden="true">
+          <div class="pointsTableScroll">
+            <table class="pointsTable">
+              <thead>
+                <tr><th>#</th><th>X</th><th>Y</th><th>Z</th><th>Code</th><th>Notes</th></tr>
+              </thead>
+              <tbody id="outputPointsBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="hint">Download saves exactly what you see here.</div>
+      </div>
+    </section>
+    </section>
+
+    <!-- Right: Map -->
     <section class="right">
       <section class="panel">
         <div class="panelhead">
@@ -599,27 +584,6 @@
         </div>
       </section>
 
-      <section class="panel outputArea">
-        <div class="panelhead">
-          <h2><span class="sig"></span> Output Stream</h2>
-          <div class="chip">Sorted: <span class="mono">numeric point id</span></div>
-        </div>
-        <div class="panelbody">
-          <label for="outText">Transformed points</label>
-          <textarea id="outText" spellcheck="false" readonly></textarea>
-          <div id="outputTableWrap" class="pointsTableWrap" aria-hidden="true">
-            <div class="pointsTableScroll">
-              <table class="pointsTable">
-                <thead>
-                  <tr><th>#</th><th>X</th><th>Y</th><th>Z</th><th>Code</th><th>Notes</th></tr>
-                </thead>
-                <tbody id="outputPointsBody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="hint">Download saves exactly what you see here.</div>
-        </div>
-      </section>
     </section>
   </main>
 
@@ -998,6 +962,9 @@
     // -----------------------------
     // UI + Map (basemap switcher)
     // -----------------------------
+    const elMain = document.querySelector("main");
+    const elIngestPanel = document.getElementById("ingestPanel");
+    const elOutputPanel = document.getElementById("outputPanel");
     const elFile = document.getElementById("file");
     const elIn = document.getElementById("inText");
     const elOut = document.getElementById("outText");
@@ -1044,6 +1011,7 @@
     let selectedGroupSelection = null;
     let currentImportContext = null;
     let usePointEditorView = false;
+    let pointEditorAccordionMode = "input";
     let projectPointFilesCache = [];
 
     const elInputTableWrap = document.getElementById("inputTableWrap");
@@ -1403,6 +1371,20 @@
       if (usePointEditorView) refreshPointEditorTables();
     }
 
+    function setPointEditorAccordionMode(mode = "input"){
+      pointEditorAccordionMode = mode === "output" ? "output" : "input";
+      const outputFocused = usePointEditorView && pointEditorAccordionMode === "output";
+      if (elMain) elMain.classList.toggle("pointEditorFocusOutput", outputFocused);
+      if (elIngestPanel) elIngestPanel.setAttribute("aria-expanded", outputFocused ? "false" : "true");
+      if (elOutputPanel) elOutputPanel.setAttribute("aria-expanded", outputFocused ? "true" : "false");
+    }
+
+    function activatePointEditorOutputAccordion(){
+      setPointEditorView(true);
+      setPointEditorAccordionMode("output");
+      refreshPointEditorTables();
+    }
+
     let map = null;
     let layer = null;
 
@@ -1677,7 +1659,7 @@
       };
       elIn.value = String(pointSet.text);
       processNow();
-      refreshPointEditorTables();
+      activatePointEditorOutputAccordion();
       elMapHint.innerHTML = `<span class="ok">Opened last point file for this active project: ${escapeHtml(title)}.</span>`;
       return true;
     }
@@ -1723,6 +1705,7 @@
     }
 
     function setStats(stats, plottedCount){
+      if (!st_lines || !st_parsed || !st_g || !st_ref || !st_map || !st_zone) return;
       st_lines.textContent = String(stats.totalLines ?? 0);
       st_parsed.textContent = String(stats.parsedCount ?? 0);
       st_g.textContent = String(stats.gCount ?? 0);
@@ -2015,7 +1998,7 @@
       elIn.value = text;
       persistPointSetToProjectFile({ kind: "import", text, context, timestamp: new Date() });
       processNow();
-      refreshPointEditorTables();
+      activatePointEditorOutputAccordion();
     });
 
 
@@ -2066,7 +2049,31 @@
     });
 
 
-    elToggleInputView.addEventListener("click", ()=>setPointEditorView(!usePointEditorView));
+    elToggleInputView.addEventListener("click", ()=>{
+      const nextEnabled = !usePointEditorView;
+      setPointEditorView(nextEnabled);
+      setPointEditorAccordionMode(nextEnabled ? "output" : "input");
+    });
+
+    elIn.addEventListener("paste", ()=>{
+      requestAnimationFrame(()=>{
+        if (!elIn.value.trim()) return;
+        activatePointEditorOutputAccordion();
+      });
+    });
+
+    elIngestPanel?.addEventListener("click", (event)=>{
+      if (pointEditorAccordionMode !== "output") return;
+      if (!(event.target instanceof Node)) return;
+      if (elIn && elIn.contains(event.target)) return;
+      setPointEditorAccordionMode("input");
+    });
+
+    elOutputPanel?.addEventListener("click", ()=>{
+      if (!usePointEditorView) return;
+      if (pointEditorAccordionMode === "output") return;
+      setPointEditorAccordionMode("output");
+    });
 
     // Re-render map when settings change (does not alter output)
     elZone.addEventListener("change", ()=>{
@@ -2222,6 +2229,7 @@
         const context = setImportContextFromRos();
         persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context, timestamp: new Date() });
         processNow();
+        activatePointEditorOutputAccordion();
         localStorage.removeItem(ROS_POINTFORGE_IMPORT_STORAGE_KEY);
         return true;
       } catch (_error){
@@ -2255,7 +2263,7 @@
         elIn.value = String(payload.csv);
         persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context: currentImportContext, timestamp: new Date() });
         processNow();
-        refreshPointEditorTables();
+        activatePointEditorOutputAccordion();
         localStorage.removeItem(PROJECT_BROWSER_POINTFORGE_IMPORT_STORAGE_KEY);
         return true;
       } catch {
@@ -2286,7 +2294,7 @@
         elIn.value = String(payload.csv);
         persistPointSetToProjectFile({ kind: "import", text: String(payload.csv), context: currentImportContext, timestamp: new Date() });
         processNow();
-        refreshPointEditorTables();
+        activatePointEditorOutputAccordion();
         elMapHint.innerHTML = `<span class="ok">Imported traversal from BoundaryLab.</span>`;
         localStorage.removeItem(BOUNDARYLAB_POINTFORGE_IMPORT_STORAGE_KEY);
         return true;
@@ -2376,7 +2384,7 @@
 
       elIn.value = text;
       processNow();
-      refreshPointEditorTables();
+      activatePointEditorOutputAccordion();
       saveLastOpenedProjectPointSet(projectContext.projectId, pointSetStorageKey(pointFileId));
       elMapHint.innerHTML = `<span class="ok">Opened point file: ${escapeHtml(title)}.</span>`;
     });
@@ -2386,6 +2394,7 @@
     setLocalizationInputsEnabled(false);
     elIn.value = "";
     setPointEditorView(false);
+    setPointEditorAccordionMode("input");
     setBasemap("street");
     setStats({ totalLines: 0, parsedCount: 0, gCount: 0, refCount: 0 }, 0);
     elMapHint.textContent = "Load a file or paste points to plot. Basemap toggle: Street / Satellite.";
