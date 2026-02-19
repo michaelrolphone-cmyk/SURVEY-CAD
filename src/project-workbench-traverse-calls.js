@@ -15,7 +15,7 @@ async function ensureBoundaryLabEvidence(store, casefileId) {
   if (existing?.id) return existing.id;
 
   const created = await store.createEvidence(casefileId, {
-    type: 'other',
+    type: 'Other',
     title: 'BoundaryLab Traverse Calls',
     source: 'BoundaryLab',
     tags: [BOUNDARYLAB_EVIDENCE_TAG],
@@ -65,4 +65,3 @@ export async function hydrateBoundaryLabTraverseCalls({ store, casefileId, trave
     calls: calls.filter((call) => call.bearing && Number.isFinite(call.distance)),
   };
 }
-

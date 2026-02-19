@@ -46,7 +46,7 @@ test('persistBoundaryLabTraverseCalls creates tagged evidence once and returns e
 
   assert.deepEqual(ids, ['ex-1', 'ex-2']);
   assert.equal(createdEvidence.length, 1);
-  assert.equal(createdEvidence[0].type, 'other');
+  assert.equal(createdEvidence[0].type, 'Other');
   assert.equal(createdExtractions.length, 2);
   assert.equal(createdExtractions[0].evidenceId, 'evidence-1');
   assert.equal(createdExtractions[1].label, 'BoundaryLab Call 2');
