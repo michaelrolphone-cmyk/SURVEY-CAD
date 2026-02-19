@@ -130,6 +130,7 @@ test('POINT_TRANSFORMER.HTML supports Project Browser point-file imports and poi
   assert.match(html, /if \(params\.get\(\"source\"\)\) return false;/, 'PointForge last-opened bootstrap should only run for direct launches without source param');
   assert.match(html, /loadLastOpenedProjectPointSet\(projectContext\.projectId\)/, 'PointForge should resolve last-opened point files by active project id');
   assert.match(html, /id="btnToggleInputView"/, 'PointForge should render a button to toggle textarea and point editor views');
+  assert.match(html, /#outputPanel\{[\s\S]*position:relative;[\s\S]*opacity:1;[\s\S]*pointer-events:auto;/, 'PointForge should keep the output panel visible in default textarea mode');
   assert.match(html, /id="inputTableWrap"/, 'PointForge should render a tabular input point editor container');
   assert.match(html, /id="outputTableWrap"/, 'PointForge should render a tabular output points container');
   assert.match(html, /function\s+setPointEditorView\(enabled\)/, 'PointForge should define a helper to switch between textarea and point editor modes');

@@ -142,15 +142,18 @@
       content:none;
     }
     #outputPanel{
-      position:absolute;
-      inset:0;
-      z-index: 2;
-      opacity:0;
-      pointer-events:none;
-      transform: translateX(24px);
+      position:relative;
+      inset:auto;
+      z-index:auto;
+      opacity:1;
+      pointer-events:auto;
+      transform:none;
       transition: transform .25s ease, opacity .2s ease;
     }
     main.pointEditorFocusOutput #outputPanel{
+      position:absolute;
+      inset:0;
+      z-index: 2;
       opacity:1;
       pointer-events:auto;
       transform: translateX(0);
@@ -170,6 +173,7 @@
     main.pointEditorFocusOutput #outputPanel .panelbody .pointsTableWrap.active{ min-height: 640px; }
     main.pointEditorFocusInput #ingestPanel{ margin-right:56px; }
     main.pointEditorFocusInput #outputPanel{
+      position:absolute;
       opacity:1;
       pointer-events:auto;
       transform: translateX(0);
