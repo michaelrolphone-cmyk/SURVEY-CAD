@@ -389,7 +389,50 @@ function looksLikeFetchResponse(x) {
   return typeof Response !== 'undefined' && x instanceof Response;
 }
 
-function normalizeBewHandler(product) {
+function decorateBewExpressRequest(req, urlObj) {
+  if (req && !req.query) {
+    req.query = urlObj?.searchParams ? Object.fromEntries(urlObj.searchParams.entries()) : {};
+  }
+  if (req && !req.params) req.params = {};
+  return req;
+}
+
+function decorateBewExpressResponse(res) {
+  if (typeof res.status !== 'function') {
+    res.status = (code) => {
+      res.statusCode = Number(code) || 200;
+      return res;
+    };
+  }
+  if (typeof res.json !== 'function') {
+    res.json = (payload) => {
+      sendJson(res, res.statusCode || 200, payload);
+      return res;
+    };
+  }
+  if (typeof res.send !== 'function') {
+    res.send = (payload) => {
+      if (Buffer.isBuffer(payload) || payload instanceof Uint8Array) {
+        if (!res.getHeader?.('content-type')) {
+          res.setHeader('Content-Type', 'application/octet-stream');
+        }
+        res.end(payload);
+        return res;
+      }
+      if (typeof payload === 'object' && payload !== null) {
+        return res.json(payload);
+      }
+      if (!res.getHeader?.('content-type')) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      }
+      res.end(payload == null ? '' : String(payload));
+      return res;
+    };
+  }
+  return res;
+}
+
+export function normalizeBewHandler(product) {
   if (!product) return null;
 
   // function handler
@@ -399,7 +442,9 @@ function normalizeBewHandler(product) {
       Array.isArray(product.stack);
 
     if (looksLikeExpressMiddleware) {
-      return async (req, res) => {
+      return async (req, res, urlObj) => {
+        decorateBewExpressRequest(req, urlObj);
+        decorateBewExpressResponse(res);
         let nextCalled = false;
         await new Promise((resolve, reject) => {
           const next = (err) => {
