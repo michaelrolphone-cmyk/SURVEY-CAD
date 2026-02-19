@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createEvidenceDeskFileStore,
   InMemoryEvidenceDeskFileStore,
   RedisEvidenceDeskFileStore,
 } from '../src/evidence-desk-file-store.js';
@@ -119,4 +120,43 @@ test('redis evidence desk store indexes files by folder', async () => {
   await store.deleteFile('proj-2', 'deeds', fileName);
   const afterDelete = await store.listFiles('proj-2', ['deeds']);
   assert.equal(afterDelete.files.length, 0);
+});
+
+test('createEvidenceDeskFileStore falls back to in-memory when redis connect stalls', async () => {
+  let quitCalled = false;
+  const neverConnectingClient = {
+    on() {},
+    connect: () => new Promise(() => {}),
+    quit: async () => { quitCalled = true; },
+  };
+
+  const result = await createEvidenceDeskFileStore({
+    redisUrl: 'redis://example.invalid:6379',
+    connectTimeoutMs: 5,
+    createRedisClient: () => neverConnectingClient,
+  });
+
+  assert.equal(result.type, 'memory');
+  assert.equal(result.redisClient, null);
+  assert.equal(quitCalled, true);
+});
+
+test('createEvidenceDeskFileStore uses redis when connection succeeds', async () => {
+  const redis = new FakeRedis();
+  let connected = false;
+  const connectedClient = {
+    ...redis,
+    on() {},
+    connect: async () => { connected = true; },
+    quit: async () => {},
+  };
+
+  const result = await createEvidenceDeskFileStore({
+    redisUrl: 'redis://localhost:6379',
+    createRedisClient: () => connectedClient,
+  });
+
+  assert.equal(connected, true);
+  assert.equal(result.type, 'redis');
+  assert.equal(result.redisClient, connectedClient);
 });
