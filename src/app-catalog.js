@@ -41,6 +41,7 @@ export const APP_CATALOG = [
     accent: '#FEF9C3',
     glyph: 'GLO',
     section: 'Research',
+    experimental: true,
   },
   {
     id: 'utilities-pack',
@@ -52,6 +53,7 @@ export const APP_CATALOG = [
     accent: '#DBEAFE',
     glyph: 'UP',
     section: 'Research',
+    experimental: true,
   },
   {
     id: 'pointforge-transformer',
