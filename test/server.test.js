@@ -702,7 +702,7 @@ test('server localstorage sync endpoint supports async-backed stores', async () 
   }
 });
 
-test('server file upload, download, and list endpoints', async () => {
+test('server file upload CRUD and list endpoints', async () => {
   const app = await startApiServer(new SurveyCadClient());
   const testProjectId = `test-upload-${Date.now()}`;
   const testProjectDir = path.join(UPLOADS_DIR, testProjectId);
@@ -756,6 +756,42 @@ test('server file upload, download, and list endpoints', async () => {
     assert.ok(Array.isArray(listPayload.files));
     assert.equal(listPayload.files.length, 1);
     assert.equal(listPayload.files[0].folderKey, 'drawings');
+    assert.ok(Array.isArray(listPayload.filesByFolder.drawings));
+
+    const storedFileName = uploadPayload.resource.reference.metadata.storedName;
+
+    const updateBoundary = '----UpdateBoundary456';
+    const updatedBody = [
+      `--${updateBoundary}`,
+      'Content-Disposition: form-data; name="projectId"',
+      '',
+      testProjectId,
+      `--${updateBoundary}`,
+      'Content-Disposition: form-data; name="folderKey"',
+      '',
+      'drawings',
+      `--${updateBoundary}`,
+      'Content-Disposition: form-data; name="fileName"',
+      '',
+      storedFileName,
+      `--${updateBoundary}`,
+      'Content-Disposition: form-data; name="file"; filename="test-drawing-updated.dxf"',
+      'Content-Type: application/octet-stream',
+      '',
+      'updated drawing content',
+      `--${updateBoundary}--`,
+    ].join('\r\n');
+
+    const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'PUT',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${updateBoundary}` },
+      body: updatedBody,
+    });
+    assert.equal(updateRes.status, 200);
+
+    const updatedDownloadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`);
+    assert.equal(updatedDownloadRes.status, 200);
+    assert.equal(await updatedDownloadRes.text(), 'updated drawing content');
 
     // Validate error cases
     const noFileRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
@@ -796,6 +832,11 @@ test('server file upload, download, and list endpoints', async () => {
       ].join('\r\n'),
     });
     assert.equal(badFolderRes.status, 400);
+
+    const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/file?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`, {
+      method: 'DELETE',
+    });
+    assert.equal(deleteRes.status, 200);
 
     // Download non-existent file
     const missingRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=${testProjectId}&folderKey=drawings&fileName=nonexistent.txt`);

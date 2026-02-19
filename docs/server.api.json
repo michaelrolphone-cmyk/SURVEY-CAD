@@ -497,6 +497,62 @@
             "$ref": "#/components/responses/Error403"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "Project Files"
+        ],
+        "summary": "Update an uploaded file in a project folder",
+        "operationId": "updateProjectFileUpload",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "projectId",
+                  "folderKey",
+                  "fileName",
+                  "file"
+                ],
+                "properties": {
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "folderKey": {
+                    "$ref": "#/components/schemas/FolderKey"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated resource record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadProjectFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
       }
     },
     "/api/project-files/download": {
@@ -2293,6 +2349,53 @@
           }
         }
       }
+    },
+    "/api/project-files/file": {
+      "delete": {
+        "tags": [
+          "Project Files"
+        ],
+        "summary": "Delete a previously uploaded file",
+        "operationId": "deleteProjectFileUpload",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectIdRequired"
+          },
+          {
+            "$ref": "#/components/parameters/folderKeyRequired"
+          },
+          {
+            "$ref": "#/components/parameters/fileNameRequired"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "deleted"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3103,7 +3206,8 @@
       "ProjectFilesListResponse": {
         "type": "object",
         "required": [
-          "files"
+          "files",
+          "filesByFolder"
         ],
         "properties": {
           "files": {
@@ -3112,7 +3216,11 @@
               "type": "object",
               "required": [
                 "folderKey",
-                "fileName"
+                "fileName",
+                "title",
+                "sizeBytes",
+                "uploadedAt",
+                "updatedAt"
               ],
               "properties": {
                 "folderKey": {
@@ -3120,9 +3228,63 @@
                 },
                 "fileName": {
                   "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer"
+                },
+                "uploadedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
                 }
               },
               "additionalProperties": false
+            }
+          },
+          "filesByFolder": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "folderKey",
+                  "fileName",
+                  "title",
+                  "sizeBytes",
+                  "uploadedAt",
+                  "updatedAt"
+                ],
+                "properties": {
+                  "folderKey": {
+                    "$ref": "#/components/schemas/FolderKey"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "sizeBytes": {
+                    "type": "integer"
+                  },
+                  "uploadedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false
+              }
             }
           }
         },
