@@ -1202,7 +1202,7 @@
       const p = points[i];
       const x = (p.E - offE);
       const y = (p.Z - offZ) * zEx;
-      const z = (p.N - offN);
+      const z = -(p.N - offN);
 
       positions[i*3+0] = x;
       positions[i*3+1] = y;
