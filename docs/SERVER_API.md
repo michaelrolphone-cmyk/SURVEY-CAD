@@ -1594,6 +1594,22 @@ Project Workbench endpoints link SurveyFoundry projects to BEW casefiles and syn
 
 Return the current project↔casefile link and the linked casefile payload (if linked).
 
+### `POST /api/projects/:projectId/workbench`
+
+Root alias for Workbench synchronization. This endpoint is equivalent to `POST /api/projects/:projectId/workbench/sync` when no link-creation flags are supplied.
+
+Use this route when clients want one endpoint that can both sync and (optionally) create a new linked casefile in one call.
+
+**Request Body (all fields optional):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Casefile name to use if a new linked casefile is created. |
+| `initializeDefaults` | `boolean` | When creating a casefile, set to `false` to skip default extraction/corner scaffolding. |
+| `forceNewCasefile` | `boolean` | If `true`, always create and link a new casefile before syncing sources. |
+
+**Response `200`:** Linked casefile payload plus sync counts (`created`, `updated`, `deleted`, `totalSources`).
+
 ### `PUT /api/projects/:projectId/workbench/link`
 
 Link an existing casefile to a project.
@@ -1613,6 +1629,8 @@ Remove a project↔casefile link.
 
 Create (or force-create) a project-linked casefile and synchronize project-derived evidence into that casefile.
 
+**Request Body (all fields optional):** Same as `POST /api/projects/:projectId/workbench`.
+
 ### `DELETE /api/projects/:projectId/workbench/casefile`
 
 Delete the linked casefile and remove the project link.
@@ -1624,3 +1642,5 @@ List the derived project sources used for Workbench sync.
 ### `POST /api/projects/:projectId/workbench/sync`
 
 Synchronize project-derived evidence into the linked casefile and return sync counts (`created`, `updated`, `deleted`, `totalSources`).
+
+**Request Body (all fields optional):** Same as `POST /api/projects/:projectId/workbench`.

@@ -1780,6 +1780,46 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "Project Workbench"
+        ],
+        "summary": "Create or sync project-linked Workbench casefile (root alias)",
+        "description": "Convenience endpoint that behaves like `POST /api/projects/{projectId}/workbench/sync` by default, and can force casefile creation with request flags.",
+        "operationId": "syncProjectWorkbenchRoot",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkbenchSyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Linked casefile with sync summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkbenchSyncResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/projects/{projectId}/workbench/link": {
@@ -1892,6 +1932,16 @@
               }
             }
           }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkbenchSyncRequest"
+              }
+            }
+          }
         }
       },
       "delete": {
@@ -1983,6 +2033,16 @@
                 "schema": {
                   "$ref": "#/components/schemas/ProjectWorkbenchSyncResponse"
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkbenchSyncRequest"
               }
             }
           }
@@ -4924,6 +4984,27 @@
           "basis",
           "calls"
         ]
+      },
+      "ProjectWorkbenchSyncRequest": {
+        "type": "object",
+        "description": "Optional controls for casefile creation and synchronization behavior.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Casefile name to use when a new linked casefile is created."
+          },
+          "initializeDefaults": {
+            "type": "boolean",
+            "description": "When creating a casefile, set to false to skip default extraction/corner scaffolding.",
+            "default": true
+          },
+          "forceNewCasefile": {
+            "type": "boolean",
+            "description": "When true, creates a fresh linked casefile before synchronizing sources.",
+            "default": false
+          }
+        },
+        "additionalProperties": false
       }
     }
   }
