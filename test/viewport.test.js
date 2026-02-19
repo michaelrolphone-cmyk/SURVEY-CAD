@@ -1029,3 +1029,14 @@ test('VIEWPORT.HTML requires crew identity before starting collaboration websock
   assert.match(html, /if \(!crewMemberId\) \{[\s\S]*setCollabStatus\("crew identity required"\);[\s\S]*return;/, 'LineSmith collaboration should stop when crew identity is missing');
   assert.match(html, /\/ws\/lineforge\?room=\$\{encodeURIComponent\(roomId\)\}&crewMemberId=\$\{encodeURIComponent\(crewMemberId\)\}&projectId=\$\{encodeURIComponent\(activeProjectId\)\}/, 'LineSmith collaboration websocket URL should include crew and project context for isolation');
 });
+
+
+test('VIEWPORT.HTML keeps sequential closures and curved rendering for PC/PT field-to-finish point codes', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /const\s+curveMarkers\s*=\s*new\s+Set\(\["PC",\s*"PT"\]\);/, 'sequential parser should treat PC/PT as curve markers so CLO directives still bind to the linework base code');
+  assert.match(html, /if \(ln\.fieldToFinishType === "curve"\) continue;/, 'line renderer should skip straight rendering for generated curve line segments');
+  assert.match(html, /function\s+buildFieldToFinishCurveSequences\(\)/, 'curve renderer should derive PC-to-PT curve sequences from sorted points');
+  assert.match(html, /function\s+computeThreePointArc\(startPoint, midPoint, endPoint\)/, 'curve renderer should compute true circular arcs from three-point curve definitions');
+  assert.match(html, /ctx\.arc\(center\.x, center\.y, radiusPixels, arc\.startAngle, arc\.endAngle, arc\.anticlockwise\);/, 'curve renderer should draw computed arc geometry instead of line-segment approximations when a 3-point curve is present');
+});
