@@ -1502,6 +1502,7 @@
       </div>
       <div class="grid2" style="margin-top:8px;">
         <button id="saveDrawingToProject" class="ok">Save Drawing to Project</button>
+        <button id="openProjectDrawing">Open Project Drawing…</button>
         <button id="restoreDrawingVersion">Restore Saved Version…</button>
       </div>
       <div class="row" style="margin-top:8px;">
@@ -1835,6 +1836,7 @@
       </div>
       <div class="quickToolsRow quickToolsRowPrimary">
         <button id="quickSave" class="quickToolBtn" title="Save Drawing to Project" aria-label="Save Drawing to Project"><i class="fa-solid fa-floppy-disk"></i></button>
+        <button id="quickOpenDrawing" class="quickToolBtn" title="Open Project Drawing" aria-label="Open Project Drawing"><i class="fa-solid fa-folder-open"></i></button>
         <button id="quickPrintView" class="quickToolBtn" title="Draw Print Window" aria-label="Draw Print Window"><i class="fa-solid fa-print"></i></button>
         <button id="quickOpenArrowHead" class="quickToolBtn" title="Open ArrowHead AR" aria-label="Open ArrowHead AR"><i class="fa-solid fa-vr-cardboard"></i></button>
         <button id="quickLayerManager" class="quickToolBtn" title="Layer Manager" aria-label="Layer Manager"><i class="fa-solid fa-layer-group"></i></button>
@@ -7717,6 +7719,7 @@ function paintBackground(ctx, w, h){
   $("#redoBtn").addEventListener("click", ()=>history.redoAction());
 
   $("#quickSave")?.addEventListener("click", () => $("#saveDrawingToProject").click());
+  $("#quickOpenDrawing")?.addEventListener("click", () => $("#openProjectDrawing")?.click());
   $("#quickPrintView")?.addEventListener("click", () => $("#generatePrintView")?.click());
   syncPrintWindowCaptureUi();
   $("#quickOpenArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
@@ -9294,6 +9297,60 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     return payload?.drawing || null;
   }
 
+  async function listProjectDrawings(projectId) {
+    if (!projectId) return [];
+    try {
+      const response = await fetch(buildProjectDrawingApiUrl(projectId));
+      if (response.ok) {
+        const payload = await response.json();
+        if (Array.isArray(payload?.drawings)) {
+          return payload.drawings
+            .filter((drawing) => drawing && typeof drawing === 'object' && String(drawing.drawingId || '').trim())
+            .map((drawing) => ({
+              drawingId: String(drawing.drawingId || '').trim(),
+              drawingName: String(drawing.drawingName || drawing.drawingId || '').trim(),
+              versionCount: Number.isFinite(Number(drawing.versionCount)) ? Number(drawing.versionCount) : null,
+              updatedAt: String(drawing.updatedAt || drawing.createdAt || '').trim(),
+            }));
+        }
+      }
+    } catch {
+      // Fall through to local project file index fallback.
+    }
+
+    const raw = localStorage.getItem(projectFileStorageKey(projectId));
+    if (!raw) return [];
+    try {
+      const projectFile = JSON.parse(raw);
+      const drawingsFolder = Array.isArray(projectFile?.folders)
+        ? projectFile.folders.find((folder) => folder?.key === 'drawings')
+        : null;
+      if (!Array.isArray(drawingsFolder?.index)) return [];
+      return drawingsFolder.index
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry) => {
+          const metadata = entry?.reference?.metadata || {};
+          const drawingId = String(metadata?.drawingId || entry?.reference?.value || '').trim();
+          if (!drawingId) return null;
+          return {
+            drawingId,
+            drawingName: String(metadata?.drawingName || entry?.title || drawingId).trim(),
+            versionCount: Number.isFinite(Number(metadata?.versionCount)) ? Number(metadata.versionCount) : null,
+            updatedAt: String(metadata?.latestSavedAt || metadata?.savedAt || '').trim(),
+          };
+        })
+        .filter((drawing) => drawing)
+        .sort((a, b) => {
+          const aSaved = Date.parse(a?.updatedAt || '');
+          const bSaved = Date.parse(b?.updatedAt || '');
+          return (Number.isFinite(bSaved) ? bSaved : Number.NEGATIVE_INFINITY)
+            - (Number.isFinite(aSaved) ? aSaved : Number.NEGATIVE_INFINITY);
+        });
+    } catch {
+      return [];
+    }
+  }
+
   async function saveCrewActiveDrawingPreference(projectId, drawingId) {
     const crewMemberId = resolveActiveCrewMemberId();
     if (!projectId || !drawingId || !crewMemberId) return false;
@@ -9553,6 +9610,72 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     return true;
   }
 
+  async function promptOpenProjectDrawing() {
+    if (!activeProjectId) {
+      setStatus('Open LineSmith from an active project to open project drawings.', 'warn');
+      return false;
+    }
+    const drawings = await listProjectDrawings(activeProjectId);
+    if (!drawings.length) {
+      setStatus('No saved drawings were found for this active project.', 'warn');
+      return false;
+    }
+    const optionList = drawings.map((drawing, index) => {
+      const activeTag = drawing.drawingId === activeDrawingId ? ' • active' : '';
+      const versionTag = drawing.versionCount ? ` • ${drawing.versionCount} version${drawing.versionCount === 1 ? '' : 's'}` : '';
+      return `${index + 1}. ${drawing.drawingName || drawing.drawingId}${versionTag}${activeTag}`;
+    }).join('\n');
+    const selection = window.prompt(`Open which drawing?\n${optionList}`, '1');
+    if (selection == null) return false;
+    const selectedIndex = Number.parseInt(String(selection).trim(), 10) - 1;
+    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= drawings.length) {
+      setStatus('Enter a valid drawing number from the open-project list.', 'warn');
+      return false;
+    }
+
+    const selectedDrawing = drawings[selectedIndex];
+    if (!selectedDrawing?.drawingId) {
+      setStatus('Selected drawing is missing an identifier and cannot be opened.', 'warn');
+      return false;
+    }
+    if (selectedDrawing.drawingId === activeDrawingId) {
+      setStatus(`Drawing "${selectedDrawing.drawingName || selectedDrawing.drawingId}" is already open.`, 'ok');
+      return true;
+    }
+    if (hasUnsavedDrawingChanges()) {
+      const proceed = window.confirm('You have unsaved changes in the current drawing. Open another project drawing anyway?');
+      if (!proceed) {
+        setStatus('Open drawing cancelled to keep current unsaved edits.', 'warn');
+        return false;
+      }
+    }
+
+    const drawing = await fetchProjectDrawingById(activeProjectId, selectedDrawing.drawingId);
+    let restored = false;
+    if (drawing && restoreDrawingFromApiRecord(drawing)) {
+      restored = true;
+      localStorage.setItem(drawingStorageKey(activeProjectId, selectedDrawing.drawingId), JSON.stringify(drawing));
+    }
+    if (!restored) {
+      const localStorageKey = drawingStorageKey(activeProjectId, selectedDrawing.drawingId);
+      restored = restoreDrawingVersion(localStorageKey, -1);
+    }
+    if (!restored) {
+      setStatus(`Drawing "${selectedDrawing.drawingName || selectedDrawing.drawingId}" could not be opened.`, 'warn');
+      return false;
+    }
+
+    activeDrawingId = selectedDrawing.drawingId;
+    activeDrawingStorageKey = drawingStorageKey(activeProjectId, activeDrawingId);
+    saveLastOpenedProjectDrawing(activeProjectId, activeDrawingStorageKey);
+    saveCrewActiveDrawingPreference(activeProjectId, activeDrawingId);
+    reconnectCollaborationForActiveDrawing();
+    const drawingNameInput = $("#drawingName");
+    if (drawingNameInput) drawingNameInput.value = selectedDrawing.drawingName || selectedDrawing.drawingId;
+    setStatus(`Opened drawing "${selectedDrawing.drawingName || selectedDrawing.drawingId}" from project history.`, 'ok');
+    return true;
+  }
+
   function triggerQuickSaveSuccessPulse() {
     const quickSaveBtn = $("#quickSave");
     if (!quickSaveBtn) return;
@@ -9676,6 +9799,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   }
 
   $("#saveDrawingToProject").addEventListener("click", () => { void saveDrawingToProject(); });
+  $("#openProjectDrawing").addEventListener("click", () => { void promptOpenProjectDrawing(); });
   $("#restoreDrawingVersion").addEventListener("click", promptRestoreDrawingVersion);
   $("#openArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
 
