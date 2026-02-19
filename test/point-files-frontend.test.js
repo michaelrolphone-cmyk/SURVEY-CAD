@@ -26,6 +26,9 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /renderPointFileThumbnailDataUrl\(text,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render point file thumbnails through the shared client library.');
   assert.match(html, /className\s*=\s*'point-file-preview-thumb'/, 'EvidenceDesk should render point file thumbnail images in file rows.');
   assert.match(html, /querySelector\('\.file-preview-slot'\)\?\.replaceChildren\(thumb\)/, 'EvidenceDesk should place point file thumbnails in the dedicated preview slot before file names.');
+  assert.match(html, /function\s+isImageResource\(entry\)\s*\{[\s\S]*\['png',\s*'jpg',\s*'jpeg',\s*'gif',\s*'webp',\s*'bmp',\s*'svg'\]/, 'EvidenceDesk should detect uploaded image resources by common file extensions.');
+  assert.match(html, /function\s+attachImagePreview\(resource,\s*entry\)\s*\{[\s\S]*className\s*=\s*'image-preview-thumb'/, 'EvidenceDesk should render image thumbnails in the shared preview slot for uploaded images.');
+  assert.match(html, /const\s+showThumbnailSlot\s*=\s*canLaunchPointForge\s*\|\|\s*canOpenLineSmithDrawing\s*\|\|\s*isPdfResource\s*\|\|\s*isImageUpload;/, 'EvidenceDesk should reserve thumbnail space for image uploads in the file browser.');
   assert.match(html, /function\s+uploadFileViaXhr\(formData,\s*onProgress\)\s*\{[\s\S]*xhr\.upload\.addEventListener\('progress'/, 'EvidenceDesk should use XHR upload progress events for project file uploads.');
   assert.match(html, /Uploading \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\} \(\$\{progress\}%\)/, 'EvidenceDesk should include percentage progress updates for uploaded files.');
   assert.match(html, /className\s*=\s*'upload-progress'/, 'EvidenceDesk should render a dedicated upload progress bar element.');
@@ -55,7 +58,7 @@ test('EvidenceDesk file rows prioritize configured names and truncate actual fil
   assert.match(html, /\.file-name-configured\s*\{[\s\S]*color:\s*#f8fafc;[\s\S]*font-weight:\s*600;/, 'EvidenceDesk should render configured names in brighter text.');
   assert.match(html, /\.file-name-actual\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/, 'EvidenceDesk should truncate long actual file names with ellipsis.');
   assert.match(html, /const\s+leadingIcon\s*=\s*showThumbnailSlot\s*\?\s*''\s*:\s*'<span class="icon">📄<\/span>';/, 'EvidenceDesk should omit the extra PDF icon when a PDF thumbnail is shown.');
-  assert.match(html, /const\s+showThumbnailSlot\s*=\s*canLaunchPointForge\s*\|\|\s*canOpenLineSmithDrawing\s*\|\|\s*isPdfResource;/, 'EvidenceDesk should reserve thumbnail space only for rows that support generated previews.');
+  assert.match(html, /const\s+showThumbnailSlot\s*=\s*canLaunchPointForge\s*\|\|\s*canOpenLineSmithDrawing\s*\|\|\s*isPdfResource\s*\|\|\s*isImageUpload;/, 'EvidenceDesk should reserve thumbnail space for rows that support generated previews, including image uploads.');
   assert.match(html, /const\s+thumbnailSlotMarkup\s*=\s*showThumbnailSlot\s*\?\s*'<span class="file-preview-slot" aria-hidden="true"><\/span>'\s*:\s*'';/, 'EvidenceDesk should avoid adding thumbnail markup to non-preview folders.');
   assert.doesNotMatch(html, /pdf-preview-icon/, 'EvidenceDesk should not render the legacy PDF icon badge markup in file rows.');
   assert.match(html, /\.pdf-preview-thumb\s*\{[\s\S]*width:\s*86px;[\s\S]*height:\s*50px;/, 'EvidenceDesk should style embedded PDF thumbnails to match preview dimensions.');
@@ -67,7 +70,7 @@ test('EvidenceDesk file rows prioritize configured names and truncate actual fil
 
 test('EvidenceDesk opens PDFs in dedicated browser windows', async () => {
   const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
-  assert.match(html, /function\s+openPdfInNewWindow\(pdfUrl\)\s*\{[\s\S]*window\.open\(pdfUrl,\s*'_blank',\s*'popup=yes,width=1200,height=900,noopener,noreferrer'\)/, 'EvidenceDesk should open PDFs in a popup-sized browser window rather than generic tab behavior.');
+  assert.match(html, /function\s+openPdfInNewWindow\(pdfUrl\)\s*\{[\s\S]*window\.open\('',\s*'_blank',\s*'popup=yes,width=1200,height=900'\)[\s\S]*popup\.location\.replace\(pdfUrl\);/, 'EvidenceDesk should open PDFs in a dedicated popup window and then navigate it to the PDF URL.');
   assert.match(html, /openPdfInNewWindow\(pdfUrl\);/, 'EvidenceDesk CP&F open actions should route through shared PDF window helper.');
   assert.match(html, /if\s*\(isServerPdf\)\s*\{[\s\S]*openPdfInNewWindow\(downloadUrl\);/, 'EvidenceDesk uploaded PDF resources should also open in a new browser window.');
 });
