@@ -11,5 +11,15 @@ test('server OpenAPI spec documents GLO records endpoint', async () => {
   const pathItem = spec?.paths?.['/api/glo-records'];
   assert.ok(pathItem, 'spec should include /api/glo-records path');
   assert.ok(pathItem.get, 'spec should include GET /api/glo-records operation');
-  assert.ok(spec?.components?.schemas?.GloRecordsResponse, 'spec should include GloRecordsResponse schema');
+
+  const paramNames = new Set((pathItem.get.parameters || []).map((param) => param.name));
+  assert.equal(paramNames.has('address'), true);
+  assert.equal(paramNames.has('lon'), true);
+  assert.equal(paramNames.has('lat'), true);
+
+  const schema = spec?.components?.schemas?.GloRecordsResponse;
+  assert.ok(schema, 'spec should include GloRecordsResponse schema');
+  assert.equal(schema?.properties?.resultsUrl?.format, 'uri');
+  assert.equal(schema?.properties?.location?.properties?.lon?.type, 'number');
+  assert.equal(schema?.properties?.location?.properties?.lat?.type, 'number');
 });

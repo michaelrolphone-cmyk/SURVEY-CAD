@@ -1661,9 +1661,21 @@ export function createSurveyServer({
       }
 
       if (urlObj.pathname === '/api/glo-records') {
-        const address = urlObj.searchParams.get('address');
-        if (!address) throw new Error('address query parameter is required.');
-        const payload = await client.lookupGloRecordsByAddress(address);
+        const address = (urlObj.searchParams.get('address') || '').trim();
+        const lonRaw = urlObj.searchParams.get('lon');
+        const latRaw = urlObj.searchParams.get('lat');
+        const hasLon = lonRaw !== null && lonRaw.trim() !== '';
+        const hasLat = latRaw !== null && latRaw.trim() !== '';
+
+        if (!address && !(hasLon && hasLat)) {
+          throw new Error('address or both lon and lat query parameters are required.');
+        }
+
+        const payload = await client.lookupGloRecords({
+          address,
+          lon: hasLon ? Number(lonRaw) : undefined,
+          lat: hasLat ? Number(latRaw) : undefined,
+        });
         sendJson(res, 200, payload);
         return;
       }
