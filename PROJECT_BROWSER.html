@@ -762,7 +762,7 @@
       if (entry?.reference?.type !== 'server-upload') return;
       if (!isImageResource(entry)) return;
 
-      const previewUrl = String(entry?.reference?.value || '').trim();
+      const previewUrl = String(entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
       if (!previewUrl) return;
 
       const slot = resource.querySelector('.file-preview-slot');

@@ -21,6 +21,12 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   assert.ok(listPath?.get, 'spec should include list endpoint');
 
 
+
+  const imageThumbPath = spec?.paths?.['/api/project-files/image-thumbnail'];
+  assert.ok(imageThumbPath?.get, 'spec should include image thumbnail endpoint');
+  assert.ok(imageThumbPath.get.responses?.['200'], 'Image thumbnail endpoint should document image response');
+  assert.ok(imageThumbPath.get.responses?.['404'], 'Image thumbnail endpoint should document thumbnail-not-found response');
+
   const thumbPath = spec?.paths?.['/api/project-files/pdf-thumbnail'];
   assert.ok(thumbPath?.get, 'spec should include PDF thumbnail endpoint');
   assert.ok(thumbPath.get.responses?.['200'], 'PDF thumbnail endpoint should document image response');

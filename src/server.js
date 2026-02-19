@@ -93,6 +93,9 @@ const smallStaticAssetCache = new Map();
 const PDF_THUMBNAIL_TARGET_WIDTH = 1024;
 const PDF_THUMBNAIL_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PDF_THUMBNAIL_FAILURE_COOLDOWN_MS = 30 * 1000;
+const IMAGE_THUMBNAIL_TARGET_WIDTH = 512;
+const IMAGE_THUMBNAIL_MAX_HEIGHT = 512;
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -134,6 +137,22 @@ async function renderPdfThumbnailFromBuffer(pdfBuffer, { width = PDF_THUMBNAIL_T
   } finally {
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+
+async function renderImageThumbnailFromBuffer(imageBuffer, { width = IMAGE_THUMBNAIL_TARGET_WIDTH, maxHeight = IMAGE_THUMBNAIL_MAX_HEIGHT } = {}) {
+  const sharp = (await import('sharp')).default;
+  return await sharp(imageBuffer)
+    .resize({ width, height: maxHeight, fit: 'inside', withoutEnlargement: true })
+    .png()
+    .toBuffer();
+}
+
+function canGenerateImageThumbnail({ extension = '', mimeType = '' } = {}) {
+  const normalizedExt = String(extension || '').replace(/^\./, '').toLowerCase();
+  const normalizedMime = String(mimeType || '').toLowerCase();
+  if (normalizedMime.startsWith('image/')) return true;
+  return IMAGE_EXTENSIONS.has(normalizedExt);
 }
 
 function sendJson(res, statusCode, payload) {
@@ -1784,6 +1803,13 @@ export function createSurveyServer({
           return;
         }
         const ext = path.extname(sanitizeFileName(fileName)).replace(/^\./, '').toLowerCase() || 'bin';
+        const effectiveMimeType = fileMimeType || 'application/octet-stream';
+        let thumbnailBuffer = null;
+        if (canGenerateImageThumbnail({ extension: ext, mimeType: effectiveMimeType })) {
+          try {
+            thumbnailBuffer = await renderImageThumbnailFromBuffer(fileBuffer);
+          } catch {}
+        }
         const { store } = await resolveEvidenceDeskStore();
 
         if (req.method === 'PUT') {
@@ -1798,7 +1824,9 @@ export function createSurveyServer({
             originalFileName: fileName,
             buffer: fileBuffer,
             extension: ext,
-            mimeType: fileMimeType || 'application/octet-stream',
+            mimeType: effectiveMimeType,
+            thumbnailBuffer,
+            thumbnailMimeType: thumbnailBuffer ? 'image/png' : null,
           });
           if (!resource) {
             sendJson(res, 404, { error: 'File not found.' });
@@ -1814,7 +1842,9 @@ export function createSurveyServer({
           originalFileName: fileName,
           buffer: fileBuffer,
           extension: ext,
-          mimeType: fileMimeType || 'application/octet-stream',
+          mimeType: effectiveMimeType,
+          thumbnailBuffer,
+          thumbnailMimeType: thumbnailBuffer ? 'image/png' : null,
         });
 
         sendJson(res, 201, { resource });
@@ -1850,6 +1880,36 @@ export function createSurveyServer({
         res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.end(file.buffer);
+        return;
+      }
+
+
+      if (urlObj.pathname === '/api/project-files/image-thumbnail') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+        const projectId = urlObj.searchParams.get('projectId');
+        const folderKey = urlObj.searchParams.get('folderKey');
+        const requestedFileName = urlObj.searchParams.get('fileName');
+        if (!projectId || !folderKey || !requestedFileName) {
+          sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
+          return;
+        }
+        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+          sendJson(res, 400, { error: 'Invalid folderKey.' });
+          return;
+        }
+        const { store } = await resolveEvidenceDeskStore();
+        const file = await store.getFile(projectId, folderKey, path.basename(requestedFileName));
+        if (!file?.thumbnailBuffer) {
+          sendJson(res, 404, { error: 'Thumbnail not found.' });
+          return;
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', file.thumbnailMimeType || 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.end(file.thumbnailBuffer);
         return;
       }
 

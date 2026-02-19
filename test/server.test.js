@@ -952,6 +952,57 @@ test('server file upload CRUD and list endpoints', async () => {
 });
 
 
+
+
+test('server upload generates and serves 512px image thumbnails for EvidenceDesk previews', async () => {
+  const app = await startApiServer(new SurveyCadClient());
+  const testProjectId = `thumb-upload-${Date.now()}`;
+  const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5lp7kAAAAASUVORK5CYII=';
+  const imageBuffer = Buffer.from(pngBase64, 'base64');
+  const boundary = '----ImageThumbBoundary';
+  const body = Buffer.concat([
+    Buffer.from([
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="projectId"',
+      '',
+      testProjectId,
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="folderKey"',
+      '',
+      'other',
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="preview-source.png"',
+      'Content-Type: image/png',
+      '',
+    ].join('\r\n') + '\r\n'),
+    imageBuffer,
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+
+  try {
+    const uploadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    assert.equal(uploadRes.status, 201);
+    const uploaded = await uploadRes.json();
+    const thumbnailPath = uploaded?.resource?.reference?.metadata?.thumbnailUrl;
+    assert.ok(thumbnailPath, 'uploaded image should include thumbnail URL metadata');
+
+    const thumbnailRes = await fetch(`http://127.0.0.1:${app.port}${thumbnailPath}`);
+    assert.equal(thumbnailRes.status, 200);
+    assert.equal(thumbnailRes.headers.get('content-type'), 'image/png');
+    const thumbnailBytes = Buffer.from(await thumbnailRes.arrayBuffer());
+    assert.ok(thumbnailBytes.length > 0, 'thumbnail endpoint should return PNG bytes');
+
+    const missingRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/image-thumbnail?projectId=${encodeURIComponent(testProjectId)}&folderKey=other&fileName=missing.png`);
+    assert.equal(missingRes.status, 404);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
 test('server file upload and download endpoints work with redis-backed EvidenceDesk store', async () => {
   const redisStore = new RedisEvidenceDeskFileStore(new FakeRedis());
   const app = await startApiServer(new SurveyCadClient(), { evidenceDeskFileStore: redisStore });
