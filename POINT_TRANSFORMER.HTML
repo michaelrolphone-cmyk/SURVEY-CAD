@@ -1027,6 +1027,7 @@
     const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
     const POINTFORGE_POINT_SET_STORAGE_PREFIX = "pointforgePointSet";
     const PROJECT_LAST_POINT_SET_PREFIX = "surveyfoundryLastPointforgePointSet";
+    const FIELD_TO_FINISH_STORAGE_KEY = "linesmith:field-to-finish:global";
 
     let latestOutputText = "";
     let latestTransformed = null;
@@ -1036,6 +1037,7 @@
     let usePointEditorView = false;
     let pointEditorAccordionMode = "input";
     let projectPointFilesCache = [];
+    let cachedThumbnailLineworkCodes = null;
 
     const elInputTableWrap = document.getElementById("inputTableWrap");
     const elOutputTableWrap = document.getElementById("outputTableWrap");
@@ -1080,8 +1082,9 @@
     }
 
     function buildLineworkSegments(points = []){
+      const lineworkCodes = getThumbnailLineworkCodes();
       if (pointThumbnailClient?.buildLineworkSegments) {
-        return pointThumbnailClient.buildLineworkSegments(points);
+        return pointThumbnailClient.buildLineworkSegments(points, { lineworkCodes });
       }
       const segmentsByBase = new Map();
       const activeByBase = new Map();
@@ -1089,6 +1092,7 @@
         const directive = parseFieldToFinishDirective(point.code);
         if (!directive) continue;
         const baseCode = directive.baseCode;
+        if (lineworkCodes?.size && !lineworkCodes.has(baseCode)) continue;
         const action = directive.action;
         if (!segmentsByBase.has(baseCode)) segmentsByBase.set(baseCode, []);
         let active = activeByBase.get(baseCode) || null;
@@ -1118,9 +1122,15 @@
     }
 
     function buildLineworkThumbnailDataUrl(segments = []){
+      const lineworkCodes = getThumbnailLineworkCodes();
       if (pointThumbnailClient?.renderLineworkThumbnailDataUrl) {
         const points = segments.flat().map((point)=>({ x: Number(point.x), y: Number(point.y), code: String(point.code || "") }));
-        return pointThumbnailClient.renderLineworkThumbnailDataUrl(points, { width: 88, height: 52, stroke: "#4ade80" });
+        return pointThumbnailClient.renderLineworkThumbnailDataUrl(points, {
+          width: 88,
+          height: 52,
+          stroke: "#4ade80",
+          lineworkCodes,
+        });
       }
       const points = segments.flat()
         .map((point)=>({ x: Number(point.x), y: Number(point.y) }))
@@ -1153,6 +1163,22 @@
       return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
     }
 
+    function getThumbnailLineworkCodes(){
+      if (cachedThumbnailLineworkCodes instanceof Set) return cachedThumbnailLineworkCodes;
+      if (!pointThumbnailClient?.deriveLineworkCodesFromFldConfig) {
+        cachedThumbnailLineworkCodes = new Set();
+        return cachedThumbnailLineworkCodes;
+      }
+      try {
+        const raw = localStorage.getItem(FIELD_TO_FINISH_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        cachedThumbnailLineworkCodes = pointThumbnailClient.deriveLineworkCodesFromFldConfig(parsed?.config || {});
+      } catch {
+        cachedThumbnailLineworkCodes = new Set();
+      }
+      return cachedThumbnailLineworkCodes;
+    }
+
     function buildPointGroupsFromRecords(recordsSorted = []){
       const byCode = new Map();
       for (const record of recordsSorted){
@@ -1172,14 +1198,12 @@
       return [...byCode.values()]
         .map((group)=>{
           const lineworks = buildLineworkSegments(group.points);
-          const subgroups = lineworks
-            .filter((linework)=>linework.segments.length > 1)
-            .map((linework, index)=>({
-              id: `${group.codeKey}-${linework.baseCode}-${index}`,
-              label: `${linework.baseCode} (${linework.segments.length} lines)`,
-              linework,
-              thumbnail: buildLineworkThumbnailDataUrl(linework.segments),
-            }));
+          const subgroups = lineworks.flatMap((linework)=>linework.segments.map((segment, index)=>({
+            id: `${group.codeKey}-${linework.baseCode}-${index}`,
+            label: `${linework.baseCode} line ${index + 1}`,
+            segments: [segment],
+            thumbnail: buildLineworkThumbnailDataUrl([segment]),
+          })));
           return {
             ...group,
             thumbnail: lineworks.length ? buildLineworkThumbnailDataUrl(lineworks.flatMap((item)=>item.segments)) : "",
@@ -1252,11 +1276,12 @@
         groupButton.className = "pointGroupButton";
         groupButton.dataset.selectionId = groupSelectionId;
         const thumb = group.thumbnail ? `<img class="pointGroupThumb" src="${group.thumbnail}" alt="${escapeHtml(group.codeLabel)} line preview" />` : "";
-        groupButton.innerHTML = `<span><strong>${escapeHtml(group.codeLabel)}</strong><br/><span class="pointGroupMeta">${group.points.length} pts · ${group.lineworks.length} line code(s)</span></span>${thumb}`;
+        const totalLines = group.lineworks.reduce((sum, item)=>sum + (Array.isArray(item.segments) ? item.segments.length : 0), 0);
+        groupButton.innerHTML = `<span><strong>${escapeHtml(group.codeLabel)}</strong><br/><span class="pointGroupMeta">${group.points.length} pts · ${totalLines} line(s)</span></span>${thumb}`;
         groupButton.addEventListener("click", ()=>{
-          const firstLinework = group.lineworks[0];
-          if (!firstLinework) return selectPointGroupSelection(null);
-          selectPointGroupSelection({ id: groupSelectionId, label: `group ${group.codeLabel}`, segments: firstLinework.segments });
+          const allSegments = group.lineworks.flatMap((linework)=>linework.segments || []);
+          if (!allSegments.length) return selectPointGroupSelection(null);
+          selectPointGroupSelection({ id: groupSelectionId, label: `group ${group.codeLabel}`, segments: allSegments });
         });
         card.appendChild(groupButton);
 
@@ -1270,7 +1295,7 @@
             subgroupButton.dataset.selectionId = subgroup.id;
             subgroupButton.innerHTML = `<span>${escapeHtml(subgroup.label)}</span>${subgroup.thumbnail ? `<img class="pointGroupThumb" src="${subgroup.thumbnail}" alt="${escapeHtml(subgroup.label)} line preview" />` : ""}`;
             subgroupButton.addEventListener("click", ()=>{
-              selectPointGroupSelection({ id: subgroup.id, label: `subgroup ${subgroup.label}`, segments: subgroup.linework.segments });
+              selectPointGroupSelection({ id: subgroup.id, label: `subgroup ${subgroup.label}`, segments: subgroup.segments });
             });
             children.appendChild(subgroupButton);
           });
