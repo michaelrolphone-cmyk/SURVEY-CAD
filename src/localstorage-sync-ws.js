@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { lineforgeCollabInternals } from './lineforge-collab.js';
 
-const { decodeFrame, encodeTextFrame, createWebSocketAccept } = lineforgeCollabInternals;
+const { decodeNextFrame, encodeTextFrame, createWebSocketAccept } = lineforgeCollabInternals;
 
 export function createLocalStorageSyncWsService({ store }) {
   const clients = new Map();
@@ -19,19 +19,24 @@ export function createLocalStorageSyncWsService({ store }) {
     clients.forEach((client) => send(client, payload));
   }
 
+  function isLikelyJsonPayload(payload) {
+    if (!Buffer.isBuffer(payload) || payload.length === 0) return false;
+    let idx = 0;
+    while (idx < payload.length && payload[idx] <= 0x20) idx += 1;
+    if (idx >= payload.length) return false;
+    const firstByte = payload[idx];
+    return firstByte === 0x7b || firstByte === 0x5b;
+  }
+
   function handleUpgrade(req, socket, head = Buffer.alloc(0)) {
     const url = new URL(req.url || '/', 'http://localhost');
     const pathname = url.pathname || '/';
-    const PATH = "/ws/localstorage-sync";
     const isLocalStorageSyncPath = pathname === '/ws/localstorage-sync'
       || pathname === '/ws/localstorage-sync/'
       || pathname.endsWith('/ws/localstorage-sync')
       || pathname.endsWith('/ws/localstorage-sync/');
     if (!isLocalStorageSyncPath) return false;
 
-    if (url.pathname.replace(/\/+$/, '') !== PATH.replace(/\/+$/, '')) {
-      return false; // don't touch the socket
-    }
     // if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
     //   socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
     //   socket.destroy();
@@ -46,7 +51,7 @@ export function createLocalStorageSyncWsService({ store }) {
     }
 
     const clientId = randomUUID();
-    const client = { id: clientId, socket };
+    const client = { id: clientId, socket, buffer: Buffer.alloc(0) };
     clients.set(clientId, client);
 
     socket.write([
@@ -63,29 +68,30 @@ export function createLocalStorageSyncWsService({ store }) {
         socket.end();
       });
 
-    if (head.length) {
-      const frame = decodeFrame(head);
-      if (frame?.opcode === 0x8) socket.end();
-    }
+    client.buffer = head.length ? Buffer.from(head) : Buffer.alloc(0);
 
     socket.on('data', (chunk) => {
-      const frame = decodeFrame(chunk);
-      if (!frame) return;
-      if (frame.opcode === 0x8) {
-        socket.end();
-        return;
-      }
-      if (frame.opcode !== 0x1) return;
+      client.buffer = client.buffer.length ? Buffer.concat([client.buffer, chunk]) : Buffer.from(chunk);
+      while (client.buffer.length) {
+        const frame = decodeNextFrame(client.buffer);
+        if (!frame) break;
+        client.buffer = client.buffer.subarray(frame.consumed);
+        if (frame.opcode === 0x8) {
+          socket.end();
+          return;
+        }
+        if (frame.opcode !== 0x1) continue;
 
-      let message;
-      try {
-        message = JSON.parse(frame.payload.toString('utf8'));
-      } catch (e) {
-        console.error(e);
-        return;
-      }
+        if (!isLikelyJsonPayload(frame.payload)) continue;
 
-      Promise.resolve((async () => {
+        let message;
+        try {
+          message = JSON.parse(frame.payload.toString('utf8'));
+        } catch {
+          continue;
+        }
+
+        Promise.resolve((async () => {
         if (message?.type === 'sync-differential-batch') {
           const diffs = Array.isArray(message.diffs) ? message.diffs : [];
           if (!diffs.length) {
@@ -140,9 +146,10 @@ export function createLocalStorageSyncWsService({ store }) {
             checksum: result.state.checksum,
           },
         });
-      })()).catch(() => {
-        socket.end();
-      });
+        })()).catch(() => {
+          socket.end();
+        });
+      }
     });
 
     socket.on('close', () => {
