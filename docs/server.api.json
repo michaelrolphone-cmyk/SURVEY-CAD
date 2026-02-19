@@ -2416,6 +2416,62 @@
           }
         }
       }
+    },
+    "/api/project-files/pdf-thumbnail": {
+      "get": {
+        "tags": [
+          "Project Files"
+        ],
+        "summary": "Get or trigger generation of a cached PDF page-1 thumbnail.",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Relative source URL for a PDF endpoint (/api/project-files/download... or /api/ros-pdf...)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PNG thumbnail image (1024px width target).",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Thumbnail generation in progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters."
+          },
+          "405": {
+            "description": "Method not allowed."
+          }
+        }
+      }
     }
   },
   "components": {
