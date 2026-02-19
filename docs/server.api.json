@@ -2467,6 +2467,9 @@
           "400": {
             "description": "Invalid request parameters."
           },
+          "404": {
+            "description": "Source PDF file was not found."
+          },
           "405": {
             "description": "Method not allowed."
           },

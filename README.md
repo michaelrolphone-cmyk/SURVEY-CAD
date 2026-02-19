@@ -218,7 +218,7 @@ PointForge group cards now render mapped FLD symbol SVGs for symbol-type code gr
 - `GET /api/projects/:projectId/point-files`
 - `GET /api/projects/:projectId/point-files/:pointFileId`
 - `GET /api/projects/:projectId/drawings/:drawingId`
-- `GET /api/project-files/pdf-thumbnail?source=<pdf-url>` – triggers deduplicated thumbnail generation and returns: `202` while work is in progress, `200 image/png` when the cached 1024px-wide page-1 thumbnail is ready, or `502` with `{ status: "failed" }` when generation fails (cooldown before automatic retry). `source` may be a relative API URL (`/api/project-files/download...`, `/api/ros-pdf...`) or an absolute `http(s)` URL targeting either API path.
+- `GET /api/project-files/pdf-thumbnail?source=<pdf-url>` – triggers deduplicated thumbnail generation and returns: `202` while work is in progress, `200 image/png` when the cached 1024px-wide page-1 thumbnail is ready, or `404` with `{ status: "failed" }` when the source PDF no longer exists (`/api/project-files/download` only), or `502` with `{ status: "failed" }` for renderer/remote-fetch failures (cooldown before automatic retry). `source` may be a relative API URL (`/api/project-files/download...`, `/api/ros-pdf...`) or an absolute `http(s)` URL targeting either API path.
 
 ### CLI/test commands for this feature
 
