@@ -1155,6 +1155,7 @@ LineSmith now resolves sequential `END`/`CLO` directives from the nearest valid 
 ## EvidenceDesk file CRUD API
 
 EvidenceDesk uploads now support Redis-backed CRUD operations and folder-level listing.
+EvidenceDesk now shows live upload progress in the upload status line (including per-file counters and percent complete when binary files are posted) so users get immediate feedback after starting an upload.
 
 ### API endpoints
 - `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`); returns `413` when declared payload size exceeds 50 MB.

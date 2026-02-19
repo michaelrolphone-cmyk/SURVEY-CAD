@@ -16,6 +16,7 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /reference:\s*\{[\s\S]*type:\s*'project-point-file'/, 'EvidenceDesk point-file rows should be API-backed resources');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\([^,]+,\s*pointFileId\),\s*\{ method: 'DELETE' \}\)/, 'EvidenceDesk should delete point files through API endpoint');
   assert.match(html, /pointFileState:\s*\{\s*text,\s*exportFormat:\s*'csv'\s*\}/, 'EvidenceDesk upload should post point file state payloads to API');
+  assert.match(html, /context\.setUploadStatus\(`Uploading point file \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\}…`\)/, 'EvidenceDesk should show per-file progress while point files upload.');
   assert.match(html, /async function\s+renameResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a rename helper for project resources');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
@@ -25,6 +26,8 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /renderPointFileThumbnailDataUrl\(text,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render point file thumbnails through the shared client library.');
   assert.match(html, /className\s*=\s*'point-file-preview-thumb'/, 'EvidenceDesk should render point file thumbnail images in file rows.');
   assert.match(html, /querySelector\('\.file-preview-slot'\)\?\.replaceChildren\(thumb\)/, 'EvidenceDesk should place point file thumbnails in the dedicated preview slot before file names.');
+  assert.match(html, /function\s+uploadFileViaXhr\(formData,\s*onProgress\)\s*\{[\s\S]*xhr\.upload\.addEventListener\('progress'/, 'EvidenceDesk should use XHR upload progress events for project file uploads.');
+  assert.match(html, /Uploading \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\} \(\$\{progress\}%\)/, 'EvidenceDesk should include percentage progress updates for uploaded files.');
   assert.match(html, /const\s+canLaunchPointForge\s*=\s*folder\.key\s*===\s*'point-files'[\s\S]*isPointFileFormat/, 'EvidenceDesk should gate PointForge launch behavior behind point-file format checks.');
 });
 
