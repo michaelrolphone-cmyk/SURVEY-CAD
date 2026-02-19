@@ -117,6 +117,17 @@
       vertical-align:top;
     }
     .tbl th{color:var(--muted);font-size:.85rem;text-align:left;font-weight:650}
+    .evidence-thumb{
+      width:96px;
+      height:56px;
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:10px;
+      object-fit:cover;
+      background:#0b1120;
+      display:block;
+    }
+    .evidence-thumb-wrap{display:flex;align-items:center;gap:10px}
+    .evidence-thumb-meta{min-width:0}
     .toast{
       position:fixed;right:16px;bottom:16px;
       width:min(420px, calc(100vw - 32px));
@@ -233,6 +244,78 @@
     return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"2-digit", hour:"2-digit", minute:"2-digit" });
   };
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const evidenceThumbnailCache = new Map();
+  let pointThumbClientPromise = null;
+
+  function parseReferenceUrlFromEvidence(ev = {}) {
+    const notes = String(ev?.notes || '');
+    const match = notes.match(/(?:^|\n)Reference:\s*(\S+)/i);
+    return match ? match[1].trim() : '';
+  }
+
+  function classifyEvidenceThumbnail(ev = {}) {
+    const tags = Array.isArray(ev?.tags) ? ev.tags.map((tag) => String(tag || '')) : [];
+    if (tags.some((tag) => tag.startsWith('project-source:drawing:'))) return 'drawing';
+    if (tags.some((tag) => tag.startsWith('project-source:point-file:'))) return 'point-file';
+    return '';
+  }
+
+  function buildThumbnailKey(ev = {}) {
+    const type = classifyEvidenceThumbnail(ev);
+    if (!type) return '';
+    const refUrl = parseReferenceUrlFromEvidence(ev);
+    return `${ev.id || ''}:${type}:${refUrl}`;
+  }
+
+  async function getPointThumbnailClient() {
+    if (window.SurveyCadPointThumbnailClient) return window.SurveyCadPointThumbnailClient;
+    if (!pointThumbClientPromise) {
+      pointThumbClientPromise = import('./src/point-thumbnail-client.js')
+        .then((mod) => mod.default || mod)
+        .catch(() => null);
+    }
+    return pointThumbClientPromise;
+  }
+
+  async function resolveEvidenceThumbnail(ev = {}) {
+    const kind = classifyEvidenceThumbnail(ev);
+    const refUrl = parseReferenceUrlFromEvidence(ev);
+    if (!kind || !refUrl || !state.activeId) return '';
+    const cacheKey = buildThumbnailKey(ev);
+    if (cacheKey && evidenceThumbnailCache.has(cacheKey)) return evidenceThumbnailCache.get(cacheKey);
+
+    try {
+      const payload = await apiRequest('GET', refUrl);
+      const thumbClient = await getPointThumbnailClient();
+      if (!thumbClient) return '';
+
+      let dataUrl = '';
+      if (kind === 'drawing') {
+        const points = Array.isArray(payload?.drawing?.currentState?.points) ? payload.drawing.currentState.points : [];
+        dataUrl = thumbClient.renderLineworkThumbnailDataUrl(points);
+      } else if (kind === 'point-file') {
+        const text = String(payload?.pointFile?.currentState?.text || '');
+        dataUrl = thumbClient.renderPointFileThumbnailDataUrl(text);
+      }
+
+      if (cacheKey && dataUrl) evidenceThumbnailCache.set(cacheKey, dataUrl);
+      return dataUrl;
+    } catch {
+      return '';
+    }
+  }
+
+  async function hydrateEvidenceThumbnails(scope = document) {
+    const nodes = $$('[data-evidence-thumb-id]', scope);
+    await Promise.all(nodes.map(async (node) => {
+      const evidenceId = node.getAttribute('data-evidence-thumb-id');
+      if (!evidenceId) return;
+      const ev = (state.evidence || []).find((item) => item.id === evidenceId);
+      if (!ev) return;
+      const src = await resolveEvidenceThumbnail(ev);
+      if (src) node.setAttribute('src', src);
+    }));
+  }
 
   function toast(title, msg, kind=""){
     elToastT.textContent = title;
@@ -743,9 +826,15 @@
       const att = ev.attachment;
       const attLabel = att ? `${esc(att.name)} · ${(att.size||0).toLocaleString()} bytes` : "—";
       const downloadUrl = att?.url || urlFor(`/casefiles/${state.activeId}/evidence/${ev.id}/attachment`);
+      const thumbKind = classifyEvidenceThumbnail(ev);
       return `
         <tr>
-          <td><div class="mono small">${esc(ev.type)}</div></td>
+          <td>
+            <div class="evidence-thumb-wrap">
+              ${thumbKind ? `<img class="evidence-thumb" data-evidence-thumb-id="${esc(ev.id)}" alt="${esc(ev.title)} thumbnail" />` : ''}
+              <div class="evidence-thumb-meta"><div class="mono small">${esc(ev.type)}</div></div>
+            </div>
+          </td>
           <td>
             <div><b>${esc(ev.title)}</b></div>
             <div class="small muted">${esc(ev.source||"")} ${ev.date?("· "+esc(ev.date)):""}</div>
@@ -819,7 +908,7 @@
               ${items.length ? `
                 <table class="tbl">
                   <thead><tr>
-                    <th style="width:120px;">Type</th>
+                    <th style="width:160px;">Type</th>
                     <th>Evidence</th>
                     <th style="width:220px;">Attachment</th>
                     <th style="width:320px;text-align:right;">Actions</th>
@@ -1162,13 +1251,21 @@ N 00°00'27&quot; W 267.69
       return `<div class="pad"><div class="card"><div class="bd">Loading outputs...</div></div></div>`;
     }
 
-    const evRows = (pkg.evidenceRegister || []).map(ev => `
+    const evRows = (pkg.evidenceRegister || []).map(ev => {
+      const thumbKind = classifyEvidenceThumbnail(ev);
+      return `
       <tr>
-        <td class="mono small">${esc(ev.type)}</td>
+        <td>
+          <div class="evidence-thumb-wrap">
+            ${thumbKind ? `<img class="evidence-thumb" data-evidence-thumb-id="${esc(ev.id)}" alt="${esc(ev.title)} thumbnail" />` : ''}
+            <div class="evidence-thumb-meta"><div class="mono small">${esc(ev.type)}</div></div>
+          </div>
+        </td>
         <td><b>${esc(ev.title)}</b><div class="small muted">${esc(ev.source||"")} ${ev.date?("· "+esc(ev.date)):""}</div></td>
         <td class="small muted">${(ev.tags||[]).join(", ")}</td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
 
     const callRows = (pkg.includedCalls || []).map((c,i) => `
       <tr>
@@ -1212,7 +1309,7 @@ N 00°00'27&quot; W 267.69
             <div class="hd">Evidence Register</div>
             <div class="bd">
               <table class="tbl">
-                <thead><tr><th style="width:120px;">Type</th><th>Evidence</th><th style="width:220px;">Tags</th></tr></thead>
+                <thead><tr><th style="width:160px;">Type</th><th>Evidence</th><th style="width:220px;">Tags</th></tr></thead>
                 <tbody>${evRows}</tbody>
               </table>
             </div>
@@ -1316,6 +1413,7 @@ N 00°00'27&quot; W 267.69
     if (state.tab === "evidence"){
       const btn = $("#saveEvBtn");
       if (btn) btn.addEventListener("click", saveEvidenceFromForm);
+      hydrateEvidenceThumbnails(elMain);
     }
 
     // Extract tab
@@ -1348,6 +1446,7 @@ N 00°00'27&quot; W 267.69
       if (r) r.addEventListener("click", async () => { await ensurePrintable(true); render(); });
       const p = $("#printNowBtn");
       if (p) p.addEventListener("click", () => setTimeout(()=>window.print(), 50));
+      hydrateEvidenceThumbnails(elMain);
     }
   }
 
