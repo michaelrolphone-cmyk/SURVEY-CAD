@@ -5233,7 +5233,6 @@ function paintBackground(ctx, w, h){
       const { tokensUpper, commands } = parseFieldToFinishCommands(point.code);
       const tokenSet = new Set(tokensUpper);
       const lineworkCodes = fieldToFinishRuleState.lineworkCodes;
-      const curveLineworkCodes = extractCurveLineworkCodes(point.code);
 
       const explicitActions = new Set();
       for (const cmd of commands) {
@@ -5264,11 +5263,7 @@ function paintBackground(ctx, w, h){
 
       const pointImplicitSequenceCodes = [...tokenSet]
         .map((token) => resolveLineworkSequenceKey(token, explicitSequentialBaseCodes))
-        .filter((token, index, arr) => token && arr.indexOf(token) === index)
-        .filter((token) => {
-          const tokenBaseCode = splitLineworkSequenceCodeToken(token).baseCode;
-          return !curveLineworkCodes.has(token) && !curveLineworkCodes.has(tokenBaseCode);
-        });
+        .filter((token, index, arr) => token && arr.indexOf(token) === index);
 
       const hasGlobalEndDirective = tokenSet.has("END") && !commands.some((cmd) => cmd.type === "sequential-line");
       if (hasGlobalEndDirective) activeSequences.clear();
