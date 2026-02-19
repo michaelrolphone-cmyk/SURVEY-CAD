@@ -539,17 +539,47 @@ async function ensureBew({ existingRedis = null } = {}) {
 
   _bewPromise = (async () => {
     const redisUrl = findHerokuRedisUrl();
+    if (!isIoredisLike(existingRedis) && !redisUrl) {
+      throw new Error('Missing Heroku Redis URL env (REDIS_URL / REDIS_TLS_URL / REDISCLOUD_URL).');
+    }
 
-    const redis = (() => {
-        if (!redisUrl) {
-          throw new Error("Missing Heroku Redis URL env (REDIS_URL / REDIS_TLS_URL / REDISCLOUD_URL).");
+    const maxWaitMs = Math.max(Number(process.env.BEW_REDIS_CONNECT_MAX_WAIT_MS) || Number(process.env.REDIS_CONNECT_MAX_WAIT_MS) || 15000, 0);
+    const retryDelayMs = Math.max(Number(process.env.BEW_REDIS_CONNECT_RETRY_DELAY_MS) || Number(process.env.REDIS_CONNECT_RETRY_DELAY_MS) || 750, 50);
+
+    let redis = null;
+    let attempts = 0;
+    let lastError = null;
+    const startedAt = Date.now();
+
+    if (isIoredisLike(existingRedis)) {
+      redis = existingRedis;
+    } else {
+      while ((Date.now() - startedAt) <= maxWaitMs) {
+        attempts += 1;
+        const candidate = createBewRedisClient({ url: redisUrl });
+        try {
+          await candidate.connect(); // ensures listeners exist before TLS handshake
+          redis = candidate;
+          break;
+        } catch (err) {
+          lastError = err;
+          if (typeof candidate.disconnect === 'function') {
+            await candidate.disconnect().catch(() => {});
+          } else if (typeof candidate.quit === 'function') {
+            await candidate.quit().catch(() => {});
+          }
+
+          if ((Date.now() - startedAt) >= maxWaitMs) {
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
         }
-        return createBewRedisClient({ url: redisUrl });
-      })();
+      }
 
-    // only connect if we created it (or if it's ioredis and not connected yet)
-    if (!isIoredisLike(existingRedis)) {
-      await redis.connect(); // ensures listeners exist before TLS handshake
+      if (!redis) {
+        const msg = lastError?.message || String(lastError || 'unknown redis connection error');
+        throw new Error(`Unable to initialize BEW Redis after ${attempts} attempt(s): ${msg}`);
+      }
     }
 
     const StoreCtor =
@@ -610,7 +640,7 @@ async function ensureBew({ existingRedis = null } = {}) {
     const HttpError = BewStore.HttpError || null;
 
     _bewRuntime = {
-      redisUrl,
+      redisUrl: redisUrl || null,
       redis,
       store,
       HttpError,
@@ -626,7 +656,12 @@ async function ensureBew({ existingRedis = null } = {}) {
     return _bewRuntime;
   })();
 
-  return _bewPromise;
+  try {
+    return await _bewPromise;
+  } catch (err) {
+    _bewPromise = null;
+    throw err;
+  }
 }
 
 

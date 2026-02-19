@@ -52,6 +52,12 @@ test('WORKBENCH boot handles initData API failures without uncaught promise reje
   assert.match(html, /async function boot\(\)\{[\s\S]*try\{[\s\S]*await initData\(\);[\s\S]*\}catch\(err\)\{[\s\S]*setApiHealthState\("ERR"\);[\s\S]*toast\("Error", err\?\.message \|\| String\(err\), "bad"\);[\s\S]*render\(\);[\s\S]*\}/);
 });
 
+test('WORKBENCH initData degrades gracefully when casefile listing API is unavailable', async () => {
+  const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
+  assert.match(html, /let casefilesLoaded = false;[\s\S]*try\{[\s\S]*await refreshCasefiles\(\);[\s\S]*casefilesLoaded = true;[\s\S]*\}catch\(err\)\{[\s\S]*Casefiles API is temporarily unavailable[\s\S]*\}/);
+  assert.match(html, /if \(!casefilesLoaded\)\{[\s\S]*await createAndActivateFallbackCasefile\(\);[\s\S]*ensureTabData\(state\.tab\);[\s\S]*render\(\);[\s\S]*return;[\s\S]*\}/);
+});
+
 test('WORKBENCH render guards against missing active casefile to avoid null meta access', async () => {
   const html = await readFile(path.resolve(__dirname, '../WORKBENCH.html'), 'utf8');
   assert.match(html, /if \(!haveActive\(\)\)\{[\s\S]*No active casefile[\s\S]*return;/);

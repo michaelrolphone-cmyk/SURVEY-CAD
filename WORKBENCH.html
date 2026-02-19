@@ -2153,7 +2153,15 @@ N 00°00'27&quot; W 267.69
       }
     }
 
-    await refreshCasefiles();
+    let casefilesLoaded = false;
+    try{
+      await refreshCasefiles();
+      casefilesLoaded = true;
+    }catch(err){
+      state.casefiles = [];
+      toast("Warning", "Casefiles API is temporarily unavailable. Retrying may restore project data.", "warn");
+      console.warn("[WORKBENCH] casefile list bootstrap failed", err);
+    }
 
     if (activeProjectId){
       const linkedExists = pinnedCasefileId && state.casefiles.some(x=>x.id===pinnedCasefileId);
@@ -2161,7 +2169,13 @@ N 00°00'27&quot; W 267.69
         try{
           const created = await api.createProjectCasefile(activeProjectId, {});
           pinnedCasefileId = resolveCasefileId(created) || pinnedCasefileId;
-          await refreshCasefiles();
+          try{
+            await refreshCasefiles();
+            casefilesLoaded = true;
+          }catch(err){
+            state.casefiles = [];
+            console.warn("[WORKBENCH] casefile refresh after project create failed", err);
+          }
         }catch(err){
           toast("Warning", "Could not create project-linked casefile. Creating a local casefile instead.", "warn");
           console.warn("[WORKBENCH] project-linked casefile bootstrap failed", err);
@@ -2182,7 +2196,13 @@ N 00°00'27&quot; W 267.69
           cf = resolveCasefileId(synced) ? synced : cf;
         }
         const createdId = resolveCasefileId(cf);
-        await refreshCasefiles();
+        try{
+          await refreshCasefiles();
+          casefilesLoaded = true;
+        }catch(err){
+          state.casefiles = [];
+          console.warn("[WORKBENCH] casefile refresh after project fallback create failed", err);
+        }
         const activated = await ensureActiveCasefile([createdId, pinnedCasefileId, state.casefiles?.[0]?.id || ""]);
         if (!activated){
           throw new Error("Unable to create or activate a project-linked casefile.");
@@ -2192,8 +2212,25 @@ N 00°00'27&quot; W 267.69
 
       cf = await api.createCasefile("New Boundary Casefile", "Idaho", "", true);
       const createdId = resolveCasefileId(cf);
-      await refreshCasefiles();
+      try{
+        await refreshCasefiles();
+        casefilesLoaded = true;
+      }catch(err){
+        state.casefiles = [];
+        console.warn("[WORKBENCH] casefile refresh after local fallback create failed", err);
+      }
       return await ensureActiveCasefile([createdId, state.casefiles?.[0]?.id || ""]);
+    }
+
+    if (!casefilesLoaded){
+      try{
+        await createAndActivateFallbackCasefile();
+      }catch(err){
+        console.warn("[WORKBENCH] fallback bootstrap unavailable while casefiles API is down", err);
+      }
+      await ensureTabData(state.tab);
+      render();
+      return;
     }
 
     if (!state.casefiles.length){
