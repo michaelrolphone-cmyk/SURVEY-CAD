@@ -1,8 +1,10 @@
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
-import { access, readdir, readFile, stat } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { access, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import SurveyCadClient from './survey-api.js';
 import { createRosOcrApp } from './ros-ocr-api.js';
 import { listApps } from './app-catalog.js';
@@ -87,6 +89,44 @@ const MIME_TYPES = {
 
 const SMALL_ASSET_CACHE_MAX_BYTES = 4 * 1024;
 const smallStaticAssetCache = new Map();
+const PDF_THUMBNAIL_TARGET_WIDTH = 1024;
+const PDF_THUMBNAIL_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+function runCommand(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], ...opts });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${cmd} exited with code ${code}${stderr ? `: ${stderr}` : ''}`));
+    });
+  });
+}
+
+async function renderPdfThumbnailFromBuffer(pdfBuffer, { width = PDF_THUMBNAIL_TARGET_WIDTH } = {}) {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'surveycad-pdf-thumb-'));
+  const pdfPath = path.join(tempDir, 'input.pdf');
+  const pngPrefix = path.join(tempDir, 'page');
+  const pageOnePng = `${pngPrefix}-1.png`;
+  try {
+    await writeFile(pdfPath, pdfBuffer);
+    await runCommand('pdftoppm', ['-f', '1', '-singlefile', '-png', pdfPath, pngPrefix]);
+    const sharp = (await import('sharp')).default;
+    return await sharp(pageOnePng)
+      .resize({ width, withoutEnlargement: true })
+      .png()
+      .toBuffer();
+  } finally {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -749,6 +789,7 @@ export function createSurveyServer({
   staticMapFetcher = fetch,
   localStorageSyncStore = new LocalStorageSyncStore(),
   evidenceDeskFileStore,
+  pdfThumbnailRenderer = renderPdfThumbnailFromBuffer,
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
@@ -766,6 +807,8 @@ export function createSurveyServer({
   });
 
   const pointforgeExportStore = new Map();
+  const inMemoryPdfThumbnailCache = new Map();
+  const inFlightPdfThumbnailGenerations = new Map();
   let evidenceDeskStorePromise = evidenceDeskFileStore
     ? Promise.resolve({ store: evidenceDeskFileStore, redisClient: null, type: 'custom' })
     : null;
@@ -775,6 +818,66 @@ export function createSurveyServer({
       evidenceDeskStorePromise = createEvidenceDeskFileStore();
     }
     return evidenceDeskStorePromise;
+  }
+
+  function buildPdfThumbnailCacheKey(sourceUrl = '') {
+    const hash = createHash('sha256').update(String(sourceUrl || '')).digest('hex');
+    return `surveycad:pdf-thumb:v1:${hash}`;
+  }
+
+  async function readCachedPdfThumbnail(cacheKey, runtime) {
+    const redisClient = runtime?.redisClient;
+    if (redisClient && typeof redisClient.get === 'function') {
+      const encoded = await redisClient.get(cacheKey);
+      if (!encoded) return null;
+      return Buffer.from(encoded, 'base64');
+    }
+    return inMemoryPdfThumbnailCache.get(cacheKey) || null;
+  }
+
+  async function writeCachedPdfThumbnail(cacheKey, pngBuffer, runtime) {
+    const redisClient = runtime?.redisClient;
+    if (redisClient && typeof redisClient.set === 'function') {
+      await redisClient.set(cacheKey, Buffer.from(pngBuffer).toString('base64'), { EX: PDF_THUMBNAIL_CACHE_TTL_SECONDS });
+      return;
+    }
+    inMemoryPdfThumbnailCache.set(cacheKey, Buffer.from(pngBuffer));
+  }
+
+  function parsePdfThumbnailSource(urlObj) {
+    const source = String(urlObj.searchParams.get('source') || '').trim();
+    if (!source) throw new Error('source query parameter is required.');
+    if (!source.startsWith('/api/project-files/download') && !source.startsWith('/api/ros-pdf')) {
+      throw new Error('source must target /api/project-files/download or /api/ros-pdf.');
+    }
+    return source;
+  }
+
+  async function fetchPdfSourceBuffer(sourceUrl, runtime) {
+    const sourceObj = new URL(sourceUrl, 'http://localhost');
+    if (sourceObj.pathname === '/api/project-files/download') {
+      const projectId = sourceObj.searchParams.get('projectId');
+      const folderKey = sourceObj.searchParams.get('folderKey');
+      const requestedFileName = sourceObj.searchParams.get('fileName');
+      if (!projectId || !folderKey || !requestedFileName) throw new Error('Invalid project file download source URL.');
+      const file = await runtime.store.getFile(projectId, folderKey, path.basename(requestedFileName));
+      if (!file?.buffer) throw new Error('PDF source file not found.');
+      return file.buffer;
+    }
+
+    if (sourceObj.pathname === '/api/ros-pdf') {
+      const remoteUrl = parseRemotePdfUrl(sourceObj);
+      const pdfResponse = await fetch(remoteUrl, {
+        headers: {
+          Accept: 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.8',
+          'User-Agent': 'SurveyCAD-ProjectBrowser/1.0 (+thumbnail)',
+        },
+      });
+      if (!pdfResponse.ok) throw new Error(`Could not fetch remote PDF for thumbnail generation: HTTP ${pdfResponse.status}`);
+      return Buffer.from(await pdfResponse.arrayBuffer());
+    }
+
+    throw new Error('Unsupported PDF thumbnail source path.');
   }
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
@@ -1721,6 +1824,48 @@ export function createSurveyServer({
         res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.end(file.buffer);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-files/pdf-thumbnail') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+
+        let sourceUrl = '';
+        try {
+          sourceUrl = parsePdfThumbnailSource(urlObj);
+        } catch (error) {
+          sendJson(res, 400, { error: error.message || 'Invalid source query parameter.' });
+          return;
+        }
+
+        const runtime = await resolveEvidenceDeskStore();
+        const cacheKey = buildPdfThumbnailCacheKey(sourceUrl);
+        const cachedPng = await readCachedPdfThumbnail(cacheKey, runtime);
+        if (cachedPng?.length) {
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.end(cachedPng);
+          return;
+        }
+
+        if (!inFlightPdfThumbnailGenerations.has(cacheKey)) {
+          const generationPromise = (async () => {
+            const pdfBuffer = await fetchPdfSourceBuffer(sourceUrl, runtime);
+            const pngBuffer = await pdfThumbnailRenderer(pdfBuffer, { width: PDF_THUMBNAIL_TARGET_WIDTH });
+            await writeCachedPdfThumbnail(cacheKey, pngBuffer, runtime);
+          })()
+            .catch(() => {})
+            .finally(() => {
+              inFlightPdfThumbnailGenerations.delete(cacheKey);
+            });
+          inFlightPdfThumbnailGenerations.set(cacheKey, generationPromise);
+        }
+
+        sendJson(res, 202, { status: 'generating', source: sourceUrl });
         return;
       }
 

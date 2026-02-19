@@ -218,6 +218,7 @@ PointForge group cards now render mapped FLD symbol SVGs for symbol-type code gr
 - `GET /api/projects/:projectId/point-files`
 - `GET /api/projects/:projectId/point-files/:pointFileId`
 - `GET /api/projects/:projectId/drawings/:drawingId`
+- `GET /api/project-files/pdf-thumbnail?source=<relative-pdf-url>` – triggers deduplicated thumbnail generation and returns cached 1024px-wide page-1 PNG previews once ready.
 
 ### CLI/test commands for this feature
 
