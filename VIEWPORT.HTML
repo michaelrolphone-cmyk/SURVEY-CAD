@@ -4742,10 +4742,21 @@
       parse(_raw, tokensUpper) {
         const commands = [];
         const directives = new Set(["BEG", "END", "CLO"]);
+        const curveMarkers = new Set(["PC", "PT"]);
         for (let i = 0; i < tokensUpper.length - 1; i++) {
-          const baseCode = tokensUpper[i];
           const action = tokensUpper[i + 1];
-          if (!baseCode || directives.has(baseCode) || !directives.has(action)) continue;
+          if (!directives.has(action)) continue;
+          let baseCode = tokensUpper[i];
+          if (!baseCode || directives.has(baseCode)) continue;
+          if (curveMarkers.has(baseCode)) {
+            for (let j = i - 1; j >= 0; j--) {
+              const candidate = tokensUpper[j];
+              if (!candidate || directives.has(candidate) || curveMarkers.has(candidate)) continue;
+              baseCode = candidate;
+              break;
+            }
+          }
+          if (!baseCode || directives.has(baseCode) || curveMarkers.has(baseCode)) continue;
           commands.push({ type: "sequential-line", baseCode, action });
         }
         return commands;
@@ -5112,6 +5123,86 @@
   function pointHasCurveEndToken(pointCode = "") {
     const { tokensUpper } = parseFieldToFinishCommands(pointCode);
     return tokensUpper.includes("PT");
+  }
+
+  function buildFieldToFinishCurveSequences() {
+    const pointsInOrder = [...points.values()].sort((a, b) => {
+      const aNum = Number(a.num);
+      const bNum = Number(b.num);
+      if (Number.isFinite(aNum) && Number.isFinite(bNum) && aNum !== bNum) return aNum - bNum;
+      return a.id - b.id;
+    });
+
+    const sequences = [];
+    let activeCurvePointIds = null;
+    for (const point of pointsInOrder) {
+      if (pointHasCurveStartToken(point.code)) {
+        activeCurvePointIds = [point.id];
+        continue;
+      }
+      if (!activeCurvePointIds) continue;
+      activeCurvePointIds.push(point.id);
+      if (pointHasCurveEndToken(point.code)) {
+        if (activeCurvePointIds.length >= 3) {
+          sequences.push({
+            layerId: points.get(activeCurvePointIds[0])?.layerId || point.layerId,
+            pointIds: [...activeCurvePointIds],
+          });
+        }
+        activeCurvePointIds = null;
+      }
+    }
+    return sequences;
+  }
+
+  function computeThreePointArc(startPoint, midPoint, endPoint) {
+    const x1 = Number(startPoint?.x);
+    const y1 = Number(startPoint?.y);
+    const x2 = Number(midPoint?.x);
+    const y2 = Number(midPoint?.y);
+    const x3 = Number(endPoint?.x);
+    const y3 = Number(endPoint?.y);
+    if (![x1, y1, x2, y2, x3, y3].every(Number.isFinite)) return null;
+
+    const determinant = 2 * ((x1 * (y2 - y3)) + (x2 * (y3 - y1)) + (x3 * (y1 - y2)));
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-9) return null;
+
+    const x1SqPlusY1Sq = (x1 * x1) + (y1 * y1);
+    const x2SqPlusY2Sq = (x2 * x2) + (y2 * y2);
+    const x3SqPlusY3Sq = (x3 * x3) + (y3 * y3);
+    const cx = (
+      (x1SqPlusY1Sq * (y2 - y3))
+      + (x2SqPlusY2Sq * (y3 - y1))
+      + (x3SqPlusY3Sq * (y1 - y2))
+    ) / determinant;
+    const cy = (
+      (x1SqPlusY1Sq * (x3 - x2))
+      + (x2SqPlusY2Sq * (x1 - x3))
+      + (x3SqPlusY3Sq * (x2 - x1))
+    ) / determinant;
+
+    const radius = Math.hypot(x1 - cx, y1 - cy);
+    if (!Number.isFinite(radius) || radius <= 0) return null;
+
+    const startAngle = Math.atan2(y1 - cy, x1 - cx);
+    const midAngle = Math.atan2(y2 - cy, x2 - cx);
+    const endAngle = Math.atan2(y3 - cy, x3 - cx);
+    const normalizeAngle = (angle) => {
+      let value = angle;
+      while (value < 0) value += Math.PI * 2;
+      while (value >= Math.PI * 2) value -= Math.PI * 2;
+      return value;
+    };
+    const normalizedStart = normalizeAngle(startAngle);
+    const normalizedMid = normalizeAngle(midAngle);
+    const normalizedEnd = normalizeAngle(endAngle);
+    const isAngleBetween = (angle, from, to) => {
+      if (from <= to) return angle >= from && angle <= to;
+      return angle >= from || angle <= to;
+    };
+    const anticlockwise = !isAngleBetween(normalizedMid, normalizedStart, normalizedEnd);
+
+    return { cx, cy, radius, startAngle, endAngle, anticlockwise };
   }
 
   function buildFieldToFinishCurveLineCommands() {
@@ -6322,6 +6413,7 @@
         const layer = getLayerById(ln.layerId);
         if (!layer || layer.visible === false) continue;
         if (!isLayerVisible(a.layerId) || !isLayerVisible(b.layerId)) continue;
+        if (ln.fieldToFinishType === "curve") continue;
         const sa = worldToScreen(a.x,a.y);
         const sb = worldToScreen(b.x,b.y);
         const isCollabLockedLine = lockVisualState.lockedLineIds.has(ln.id);
@@ -6351,6 +6443,38 @@
         if (lineIsEligibleForBearingLabels(ln, a, b)) {
           lineLabelCandidates.push({ a, b, sa, sb });
         }
+      }
+
+      const curveSequences = buildFieldToFinishCurveSequences();
+      for (const sequence of curveSequences) {
+        const layer = getLayerById(sequence.layerId);
+        if (!layer || layer.visible === false) continue;
+        const curvePoints = sequence.pointIds.map((pointId) => points.get(pointId)).filter(Boolean);
+        if (curvePoints.length < 3) continue;
+        ctx.strokeStyle = layer.color;
+        ctx.lineWidth = Math.max(0.5, layer.lineWeight);
+        if (curvePoints.length === 3) {
+          const [startPoint, midPoint, endPoint] = curvePoints;
+          const arc = computeThreePointArc(startPoint, midPoint, endPoint);
+          if (arc) {
+            const center = worldToScreen(arc.cx, arc.cy);
+            const startScreen = worldToScreen(startPoint.x, startPoint.y);
+            const radiusPixels = Math.hypot(startScreen.x - center.x, startScreen.y - center.y);
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, radiusPixels, arc.startAngle, arc.endAngle, arc.anticlockwise);
+            ctx.stroke();
+            continue;
+          }
+        }
+
+        ctx.beginPath();
+        const startScreen = worldToScreen(curvePoints[0].x, curvePoints[0].y);
+        ctx.moveTo(startScreen.x, startScreen.y);
+        for (let i = 1; i < curvePoints.length; i++) {
+          const nextScreen = worldToScreen(curvePoints[i].x, curvePoints[i].y);
+          ctx.lineTo(nextScreen.x, nextScreen.y);
+        }
+        ctx.stroke();
       }
 
       const circleCommands = buildFieldToFinishCircleCommands();
