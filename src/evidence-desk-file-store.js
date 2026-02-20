@@ -127,6 +127,7 @@ function resolveS3ConfigFromEnv(env = process.env) {
     env.EVIDENCE_DESK_S3_FORCE_PATH_STYLE
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_FORCE_PATH_STYLE
     || env.STACKHERO_MINIO_FORCE_PATH_STYLE
+    || (stackheroMinioEndpoint ? 'true' : '')
     || (fromUrl.forcePathStyle ? 'true' : ''),
   ).toLowerCase());
   const sessionToken = String(

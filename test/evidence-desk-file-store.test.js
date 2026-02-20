@@ -257,6 +257,53 @@ test('createEvidenceDeskFileStore supports Stackhero root key env vars', async (
   }
 });
 
+test('createEvidenceDeskFileStore uses path-style requests for Stackhero MinIO host config', async () => {
+  const originalEnv = { ...process.env };
+  const originalFetch = global.fetch;
+  const requests = [];
+
+  process.env.STACKHERO_MINIO_HOST = 'minio.stackhero.network';
+  process.env.STACKHERO_MINIO_ACCESS_KEY = 'access-key';
+  process.env.STACKHERO_MINIO_SECRET_KEY = 'secret-key';
+  process.env.STACKHERO_MINIO_BUCKET = 'survey-foundry';
+  delete process.env.EVIDENCE_DESK_S3_FORCE_PATH_STYLE;
+  delete process.env.AH_S3_OBJECT_STORAGE_STACKHERO_FORCE_PATH_STYLE;
+  delete process.env.STACKHERO_MINIO_FORCE_PATH_STYLE;
+  delete process.env.EVIDENCE_DESK_S3_URL;
+  delete process.env.AH_S3_OBJECT_STORAGE_STACKHERO_URL;
+  delete process.env.AH_S3_OBJECT_STORAGE_STACKHERO;
+
+  global.fetch = async (url) => {
+    requests.push(String(url));
+    return {
+      status: 200,
+      arrayBuffer: async () => new Uint8Array().buffer,
+    };
+  };
+
+  try {
+    const result = await createEvidenceDeskFileStore({ redisClient: null, s3Client: null });
+    assert.equal(result.type, 's3');
+
+    await result.store.createFile({
+      projectId: 'proj-stackhero',
+      folderKey: 'photos',
+      originalFileName: 'stackhero-test.txt',
+      buffer: Buffer.from('hello stackhero', 'utf8'),
+      extension: 'txt',
+      mimeType: 'text/plain',
+    });
+
+    assert.ok(requests.length > 0, 'expected at least one signed S3 request');
+    const uploadRequest = requests.find((entry) => entry.includes('stackhero-test.txt')) || requests[0];
+    assert.match(uploadRequest, /^https:\/\/minio\.stackhero\.network\/survey-foundry\//, 'Stackhero host config should use path-style bucket URL');
+    assert.doesNotMatch(uploadRequest, /^https:\/\/survey-foundry\.minio\.stackhero\.network\//, 'bucket-prefixed host should not be used unless explicitly configured');
+  } finally {
+    global.fetch = originalFetch;
+    process.env = originalEnv;
+  }
+});
+
 test('createEvidenceDeskFileStore falls back to in-memory when redis connect stalls', async () => {
   let quitCalled = false;
   const neverConnectingClient = {
