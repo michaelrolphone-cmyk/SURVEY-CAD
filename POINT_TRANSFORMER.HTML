@@ -1734,6 +1734,29 @@
       return `${dated}${context?.extension || ".txt"}`;
     }
 
+    function normalizePointFileId(value = ""){
+      return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\.[a-z0-9]+$/i, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+
+    function resolveLineSmithLinkedPointFile(context, exportedAt = new Date()){
+      const projectContext = getProjectContext();
+      if (!projectContext.projectId) return null;
+      const exportName = buildEditedExportFileName(context, exportedAt);
+      const fallbackId = normalizePointFileId(exportName);
+      const pointFileId = normalizePointFileId(context?.pointFileId || fallbackId);
+      if (!pointFileId) return null;
+      return {
+        projectId: projectContext.projectId,
+        pointFileId,
+        pointFileName: exportName,
+      };
+    }
+
     function persistPointSetToProjectFile({ kind, text, context, timestamp = new Date() }){
       const projectContext = getProjectContext();
       if (!projectContext.projectId || !text) return null;
@@ -1931,7 +1954,7 @@
     }
 
 
-    function buildLineSmithImportPayload(recordsSorted){
+    function buildLineSmithImportPayload(recordsSorted, options = {}){
       const rows = [["number","x","y","z","code","notes"]];
       const georeferencePoints = [];
       const zone = elZone.value || "west";
@@ -1977,6 +2000,7 @@
       return {
         source: "pointforge-transformer",
         exportedAt: new Date().toISOString(),
+        pointFileLink: options.pointFileLink || null,
         csv: rows.map((row)=>row.map(csvEscape).join(",")).join("\n"),
         georeference: {
           type: "idaho-state-plane-usft",
@@ -2299,10 +2323,12 @@
       const recordsSorted = latestTransformed?.recordsSorted;
       if (!recordsSorted?.length) return;
 
-      const payload = buildLineSmithImportPayload(recordsSorted);
       const originalCsv = elIn.value || "";
       const modifiedCsv = latestOutputText || "";
       const context = ensureImportContextForPaste(true);
+      const exportedAt = new Date();
+      const pointFileLink = resolveLineSmithLinkedPointFile(context, exportedAt);
+      const payload = buildLineSmithImportPayload(recordsSorted, { pointFileLink });
 
       // Persist both original and modified points via API
       const apiBody = {
@@ -2314,6 +2340,7 @@
           sourceLabel: context?.sourceLabel || "",
           sourceType: context?.sourceType || "unknown",
           exportedAt: payload.exportedAt,
+          pointFileLink,
         },
       };
 
@@ -2326,8 +2353,9 @@
         .then((result) => {
           const exportId = result?.export?.id || "";
           // Also persist the export context to project file
-          persistPointSetToProjectFile({ kind: "import", text: originalCsv, context, timestamp: new Date() });
-          persistPointSetToProjectFile({ kind: "export", text: modifiedCsv, context, timestamp: new Date() });
+          persistPointSetToProjectFile({ kind: "import", text: originalCsv, context, timestamp: exportedAt });
+          const exportContext = pointFileLink ? { ...context, pointFileId: pointFileLink.pointFileId } : context;
+          persistPointSetToProjectFile({ kind: "export", text: modifiedCsv, context: exportContext, timestamp: exportedAt });
           // Store payload in localStorage as fallback, then navigate
           localStorage.setItem(SURVEY_SKETCH_IMPORT_STORAGE_KEY, JSON.stringify(payload));
           const exportParam = exportId ? `&exportId=${encodeURIComponent(exportId)}` : "";
@@ -2337,8 +2365,9 @@
         })
         .catch((_err) => {
           // Fallback: still navigate with localStorage handoff if API fails
-          persistPointSetToProjectFile({ kind: "import", text: originalCsv, context, timestamp: new Date() });
-          persistPointSetToProjectFile({ kind: "export", text: modifiedCsv, context, timestamp: new Date() });
+          persistPointSetToProjectFile({ kind: "import", text: originalCsv, context, timestamp: exportedAt });
+          const exportContext = pointFileLink ? { ...context, pointFileId: pointFileLink.pointFileId } : context;
+          persistPointSetToProjectFile({ kind: "export", text: modifiedCsv, context: exportContext, timestamp: exportedAt });
           localStorage.setItem(SURVEY_SKETCH_IMPORT_STORAGE_KEY, JSON.stringify(payload));
           const projectContext = getProjectContext();
           const projectParams = projectContext.projectId ? `&activeProjectId=${encodeURIComponent(projectContext.projectId)}&activeProjectName=${encodeURIComponent(projectContext.projectName || "")}` : "";

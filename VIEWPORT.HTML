@@ -9517,6 +9517,10 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       setStatus("PointForge payload was invalid (missing CSV content).", "warn");
       return false;
     }
+    const linkedPointFileId = String(payload?.pointFileLink?.pointFileId || "").trim();
+    if (linkedPointFileId) {
+      setActiveDrawingPointFileLink(payload.pointFileLink);
+    }
     importCsvText(payload.csv, "PointForge import");
     const aligned = syncViewToGeoreference(payload);
     setMapLayerEnabled(true);
@@ -9538,6 +9542,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
           exportedAt: record.createdAt,
           csv: record.modifiedCsv,
           georeference: record.georeference,
+          pointFileLink: record?.metadata?.pointFileLink || null,
         };
         applyPointforgePayload(payload);
         setStatus(`PointForge import loaded from server (${exportId}).`, "ok");

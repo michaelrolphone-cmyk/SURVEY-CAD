@@ -51,6 +51,9 @@ test('POINT_TRANSFORMER.HTML exposes Open in LineSmith handoff controls', async 
   assert.match(html, /const\s+swapXY\s*=\s*false\s*;/, 'PointForge handoff metadata should declare unswapped X/Y coordinates');
   assert.match(html, /rows\.push\(\[number, handoffX, handoffY, z, code, notes\]\)/, 'PointForge should preserve handoff coordinates and metadata without additional normalization');
   assert.match(html, /const\s+georeferencePoints\s*=\s*\[\]/, 'PointForge should collect georeference samples for LineSmith map alignment');
+  assert.match(html, /function\s+resolveLineSmithLinkedPointFile\(context,\s*exportedAt\s*=\s*new Date\(\)\)/, 'PointForge should derive a linked project point-file reference for LineSmith handoff exports');
+  assert.match(html, /pointFileLink:\s*options\.pointFileLink\s*\|\|\s*null/, 'PointForge handoff payload should include linked point-file metadata when available');
+  assert.match(html, /metadata:\s*\{[\s\S]*pointFileLink,/, 'PointForge export API metadata should persist linked point-file handoff details');
   assert.match(html, /georeference:\s*\{[\s\S]*type:\s*"idaho-state-plane-usft"[\s\S]*zone,[\s\S]*swapXY,[\s\S]*points:\s*georeferencePoints/, 'PointForge handoff payload should include georeference metadata and sample points');
   assert.match(html, /georeferencePoints\.push\(\{\s*x:\s*handoffX,\s*y:\s*handoffY,\s*lat,\s*lng:\s*lon\s*\}\)/, 'PointForge georeference samples should be keyed to the exact handoff coordinates');
 });
@@ -62,6 +65,8 @@ test('VIEWPORT.HTML auto-imports PointForge payloads', async () => {
   assert.match(html, /function\s+tryImportPointforgePayload\(\)/, 'LineSmith should define PointForge import bootstrap logic');
   assert.match(html, /launchSource\s*!==\s*"pointforge"/, 'LineSmith import bootstrap should be gated by query param');
   assert.match(html, /importCsvText\(payload\.csv,\s*"PointForge import"\)/, 'LineSmith should reuse CSV import pipeline for PointForge payloads');
+  assert.match(html, /setActiveDrawingPointFileLink\(payload\.pointFileLink\)/, 'LineSmith should adopt PointForge-linked point-file metadata on import');
+  assert.match(html, /pointFileLink:\s*record\?\.metadata\?\.pointFileLink\s*\|\|\s*null/, 'LineSmith API export fallback should restore linked point-file metadata from persisted PointForge records');
   assert.match(html, /idx\.x\s*=\s*pick\("x","e","east","easting"\)\s*\?\?\s*1;/, 'LineSmith CSV import should map X columns to easting fields');
   assert.match(html, /idx\.y\s*=\s*pick\("y","n","north","northing"\)\s*\?\?\s*2;/, 'LineSmith CSV import should map Y columns to northing fields');
   assert.match(html, /syncViewToGeoreference\(payload\)/, 'LineSmith should apply georeference alignment when PointForge provides it');
