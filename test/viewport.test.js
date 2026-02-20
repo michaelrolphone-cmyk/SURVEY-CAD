@@ -1126,9 +1126,28 @@ test('VIEWPORT.HTML point inspector shows linked EvidenceDesk point-photo thumbn
   const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
 
   assert.match(html, /function\s+buildPointPhotoResourceLookup\(projectId\)/, 'LineSmith should build a project-file lookup of uploaded photos keyed by point number');
+  assert.match(html, /function\s+getPointPhotoResourceLookup\(projectId\)/, 'LineSmith should cache point-photo lookup results so point-label rendering can check photo links efficiently');
   assert.match(html, /metadata\?\.pointNumber/, 'photo lookup should use uploaded file point-number metadata');
-  assert.match(html, /const\s+photoLookup\s*=\s*buildPointPhotoResourceLookup\(activeProjectId\);/, 'point inspector should resolve matching project photos for the selected point number');
+  assert.match(html, /const\s+photoLookup\s*=\s*getPointPhotoResourceLookup\(activeProjectId\);/, 'point inspector should resolve matching project photos from the cached lookup helper');
   assert.match(html, /photoLabel\.textContent\s*=\s*"Point photo"/, 'point inspector should render a Point photo summary row');
   assert.match(html, /img\.className\s*=\s*"inspectorPointPhotoThumb"/, 'point inspector should render a thumbnail image for linked photos');
   assert.match(html, /a\.textContent\s*=\s*`Open photo \$\{pointPhoto\.title \|\| pointPhoto\.pointNumber\}`/, 'point inspector should render a full-size photo link for linked images');
+});
+
+test('VIEWPORT.HTML draws a small photo icon beside point numbers when linked EvidenceDesk photos exist', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+drawPointNumberLabel\(ctx, numberText, x, y, pointNumber, pointPhotoLookup, pointDocumentLookup\)\s*\{[\s\S]*ctx\.fillText\("📷", iconX, y\);/, 'point-number label renderer should append a small photo icon for points with linked photos');
+  assert.match(html, /const\s+pointPhotoLookup\s*=\s*pointDisplayVisibility\.names\s*\?\s*getPointPhotoResourceLookup\(activeProjectId\)\s*:\s*null;/, 'point rendering should build a photo lookup only when point-number labels are enabled');
+  assert.match(html, /drawPointNumberLabel\(ctx, numText, sp\.x \+ 8, sp\.y - 10, p\.num, pointPhotoLookup, pointDocumentLookup\);/, 'regular point labels should use the shared photo-aware point-number label helper');
+  assert.match(html, /drawPointNumberLabel\(ctx, numText, labelX, labelY, member\.point\.num, pointPhotoLookup, pointDocumentLookup\);/, 'cluster breakout labels should use the same helper so icons appear in clustered label layouts');
+});
+
+test('VIEWPORT.HTML draws a document icon beside point numbers when points reference ROS or CPNF records', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+pointHasDocumentAssociation\(point, rosLookup = null\)\s*\{[\s\S]*parseCpfInstruments\(point\.notes \|\| ""\);[\s\S]*collectPointRosReferences\(point\);/, 'point-document detection should treat both CPNF notes and ROS references as document associations');
+  assert.match(html, /const\s+rosLookup\s*=\s*pointDisplayVisibility\.names\s*\?\s*buildRosResourceLookup\(activeProjectId\)\s*:\s*null;/, 'point label rendering should resolve ROS resources while names are visible');
+  assert.match(html, /const\s+pointDocumentLookup\s*=\s*new Map\(\);[\s\S]*pointHasDocumentAssociation\(point, rosLookup\)/, 'point label rendering should build a lookup of point numbers that have associated ROS or CPNF documents');
+  assert.match(html, /ctx\.fillText\("📄", iconX, y\);/, 'point-number label renderer should append a small document icon when a point has ROS/CPNF associations');
 });
