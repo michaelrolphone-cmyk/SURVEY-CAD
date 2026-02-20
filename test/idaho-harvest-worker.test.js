@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createIdahoHarvestObjectStoreFromEnv, runIdahoHarvestWorker } from '../src/idaho-harvest-worker.js';
+import {
+  createIdahoHarvestObjectStoreFromEnv,
+  resolveInterBatchDelayMs,
+  runIdahoHarvestWorker,
+} from '../src/idaho-harvest-worker.js';
 
 function createMemoryObjectStore() {
   const map = new Map();
@@ -62,14 +66,32 @@ test('createIdahoHarvestObjectStoreFromEnv creates per-bucket S3 clients and rou
   });
 });
 
-test('runIdahoHarvestWorker can run one cycle with injected store/client', async () => {
+test('resolveInterBatchDelayMs returns random 2-10 minute delay when enabled', () => {
+  const delay = resolveInterBatchDelayMs({
+    IDAHO_HARVEST_RANDOM_DELAY_ENABLED: '1',
+    IDAHO_HARVEST_RANDOM_DELAY_MIN_MS: '120000',
+    IDAHO_HARVEST_RANDOM_DELAY_MAX_MS: '600000',
+  }, () => 0.5);
+
+  assert.equal(delay, 360000);
+});
+
+test('resolveInterBatchDelayMs returns fixed poll interval when random delay disabled', () => {
+  const delay = resolveInterBatchDelayMs({
+    IDAHO_HARVEST_RANDOM_DELAY_ENABLED: '0',
+    IDAHO_HARVEST_POLL_INTERVAL_MS: '2500',
+  }, () => 0.75);
+
+  assert.equal(delay, 2500);
+});
+
+test('runIdahoHarvestWorker uses randomized delay between non-complete batches', async () => {
   const store = createMemoryObjectStore();
+  let calls = 0;
   const fakeClient = {
-    fetchImpl: async (url) => {
-      const parsed = new URL(url);
-      const layer = parsed.pathname.split('/').slice(-2, -1)[0];
-      const offset = Number(parsed.searchParams.get('resultOffset') || 0);
-      if (layer === '24' && offset === 0) {
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) {
         return {
           ok: true,
           json: async () => ({
@@ -80,10 +102,11 @@ test('runIdahoHarvestWorker can run one cycle with injected store/client', async
       return { ok: true, json: async () => ({ features: [] }) };
     },
     config: {
-      adaMapServer: 'http://example.test/map',
+      adaMapServer: 'http://example.test/map/24',
     },
   };
 
+  const sleeps = [];
   await runIdahoHarvestWorker({
     env: {
       IDAHO_HARVEST_BATCH_SIZE: '100',
@@ -93,8 +116,17 @@ test('runIdahoHarvestWorker can run one cycle with injected store/client', async
       IDAHO_HARVEST_MINIO_TILE_BUCKET: 'tile-server',
       IDAHO_HARVEST_MINIO_INDEX_BUCKET: 'tile-server',
       IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET: 'tile-server',
+      IDAHO_HARVEST_RANDOM_DELAY_ENABLED: '1',
+      IDAHO_HARVEST_RANDOM_DELAY_MIN_MS: '120000',
+      IDAHO_HARVEST_RANDOM_DELAY_MAX_MS: '600000',
     },
     client: fakeClient,
     store,
+    randomFn: () => 0,
+    sleepFn: async (ms) => {
+      sleeps.push(ms);
+    },
   });
+
+  assert.deepEqual(sleeps, [120000]);
 });

@@ -57,7 +57,10 @@ The server now includes a restartable background worker that harvests Idaho parc
 
 - `IDAHO_HARVEST_AUTOSTART` (set to `1` to auto-start the worker on server boot)
 - `IDAHO_HARVEST_BATCH_SIZE` (ArcGIS page size, default: `100`)
-- `IDAHO_HARVEST_POLL_INTERVAL_MS` (delay between batches, default: `1000`)
+- `IDAHO_HARVEST_RANDOM_DELAY_ENABLED` (default: `1`; set to `0` to disable randomized throttling)
+- `IDAHO_HARVEST_RANDOM_DELAY_MIN_MS` (default: `120000` = 2 minutes)
+- `IDAHO_HARVEST_RANDOM_DELAY_MAX_MS` (default: `600000` = 10 minutes)
+- `IDAHO_HARVEST_POLL_INTERVAL_MS` (fixed delay used only when randomized throttling is disabled; default: `1000`)
 - `IDAHO_HARVEST_PARCEL_LAYER` (default: `24`)
 - `IDAHO_HARVEST_CPNF_LAYER` (default: `18`)
 - `STACKHERO_MINIO_HOST` (required; worker will fail fast when MinIO is not configured)

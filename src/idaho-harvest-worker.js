@@ -2,7 +2,28 @@ import SurveyCadClient from './survey-api.js';
 import { createS3FetchClient } from './evidence-desk-file-store.js';
 import { runIdahoHarvestCycle } from './idaho-harvest-worker-core.js';
 
-const POLL_INTERVAL_MS = Number(process.env.IDAHO_HARVEST_POLL_INTERVAL_MS || 1000);
+const DEFAULT_POLL_INTERVAL_MS = 1000;
+const DEFAULT_RANDOM_DELAY_MIN_MS = 2 * 60 * 1000;
+const DEFAULT_RANDOM_DELAY_MAX_MS = 10 * 60 * 1000;
+
+function randomIntBetween(minInclusive, maxInclusive, randomFn = Math.random) {
+  const min = Math.ceil(Number(minInclusive));
+  const max = Math.floor(Number(maxInclusive));
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return 0;
+  if (max <= min) return min;
+  return Math.floor(randomFn() * (max - min + 1)) + min;
+}
+
+export function resolveInterBatchDelayMs(env = process.env, randomFn = Math.random) {
+  const randomEnabled = String(env.IDAHO_HARVEST_RANDOM_DELAY_ENABLED || '1') !== '0';
+  if (!randomEnabled) {
+    return Math.max(0, Number(env.IDAHO_HARVEST_POLL_INTERVAL_MS || DEFAULT_POLL_INTERVAL_MS));
+  }
+
+  const minMs = Math.max(0, Number(env.IDAHO_HARVEST_RANDOM_DELAY_MIN_MS || DEFAULT_RANDOM_DELAY_MIN_MS));
+  const maxMs = Math.max(minMs, Number(env.IDAHO_HARVEST_RANDOM_DELAY_MAX_MS || DEFAULT_RANDOM_DELAY_MAX_MS));
+  return randomIntBetween(minMs, maxMs, randomFn);
+}
 
 export function createIdahoHarvestObjectStoreFromEnv(env = process.env, createS3Client = createS3FetchClient) {
   const endpoint = String(env.STACKHERO_MINIO_HOST || '').trim();
@@ -48,7 +69,13 @@ export function createIdahoHarvestObjectStoreFromEnv(env = process.env, createS3
   };
 }
 
-export async function runIdahoHarvestWorker({ env = process.env, client = new SurveyCadClient(), store = null } = {}) {
+export async function runIdahoHarvestWorker({
+  env = process.env,
+  client = new SurveyCadClient(),
+  store = null,
+  sleepFn = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  randomFn = Math.random,
+} = {}) {
   const resolvedStore = store || createIdahoHarvestObjectStoreFromEnv(env);
   let shuttingDown = false;
 
@@ -79,7 +106,8 @@ export async function runIdahoHarvestWorker({ env = process.env, client = new Su
       });
 
       if (result.done) return;
-      await new Promise((resolve) => setTimeout(resolve, Math.max(0, POLL_INTERVAL_MS)));
+      const delayMs = resolveInterBatchDelayMs(env, randomFn);
+      await sleepFn(delayMs);
     }
   } finally {
     process.off('SIGTERM', sigtermHandler);
