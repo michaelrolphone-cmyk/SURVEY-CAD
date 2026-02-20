@@ -4906,10 +4906,8 @@
             "$ref": "#/components/schemas/LineSmithDrawingPointFileLink"
           }
         },
-        "required": [
-          "drawingState"
-        ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "For PUT/PATCH, drawingState is optional and defaults to the drawing's current state, allowing point-file relinking without resending geometry. For POST create, drawingState is required."
       },
       "LineSmithDrawingListResponse": {
         "type": "object",

@@ -29,4 +29,6 @@ test('server OpenAPI spec documents project drawing CRUD endpoints', async () =>
 
   const drawingRecord = spec.components.schemas.LineSmithDrawingRecord;
   assert.equal(drawingRecord?.properties?.linkedPointFileId?.type, 'string');
+
+  assert.ok(!Array.isArray(drawingMutation?.required) || !drawingMutation.required.includes('drawingState'), 'drawingState should be optional in mutation schema for relink PATCH flows');
 });

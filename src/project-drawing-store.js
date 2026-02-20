@@ -6,6 +6,8 @@ function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+const POINT_FILE_LINK_UNSET = Symbol('POINT_FILE_LINK_UNSET');
+
 export function diffDrawingState(previous, next) {
   if (Object.is(previous, next)) return undefined;
   if (Array.isArray(previous) && Array.isArray(next)) {
@@ -108,6 +110,15 @@ function normalizeDrawingName(name = '') {
   return value || 'Untitled Drawing';
 }
 
+function normalizeLinkedPointFileId(pointFileId = '') {
+  return String(pointFileId || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -147,7 +158,8 @@ function materializeDrawingVersion(record, versionIndex = -1) {
   return state;
 }
 
-function assertValidState(state) {
+function assertValidState(state, { required = true } = {}) {
+  if (state === undefined && !required) return;
   if (!state || typeof state !== 'object' || Array.isArray(state)) {
     throw new Error('drawingState must be a JSON object.');
   }
@@ -186,25 +198,33 @@ export async function createOrUpdateProjectDrawing(store, {
   drawingId: drawingIdRaw,
   drawingName,
   drawingState,
-  pointFileLink,
+  pointFileLink = POINT_FILE_LINK_UNSET,
 } = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
   const drawingId = normalizeDrawingId(drawingIdRaw || drawingName || `drawing-${Date.now()}`);
   if (!projectId) throw new Error('projectId is required.');
   if (!drawingId) throw new Error('drawingId is required.');
-  assertValidState(drawingState);
+  assertValidState(drawingState, { required: false });
 
   const now = nowIso();
   const state = await Promise.resolve(store.getState());
   const snapshot = state?.snapshot || {};
   const existing = parseSnapshotJson(snapshot, drawingKey(projectId, drawingId));
   const index = parseSnapshotJson(snapshot, drawingIndexKey(projectId)) || {};
+  const priorState = existing?.versions?.length ? materializeDrawingVersion(existing, -1) : null;
+  const nextDrawingState = drawingState === undefined ? priorState : drawingState;
+
+  if (!existing?.versions?.length) {
+    assertValidState(nextDrawingState, { required: true });
+  }
+  assertValidState(nextDrawingState, { required: false });
 
   let record;
+  const hasPointFileLinkInput = pointFileLink !== POINT_FILE_LINK_UNSET;
   const normalizedPointFileLink = pointFileLink && typeof pointFileLink === 'object' && !Array.isArray(pointFileLink)
     ? {
       projectId: normalizeProjectId(pointFileLink.projectId || projectId),
-      pointFileId: String(pointFileLink.pointFileId || '').trim(),
+      pointFileId: normalizeLinkedPointFileId(pointFileLink.pointFileId),
       pointFileName: String(pointFileLink.pointFileName || '').trim(),
     }
     : null;
@@ -218,7 +238,7 @@ export async function createOrUpdateProjectDrawing(store, {
       drawingName: normalizeDrawingName(drawingName || drawingId),
       createdAt: now,
       updatedAt: now,
-      latestMapGeoreference: drawingState.mapGeoreference || null,
+      latestMapGeoreference: nextDrawingState.mapGeoreference || null,
       linkedPointFileProjectId: hasExplicitPointFileLink ? normalizedPointFileLink.projectId : null,
       linkedPointFileId: hasExplicitPointFileLink ? normalizedPointFileLink.pointFileId : null,
       linkedPointFileName: hasExplicitPointFileLink ? normalizedPointFileLink.pointFileName || null : null,
@@ -226,25 +246,24 @@ export async function createOrUpdateProjectDrawing(store, {
         versionId: `v-${Date.now()}`,
         savedAt: now,
         label: normalizeDrawingName(drawingName || drawingId),
-        baseState: drawingState,
+        baseState: nextDrawingState,
       }],
     };
   } else {
-    const priorState = materializeDrawingVersion(existing, -1);
-    const diffFromPrevious = diffDrawingState(priorState, drawingState);
+        const diffFromPrevious = diffDrawingState(priorState, nextDrawingState);
     record = {
       ...existing,
       drawingName: normalizeDrawingName(drawingName || existing.drawingName || drawingId),
       updatedAt: now,
-      latestMapGeoreference: drawingState.mapGeoreference || null,
-      linkedPointFileProjectId: hasExplicitPointFileLink
-        ? normalizedPointFileLink.projectId
+      latestMapGeoreference: nextDrawingState.mapGeoreference || null,
+      linkedPointFileProjectId: hasPointFileLinkInput
+        ? (hasExplicitPointFileLink ? normalizedPointFileLink.projectId : null)
         : (existing.linkedPointFileProjectId || null),
-      linkedPointFileId: hasExplicitPointFileLink
-        ? normalizedPointFileLink.pointFileId
+      linkedPointFileId: hasPointFileLinkInput
+        ? (hasExplicitPointFileLink ? normalizedPointFileLink.pointFileId : null)
         : (existing.linkedPointFileId || null),
-      linkedPointFileName: hasExplicitPointFileLink
-        ? (normalizedPointFileLink.pointFileName || null)
+      linkedPointFileName: hasPointFileLinkInput
+        ? (hasExplicitPointFileLink ? (normalizedPointFileLink.pointFileName || null) : null)
         : (existing.linkedPointFileName || null),
       versions: [...existing.versions],
     };

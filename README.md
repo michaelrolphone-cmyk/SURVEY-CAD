@@ -193,7 +193,7 @@ Request body for create/update:
 }
 ```
 
-When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points.
+When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points. You can switch which point file a drawing uses by sending a new `pointFileLink` in `PATCH /api/projects/:projectId/drawings/:drawingId` without resending `drawingState`.
 
 EvidenceDesk now hydrates its **Drawings** folder from the drawing CRUD API (`GET /api/projects/:projectId/drawings`) and fetches selected drawing history records from `GET /api/projects/:projectId/drawings/:drawingId` before launching LineSmith, so project browser drawing lists stay API-backed rather than relying only on legacy local-storage indexes.
 
@@ -410,7 +410,7 @@ Request body for create/update:
 }
 ```
 
-When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points.
+When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points. You can switch which point file a drawing uses by sending a new `pointFileLink` in `PATCH /api/projects/:projectId/drawings/:drawingId` without resending `drawingState`.
 
 EvidenceDesk now hydrates its **Drawings** folder from the drawing CRUD API (`GET /api/projects/:projectId/drawings`) and fetches selected drawing history records from `GET /api/projects/:projectId/drawings/:drawingId` before launching LineSmith, so project browser drawing lists stay API-backed rather than relying only on legacy local-storage indexes.
 

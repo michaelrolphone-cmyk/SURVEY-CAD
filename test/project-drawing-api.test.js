@@ -74,6 +74,32 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(linkedPointFile.pointFile.versions.length, 3);
     assert.equal(linkedPointFile.pointFile.source, 'linesmith-drawing');
 
+
+    const relinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileLink: {
+          pointFileId: 'boundary-points-relinked',
+          pointFileName: 'Boundary Points Relinked.csv',
+        },
+      }),
+    });
+    assert.equal(relinkRes.status, 200);
+    const relinked = await relinkRes.json();
+    assert.equal(relinked.drawing.linkedPointFileId, 'boundary-points-relinked');
+
+    const oldPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points`);
+    assert.equal(oldPointFileRes.status, 200);
+    const oldPointFile = await oldPointFileRes.json();
+    assert.equal(oldPointFile.pointFile.versions.length, 3);
+
+    const relinkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points-relinked`);
+    assert.equal(relinkedPointFileRes.status, 200);
+    const relinkedPointFile = await relinkedPointFileRes.json();
+    assert.equal(relinkedPointFile.pointFile.currentState.text, 'p-1,3,2,,,\np-2,5,8,,,');
+    assert.equal(relinkedPointFile.pointFile.versions.length, 1);
+
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
       method: 'DELETE',
     });

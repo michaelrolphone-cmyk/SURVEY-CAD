@@ -948,7 +948,7 @@ Fetch the full drawing record and reconstructed latest state.
 ### `PUT /api/projects/:projectId/drawings/:drawingId`
 ### `PATCH /api/projects/:projectId/drawings/:drawingId`
 
-Append a new drawing version using differential patching from the prior version. If the drawing has a linked point file (from `pointFileLink`), every save also appends a new version in that point file using the latest drawing point rows.
+Append a new drawing version using differential patching from the prior version. If the drawing has a linked point file (from `pointFileLink`), every save also appends a new version in that point file using the latest drawing point rows. `drawingState` may be omitted for PUT/PATCH to keep existing geometry while only changing `drawingName` and/or `pointFileLink` (for relinking).
 
 **Request Body:**
 ```json
