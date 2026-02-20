@@ -2029,13 +2029,13 @@
           <table>
             <thead>
               <tr>
-                <th style="width:120px;">Code</th>
-                <th style="width:110px;">Entity</th>
-                <th style="width:110px;">Process</th>
-                <th style="width:180px;">Layer</th>
-                <th style="width:220px;">Description</th>
-                <th style="width:340px;">Type Config (line type / symbol + scale)</th>
-                <th style="width:220px;">Companion Codes</th>
+                <th data-fld-sort-key="code" style="width:120px;cursor:pointer;">Code</th>
+                <th data-fld-sort-key="entity" style="width:110px;cursor:pointer;">Entity</th>
+                <th data-fld-sort-key="process" style="width:110px;cursor:pointer;">Process</th>
+                <th data-fld-sort-key="layer" style="width:180px;cursor:pointer;">Layer</th>
+                <th data-fld-sort-key="description" style="width:220px;cursor:pointer;">Description</th>
+                <th data-fld-sort-key="typeConfig" style="width:340px;cursor:pointer;">Type Config (line type / symbol + scale)</th>
+                <th data-fld-sort-key="companions" style="width:220px;cursor:pointer;">Companion Codes</th>
                 <th style="width:100px;">Actions</th>
               </tr>
             </thead>
@@ -2896,6 +2896,7 @@
   const fldResetServerBtn = $("#fldResetServer");
   const fldDownloadLocalInlineBtn = $("#fldDownloadLocal");
   const fldDownloadCurrentBtn = $("#fldDownloadCurrent");
+  const fldSortableHeaders = Array.from(document.querySelectorAll("[data-fld-sort-key]"));
 
   // -------------------------
   // Model
@@ -4364,6 +4365,8 @@ function paintBackground(ctx, w, h){
     activeConfig: null,
     source: "server",
     symbolSvgOverrides: new Map(),
+    sortKey: "code",
+    sortDirection: "asc",
   };
   const fldSymbolLibraryState = {
     symbols: [],
@@ -7807,6 +7810,19 @@ function paintBackground(ctx, w, h){
   fldResetServerBtn?.addEventListener("click", () => resetFldEditorToServer());
   fldDownloadLocalInlineBtn?.addEventListener("click", () => downloadFldLocalOverride());
   fldDownloadCurrentBtn?.addEventListener("click", () => downloadFldCurrentConfig());
+  fldSortableHeaders.forEach((header) => {
+    header.addEventListener("click", () => {
+      const clickedSortKey = String(header?.dataset?.fldSortKey || "");
+      if (!clickedSortKey) return;
+      if (fldEditorState.sortKey === clickedSortKey) {
+        fldEditorState.sortDirection = fldEditorState.sortDirection === "asc" ? "desc" : "asc";
+      } else {
+        fldEditorState.sortKey = clickedSortKey;
+        fldEditorState.sortDirection = "asc";
+      }
+      renderFldEditorTable();
+    });
+  });
   layersAddBtn?.addEventListener("click", () => {
     const id = `layer-${Date.now()}`;
     layers.set(id, sanitizeLayer({ id, name: `Layer ${layers.size + 1}`, color: "#00a6ff", lineWeight: 1.5 }, id));
@@ -11952,9 +11968,45 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     const lineTypeOptions = buildLineTypeOptions(config);
     const symbolMapChoices = buildSymbolMapChoices(config);
     const filter = String(fldFilterInput?.value || "").trim().toUpperCase();
+    const sortKey = String(fldEditorState.sortKey || "code");
+    const direction = fldEditorState.sortDirection === "desc" ? -1 : 1;
+    const getSortableValue = (rule, key) => {
+      const raw = rule?.raw || {};
+      if (key === "code") return String(raw.code || "").trim().toUpperCase();
+      if (key === "entity") return String(raw.entity_type || "").trim();
+      if (key === "process") return String(raw.processing_on || "0") === "1" ? "1" : "0";
+      if (key === "layer") return String(raw.layer || "").trim().toUpperCase();
+      if (key === "description") return String(raw.description || "").trim().toUpperCase();
+      if (key === "typeConfig") {
+        const isLinework = isLineworkEntityType(raw.entity_type);
+        return isLinework
+          ? String(raw.linetype || "").trim().toUpperCase()
+          : `${String(raw.symbol || "").trim().toUpperCase()}::${String(raw.symbol_size || "").trim()}`;
+      }
+      if (key === "companions") return String(raw.companion_codes || "").trim().toUpperCase();
+      return String(raw.code || "").trim().toUpperCase();
+    };
+    const sortedRules = [...rules].sort((a, b) => {
+      const left = getSortableValue(a, sortKey);
+      const right = getSortableValue(b, sortKey);
+      if (left < right) return -1 * direction;
+      if (left > right) return 1 * direction;
+      const leftCode = String(a?.raw?.code || "").trim().toUpperCase();
+      const rightCode = String(b?.raw?.code || "").trim().toUpperCase();
+      if (leftCode < rightCode) return -1;
+      if (leftCode > rightCode) return 1;
+      return 0;
+    });
     fldTbody.innerHTML = "";
+    fldSortableHeaders.forEach((header) => {
+      const headerSortKey = String(header?.dataset?.fldSortKey || "");
+      const label = String(header.textContent || "").replace(/\s*[▲▼]$/, "").trim();
+      header.textContent = headerSortKey === sortKey
+        ? `${label} ${fldEditorState.sortDirection === "desc" ? "▼" : "▲"}`
+        : label;
+    });
     const frag = document.createDocumentFragment();
-    rules.forEach((rule) => {
+    sortedRules.forEach((rule) => {
       const code = String(rule?.raw?.code || "").trim();
       const description = String(rule?.raw?.description || "").trim();
       if (filter && !code.toUpperCase().includes(filter) && !description.toUpperCase().includes(filter)) return;

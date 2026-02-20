@@ -969,6 +969,10 @@ test('VIEWPORT.HTML exposes an FLD editor backed by shared API save/reset and do
   assert.match(html, /function\s+saveFldEditorLocalOverride\(\)\s*\{[\s\S]*saveFieldToFinishSettingsToApi\(fldEditorState\.activeConfig\)[\s\S]*applyFieldToFinishConfig\(fldEditorState\.activeConfig, "api"\);/, 'FLD editor save action should persist shared API settings and apply them to active linework rules');
   assert.match(html, /function\s+resetFldEditorToServer\(\)\s*\{[\s\S]*resetFieldToFinishSettingsToServerDefaults\(\)[\s\S]*loadFieldToFinishRulesFromFld\(defaultFldConfigPath\)/, 'FLD editor reset action should clear shared settings and restore the server FLD rules');
   assert.match(html, /function\s+downloadFldLocalOverride\(\)\s*\{[\s\S]*downloadTextFile\("LineSmith-Shared\.fld", serializeFieldToFinishConfig\(fldEditorState\.activeConfig\)\);/, 'FLD editor should support downloading shared FLD files');
+  assert.match(html, /<th\s+data-fld-sort-key="code"[\s\S]*<th\s+data-fld-sort-key="companions"/, 'FLD editor should expose sortable headers for primary rule columns');
+  assert.match(html, /const\s+fldEditorState\s*=\s*\{[\s\S]*sortKey:\s*"code",[\s\S]*sortDirection:\s*"asc"/, 'FLD editor should persist current sort key and direction in editor state');
+  assert.match(html, /const\s+sortedRules\s*=\s*\[\.\.\.rules\]\.sort\(\(a, b\) => \{[\s\S]*getSortableValue\(a, sortKey\)[\s\S]*fldSortableHeaders\.forEach\(\(header\) => \{[\s\S]*header\.textContent\s*=\s*headerSortKey === sortKey/, 'FLD editor should sort rows by active header selection and show sort direction indicators in column labels');
+  assert.match(html, /fldSortableHeaders\.forEach\(\(header\) => \{[\s\S]*header\.addEventListener\("click", \(\) => \{[\s\S]*fldEditorState\.sortDirection = fldEditorState\.sortDirection === "asc" \? "desc" : "asc";[\s\S]*renderFldEditorTable\(\);/, 'FLD editor header clicks should toggle ascending\/descending sort and rerender the table');
 });
 
 
