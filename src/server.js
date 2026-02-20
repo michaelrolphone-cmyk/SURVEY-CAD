@@ -364,6 +364,10 @@ function getErrorStatusCode(err) {
   return 400;
 }
 
+function hasDrawingStatePayload(body = {}) {
+  return !!body && typeof body === 'object' && Object.prototype.hasOwnProperty.call(body, 'drawingState');
+}
+
 function parseRemotePdfUrl(urlObj) {
   const rawUrl = urlObj.searchParams.get('url');
   if (!rawUrl) throw new Error('url query parameter is required.');
@@ -1382,11 +1386,13 @@ export function createSurveyServer({
             drawingState: body.drawingState,
             pointFileLink: body.pointFileLink,
           });
-          const linkedPointFileSync = await syncDrawingLinkedPointFile(
-            localStorageSyncStore,
-            result.drawing,
-            parsePointFileChangeContext(req, body, 'linesmith-drawing'),
-          );
+          const linkedPointFileSync = hasDrawingStatePayload(body)
+            ? await syncDrawingLinkedPointFile(
+              localStorageSyncStore,
+              result.drawing,
+              parsePointFileChangeContext(req, body, 'linesmith-drawing'),
+            )
+            : null;
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: [
