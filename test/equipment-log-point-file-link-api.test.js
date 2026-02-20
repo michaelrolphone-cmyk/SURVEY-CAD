@@ -20,10 +20,12 @@ test('equipment log API persists linked project point file metadata for audits',
         pointFileState: { text: '1,100,200', exportFormat: 'csv' },
         source: 'equipment-log',
         sourceLabel: 'Equipment log: Job 17 · Trimble S7 · Riley',
+        changeContext: { app: 'equipment-log', user: 'Riley' },
       }),
     });
     assert.equal(pointFileRes.status, 201);
     const pointFilePayload = await pointFileRes.json();
+    assert.deepEqual(pointFilePayload.pointFile.versions[0].actor, { app: 'equipment-log', user: 'Riley' });
 
     const logRes = await fetch(`http://127.0.0.1:${app.port}/api/equipment-logs`, {
       method: 'POST',

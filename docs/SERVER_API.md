@@ -1018,6 +1018,10 @@ Create a point-file record for a project.
   "pointFileState": {
     "text": "1,100,200",
     "exportFormat": "csv"
+  },
+  "changeContext": {
+    "app": "pointforge",
+    "user": "casey"
   }
 }
 ```
@@ -1034,6 +1038,7 @@ Create a point-file record for a project.
         "versionId": "v-1739836800000",
         "savedAt": "2026-02-18T00:00:00.000Z",
         "label": "Boundary Export.csv",
+        "actor": { "app": "pointforge", "user": "casey" },
         "baseState": { "text": "1,100,200", "exportFormat": "csv" }
       }
     ],
@@ -1058,7 +1063,7 @@ Fetch the full point-file record and reconstructed latest state.
 ### `PUT /api/projects/:projectId/point-files/:pointFileId`
 ### `PATCH /api/projects/:projectId/point-files/:pointFileId`
 
-Append a new point-file version using differential patching from the prior version.
+Append a new point-file version using differential patching from the prior version. Include optional `changeContext.app` and `changeContext.user` to persist timeline/audit metadata for each saved version.
 
 ### `DELETE /api/projects/:projectId/point-files/:pointFileId`
 

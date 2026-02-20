@@ -193,7 +193,7 @@ Request body for create/update:
 }
 ```
 
-When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points. You can switch which point file a drawing uses by sending a new `pointFileLink` in `PATCH /api/projects/:projectId/drawings/:drawingId` without resending `drawingState`. If the linked point file is edited elsewhere in the app, the next `GET /api/projects/:projectId/drawings/:drawingId` returns drawing points hydrated from that updated point file. In LineSmith UI, use **Choose Point File…** in the Project Drawing Saves panel, then click **Save Drawing to Project** to persist the selected link.
+When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points. LineSmith now sends actor headers (`x-survey-app: linesmith-drawing`, `x-survey-user: <active crew member>`) so linked point-file versions capture who saved them. You can switch which point file a drawing uses by sending a new `pointFileLink` in `PATCH /api/projects/:projectId/drawings/:drawingId` without resending `drawingState`. If the linked point file is edited elsewhere in the app, the next `GET /api/projects/:projectId/drawings/:drawingId` returns drawing points hydrated from that updated point file. In LineSmith UI, use **Choose Point File…** in the Project Drawing Saves panel, then click **Save Drawing to Project** to persist the selected link.
 
 EvidenceDesk now hydrates its **Drawings** folder from the drawing CRUD API (`GET /api/projects/:projectId/drawings`) and fetches selected drawing history records from `GET /api/projects/:projectId/drawings/:drawingId` before launching LineSmith, so project browser drawing lists stay API-backed rather than relying only on legacy local-storage indexes.
 
@@ -213,9 +213,15 @@ Request body for create/update:
 ```json
 {
   "pointFileName": "Boundary Export.csv",
-  "pointFileState": { "text": "1,100,200", "exportFormat": "csv" }
+  "pointFileState": { "text": "1,100,200", "exportFormat": "csv" },
+  "changeContext": {
+    "app": "pointforge",
+    "user": "casey"
+  }
 }
 ```
+
+Each point-file version now records timeline metadata in `versions[n].actor` (`app`, `user`) plus `savedAt`, allowing audit history and rollback context across Equipment Log uploads, PointForge edits, and LineSmith save syncs.
 
 
 ## API and CLI notes for shared FieldToFinish thumbnail rendering
@@ -969,7 +975,7 @@ Base URL (local): `http://localhost:3000`
 - `GET /api/equipment-logs`
 - `POST /api/equipment-logs` (accepts optional `pointFileId`, `pointFileName`, `pointFileProjectId` linkage fields for audit traceability)
 - `GET /api/equipment-logs?id=<logId>`
-- `EquipmentLog.html` now supports attaching a `.csv`/`.txt` point file while saving a log (requires `?activeProjectId=<projectId>`), pushes the file into `POST /api/projects/:projectId/point-files` with `source: "equipment-log"`, and records the returned point-file linkage back into the equipment log for audit history in `PROJECT_BROWSER.html` Point Files.
+- `EquipmentLog.html` now supports attaching a `.csv`/`.txt` point file while saving a log (requires `?activeProjectId=<projectId>`), pushes the file into `POST /api/projects/:projectId/point-files` with `source: "equipment-log"` plus `changeContext` (`app: "equipment-log"`, `user: <rodman|createdBy>`), and records the returned point-file linkage back into the equipment log for audit history in `PROJECT_BROWSER.html` Point Files.
 - `EquipmentLog.html` now hydrates its **Equipment Type** dropdown from Equipment Manager inventory records (`/api/equipment` + `surveyfoundryEquipmentInventory` local cache), so users select actual managed equipment entries instead of generic type presets.
 
 ### Field-to-Finish (FLD)

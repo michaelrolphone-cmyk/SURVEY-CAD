@@ -718,6 +718,9 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /\$\("#quickOpenDrawing"\)\?\.addEventListener\("click", \(\) => \$\("#openProjectDrawing"\)\?\.click\(\)\);/, 'quick toolbar open icon should route to the shared project drawing picker action');
   assert.match(html, /window\.prompt\("Name this drawing before saving:",\s*"Boundary Base Map"\)/, 'save workflow should prompt for a drawing name when blank');
   assert.match(html, /if \(drawingNameInput\) drawingNameInput\.value = drawingName;/, 'save workflow should write prompted drawing name back to input');
+  assert.match(html, /function\s+resolveActiveCrewUserLabel\(\)/, 'LineSmith should resolve an active crew display name for save actor metadata');
+  assert.match(html, /function\s+buildPointFileActorHeaders\(\)\s*\{[\s\S]*'x-survey-app':\s*'linesmith-drawing',[\s\S]*'x-survey-user':\s*resolveActiveCrewUserLabel\(\),[\s\S]*\}/, 'LineSmith should tag drawing saves with app and active user headers for point-file actor history');
+  assert.match(html, /headers:\s*\{\s*'Content-Type':\s*'application\/json',\s*\.\.\.buildPointFileActorHeaders\(\)\s*\}/, 'drawing save API calls should send actor headers for linked point-file version tracking');
   assert.match(html, /body:\s*JSON\.stringify\(\{ drawingId, drawingName, drawingState: currentState, pointFileLink: activeDrawingPointFileLink \|\| null \}\)/, 'drawing save payload should include selected point-file link metadata');
   assert.match(html, /versions\.push\(\{[\s\S]*diffFromPrevious:/, 'subsequent saves should append differential revisions');
   assert.match(html, /function\s+promptRestoreDrawingVersion\(\)/, 'LineSmith should expose saved version restore workflow');

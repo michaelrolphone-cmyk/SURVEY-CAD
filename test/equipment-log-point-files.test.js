@@ -35,4 +35,18 @@ test('buildEquipmentLogPointFilePayload builds equipment-log source metadata for
   assert.equal(payload.pointFileState.text, '1,2,3');
   assert.equal(payload.source, 'equipment-log');
   assert.equal(payload.sourceLabel, 'Equipment log: Audit Job · Trimble S7 · Jordan');
+  assert.deepEqual(payload.changeContext, { app: 'equipment-log', user: 'Jordan' });
+});
+
+test('buildEquipmentLogPointFilePayload uses unknown-user fallback when rodman is missing', () => {
+  const payload = buildEquipmentLogPointFilePayload({
+    projectId: 'proj-1',
+    fileName: 'Control.csv',
+    text: '1,2,3',
+    log: {
+      equipmentType: 'Leica TS16',
+    },
+  });
+
+  assert.deepEqual(payload.changeContext, { app: 'equipment-log', user: 'unknown-user' });
 });

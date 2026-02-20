@@ -179,6 +179,17 @@ function parseProjectPointFileRoute(pathname = '') {
   };
 }
 
+
+function parsePointFileChangeContext(req, body = {}, fallbackApp = 'unknown-app') {
+  const appFromHeader = String(req.headers['x-survey-app'] || req.headers['x-app-name'] || '').trim();
+  const userFromHeader = String(req.headers['x-survey-user'] || req.headers['x-user-id'] || '').trim();
+  const context = body?.changeContext && typeof body.changeContext === 'object' ? body.changeContext : {};
+  const sourceAsApp = String(body?.source || '').trim();
+  const app = String(context.app || body?.app || appFromHeader || sourceAsApp || fallbackApp || 'unknown-app').trim() || 'unknown-app';
+  const user = String(context.user || body?.user || userFromHeader).trim() || 'unknown-user';
+  return { app, user };
+}
+
 function parseProjectWorkbenchRoute(pathname = '') {
   const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/workbench(?:\/(link|casefile|sources|sync|traverses(?:\/[^/]+)?))?\/?$/);
   if (!match) return null;
@@ -323,7 +334,7 @@ async function hydrateDrawingStateFromLinkedPointFile(store, drawing = null) {
   };
 }
 
-async function syncDrawingLinkedPointFile(store, drawingRecord = {}) {
+async function syncDrawingLinkedPointFile(store, drawingRecord = {}, changeContext = null) {
   const linkedProjectId = String(drawingRecord?.linkedPointFileProjectId || '').trim();
   const linkedPointFileId = String(drawingRecord?.linkedPointFileId || '').trim();
   if (!linkedProjectId || !linkedPointFileId) return null;
@@ -339,6 +350,7 @@ async function syncDrawingLinkedPointFile(store, drawingRecord = {}) {
     },
     source: 'linesmith-drawing',
     sourceLabel: drawingRecord.drawingName || null,
+    changeContext: changeContext || { app: 'linesmith-drawing', user: 'unknown-user' },
   });
 
   return result;
@@ -1368,7 +1380,11 @@ export function createSurveyServer({
             drawingState: body.drawingState,
             pointFileLink: body.pointFileLink,
           });
-          const linkedPointFileSync = await syncDrawingLinkedPointFile(localStorageSyncStore, result.drawing);
+          const linkedPointFileSync = await syncDrawingLinkedPointFile(
+            localStorageSyncStore,
+            result.drawing,
+            parsePointFileChangeContext(req, body, 'linesmith-drawing'),
+          );
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: [
@@ -1718,6 +1734,7 @@ export function createSurveyServer({
             pointFileState: body.pointFileState,
             source: body.source,
             sourceLabel: body.sourceLabel,
+            changeContext: parsePointFileChangeContext(req, body, 'point-file-api'),
           });
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',

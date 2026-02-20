@@ -15,7 +15,7 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
   try {
     const createRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-survey-user': 'Jordan' },
       body: JSON.stringify({
         drawingName: 'Boundary Draft',
         drawingState: { points: [{ id: 'p-1', x: 1, y: 2 }], mapGeoreference: { origin: [0, 0] } },
@@ -44,7 +44,7 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
 
     const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-survey-user': 'Jordan' },
       body: JSON.stringify({
         drawingName: 'Boundary Draft Renamed',
         drawingState: { points: [{ id: 'p-1', x: 3, y: 2 }, { id: 'p-2', x: 5, y: 8 }], mapGeoreference: { origin: [10, 10] } },
@@ -73,6 +73,8 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(linkedPointFile.pointFile.currentState.text, 'p-1,3,2,,,\np-2,5,8,,,');
     assert.equal(linkedPointFile.pointFile.versions.length, 3);
     assert.equal(linkedPointFile.pointFile.source, 'linesmith-drawing');
+    assert.deepEqual(linkedPointFile.pointFile.versions[0].actor, { app: 'linesmith-drawing', user: 'Jordan' });
+    assert.deepEqual(linkedPointFile.pointFile.versions[2].actor, { app: 'linesmith-drawing', user: 'Jordan' });
 
 
     const relinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
