@@ -15,6 +15,7 @@ import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { createCrewPresenceWsService } from './crew-presence-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
+import { createIdahoHarvestSupervisor } from './idaho-harvest-supervisor.js';
 import { createLmProxyHubWsService } from "./lmstudio-proxy-control-ws.js";
 import { createRedisClient as createBewRedisClient } from "./bew-redis.js";
 import { createEvidenceDeskFileStore } from './evidence-desk-file-store.js';
@@ -154,6 +155,12 @@ function canGenerateImageThumbnail({ extension = '', mimeType = '' } = {}) {
   const normalizedMime = String(mimeType || '').toLowerCase();
   if (normalizedMime.startsWith('image/')) return true;
   return IMAGE_EXTENSIONS.has(normalizedExt);
+}
+
+
+function areWorkersEnabled(env = process.env) {
+  return String(env.WORKERS_ENABLED || '1').trim().toLowerCase() !== 'false'
+    && String(env.WORKERS_ENABLED || '1').trim() !== '0';
 }
 
 function sendJson(res, statusCode, payload) {
@@ -1073,6 +1080,7 @@ export function createSurveyServer({
   localStorageSyncStore = new LocalStorageSyncStore(),
   evidenceDeskFileStore,
   pdfThumbnailRenderer = renderPdfThumbnailFromBuffer,
+  idahoHarvestSupervisor = createIdahoHarvestSupervisor(),
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
@@ -1212,6 +1220,10 @@ export function createSurveyServer({
   // ensure BEW redis closes on server close (only if we created it)
   let bewCloseHookInstalled = false;
   let evidenceDeskCloseHookInstalled = false;
+
+  if (idahoHarvestSupervisor && process.env.IDAHO_HARVEST_AUTOSTART === '1' && areWorkersEnabled(process.env)) {
+    idahoHarvestSupervisor.start();
+  }
 
   const server = createServer(async (req, res) => {
     if (!req.url) {
@@ -2417,6 +2429,31 @@ export function createSurveyServer({
         return;
       }
 
+      if (urlObj.pathname === '/api/idaho-harvest/start') {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
+        if (!areWorkersEnabled(process.env)) {
+          sendJson(res, 403, { error: 'Workers are disabled by WORKERS_ENABLED.' });
+          return;
+        }
+        const status = idahoHarvestSupervisor?.start?.() || null;
+        sendJson(res, 202, { worker: status });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/idaho-harvest/stop') {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
+        const status = idahoHarvestSupervisor?.stop?.() || null;
+        sendJson(res, 202, { worker: status });
+        return;
+      }
+
+
       if (req.method !== 'GET') {
         sendJson(res, 405, { error: 'Only GET is supported.' });
         return;
@@ -2554,6 +2591,10 @@ export function createSurveyServer({
         return;
       }
 
+      if (urlObj.pathname === '/api/idaho-harvest/status' && req.method === 'GET') {
+        sendJson(res, 200, { worker: idahoHarvestSupervisor?.getStatus?.() || null });
+        return;
+      }
       if (urlObj.pathname === '/api/section') {
         const { lon, lat } = parseLonLat(urlObj);
         const section = await client.loadSectionAtPoint(lon, lat);
@@ -2658,6 +2699,12 @@ export function createSurveyServer({
       }
     }
   });
+
+  if (idahoHarvestSupervisor && typeof idahoHarvestSupervisor.close === 'function') {
+    server.on('close', () => {
+      Promise.resolve(idahoHarvestSupervisor.close()).catch(() => {});
+    });
+  }
 
   return server;
 }

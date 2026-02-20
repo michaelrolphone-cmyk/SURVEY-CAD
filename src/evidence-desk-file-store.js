@@ -182,7 +182,7 @@ function parseXmlTagValues(xml = '', tagName = '') {
   return values;
 }
 
-function createS3FetchClient({ endpoint, bucket, region = 'us-east-1', accessKeyId, secretAccessKey, sessionToken = '', forcePathStyle = true, fetchImpl = fetch }) {
+export function createS3FetchClient({ endpoint, bucket, region = 'us-east-1', accessKeyId, secretAccessKey, sessionToken = '', forcePathStyle = true, fetchImpl = fetch }) {
   if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
     throw new Error('Incomplete S3 config: endpoint, bucket, access key, and secret are required.');
   }

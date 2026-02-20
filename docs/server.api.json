@@ -2741,6 +2741,79 @@
           }
         }
       }
+    },
+    "/api/idaho-harvest/status": {
+      "get": {
+        "tags": [
+          "Worker"
+        ],
+        "summary": "Get Idaho parcel/CPNF harvest worker status",
+        "operationId": "getIdahoHarvestStatus",
+        "responses": {
+          "200": {
+            "description": "Worker status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdahoHarvestStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/idaho-harvest/start": {
+      "post": {
+        "tags": [
+          "Worker"
+        ],
+        "summary": "Start Idaho parcel/CPNF harvest worker",
+        "operationId": "startIdahoHarvestWorker",
+        "responses": {
+          "202": {
+            "description": "Worker start accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdahoHarvestStatusResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Workers disabled by configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/idaho-harvest/stop": {
+      "post": {
+        "tags": [
+          "Worker"
+        ],
+        "summary": "Stop Idaho parcel/CPNF harvest worker",
+        "operationId": "stopIdahoHarvestWorker",
+        "responses": {
+          "202": {
+            "description": "Worker stop accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdahoHarvestStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5785,6 +5858,52 @@
             "description": "User identifier/name for the operator who made the change."
           }
         }
+      },
+      "IdahoHarvestWorkerStatus": {
+        "type": "object",
+        "properties": {
+          "desiredRunning": {
+            "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "pid": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "restartCount": {
+            "type": "integer"
+          },
+          "lastExitCode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "desiredRunning",
+          "running",
+          "restartCount",
+          "status"
+        ]
+      },
+      "IdahoHarvestStatusResponse": {
+        "type": "object",
+        "properties": {
+          "worker": {
+            "$ref": "#/components/schemas/IdahoHarvestWorkerStatus"
+          }
+        },
+        "required": [
+          "worker"
+        ]
       }
     }
   }
