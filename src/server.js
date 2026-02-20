@@ -1119,6 +1119,10 @@ export function createSurveyServer({
     return evidenceDeskStorePromise;
   }
 
+  Promise.resolve()
+    .then(() => resolveEvidenceDeskStore())
+    .catch(() => {});
+
   function buildPdfThumbnailCacheKey(sourceUrl = '') {
     const hash = createHash('sha256').update(String(sourceUrl || '')).digest('hex');
     return `surveycad:pdf-thumb:v1:${hash}`;

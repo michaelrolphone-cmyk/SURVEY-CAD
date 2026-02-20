@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createEvidenceDeskFileStore,
   InMemoryEvidenceDeskFileStore,
+  purgeLegacyRedisBinaryKeys,
   RedisEvidenceDeskFileStore,
   S3EvidenceDeskFileStore,
 } from '../src/evidence-desk-file-store.js';
@@ -41,8 +42,26 @@ class FakeRedis {
     return [...(this.sets.get(key) || new Set())];
   }
 
-  async del(key) {
-    return this.values.delete(key) ? 1 : 0;
+  async del(...keys) {
+    let removed = 0;
+    for (const key of keys) {
+      if (this.values.delete(key)) removed += 1;
+    }
+    return removed;
+  }
+
+  async unlink(...keys) {
+    return this.del(...keys);
+  }
+
+  async scan(cursor = '0', { MATCH: matchPattern = '*', COUNT: count = 10 } = {}) {
+    const escaped = String(matchPattern).replace(/[|\{}()[\]^$+?.]/g, '\\$&').replace(/\*/g, '.*');
+    const regex = new RegExp(`^${escaped}$`);
+    const allKeys = [...this.values.keys()].filter((key) => regex.test(key)).sort();
+    const start = Number(cursor) || 0;
+    const next = allKeys.slice(start, start + Number(count || 10));
+    const nextCursor = start + next.length >= allKeys.length ? '0' : String(start + next.length);
+    return [nextCursor, next];
   }
 
   multi() {
@@ -367,6 +386,40 @@ test('createEvidenceDeskFileStore uses redis when connection succeeds', async ()
   assert.equal(connected, true);
   assert.equal(result.type, 'redis');
   assert.equal(result.redisClient, connectedClient);
+});
+
+
+test('purgeLegacyRedisBinaryKeys removes legacy redis binary + thumbnail keys', async () => {
+  const redis = new FakeRedis();
+  await redis.set('surveycad:evidence-desk:bin:proj-1:drawings:legacy.pdf', 'AA==');
+  await redis.set('surveycad:evidence-desk:thumb:proj-1:drawings:legacy.pdf', 'BB==');
+  await redis.set('surveycad:evidence-desk:meta:proj-1:drawings:legacy.pdf', '{"ok":true}');
+
+  const result = await purgeLegacyRedisBinaryKeys({ redis });
+
+  assert.equal(result.matchedKeys, 2);
+  assert.equal(result.deletedKeys, 2);
+  assert.equal(await redis.get('surveycad:evidence-desk:meta:proj-1:drawings:legacy.pdf'), '{"ok":true}');
+  assert.equal(await redis.get('surveycad:evidence-desk:bin:proj-1:drawings:legacy.pdf'), null);
+  assert.equal(await redis.get('surveycad:evidence-desk:thumb:proj-1:drawings:legacy.pdf'), null);
+});
+
+test('createEvidenceDeskFileStore runs legacy redis binary cleanup when using s3/minio', async () => {
+  const redis = new FakeRedis();
+  const s3 = new FakeS3();
+  await redis.set('surveycad:evidence-desk:bin:proj-2:drawings:migrated.pdf', 'AA==');
+  await redis.set('surveycad:evidence-desk:thumb:proj-2:drawings:migrated.pdf', 'BB==');
+
+  const result = await createEvidenceDeskFileStore({
+    redisClient: redis,
+    s3Client: s3,
+    s3Config: { bucket: 'survey-foundry', prefix: 'test/evidence', region: 'us-east-1' },
+  });
+
+  assert.equal(result.type, 's3');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(await redis.get('surveycad:evidence-desk:bin:proj-2:drawings:migrated.pdf'), null);
+  assert.equal(await redis.get('surveycad:evidence-desk:thumb:proj-2:drawings:migrated.pdf'), null);
 });
 
 test('redis evidence desk store maps redis maxmemory OOM errors to HTTP 507 semantics', async () => {

@@ -48,6 +48,65 @@ function sanitizeStorageSegment(value = '') {
   return encodeURIComponent(String(value || '').trim());
 }
 
+function parseScanReply(reply) {
+  if (!reply) return { cursor: '0', keys: [] };
+  if (Array.isArray(reply)) {
+    return {
+      cursor: String(reply[0] ?? '0'),
+      keys: Array.isArray(reply[1]) ? reply[1] : [],
+    };
+  }
+  return {
+    cursor: String(reply.cursor ?? '0'),
+    keys: Array.isArray(reply.keys) ? reply.keys : [],
+  };
+}
+
+async function scanKeys(redis, pattern, count = 200) {
+  if (typeof redis?.scan === 'function') {
+    let cursor = '0';
+    const keys = [];
+    do {
+      const reply = await redis.scan(cursor, { MATCH: pattern, COUNT: count });
+      const parsed = parseScanReply(reply);
+      cursor = parsed.cursor;
+      keys.push(...parsed.keys);
+    } while (cursor !== '0');
+    return keys;
+  }
+  if (typeof redis?.keys === 'function') {
+    const keys = await redis.keys(pattern);
+    return Array.isArray(keys) ? keys : [];
+  }
+  return [];
+}
+
+async function deleteKeys(redis, keys = []) {
+  if (!Array.isArray(keys) || keys.length === 0) return 0;
+  if (typeof redis?.unlink === 'function') {
+    return Number(await redis.unlink(...keys)) || 0;
+  }
+  if (typeof redis?.del === 'function') {
+    return Number(await redis.del(...keys)) || 0;
+  }
+  return 0;
+}
+
+export async function purgeLegacyRedisBinaryKeys({ redis, prefix = 'surveycad:evidence-desk', scanCount = 200 } = {}) {
+  if (!redis) return { deletedKeys: 0, matchedKeys: 0 };
+
+  const patterns = [`${prefix}:bin:*`, `${prefix}:thumb:*`];
+  let matchedKeys = 0;
+  let deletedKeys = 0;
+  for (const pattern of patterns) {
+    const keys = await scanKeys(redis, pattern, scanCount);
+    matchedKeys += keys.length;
+    if (!keys.length) continue;
+    deletedKeys += await deleteKeys(redis, keys);
+  }
+  return { deletedKeys, matchedKeys };
+}
+
 function parseEnvUrl(urlRaw = '') {
   const value = String(urlRaw || '').trim();
   if (!value) return null;
@@ -871,6 +930,17 @@ export async function createEvidenceDeskFileStore({
       sessionToken: resolvedConfig.sessionToken || '',
       forcePathStyle: resolvedConfig.forcePathStyle !== false,
     });
+    if (redisClient) {
+      Promise.resolve()
+        .then(() => purgeLegacyRedisBinaryKeys({ redis: redisClient }))
+        .then(({ deletedKeys }) => {
+          if (deletedKeys > 0) console.log(`[evidence-desk] cleaned ${deletedKeys} legacy Redis binary key(s) after S3/MinIO migration.`);
+        })
+        .catch((error) => {
+          console.warn(`[evidence-desk] failed to clean legacy Redis binary keys: ${error?.message || error}`);
+        });
+    }
+
     return {
       store: new S3EvidenceDeskFileStore(client, { bucket: resolvedConfig.bucket, prefix: resolvedConfig.prefix }),
       redisClient: null,
