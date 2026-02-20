@@ -668,10 +668,11 @@ test('VIEWPORT.HTML point inspector surfaces CP&F instrument links from selected
   assert.match(html, /ADA_CPF_PDF_BASE\s*=\s*"https:\/\/gisprod\.adacounty\.id\.gov\/apps\/acdscpf\/CpfPdfs\/"/, 'point inspector should use the Ada CP&F PDF base path');
   assert.match(html, /cpfLabel\.textContent\s*=\s*`CP&F \(≤\$\{CPNF_NEARBY_DISTANCE_FEET\}ft\)`/, 'point inspector should label CP&F row with nearby radius context');
   assert.match(html, /a\.textContent\s*=\s*`Open\s+\$\{instrument\}`/, 'point inspector should render quick-open CP&F links per instrument');
-  assert.match(html, /function\s+parseRosNumbers\(value\s*=\s*""\)/, 'point inspector should parse ROS number references from point data.');
+  assert.match(html, /function\s+parseRosNumbers\(value\s*=\s*""\)/, 'point inspector should parse ROS number references directly from notes text.');
   assert.match(html, /function\s+buildRosResourceLookup\(projectId\)/, 'point inspector should build an ROS-number lookup from EvidenceDesk project resources.');
   assert.match(html, /if \(folder\?\.key !== "ros"\) continue;/, 'ROS lookup should only include uploaded PDFs from the ROS folder.');
-  assert.match(html, /\["ROS Refs",\s*"rosRefs",\s*p\.rosRefs \|\| ""\]/, 'point inspector should expose an editable ROS Refs field for associating point evidence.');
+  assert.match(html, /const\s+matches\s*=\s*raw\.matchAll\(/, 'ROS parser should scan note text for ROS tokens so mixed note content remains supported.');
+  assert.match(html, /const\s+refs\s*=\s*new\s+Set\(parseRosNumbers\(point\.notes \|\| ""\)\);/, 'ROS summary should derive references from point notes instead of a dedicated rosRefs field.');
   assert.match(html, /rosLabel\.textContent\s*=\s*"ROS refs";/, 'point inspector should render an ROS refs summary row.');
   assert.match(html, /a\.textContent\s*=\s*`Open ROS \$\{ros\.rosNumber\}`;/, 'point inspector should render quick-open links for ROS references mapped to uploaded PDFs.');
   assert.match(html, /function\s+applySelectedPointEdits\(fields,\s*sourceLabel\s*=\s*"inspector",\s*options\s*=\s*\{\}\)/, 'point inspector and point editor should share a single apply helper for point property updates');
