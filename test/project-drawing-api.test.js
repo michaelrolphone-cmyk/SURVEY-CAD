@@ -67,6 +67,16 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(loaded.drawing.currentState.points[0].x, 3);
     assert.equal(loaded.drawing.currentState.points[0].notes, '');
 
+    const drawingFileListRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/list?projectId=demo-project`);
+    assert.equal(drawingFileListRes.status, 200);
+    const drawingFileListPayload = await drawingFileListRes.json();
+    const objectStoreDrawingFile = drawingFileListPayload.files.find((file) => file.folderKey === 'drawings' && String(file.fileName || '').endsWith(`${drawingId}.linesmith.json`));
+    assert.ok(objectStoreDrawingFile);
+
+    const objectStoreDrawingRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=demo-project&folderKey=drawings&fileName=${encodeURIComponent(objectStoreDrawingFile.fileName)}`);
+    assert.equal(objectStoreDrawingRes.status, 200);
+    const objectStoreDrawing = await objectStoreDrawingRes.json();
+    assert.equal(objectStoreDrawing.drawingState.points[0].x, 3);
 
     const linkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points`);
     assert.equal(linkedPointFileRes.status, 200);
@@ -235,6 +245,9 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
 
     const missingRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`);
     assert.equal(missingRes.status, 404);
+
+    const deletedObjectStoreDrawingRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=demo-project&folderKey=drawings&fileName=${encodeURIComponent(objectStoreDrawingFile.fileName)}`);
+    assert.equal(deletedObjectStoreDrawingRes.status, 404);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }

@@ -35,6 +35,35 @@ npm start
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 
+
+## API and CLI notes for object-store-backed LineSmith and PointFoundry files
+
+LineSmith project drawing saves now write a JSON drawing artifact into the project object store `drawings` folder, and PointFoundry project point-file saves now write the exported text artifact into the project object store `point-files` folder.
+
+- LineSmith drawing API endpoints:
+  - `GET /api/projects/:projectId/drawings`
+  - `POST /api/projects/:projectId/drawings`
+  - `GET /api/projects/:projectId/drawings/:drawingId`
+  - `PUT /api/projects/:projectId/drawings/:drawingId`
+  - `PATCH /api/projects/:projectId/drawings/:drawingId`
+  - `DELETE /api/projects/:projectId/drawings/:drawingId`
+- PointFoundry point-file API endpoints:
+  - `GET /api/projects/:projectId/point-files`
+  - `POST /api/projects/:projectId/point-files`
+  - `GET /api/projects/:projectId/point-files/:pointFileId`
+  - `PUT /api/projects/:projectId/point-files/:pointFileId`
+  - `PATCH /api/projects/:projectId/point-files/:pointFileId`
+  - `DELETE /api/projects/:projectId/point-files/:pointFileId`
+- Object-store file APIs used by the backend for persisted artifacts:
+  - `GET /api/project-files/list`
+  - `GET /api/project-files/download`
+  - `POST /api/project-files/upload`
+  - `PUT /api/project-files/file`
+  - `DELETE /api/project-files/file`
+- CLI/server commands:
+  - `npm start`
+  - `npm test`
+
 ## API and CLI notes for Marks LLM long-running chat streaming
 
 Marks chat websocket proxy requests (`GET /ws/lmproxy`) now default to **no server-side per-request timeout**, so long-running streamed LLM responses can continue for extended durations without the hub force-cancelling at 120 seconds.
