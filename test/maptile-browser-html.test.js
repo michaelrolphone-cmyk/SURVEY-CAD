@@ -15,4 +15,8 @@ test('MapTileBrowser app uses Leaflet and maptile APIs', async () => {
   assert.match(html, /id="map"/i);
   assert.match(html, /fetch\('\/api\/maptiles'\)/i);
   assert.match(html, /\/api\/maptiles\/\$\{encodeURIComponent\(dataset\)\}\/tilejson\.json/i);
+  assert.match(html, /parcelOverlayPane/i);
+  assert.match(html, /const datasetPaint = \{/i);
+  assert.match(html, /Drew \$\{drawnFeatures\} features\./i);
+  assert.match(html, /Promise\.all\(fetchQueue\)/i);
 });
