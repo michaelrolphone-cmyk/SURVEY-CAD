@@ -59,6 +59,8 @@ Harvest cycles now rotate dataset processing order between parcels and CPNF so C
 - Feature objects: `surveycad/idaho-harvest/features/id/<dataset>/<objectId>.geojson`
   - `cpnf` dataset writes into MinIO bucket `cpnfs`
   - `parcels` dataset writes into MinIO bucket `tile-server`
+  - CPNF features include `properties.cpnfPdfKeys` when PDF links are discovered and downloaded
+- CPNF PDF objects: `surveycad/idaho-harvest/pdfs/id/cpnf/<objectId>/<index>-<fileName>.pdf` (MinIO bucket `cpnfs`)
 - Tile buckets: `surveycad/idaho-harvest/tiles/id/<dataset>/<z>/<x>/<y>.geojson` (MinIO bucket `tile-server`)
   - Tile feature properties include harvested survey-number fields (when present) as `surveyNumbers` and computed centroid coordinates as `location`
 - Master index: `surveycad/idaho-harvest/indexes/id-master-index.geojson` (MinIO bucket `tile-server`)
@@ -75,6 +77,7 @@ Harvest cycles now rotate dataset processing order between parcels and CPNF so C
 - `IDAHO_HARVEST_POLL_INTERVAL_MS` (fixed delay used only when randomized throttling is disabled; default: `1000`)
 - `IDAHO_HARVEST_PARCEL_LAYER` (default: `24`)
 - `IDAHO_HARVEST_CPNF_LAYER` (default: `18`)
+- `IDAHO_HARVEST_CPNF_PDF_BASE_URL` (optional base URL used to resolve relative CPNF PDF paths before download)
 - `STACKHERO_MINIO_HOST` (required; worker will fail fast when MinIO is not configured)
 - `STACKHERO_MINIO_ACCESS_KEY`
 - `STACKHERO_MINIO_SECRET_KEY`

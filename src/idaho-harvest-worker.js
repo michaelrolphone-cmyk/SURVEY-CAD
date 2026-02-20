@@ -98,6 +98,7 @@ export async function runIdahoHarvestWorker({
         objectStore: resolvedStore,
         adaMapServerBaseUrl: client.config.adaMapServer,
         batchSize: Number(env.IDAHO_HARVEST_BATCH_SIZE || 100),
+        cpnfPdfBaseUrl: String(env.IDAHO_HARVEST_CPNF_PDF_BASE_URL || ''),
         datasets: [
           { name: 'parcels', layerId: Number(env.IDAHO_HARVEST_PARCEL_LAYER || 24) },
           { name: 'cpnf', layerId: Number(env.IDAHO_HARVEST_CPNF_LAYER || 18) },
