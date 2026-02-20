@@ -56,21 +56,17 @@ test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and 
   assert.match(html, /renameResourceTitle\(projectContext\?\.projectFile, folder\?\.key, entry\?\.id, nextTitle\)/, 'EvidenceDesk should rename non-API resources in project-file index state');
 });
 
-test('EvidenceDesk file rows prioritize configured names and truncate actual file names', async () => {
+test('EvidenceDesk file rows keep controls aligned and always visible', async () => {
   const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
-  assert.match(html, /\.file-name-configured\s*\{[\s\S]*color:\s*#f8fafc;[\s\S]*font-weight:\s*600;/, 'EvidenceDesk should render configured names in brighter text.');
-  assert.match(html, /\.file-name-actual\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/, 'EvidenceDesk should truncate long actual file names with ellipsis.');
+  assert.match(html, /\.file-name-configured\s*\{[\s\S]*color:\s*#f8fafc;[\s\S]*font-weight:\s*600;[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/, 'EvidenceDesk should truncate configured file names so controls stay visible.');
+  assert.match(html, /\.file-actions\s*\{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;[\s\S]*margin-left:\s*auto;/, 'EvidenceDesk should render actions in a dedicated right-aligned button container.');
   assert.match(html, /const\s+leadingIcon\s*=\s*showThumbnailSlot\s*\?\s*''\s*:\s*'<span class="icon">📄<\/span>';/, 'EvidenceDesk should omit the extra PDF icon when a PDF thumbnail is shown.');
   assert.match(html, /const\s+showThumbnailSlot\s*=\s*canLaunchPointForge\s*\|\|\s*canOpenLineSmithDrawing\s*\|\|\s*isPdfResource\s*\|\|\s*isImageUpload;/, 'EvidenceDesk should reserve thumbnail space for rows that support generated previews, including image uploads.');
   assert.match(html, /const\s+thumbnailSlotMarkup\s*=\s*showThumbnailSlot\s*\?\s*'<span class="file-preview-slot" aria-hidden="true"><\/span>'\s*:\s*'';/, 'EvidenceDesk should avoid adding thumbnail markup to non-preview folders.');
-  assert.doesNotMatch(html, /pdf-preview-icon/, 'EvidenceDesk should not render the legacy PDF icon badge markup in file rows.');
-  assert.match(html, /\.pdf-preview-thumb\s*\{[\s\S]*width:\s*86px;[\s\S]*height:\s*50px;/, 'EvidenceDesk should style embedded PDF thumbnails to match preview dimensions.');
-  assert.match(html, /function\s+attachPdfPreview\(resource,\s*folder,\s*entry\)\s*\{[\s\S]*document\.createElement\('img'\)[\s\S]*className\s*=\s*'pdf-preview-thumb'/, 'EvidenceDesk should hydrate PDF preview slots with a generated first-page image thumbnail.');
-  assert.match(html, /if\s*\(isPdfResource\)\s*\{[\s\S]*attachPdfPreview\(resource,\s*folder,\s*entry\);/, 'EvidenceDesk should attach PDF previews when rendering PDF resources.');
-  assert.match(html, /<span class="file-meta">\$\{leadingIcon\}\$\{thumbnailSlotMarkup\}<span class="file-name">/, 'EvidenceDesk should inject the preview slot before file names when thumbnail rows are rendered.');
-  assert.match(html, /<span class="file-name-configured">\$\{configuredFileName\}<\/span><span class="file-name-actual" title="\$\{actualFileName\}">— \$\{actualFileName\}<\/span>/, 'EvidenceDesk should display configured file name first and actual file name after it.');
-  assert.match(html, /if \(!canLaunchPointForge && !canOpenLineSmithDrawing && !canOpenCpfPdf && !isServerUpload\)\s*\{[\s\S]*deleteButton\.textContent\s*=\s*'Delete'[\s\S]*renameButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk should expose rename and delete controls for files in any non-specialized folder.');
-  assert.match(html, /if \(isServerUpload\)\s*\{[\s\S]*renameButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk should expose rename controls for uploaded files in every folder.');
+  assert.match(html, /resource\.innerHTML\s*=\s*`<span class="file-meta">\$\{leadingIcon\}\$\{thumbnailSlotMarkup\}<span class="file-name"><span class="file-name-configured" title="\$\{actualFileName\}">\$\{configuredFileName\}<\/span><\/span><\/span>`;/, 'EvidenceDesk should remove the extra actual filename column from row content.');
+  assert.match(html, /const\s+actionButtons\s*=\s*document\.createElement\('div'\);[\s\S]*actionButtons\.className\s*=\s*'file-actions';/, 'EvidenceDesk should construct a shared actions container for each file row.');
+  assert.match(html, /actionButtons\.appendChild\(openButton\);[\s\S]*actionButtons\.appendChild\(deleteButton\);[\s\S]*actionButtons\.appendChild\(renameButton\);/, 'EvidenceDesk should append open\/delete\/rename controls into the aligned action container.');
+  assert.doesNotMatch(html, /file-name-actual/, 'EvidenceDesk should no longer render the legacy actual file name label in each row.');
 });
 
 test('EvidenceDesk opens PDFs in dedicated browser windows', async () => {

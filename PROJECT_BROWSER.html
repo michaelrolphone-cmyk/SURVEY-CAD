@@ -155,6 +155,7 @@
       align-items: center;
       gap: 0.4rem;
       min-width: 0;
+      flex: 1 1 auto;
     }
 
     .point-file-preview-thumb {
@@ -239,15 +240,20 @@
     .file-name-configured {
       color: #f8fafc;
       font-weight: 600;
-      flex: none;
-    }
-
-    .file-name-actual {
-      color: var(--muted);
+      min-width: 0;
+      flex: 1 1 auto;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      min-width: 0;
+    }
+
+    .file-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.4rem;
+      margin-left: auto;
+      flex: none;
     }
 
     .launch-btn {
@@ -1324,7 +1330,10 @@
           const configuredFileName = entry?.title || actualFileName;
           const leadingIcon = showThumbnailSlot ? '' : '<span class="icon">📄</span>';
           const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span></span></span>`;
+          const actionButtons = document.createElement('div');
+          actionButtons.className = 'file-actions';
+          resource.appendChild(actionButtons);
 
           if (canLaunchPointForge) {
             attachPointFilePreview(resource, entry).catch(() => {});
@@ -1363,7 +1372,7 @@
               event.stopPropagation();
               launchPointForgeFromResource(entry, projectContext);
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const deletePointFileButton = document.createElement('button');
             deletePointFileButton.type = 'button';
@@ -1374,7 +1383,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deletePointFileButton);
+            actionButtons.appendChild(deletePointFileButton);
 
             const renamePointFileButton = document.createElement('button');
             renamePointFileButton.type = 'button';
@@ -1385,7 +1394,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renamePointFileButton);
+            actionButtons.appendChild(renamePointFileButton);
           }
 
           if (canOpenLineSmithDrawing) {
@@ -1409,7 +1418,7 @@
               event.stopPropagation();
               launchLineSmithFromDrawingResource(entry, projectContext);
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const renameDrawingButton = document.createElement('button');
             renameDrawingButton.type = 'button';
@@ -1420,7 +1429,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renameDrawingButton);
+            actionButtons.appendChild(renameDrawingButton);
 
             const deleteDrawingButton = document.createElement('button');
             deleteDrawingButton.type = 'button';
@@ -1431,7 +1440,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteDrawingButton);
+            actionButtons.appendChild(deleteDrawingButton);
           }
 
           if (canOpenCpfPdf) {
@@ -1455,7 +1464,7 @@
               event.stopPropagation();
               openCpfPdfFromResource(entry);
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
@@ -1466,7 +1475,7 @@
               event.stopPropagation();
               deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteButton);
+            actionButtons.appendChild(deleteButton);
 
             const renameButton = document.createElement('button');
             renameButton.type = 'button';
@@ -1477,7 +1486,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renameButton);
+            actionButtons.appendChild(renameButton);
           }
 
           const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;
@@ -1520,7 +1529,7 @@
               }
               window.open(downloadUrl, '_blank', 'noopener,noreferrer');
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
@@ -1531,7 +1540,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteButton);
+            actionButtons.appendChild(deleteButton);
 
             const renameButton = document.createElement('button');
             renameButton.type = 'button';
@@ -1542,7 +1551,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renameButton);
+            actionButtons.appendChild(renameButton);
           }
 
           if (!canLaunchPointForge && !canOpenLineSmithDrawing && !canOpenCpfPdf && !isServerUpload) {
@@ -1555,7 +1564,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteButton);
+            actionButtons.appendChild(deleteButton);
 
             const renameButton = document.createElement('button');
             renameButton.type = 'button';
@@ -1566,7 +1575,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renameButton);
+            actionButtons.appendChild(renameButton);
           }
 
           treeContainer.appendChild(resource);
