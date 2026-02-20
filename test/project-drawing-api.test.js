@@ -82,6 +82,7 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        drawingState: { points: [{ id: 'p-1', x: 3, y: 2 }, { id: 'p-2', x: 5, y: 8 }], mapGeoreference: { origin: [10, 10] } },
         pointFileLink: {
           pointFileId: 'boundary-points-relinked',
           pointFileName: 'Boundary Points Relinked.csv',
@@ -109,6 +110,11 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
       }),
     });
     assert.equal(seededRelinkedPointFileRes.status, 201);
+
+    const relinkedPointFileAfterRelinkSaveRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points-relinked`);
+    assert.equal(relinkedPointFileAfterRelinkSaveRes.status, 200);
+    const relinkedPointFileAfterRelinkSave = await relinkedPointFileAfterRelinkSaveRes.json();
+    assert.equal(relinkedPointFileAfterRelinkSave.pointFile.currentState.text, '900,700,800,9,NEW,Relink Target');
 
     const getAfterRelinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`);
     assert.equal(getAfterRelinkRes.status, 200);
