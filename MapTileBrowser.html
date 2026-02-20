@@ -81,7 +81,26 @@
 
     const activeTileLayer = L.layerGroup().addTo(map);
     const tileCache = new Map();
+    const tilePane = map.createPane('parcelOverlayPane');
+    tilePane.style.zIndex = '450';
+    tilePane.style.pointerEvents = 'none';
     let tileTemplate = '';
+    let renderSequence = 0;
+
+    const datasetPaint = {
+      parcels: {
+        stroke: '#f97316',
+        fill: '#fbff12',
+      },
+      cpnf: {
+        stroke: '#ff00ff',
+        fill: '#39ff14',
+      },
+      fallback: {
+        stroke: '#ff2d95',
+        fill: '#00fff7',
+      },
+    };
 
     function setStatus(text, isError = false) {
       statusEl.textContent = text;
@@ -123,8 +142,7 @@
     async function renderVisibleTiles() {
       const dataset = datasetSelect.value;
       if (!dataset || !tileTemplate) return;
-
-      activeTileLayer.clearLayers();
+      const localRenderSequence = ++renderSequence;
       const zoom = Math.round(map.getZoom());
       const minZoom = Math.max(0, Number(minZoomInput.value || 0));
       const maxZoom = Math.max(minZoom, Number(maxZoomInput.value || 22));
@@ -139,30 +157,52 @@
       const yMin = lat2tile(bounds.getNorth(), zoom);
       const yMax = lat2tile(bounds.getSouth(), zoom);
 
-      let loaded = 0;
-      let attempted = 0;
+      const paint = datasetPaint[dataset] || datasetPaint.fallback;
+      const fetchQueue = [];
       for (let x = xMin; x <= xMax; x += 1) {
         for (let y = yMin; y <= yMax; y += 1) {
-          attempted += 1;
-          const tile = await fetchTile(dataset, zoom, x, y);
-          if (!tile || tile.type !== 'FeatureCollection') continue;
-          loaded += 1;
-          L.geoJSON(tile, {
-            style: {
-              color: '#22d3ee',
-              weight: 1,
-              fillColor: '#0ea5e9',
-              fillOpacity: 0.2,
-            },
-            onEachFeature(feature, layer) {
-              const props = feature?.properties || {};
-              const title = props.PARCEL || props.PROP_ID || props.objectid || 'Feature';
-              layer.bindPopup(`<strong>${title}</strong><br/><pre style="margin:0;white-space:pre-wrap">${JSON.stringify(props, null, 2)}</pre>`);
-            },
-          }).addTo(activeTileLayer);
+          fetchQueue.push(fetchTile(dataset, zoom, x, y));
         }
       }
-      setStatus(`Loaded ${loaded}/${attempted} tiles at z${zoom} for ${dataset}.`);
+      const tiles = await Promise.all(fetchQueue);
+      if (localRenderSequence !== renderSequence) return;
+
+      activeTileLayer.clearLayers();
+
+      let loaded = 0;
+      let drawnFeatures = 0;
+      for (const tile of tiles) {
+        if (!tile || tile.type !== 'FeatureCollection') continue;
+        const features = Array.isArray(tile.features) ? tile.features : [];
+        loaded += 1;
+        drawnFeatures += features.length;
+        L.geoJSON(tile, {
+          pane: 'parcelOverlayPane',
+          style: {
+            color: paint.stroke,
+            weight: 3,
+            fillColor: paint.fill,
+            fillOpacity: 0.45,
+          },
+          pointToLayer(_feature, latlng) {
+            return L.circleMarker(latlng, {
+              radius: 7,
+              color: paint.stroke,
+              weight: 2,
+              fillColor: paint.fill,
+              fillOpacity: 0.95,
+              pane: 'parcelOverlayPane',
+            });
+          },
+          onEachFeature(feature, layer) {
+            const props = feature?.properties || {};
+            const title = props.PARCEL || props.PROP_ID || props.objectid || 'Feature';
+            layer.bindPopup(`<strong>${title}</strong><br/><pre style="margin:0;white-space:pre-wrap">${JSON.stringify(props, null, 2)}</pre>`);
+          },
+        }).addTo(activeTileLayer);
+      }
+
+      setStatus(`Loaded ${loaded}/${fetchQueue.length} tiles at z${zoom} for ${dataset}. Drew ${drawnFeatures} features.`);
     }
 
     async function loadDataset(dataset) {
