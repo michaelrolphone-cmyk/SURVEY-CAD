@@ -393,6 +393,8 @@ Create a new uploaded file in EvidenceDesk project storage.
 
 **Response `413`:** Returned immediately when `Content-Length` exceeds the 50 MB upload limit.
 
+**Response `507`:** Redis-backed file storage is out of memory (`maxmemory` exhausted), so the upload cannot be persisted.
+
 ---
 
 ### `PUT /api/project-files/upload`
@@ -412,6 +414,8 @@ Update an existing uploaded file (replace file contents in Redis).
 **Response `200`:** Returns updated `resource` metadata. Image updates regenerate `reference.metadata.thumbnailUrl` previews.
 
 **Response `413`:** Returned immediately when `Content-Length` exceeds the 50 MB upload limit.
+
+**Response `507`:** Redis-backed file storage is out of memory (`maxmemory` exhausted), so the upload cannot be persisted.
 
 ---
 

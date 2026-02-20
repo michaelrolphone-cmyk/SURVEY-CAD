@@ -513,6 +513,9 @@
                 }
               }
             }
+          },
+          "507": {
+            "$ref": "#/components/responses/Error507"
           }
         }
       },
@@ -587,6 +590,9 @@
                 }
               }
             }
+          },
+          "507": {
+            "$ref": "#/components/responses/Error507"
           }
         }
       }
@@ -3026,6 +3032,16 @@
       },
       "Error502": {
         "description": "Upstream server error (proxied requests)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error507": {
+        "description": "Insufficient storage capacity in Redis-backed upload store.",
         "content": {
           "application/json": {
             "schema": {

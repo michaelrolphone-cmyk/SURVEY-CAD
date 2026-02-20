@@ -1192,3 +1192,62 @@ test('pointforge-exports API saves and loads original and modified points', asyn
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+test('project file upload returns HTTP 507 when storage backend is out of memory', async () => {
+  const evidenceDeskFileStore = {
+    async createFile() {
+      const err = new Error('Upload storage is full. Could not store project file.');
+      err.status = 507;
+      throw err;
+    },
+    async updateFile() {
+      throw new Error('not implemented');
+    },
+    async getFile() {
+      return null;
+    },
+    async listFiles() {
+      return { files: [], filesByFolder: {} };
+    },
+    async deleteFile() {
+      return false;
+    },
+    async updateFileMetadata() {
+      return null;
+    },
+    async moveFile() {
+      return null;
+    },
+  };
+
+  const app = await startApiServer(new SurveyCadClient(), { evidenceDeskFileStore });
+  const boundary = '----StorageFullBoundary';
+  try {
+    const uploadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body: [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="projectId"',
+        '',
+        'project-storage-full',
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="folderKey"',
+        '',
+        'drawings',
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="full.txt"',
+        'Content-Type: text/plain',
+        '',
+        'content',
+        `--${boundary}--`,
+      ].join('\r\n'),
+    });
+
+    assert.equal(uploadRes.status, 507);
+    const payload = await uploadRes.json();
+    assert.match(payload.error, /storage is full/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});

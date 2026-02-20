@@ -1192,8 +1192,8 @@ EvidenceDesk now shows live upload progress in the upload status line (including
 EvidenceDesk photo uploads now support point-number metadata so LineSmith can show a matching point photo thumbnail and full-size link in the point inspector when a selected point number matches uploaded image metadata.
 
 ### API endpoints
-- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB.
-- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB.
+- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB and `507` when Redis-backed upload storage is out of memory.
+- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB and `507` when Redis-backed upload storage is out of memory.
 - `GET /api/project-files/download?projectId=...&folderKey=...&fileName=...` — read/download a stored file.
 - `GET /api/project-files/image-thumbnail?projectId=...&folderKey=...&fileName=...` — read a generated 512px-wide PNG thumbnail for uploaded image files (when available).
 - `DELETE /api/project-files/file?projectId=...&folderKey=...&fileName=...` — delete a stored file.
