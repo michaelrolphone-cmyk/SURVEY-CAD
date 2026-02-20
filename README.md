@@ -1290,3 +1290,10 @@ EvidenceDesk photo uploads now support point-number metadata so LineSmith can sh
 - `npm start`
 - `npm test`
 - `npm run cli -- --help`
+
+## API and CLI notes for EvidenceDesk Redis binary cleanup on startup
+
+When EvidenceDesk is configured for S3/MinIO object storage, server startup now schedules a background cleanup pass that scans Redis for legacy EvidenceDesk binary payload keys and deletes them (`surveycad:evidence-desk:bin:*` and `surveycad:evidence-desk:thumb:*`). This removes pre-migration binary blobs that are now persisted in MinIO.
+
+- API endpoints: `GET /health`, `GET /api/project-files`, `GET /api/project-files/download`, `GET /api/project-files/image-thumbnail`.
+- CLI/server commands: `npm start`, `npm test`.
