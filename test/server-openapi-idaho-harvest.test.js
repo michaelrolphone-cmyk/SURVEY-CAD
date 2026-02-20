@@ -10,6 +10,7 @@ test('server OpenAPI spec documents Idaho harvest worker endpoints', async () =>
 
   assert.ok(spec?.paths?.['/api/idaho-harvest/status']?.get);
   assert.ok(spec?.paths?.['/api/idaho-harvest/start']?.post);
+  assert.ok(spec?.paths?.['/api/idaho-harvest/start']?.post?.responses?.['403']);
   assert.ok(spec?.paths?.['/api/idaho-harvest/stop']?.post);
 
   const schema = spec?.components?.schemas?.IdahoHarvestWorkerStatus;

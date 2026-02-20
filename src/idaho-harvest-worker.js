@@ -25,6 +25,11 @@ export function resolveInterBatchDelayMs(env = process.env, randomFn = Math.rand
   return randomIntBetween(minMs, maxMs, randomFn);
 }
 
+function areWorkersEnabled(env = process.env) {
+  return String(env.WORKERS_ENABLED || '1').trim().toLowerCase() !== 'false'
+    && String(env.WORKERS_ENABLED || '1').trim() !== '0';
+}
+
 export function createIdahoHarvestObjectStoreFromEnv(env = process.env, createS3Client = createS3FetchClient) {
   const endpoint = String(env.STACKHERO_MINIO_HOST || '').trim();
   const accessKeyId = String(env.STACKHERO_MINIO_ACCESS_KEY || '').trim();
@@ -76,6 +81,8 @@ export async function runIdahoHarvestWorker({
   sleepFn = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   randomFn = Math.random,
 } = {}) {
+  if (!areWorkersEnabled(env)) return;
+
   const resolvedStore = store || createIdahoHarvestObjectStoreFromEnv(env);
   let shuttingDown = false;
 

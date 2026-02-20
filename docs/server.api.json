@@ -2780,6 +2780,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Workers disabled by configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }

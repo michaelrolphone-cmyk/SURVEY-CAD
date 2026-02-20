@@ -157,6 +157,12 @@ function canGenerateImageThumbnail({ extension = '', mimeType = '' } = {}) {
   return IMAGE_EXTENSIONS.has(normalizedExt);
 }
 
+
+function areWorkersEnabled(env = process.env) {
+  return String(env.WORKERS_ENABLED || '1').trim().toLowerCase() !== 'false'
+    && String(env.WORKERS_ENABLED || '1').trim() !== '0';
+}
+
 function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -1215,7 +1221,7 @@ export function createSurveyServer({
   let bewCloseHookInstalled = false;
   let evidenceDeskCloseHookInstalled = false;
 
-  if (idahoHarvestSupervisor && process.env.IDAHO_HARVEST_AUTOSTART === '1') {
+  if (idahoHarvestSupervisor && process.env.IDAHO_HARVEST_AUTOSTART === '1' && areWorkersEnabled(process.env)) {
     idahoHarvestSupervisor.start();
   }
 
@@ -2426,6 +2432,10 @@ export function createSurveyServer({
       if (urlObj.pathname === '/api/idaho-harvest/start') {
         if (req.method !== 'POST') {
           sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
+        if (!areWorkersEnabled(process.env)) {
+          sendJson(res, 403, { error: 'Workers are disabled by WORKERS_ENABLED.' });
           return;
         }
         const status = idahoHarvestSupervisor?.start?.() || null;

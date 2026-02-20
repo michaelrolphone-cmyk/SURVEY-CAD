@@ -39,3 +39,21 @@ test('idaho harvest supervisor restarts worker when it exits with non-zero code'
   assert.equal(children.length, 2);
   assert.equal(supervisor.getStatus().restartCount, 1);
 });
+
+
+test('idaho harvest supervisor does not spawn worker when WORKERS_ENABLED is false', () => {
+  const children = [];
+  const supervisor = createIdahoHarvestSupervisor({
+    forkImpl: () => {
+      const child = createFakeChild();
+      children.push(child);
+      return child;
+    },
+    isEnabledFn: () => false,
+  });
+
+  const status = supervisor.start();
+  assert.equal(children.length, 0);
+  assert.equal(status.running, false);
+  assert.equal(status.status, 'disabled');
+});

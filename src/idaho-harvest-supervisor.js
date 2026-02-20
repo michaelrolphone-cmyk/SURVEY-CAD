@@ -11,6 +11,8 @@ export function createIdahoHarvestSupervisor({
   restartDelayMs = 1_000,
   setTimeoutImpl = setTimeout,
   clearTimeoutImpl = clearTimeout,
+  isEnabledFn = () => String(process.env.WORKERS_ENABLED || '1').trim().toLowerCase() !== 'false'
+    && String(process.env.WORKERS_ENABLED || '1').trim() !== '0',
 } = {}) {
   let desiredRunning = false;
   let child = null;
@@ -50,6 +52,11 @@ export function createIdahoHarvestSupervisor({
 
   return {
     start() {
+      if (!isEnabledFn()) {
+        desiredRunning = false;
+        status = 'disabled';
+        return this.getStatus();
+      }
       desiredRunning = true;
       if (restartTimer) {
         clearTimeoutImpl(restartTimer);

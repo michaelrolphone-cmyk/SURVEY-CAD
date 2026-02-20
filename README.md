@@ -56,6 +56,7 @@ The server now includes a restartable background worker that harvests Idaho parc
 ### Worker runtime environment
 
 - `IDAHO_HARVEST_AUTOSTART` (set to `1` to auto-start the worker on server boot)
+- `WORKERS_ENABLED` (set to `false` or `0` to globally disable workers and block `/api/idaho-harvest/start`)
 - `IDAHO_HARVEST_BATCH_SIZE` (ArcGIS page size, default: `100`)
 - `IDAHO_HARVEST_RANDOM_DELAY_ENABLED` (default: `1`; set to `0` to disable randomized throttling)
 - `IDAHO_HARVEST_RANDOM_DELAY_MIN_MS` (default: `120000` = 2 minutes)

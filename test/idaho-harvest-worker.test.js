@@ -130,3 +130,29 @@ test('runIdahoHarvestWorker uses randomized delay between non-complete batches',
 
   assert.deepEqual(sleeps, [120000]);
 });
+
+
+test('runIdahoHarvestWorker exits immediately when WORKERS_ENABLED is false', async () => {
+  const store = createMemoryObjectStore();
+  let fetchCalls = 0;
+  const fakeClient = {
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return { ok: true, json: async () => ({ features: [] }) };
+    },
+    config: {
+      adaMapServer: 'http://example.test/map/24',
+    },
+  };
+
+  await runIdahoHarvestWorker({
+    env: {
+      WORKERS_ENABLED: 'false',
+    },
+    client: fakeClient,
+    store,
+  });
+
+  assert.equal(fetchCalls, 0);
+});
+
