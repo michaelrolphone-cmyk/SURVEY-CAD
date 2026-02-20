@@ -191,6 +191,53 @@ function parseProjectWorkbenchRoute(pathname = '') {
   };
 }
 
+function toCsvValue(value) {
+  if (value === null || value === undefined) return '';
+  const raw = String(value);
+  if (/[,"\n\r]/.test(raw)) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+function buildPointFileTextFromDrawingState(drawingState = {}) {
+  const points = Array.isArray(drawingState?.points)
+    ? drawingState.points.filter((point) => point && typeof point === 'object')
+    : [];
+  return points
+    .map((point, index) => {
+      const number = point.number ?? point.pointNumber ?? point.name ?? point.id ?? index + 1;
+      const x = point.x ?? point.easting ?? '';
+      const y = point.y ?? point.northing ?? '';
+      const z = point.z ?? point.elevation ?? '';
+      const code = point.code ?? '';
+      const notes = point.notes ?? point.description ?? '';
+      return [number, x, y, z, code, notes].map(toCsvValue).join(',');
+    })
+    .join('\n');
+}
+
+async function syncDrawingLinkedPointFile(store, drawingRecord = {}) {
+  const linkedProjectId = String(drawingRecord?.linkedPointFileProjectId || '').trim();
+  const linkedPointFileId = String(drawingRecord?.linkedPointFileId || '').trim();
+  if (!linkedProjectId || !linkedPointFileId) return null;
+
+  const text = buildPointFileTextFromDrawingState(drawingRecord?.currentState);
+  const result = await createOrUpdateProjectPointFile(store, {
+    projectId: linkedProjectId,
+    pointFileId: linkedPointFileId,
+    pointFileName: drawingRecord.linkedPointFileName || `${drawingRecord.drawingName || linkedPointFileId}.csv`,
+    pointFileState: {
+      text: String(text || '# empty drawing\n'),
+      exportFormat: 'csv',
+    },
+    source: 'linesmith-drawing',
+    sourceLabel: drawingRecord.drawingName || null,
+  });
+
+  return result;
+}
+
 function getErrorStatusCode(err) {
   const message = err?.message || '';
   if (/^HTTP\s+\d{3}:/i.test(message)) return 502;
@@ -1212,13 +1259,18 @@ export function createSurveyServer({
             drawingId: payloadDrawingId,
             drawingName: body.drawingName,
             drawingState: body.drawingState,
+            pointFileLink: body.pointFileLink,
           });
+          const linkedPointFileSync = await syncDrawingLinkedPointFile(localStorageSyncStore, result.drawing);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
-            operations: result?.sync?.allOperations || [],
+            operations: [
+              ...(result?.sync?.allOperations || []),
+              ...(linkedPointFileSync?.sync?.allOperations || []),
+            ],
             state: {
-              version: result?.sync?.state?.version,
-              checksum: result?.sync?.state?.checksum,
+              version: linkedPointFileSync?.sync?.state?.version || result?.sync?.state?.version,
+              checksum: linkedPointFileSync?.sync?.state?.checksum || result?.sync?.state?.checksum,
             },
             originClientId: null,
             requestId: null,

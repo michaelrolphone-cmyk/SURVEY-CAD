@@ -121,6 +121,9 @@ function buildDrawingSummary(record) {
     latestVersionId: record.versions?.[record.versions.length - 1]?.versionId || null,
     versionCount: Array.isArray(record.versions) ? record.versions.length : 0,
     latestMapGeoreference: record.latestMapGeoreference || null,
+    linkedPointFileProjectId: record.linkedPointFileProjectId || null,
+    linkedPointFileId: record.linkedPointFileId || null,
+    linkedPointFileName: record.linkedPointFileName || null,
   };
 }
 
@@ -183,6 +186,7 @@ export async function createOrUpdateProjectDrawing(store, {
   drawingId: drawingIdRaw,
   drawingName,
   drawingState,
+  pointFileLink,
 } = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
   const drawingId = normalizeDrawingId(drawingIdRaw || drawingName || `drawing-${Date.now()}`);
@@ -197,6 +201,15 @@ export async function createOrUpdateProjectDrawing(store, {
   const index = parseSnapshotJson(snapshot, drawingIndexKey(projectId)) || {};
 
   let record;
+  const normalizedPointFileLink = pointFileLink && typeof pointFileLink === 'object' && !Array.isArray(pointFileLink)
+    ? {
+      projectId: normalizeProjectId(pointFileLink.projectId || projectId),
+      pointFileId: String(pointFileLink.pointFileId || '').trim(),
+      pointFileName: String(pointFileLink.pointFileName || '').trim(),
+    }
+    : null;
+  const hasExplicitPointFileLink = normalizedPointFileLink && normalizedPointFileLink.projectId && normalizedPointFileLink.pointFileId;
+
   if (!existing?.versions?.length) {
     record = {
       schemaVersion: '1.0.0',
@@ -206,6 +219,9 @@ export async function createOrUpdateProjectDrawing(store, {
       createdAt: now,
       updatedAt: now,
       latestMapGeoreference: drawingState.mapGeoreference || null,
+      linkedPointFileProjectId: hasExplicitPointFileLink ? normalizedPointFileLink.projectId : null,
+      linkedPointFileId: hasExplicitPointFileLink ? normalizedPointFileLink.pointFileId : null,
+      linkedPointFileName: hasExplicitPointFileLink ? normalizedPointFileLink.pointFileName || null : null,
       versions: [{
         versionId: `v-${Date.now()}`,
         savedAt: now,
@@ -221,6 +237,15 @@ export async function createOrUpdateProjectDrawing(store, {
       drawingName: normalizeDrawingName(drawingName || existing.drawingName || drawingId),
       updatedAt: now,
       latestMapGeoreference: drawingState.mapGeoreference || null,
+      linkedPointFileProjectId: hasExplicitPointFileLink
+        ? normalizedPointFileLink.projectId
+        : (existing.linkedPointFileProjectId || null),
+      linkedPointFileId: hasExplicitPointFileLink
+        ? normalizedPointFileLink.pointFileId
+        : (existing.linkedPointFileId || null),
+      linkedPointFileName: hasExplicitPointFileLink
+        ? (normalizedPointFileLink.pointFileName || null)
+        : (existing.linkedPointFileName || null),
       versions: [...existing.versions],
     };
     record.versions.push({

@@ -22,4 +22,11 @@ test('server OpenAPI spec documents project drawing CRUD endpoints', async () =>
 
   assert.ok(spec?.components?.schemas?.LineSmithDrawingRecord, 'spec should include LineSmithDrawingRecord schema');
   assert.ok(spec?.components?.schemas?.LineSmithDrawingMutationRequest, 'spec should include drawing mutation request schema');
+  assert.ok(spec?.components?.schemas?.LineSmithDrawingPointFileLink, 'spec should include drawing point-file link schema');
+
+  const drawingMutation = spec.components.schemas.LineSmithDrawingMutationRequest;
+  assert.equal(drawingMutation?.properties?.pointFileLink?.$ref, '#/components/schemas/LineSmithDrawingPointFileLink');
+
+  const drawingRecord = spec.components.schemas.LineSmithDrawingRecord;
+  assert.equal(drawingRecord?.properties?.linkedPointFileId?.type, 'string');
 });

@@ -63,3 +63,25 @@ test('project drawing store CRUD persists versions and summaries in sync snapsho
   const missing = await getProjectDrawing(store, 'project-a', createResult.drawing.drawingId);
   assert.equal(missing, null);
 });
+
+test('project drawing store persists linked point-file metadata in records and summaries', async () => {
+  const store = new LocalStorageSyncStore();
+
+  const createResult = await createOrUpdateProjectDrawing(store, {
+    projectId: 'project-a',
+    drawingName: 'Boundary Base Map',
+    drawingState: { points: [{ id: '1', x: 10, y: 20 }] },
+    pointFileLink: {
+      projectId: 'project-a',
+      pointFileId: 'boundary-points',
+      pointFileName: 'Boundary Points.csv',
+    },
+  });
+
+  assert.equal(createResult.drawing.linkedPointFileId, 'boundary-points');
+  assert.equal(createResult.drawing.linkedPointFileProjectId, 'project-a');
+
+  const listed = await listProjectDrawings(store, 'project-a');
+  assert.equal(listed[0].linkedPointFileId, 'boundary-points');
+  assert.equal(listed[0].linkedPointFileName, 'Boundary Points.csv');
+});

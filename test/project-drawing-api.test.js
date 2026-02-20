@@ -19,6 +19,10 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
       body: JSON.stringify({
         drawingName: 'Boundary Draft',
         drawingState: { points: [{ id: 'p-1', x: 1, y: 2 }], mapGeoreference: { origin: [0, 0] } },
+        pointFileLink: {
+          pointFileId: 'boundary-points',
+          pointFileName: 'Boundary Points.csv',
+        },
       }),
     });
     assert.equal(createRes.status, 201);
@@ -61,6 +65,14 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(getRes.status, 200);
     const loaded = await getRes.json();
     assert.equal(loaded.drawing.currentState.points[0].x, 3);
+
+
+    const linkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points`);
+    assert.equal(linkedPointFileRes.status, 200);
+    const linkedPointFile = await linkedPointFileRes.json();
+    assert.equal(linkedPointFile.pointFile.currentState.text, 'p-1,3,2,,,\np-2,5,8,,,');
+    assert.equal(linkedPointFile.pointFile.versions.length, 3);
+    assert.equal(linkedPointFile.pointFile.source, 'linesmith-drawing');
 
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
       method: 'DELETE',
