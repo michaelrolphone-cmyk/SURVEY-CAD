@@ -1504,7 +1504,8 @@
           "404": {
             "$ref": "#/components/responses/Error404"
           }
-        }
+        },
+        "description": "Returns the full drawing record. When linkedPointFileId is set, currentState.points is hydrated from the latest linked project point-file text so external point-file edits are reflected when LineSmith loads the drawing."
       },
       "put": {
         "tags": [
@@ -4862,6 +4863,21 @@
           "currentState": {
             "type": "object",
             "additionalProperties": true
+          },
+          "linkedPointFileProjectId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Project ID for the linked point file that receives synchronized point updates."
+          },
+          "linkedPointFileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Point file ID linked to this drawing for synchronized point updates."
+          },
+          "linkedPointFileName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display name of the linked point file."
           }
         },
         "required": [
@@ -4886,12 +4902,13 @@
           "drawingState": {
             "type": "object",
             "additionalProperties": true
+          },
+          "pointFileLink": {
+            "$ref": "#/components/schemas/LineSmithDrawingPointFileLink"
           }
         },
-        "required": [
-          "drawingState"
-        ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "For PUT/PATCH, drawingState is optional and defaults to the drawing's current state, allowing point-file relinking without resending geometry. For POST create, drawingState is required."
       },
       "LineSmithDrawingListResponse": {
         "type": "object",
@@ -5689,6 +5706,28 @@
             "default": false
           }
         },
+        "additionalProperties": false
+      },
+      "LineSmithDrawingPointFileLink": {
+        "type": "object",
+        "description": "Associates a LineSmith drawing with a project point file. When set, drawing saves synchronize point rows into the linked point file with version history.",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Project ID that owns the linked point file. Defaults to the drawing project when omitted."
+          },
+          "pointFileId": {
+            "type": "string",
+            "description": "Point file identifier to update when drawing points change."
+          },
+          "pointFileName": {
+            "type": "string",
+            "description": "Optional display name for the linked point file."
+          }
+        },
+        "required": [
+          "pointFileId"
+        ],
         "additionalProperties": false
       }
     }
