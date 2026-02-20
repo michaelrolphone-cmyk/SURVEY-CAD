@@ -175,6 +175,94 @@ test('runIdahoHarvestCycle includes survey number metadata in tile features', as
   assert.deepEqual(parcelTile.features[0].properties.location, { lon: -116.2, lat: 43.6 });
 });
 
+test('runIdahoHarvestCycle keeps parcels out of cpnf bucket when default bucket is cpnfs', async () => {
+  const objectStore = createMemoryObjectStore();
+  const fetchImpl = async (url) => {
+    const layer = new URL(url).pathname.split('/').slice(-2, -1)[0];
+    if (layer === '24') {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{ attributes: { OBJECTID: 101, PARCEL: 'P-101' }, geometry: { x: -116.2, y: 43.6 } }],
+        }),
+      };
+    }
+
+    return { ok: true, json: async () => ({ features: [] }) };
+  };
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+    datasets: [{ name: 'parcels', layerId: 24 }],
+    buckets: {
+      default: 'cpnfs',
+      cpnf: 'cpnfs',
+      tiles: 'tile-server',
+      indexes: 'tile-server',
+      checkpoints: 'tile-server',
+    },
+  });
+
+  assert.equal(objectStore.has('surveycad/idaho-harvest/features/id/parcels/101.geojson', { bucket: 'tile-server' }), true);
+  assert.equal(objectStore.has('surveycad/idaho-harvest/features/id/parcels/101.geojson', { bucket: 'cpnfs' }), false);
+});
+
+test('runIdahoHarvestCycle downloads and stores CPNF PDFs in cpnfs bucket', async () => {
+  const objectStore = createMemoryObjectStore();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const stringUrl = String(url);
+    calls.push(stringUrl);
+    if (stringUrl.includes('/query?')) {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            attributes: {
+              OBJECTID: 301,
+              DOC_URLS: 'cpf-301-a.pdf; https://example.test/docs/cpf-301-b.pdf',
+              NAME: 'CPNF-301',
+            },
+            geometry: { x: -116.25, y: 43.65 },
+          }],
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/pdf' }),
+      arrayBuffer: async () => new Uint8Array(Buffer.from('%PDF-1.4\n%cpnf\n')).buffer,
+    };
+  };
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+    cpnfPdfBaseUrl: 'https://example.test/docs/',
+    datasets: [{ name: 'cpnf', layerId: 18, tileZoom: 12 }],
+    buckets: {
+      default: 'tile-server',
+      cpnf: 'cpnfs',
+      tiles: 'tile-server',
+      indexes: 'tile-server',
+      checkpoints: 'tile-server',
+    },
+  });
+
+  const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/301.geojson', { bucket: 'cpnfs' });
+  assert.equal(Array.isArray(cpnfFeature.properties.cpnfPdfKeys), true);
+  assert.equal(cpnfFeature.properties.cpnfPdfKeys.length, 2);
+  assert.ok(cpnfFeature.properties.cpnfPdfKeys.every((key) => key.includes('/pdfs/id/cpnf/301/')));
+  assert.ok(cpnfFeature.properties.cpnfPdfKeys.every((key) => objectStore.has(key, { bucket: 'cpnfs' })));
+  assert.equal(calls.filter((call) => call.endsWith('.pdf')).length, 2);
+});
+
 
 test('runIdahoHarvestCycle rotates datasets so cpnf is harvested before parcels finish', async () => {
   const objectStore = createMemoryObjectStore();

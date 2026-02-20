@@ -171,6 +171,46 @@ function extractSurveyNumbers(attributes = {}) {
       .filter(Boolean)))];
 }
 
+function extractPdfUrls(attributes = {}, { baseUrl = '' } = {}) {
+  const urls = [];
+  const normalizedBase = String(baseUrl || '').trim();
+  const addValue = (value) => {
+    if (value === null || value === undefined) return;
+    const raw = String(value).trim();
+    if (!raw) return;
+    const candidates = raw.split(/[\s,;|]+/).map((entry) => entry.trim()).filter(Boolean);
+    for (const candidate of candidates) {
+      if (!/\.pdf($|[?#])/i.test(candidate)) continue;
+      try {
+        urls.push(new URL(candidate).toString());
+        continue;
+      } catch {
+        if (!normalizedBase) continue;
+      }
+
+      try {
+        urls.push(new URL(candidate, normalizedBase).toString());
+      } catch {
+        // ignore malformed URL values
+      }
+    }
+  };
+
+  for (const [rawKey, rawValue] of Object.entries(attributes || {})) {
+    const key = String(rawKey || '');
+    if (!/(pdf|file|url|link|document|doc)/i.test(key)) continue;
+    addValue(rawValue);
+  }
+
+  return [...new Set(urls)];
+}
+
+function buildPdfObjectKey({ prefix, stateAbbr, dataset, objectId, pdfUrl, index }) {
+  const parsed = new URL(pdfUrl);
+  const fileName = path.basename(parsed.pathname || '') || `document-${index + 1}.pdf`;
+  return `${prefix}/pdfs/${stateAbbr.toLowerCase()}/${dataset}/${encodeURIComponent(String(objectId))}/${index + 1}-${encodeURIComponent(fileName)}`;
+}
+
 function toGeoJsonFeature(feature = {}, { id, dataset, center }) {
   const attributes = feature?.attributes || {};
   const surveyNumbers = extractSurveyNumbers(attributes);
@@ -225,6 +265,7 @@ export async function runIdahoHarvestCycle({
   batchSize = 100,
   prefix = DEFAULT_PREFIX,
   stateAbbr = 'ID',
+  cpnfPdfBaseUrl = '',
   datasets = [
     { name: 'parcels', layerId: 24, tileZoom: 14 },
     { name: 'cpnf', layerId: 18, tileZoom: 12 },
@@ -239,8 +280,16 @@ export async function runIdahoHarvestCycle({
   },
 }) {
   if (!objectStore) throw new Error('objectStore is required');
+  const DATASET_BUCKET_FALLBACKS = {
+    parcels: 'tile-server',
+    cpnf: 'cpnfs',
+    subdivisions: 'cpnfs',
+    subdivision: 'cpnfs',
+  };
   const bucketFor = (kind, datasetName = '') => {
     if (datasetName && buckets?.[datasetName]) return buckets[datasetName];
+    const fallbackBucket = DATASET_BUCKET_FALLBACKS[String(datasetName || '').toLowerCase()];
+    if (fallbackBucket) return fallbackBucket;
     if (kind && buckets?.[kind]) return buckets[kind];
     return buckets?.default || null;
   };
@@ -335,6 +384,7 @@ export async function runIdahoHarvestCycle({
     for (const feature of features) {
       const objectId = toObjectId(feature);
       if (objectId === '') continue;
+      const attributes = feature?.attributes || {};
 
       const center = computeFeatureCenter(feature);
       const hasCenter = Number.isFinite(center.lon) && Number.isFinite(center.lat);
@@ -345,6 +395,35 @@ export async function runIdahoHarvestCycle({
       });
       const featureKey = `${prefix}/features/${stateAbbr.toLowerCase()}/${dataset.name}/${encodeURIComponent(String(objectId))}.geojson`;
       const featureBucket = bucketFor('features', dataset.name);
+
+      const pdfKeys = [];
+      if (String(dataset.name).toLowerCase() === 'cpnf') {
+        const pdfUrls = extractPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
+        for (const [pdfIndex, pdfUrl] of pdfUrls.entries()) {
+          const pdfResponse = await fetchImpl(pdfUrl);
+          if (!pdfResponse.ok) continue;
+          const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+          if (!pdfBuffer.length) continue;
+          const pdfKey = buildPdfObjectKey({
+            prefix,
+            stateAbbr,
+            dataset: dataset.name,
+            objectId,
+            pdfUrl,
+            index: pdfIndex,
+          });
+          await objectStore.putObject(pdfKey, pdfBuffer, {
+            contentType: pdfResponse.headers?.get?.('content-type') || 'application/pdf',
+            bucket: featureBucket,
+          });
+          pdfKeys.push(pdfKey);
+        }
+      }
+
+      if (pdfKeys.length) {
+        geojsonFeature.properties.cpnfPdfKeys = pdfKeys;
+      }
+
       await writeJsonObjectInBucket(objectStore, featureBucket, featureKey, geojsonFeature);
 
       const tileKeys = hasCenter
