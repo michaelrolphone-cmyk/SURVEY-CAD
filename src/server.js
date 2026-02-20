@@ -270,6 +270,20 @@ function normalizePointCode(point = {}) {
   return String(point?.code || '').trim().toUpperCase();
 }
 
+function normalizeLinkedPointFileReference(drawing = null) {
+  return {
+    projectId: String(drawing?.linkedPointFileProjectId || '').trim(),
+    pointFileId: String(drawing?.linkedPointFileId || '').trim(),
+  };
+}
+
+function hasLinkedPointFileReferenceChanged(previousDrawing = null, nextDrawing = null) {
+  const previousReference = normalizeLinkedPointFileReference(previousDrawing);
+  const nextReference = normalizeLinkedPointFileReference(nextDrawing);
+  return previousReference.projectId !== nextReference.projectId
+    || previousReference.pointFileId !== nextReference.pointFileId;
+}
+
 function buildDrawingPointsFromPointFileText(text = '') {
   return String(text || '')
     .split(/\r?\n/)
@@ -1388,6 +1402,9 @@ export function createSurveyServer({
         if ((req.method === 'POST' && !drawingId) || ((req.method === 'PUT' || req.method === 'PATCH') && drawingId)) {
           const body = await readJsonBody(req);
           const payloadDrawingId = drawingId || body.drawingId || body.drawingName;
+          const existingDrawing = payloadDrawingId
+            ? await getProjectDrawing(localStorageSyncStore, projectId, payloadDrawingId)
+            : null;
           const result = await createOrUpdateProjectDrawing(localStorageSyncStore, {
             projectId,
             drawingId: payloadDrawingId,
@@ -1395,13 +1412,15 @@ export function createSurveyServer({
             drawingState: body.drawingState,
             pointFileLink: body.pointFileLink,
           });
-          const linkedPointFileSync = hasDrawingStatePayload(body)
+          const linkedPointFileReferenceChanged = !!existingDrawing && hasLinkedPointFileReferenceChanged(existingDrawing, result.drawing);
+          const linkedPointFileSync = hasDrawingStatePayload(body) && !linkedPointFileReferenceChanged
             ? await syncDrawingLinkedPointFile(
               localStorageSyncStore,
               result.drawing,
               parsePointFileChangeContext(req, body, 'linesmith-drawing'),
             )
             : null;
+          const hydratedDrawing = await hydrateDrawingStateFromLinkedPointFile(localStorageSyncStore, result.drawing);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: [
@@ -1415,7 +1434,7 @@ export function createSurveyServer({
             originClientId: null,
             requestId: null,
           });
-          sendJson(res, result.created ? 201 : 200, { drawing: result.drawing });
+          sendJson(res, result.created ? 201 : 200, { drawing: hydratedDrawing });
           return;
         }
 

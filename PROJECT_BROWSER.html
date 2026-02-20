@@ -452,6 +452,37 @@
       return pointFileId ? `${base}/${encodeURIComponent(pointFileId)}` : base;
     }
 
+    function resolveActiveCrewUserLabel() {
+      const crewMemberId = String(localStorage.getItem('surveyfoundryActiveCrewMemberId') || '').trim();
+      if (!crewMemberId) return 'unknown-user';
+      try {
+        const profiles = JSON.parse(localStorage.getItem('surveyfoundryCrewProfiles') || '[]');
+        const member = Array.isArray(profiles) ? profiles.find((entry) => entry?.id === crewMemberId) : null;
+        const displayName = [member?.firstName, member?.lastName]
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+          .join(' ');
+        return displayName || crewMemberId;
+      } catch {
+        return crewMemberId;
+      }
+    }
+
+    function buildPointFileActorMetadata(app = 'project-browser') {
+      const actorApp = String(app || 'project-browser').trim() || 'project-browser';
+      const user = resolveActiveCrewUserLabel();
+      return {
+        headers: {
+          'x-survey-app': actorApp,
+          'x-survey-user': user,
+        },
+        changeContext: {
+          app: actorApp,
+          user,
+        },
+      };
+    }
+
     function buildProjectDrawingApiUrl(projectId = '', drawingId = '') {
       if (!projectId) return '';
       const base = `/api/projects/${encodeURIComponent(projectId)}/drawings`;
@@ -771,12 +802,15 @@
             throw new Error('Point file state was missing.');
           }
 
+          const actorMetadata = buildPointFileActorMetadata('project-browser');
           const renameRes = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId), {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...actorMetadata.headers },
             body: JSON.stringify({
               pointFileName: nextTitle,
               pointFileState: currentState,
+              source: 'project-browser',
+              changeContext: actorMetadata.changeContext,
             }),
           });
           if (!renameRes.ok) throw new Error(`Unable to rename point file (${renameRes.status}).`);
@@ -1239,14 +1273,16 @@
           context.setUploadProgress(null);
           context.setUploadStatus(`Uploading point file ${currentFileNumber}/${totalFiles}: ${file.name}…`);
           const text = await file.text();
+          const actorMetadata = buildPointFileActorMetadata('evidence-desk-upload');
           const response = await fetch(buildProjectPointFileApiUrl(context.activeProjectId), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...actorMetadata.headers },
             body: JSON.stringify({
               pointFileName: file.name,
               pointFileState: { text, exportFormat: 'csv' },
               source: 'evidence-desk-upload',
               sourceLabel: file.name,
+              changeContext: actorMetadata.changeContext,
             }),
           });
           if (!response.ok) {
