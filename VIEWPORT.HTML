@@ -662,6 +662,36 @@
       align-items:center;
       gap:4px;
     }
+    .quickPointGroupThumb{
+      width:18px;
+      height:18px;
+      border-radius:4px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:#0c0c0c;
+      object-fit:contain;
+      padding:1px;
+      flex:0 0 auto;
+    }
+    .quickPointGroupThumbFallback{
+      width:18px;
+      height:18px;
+      border-radius:4px;
+      border:1px solid rgba(255,255,255,0.22);
+      background:#1a1a1a;
+      color:#d9d9d9;
+      font-size:10px;
+      font-weight:700;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      text-transform:uppercase;
+      flex:0 0 auto;
+    }
+    .quickPointGroupMeta{
+      color:var(--muted);
+      font-size:11px;
+      white-space:nowrap;
+    }
     .quickToolIconBtn{
       width:24px;
       height:24px;
@@ -1857,6 +1887,15 @@
             <div id="quickLayerDropdownMenu" class="quickLayerDropdownMenu hidden" role="listbox" aria-label="Layer options"></div>
           </div>
         </div>
+        <div class="quickToolField quickToolLayer" title="Select points by point group">
+          <div id="quickPointGroupDropdown" class="quickLayerDropdown">
+            <button id="quickPointGroupDropdownButton" class="quickLayerDropdownBtn" aria-label="Point Groups" aria-haspopup="listbox" aria-expanded="false">
+              <span id="quickPointGroupDropdownLabel" class="quickLayerDropdownBtnText">Point Groups</span>
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </button>
+            <div id="quickPointGroupDropdownMenu" class="quickLayerDropdownMenu hidden" role="listbox" aria-label="Point group options"></div>
+          </div>
+        </div>
         <div class="quickToolField quickToolToggleGroup" title="Display toggles" aria-label="Display toggles">
           <button id="quickShowLines" class="quickToggleBtn active" title="Toggle lines" aria-label="Toggle lines"><i class="fa-solid fa-slash"></i><span class="sr-only">Lines</span></button>
           <button id="quickShowBearings" class="quickToggleBtn active" title="Toggle bearings" aria-label="Toggle bearings"><i class="fa-solid fa-compass"></i><span class="sr-only">Bearings</span></button>
@@ -2848,6 +2887,10 @@
   const quickLayerDropdownButton = $("#quickLayerDropdownButton");
   const quickLayerDropdownLabel = $("#quickLayerDropdownLabel");
   const quickLayerDropdownMenu = $("#quickLayerDropdownMenu");
+  const quickPointGroupDropdown = $("#quickPointGroupDropdown");
+  const quickPointGroupDropdownButton = $("#quickPointGroupDropdownButton");
+  const quickPointGroupDropdownLabel = $("#quickPointGroupDropdownLabel");
+  const quickPointGroupDropdownMenu = $("#quickPointGroupDropdownMenu");
 
   const quickLayerColor = $("#quickLayerColor");
   const quickLayerManagerBtn = $("#quickLayerManager");
@@ -2920,6 +2963,8 @@
   let recordBasisBearing = "";
   let recordBasisDistance = "";
   let quickLayerDropdownOpen = false;
+  let quickPointGroupDropdownOpen = false;
+  let quickPointGroupSelectionKey = "";
   let mobileToolbarsHidden = false;
 
   // Selection
@@ -7812,14 +7857,23 @@ function paintBackground(ctx, w, h){
 
   quickLayerDropdownButton?.addEventListener("click", (event) => {
     event.preventDefault();
+    setQuickPointGroupDropdownOpen(false);
     setQuickLayerDropdownOpen(!quickLayerDropdownOpen);
   });
+  quickPointGroupDropdownButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    setQuickLayerDropdownOpen(false);
+    setQuickPointGroupDropdownOpen(!quickPointGroupDropdownOpen);
+  });
   document.addEventListener("mousedown", (event) => {
-    if (!quickLayerDropdown || !quickLayerDropdownOpen) return;
-    if (!quickLayerDropdown.contains(event.target)) setQuickLayerDropdownOpen(false);
+    if (quickLayerDropdownOpen && quickLayerDropdown && !quickLayerDropdown.contains(event.target)) setQuickLayerDropdownOpen(false);
+    if (quickPointGroupDropdownOpen && quickPointGroupDropdown && !quickPointGroupDropdown.contains(event.target)) setQuickPointGroupDropdownOpen(false);
   });
   window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") setQuickLayerDropdownOpen(false);
+    if (event.key === "Escape") {
+      setQuickLayerDropdownOpen(false);
+      setQuickPointGroupDropdownOpen(false);
+    }
   });
   quickLayerManagerBtn?.addEventListener("click", () => openLayersModal());
   layersModalClose?.addEventListener("click", () => closeLayersModal());
@@ -12031,6 +12085,106 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     if (quickLayerDropdownButton) quickLayerDropdownButton.setAttribute("aria-expanded", quickLayerDropdownOpen ? "true" : "false");
   }
 
+  function setQuickPointGroupDropdownOpen(open) {
+    quickPointGroupDropdownOpen = !!open;
+    if (quickPointGroupDropdownMenu) quickPointGroupDropdownMenu.classList.toggle("hidden", !quickPointGroupDropdownOpen);
+    if (quickPointGroupDropdownButton) quickPointGroupDropdownButton.setAttribute("aria-expanded", quickPointGroupDropdownOpen ? "true" : "false");
+  }
+
+  function buildQuickPointGroups() {
+    const includeAllLayers = selectedLayerId === DEFAULT_LAYER_ID;
+    const groupsByKey = new Map();
+    for (const point of points.values()) {
+      if (!includeAllLayers && point.layerId !== selectedLayerId) continue;
+      const rawCode = String(point.code || "").trim();
+      const key = rawCode.toUpperCase() || "(NO CODE)";
+      if (!groupsByKey.has(key)) {
+        groupsByKey.set(key, {
+          key,
+          label: rawCode || "(No Code)",
+          pointIds: [],
+          symbolUrl: getPointSymbolPreviewUrl(rawCode),
+          layerNames: new Set()
+        });
+      }
+      const group = groupsByKey.get(key);
+      group.pointIds.push(point.id);
+      const layerName = getLayerById(point.layerId)?.name || "(Unknown Layer)";
+      group.layerNames.add(layerName);
+    }
+    return Array.from(groupsByKey.values())
+      .sort((a, b) => String(a.label).localeCompare(String(b.label), undefined, { numeric: true }))
+      .map((group) => ({
+        ...group,
+        layerNames: Array.from(group.layerNames).sort((a, b) => a.localeCompare(b))
+      }));
+  }
+
+  function selectQuickPointGroup(group) {
+    if (!group?.pointIds?.length) return;
+    selectedPointIds = group.pointIds.filter((pointId) => points.has(pointId));
+    selectedPointId = selectedPointIds.length ? selectedPointIds[selectedPointIds.length - 1] : null;
+    selectedLines = [];
+    lastSelectedLineId = null;
+    quickPointGroupSelectionKey = String(group.key || "");
+    updatePointEditorFromSelection();
+    schedulePointsTableRender();
+    setStatus(`Selected ${selectedPointIds.length} point${selectedPointIds.length === 1 ? "" : "s"} in group ${group.label}.`, "ok");
+  }
+
+  function renderQuickPointGroupControls() {
+    if (!quickPointGroupDropdownButton || !quickPointGroupDropdownMenu || !quickPointGroupDropdownLabel) return;
+    const groups = buildQuickPointGroups();
+    const activeGroup = groups.find((group) => group.key === quickPointGroupSelectionKey) || null;
+    if (!activeGroup) quickPointGroupSelectionKey = "";
+    quickPointGroupDropdownLabel.textContent = activeGroup ? `${activeGroup.label} (${activeGroup.pointIds.length})` : "Point Groups";
+    quickPointGroupDropdownMenu.innerHTML = "";
+
+    if (!groups.length) {
+      const empty = document.createElement("div");
+      empty.className = "quickLayerDropdownItem";
+      empty.textContent = "No point groups in this layer.";
+      quickPointGroupDropdownMenu.appendChild(empty);
+      return;
+    }
+
+    for (const group of groups) {
+      const rowBtn = document.createElement("button");
+      rowBtn.className = `quickLayerDropdownItem${group.key === quickPointGroupSelectionKey ? " active" : ""}`;
+      rowBtn.type = "button";
+      rowBtn.setAttribute("role", "option");
+      rowBtn.setAttribute("aria-selected", group.key === quickPointGroupSelectionKey ? "true" : "false");
+
+      if (group.symbolUrl) {
+        const thumb = document.createElement("img");
+        thumb.className = "quickPointGroupThumb";
+        thumb.src = group.symbolUrl;
+        thumb.alt = `${group.label} symbol`;
+        rowBtn.appendChild(thumb);
+      } else {
+        const fallback = document.createElement("span");
+        fallback.className = "quickPointGroupThumbFallback";
+        fallback.textContent = String(group.label || "?").slice(0, 2) || "?";
+        rowBtn.appendChild(fallback);
+      }
+
+      const name = document.createElement("span");
+      name.className = "quickLayerItemName";
+      name.textContent = group.label;
+
+      const meta = document.createElement("span");
+      meta.className = "quickPointGroupMeta";
+      meta.textContent = `${group.pointIds.length} pt${group.pointIds.length === 1 ? "" : "s"}${selectedLayerId === DEFAULT_LAYER_ID ? ` • ${group.layerNames.join(", ")}` : ""}`;
+
+      rowBtn.append(name, meta);
+      rowBtn.addEventListener("click", () => {
+        selectQuickPointGroup(group);
+        setQuickPointGroupDropdownOpen(false);
+      });
+      quickPointGroupDropdownMenu.appendChild(rowBtn);
+    }
+  }
+
   function toggleLayerFlag(layer, key) {
     if (!layer) return;
     if (key === "visible") layer.visible = !(layer.visible !== false);
@@ -12095,6 +12249,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       });
       quickLayerDropdownMenu.appendChild(rowBtn);
     }
+    renderQuickPointGroupControls();
   }
 
 
@@ -12489,6 +12644,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   function updateCounts() {
     pointsCount.textContent = `${points.size} point${points.size===1?"":"s"} / ${lines.size} line${lines.size===1?"":"s"}`;
     modalPointsCount.textContent = String(points.size);
+    renderQuickPointGroupControls();
   }
 
   function updateDerivedSelectionInfo() {
