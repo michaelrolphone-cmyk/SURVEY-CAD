@@ -65,6 +65,7 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(getRes.status, 200);
     const loaded = await getRes.json();
     assert.equal(loaded.drawing.currentState.points[0].x, 3);
+    assert.equal(loaded.drawing.currentState.points[0].notes, '');
 
 
     const linkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points`);
@@ -124,6 +125,7 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].x, 1000.5);
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].y, 2000.5);
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].code, 'IP');
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].notes, 'Imported from PointForge');
 
     const createWithNumRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
       method: 'POST',
