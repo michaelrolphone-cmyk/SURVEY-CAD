@@ -975,7 +975,7 @@ Base URL (local): `http://localhost:3000`
 - `GET /api/equipment-logs`
 - `POST /api/equipment-logs` (accepts optional `pointFileId`, `pointFileName`, `pointFileProjectId` linkage fields for audit traceability)
 - `GET /api/equipment-logs?id=<logId>`
-- `EquipmentLog.html` now supports attaching a `.csv`/`.txt` point file while saving a log (requires `?activeProjectId=<projectId>`), pushes the file into `POST /api/projects/:projectId/point-files` with `source: "equipment-log"`, and records the returned point-file linkage back into the equipment log for audit history in `PROJECT_BROWSER.html` Point Files.
+- `EquipmentLog.html` now supports attaching a `.csv`/`.txt` point file while saving a log (requires `?activeProjectId=<projectId>`), pushes the file into `POST /api/projects/:projectId/point-files` with `source: "equipment-log"` plus `changeContext` (`app: "equipment-log"`, `user: <rodman|createdBy>`), and records the returned point-file linkage back into the equipment log for audit history in `PROJECT_BROWSER.html` Point Files.
 - `EquipmentLog.html` now hydrates its **Equipment Type** dropdown from Equipment Manager inventory records (`/api/equipment` + `surveyfoundryEquipmentInventory` local cache), so users select actual managed equipment entries instead of generic type presets.
 
 ### Field-to-Finish (FLD)

@@ -19,6 +19,8 @@ export function buildEquipmentLogPointFilePayload({ fileName = '', text = '', lo
     ? `Equipment log: ${sourceBits.join(' · ')}`
     : 'Equipment log attachment';
 
+  const user = String(log?.rodman || log?.user || log?.createdBy || '').trim() || 'unknown-user';
+
   return {
     pointFileName: name,
     pointFileState: {
@@ -27,5 +29,9 @@ export function buildEquipmentLogPointFilePayload({ fileName = '', text = '', lo
     },
     source: 'equipment-log',
     sourceLabel,
+    changeContext: {
+      app: 'equipment-log',
+      user,
+    },
   };
 }
