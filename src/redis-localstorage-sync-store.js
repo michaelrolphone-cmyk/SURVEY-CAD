@@ -115,6 +115,10 @@ export class RedisLocalStorageSyncStore {
       await this.#redis.quit();
     }
   }
+
+  getRedisClient() {
+    return this.#redis;
+  }
 }
 
 export async function createRedisLocalStorageSyncStore({

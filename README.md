@@ -1186,6 +1186,7 @@ LineSmith now resolves sequential `END`/`CLO` directives from the nearest valid 
 ## EvidenceDesk file CRUD API
 
 EvidenceDesk uploads now support Redis-backed CRUD operations and folder-level listing. EvidenceDesk file rows can be dragged onto destination folders to reorganize project-file uploads directly in the UI.
+When the server already has a Redis-backed localStorage sync store, EvidenceDesk now reuses that same Redis client for `/api/project-files/*` binary+metadata persistence so uploads survive process restarts even if `REDIS_URL` is temporarily unset for a later boot.
 Uploaded image resources now generate a 512px-wide PNG thumbnail during upload/update, and EvidenceDesk image preview slots use `resource.reference.metadata.thumbnailUrl` before falling back to full-size downloads.
 EvidenceDesk now shows live upload progress in the upload status line (including per-file counters and percent complete when binary files are posted) so users get immediate feedback after starting an upload.
 EvidenceDesk photo uploads now support point-number metadata so LineSmith can show a matching point photo thumbnail and full-size link in the point inspector when a selected point number matches uploaded image metadata.
