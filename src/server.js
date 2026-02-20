@@ -266,6 +266,10 @@ function normalizePointNumber(point = {}) {
   return String(point?.num ?? point?.number ?? point?.pointNumber ?? point?.name ?? point?.id ?? '').trim();
 }
 
+function normalizePointCode(point = {}) {
+  return String(point?.code || '').trim().toUpperCase();
+}
+
 function normalizeLinkedPointFileReference(drawing = null) {
   return {
     projectId: String(drawing?.linkedPointFileProjectId || '').trim(),
@@ -334,11 +338,15 @@ async function hydrateDrawingStateFromLinkedPointFile(store, drawing = null) {
         ...linkedPoint,
       };
     }
+    const existingCode = normalizePointCode(existingPoint);
+    const linkedCode = normalizePointCode(linkedPoint);
+    const shouldPreserveLayerId = !!existingPoint.layerId && existingCode === linkedCode;
     return {
       ...existingPoint,
       ...linkedPoint,
       id: existingPoint.id ?? linkedPoint.num,
       num: linkedPoint.num,
+      layerId: shouldPreserveLayerId ? existingPoint.layerId : undefined,
     };
   });
 
