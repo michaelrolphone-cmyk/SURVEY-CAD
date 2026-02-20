@@ -244,6 +244,20 @@ function shouldReplayInFlightOnSocketClose({
   return String(inFlightRequestId) === String(queueHeadRequestId);
 }
 
+function shrinkQueuedDifferentialsForStorage(queue = []) {
+  const normalizedQueue = Array.isArray(queue) ? queue.filter((entry) => entry && typeof entry === 'object') : [];
+  if (!normalizedQueue.length) return [];
+
+  const merged = mergeQueuedDifferentials([], {
+    requestId: normalizedQueue[0]?.requestId || `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    baseChecksum: normalizedQueue[0]?.baseChecksum || '',
+    operations: normalizedQueue.flatMap((entry) => entry?.operations || []),
+  }, null);
+  const operations = merged[0]?.operations || [];
+  if (operations.length <= 1) return merged;
+  return [{ ...merged[0], operations: operations.slice(Math.floor(operations.length / 2)) }];
+}
+
 function normalizeQueuedDifferential(diff = {}) {
   const operationsRaw = Array.isArray(diff?.operations) ? diff.operations : [];
   const operations = operationsRaw
@@ -971,13 +985,25 @@ class LocalStorageSocketSync {
     } catch (error) {
       if (error?.name !== 'QuotaExceededError') throw error;
 
-      this.queue = mergeQueuedDifferentials([], {
-        requestId: this.queue[0]?.requestId || `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        baseChecksum: this.queue[0]?.baseChecksum || this.serverChecksum || '',
-        operations: this.queue.flatMap((entry) => entry?.operations || []),
-      }, null);
+      let nextQueue = this.queue;
+      let persisted = false;
+      while (!persisted) {
+        nextQueue = shrinkQueuedDifferentialsForStorage(nextQueue);
+        if (!nextQueue.length) {
+          this.queue = [];
+          window.localStorage.removeItem(PENDING_DIFFS_KEY);
+          persisted = true;
+          break;
+        }
 
-      window.localStorage.setItem(PENDING_DIFFS_KEY, JSON.stringify(this.queue));
+        try {
+          window.localStorage.setItem(PENDING_DIFFS_KEY, JSON.stringify(nextQueue));
+          this.queue = nextQueue;
+          persisted = true;
+        } catch (retryError) {
+          if (retryError?.name !== 'QuotaExceededError') throw retryError;
+        }
+      }
     } finally {
       this.suppress = false;
     }
@@ -1070,4 +1096,5 @@ export {
   shouldRunHttpFallbackSync,
   buildSocketEndpointCandidates,
   buildApiEndpointCandidates,
+  shrinkQueuedDifferentialsForStorage,
 };

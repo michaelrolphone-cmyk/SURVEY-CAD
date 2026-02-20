@@ -9920,6 +9920,9 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
         [projectId]: drawingId,
       };
       const update = { ...member, lineSmithActiveDrawingByProject: nextPreference };
+      if (!String(update.firstName || '').trim() && !String(update.lastName || '').trim()) {
+        update.firstName = 'Crew';
+      }
       const saveRes = await fetch('/api/crew', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -10417,6 +10420,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     };
   }
 
+  let arrowHeadStorageQuotaWarningShown = false;
   function syncArrowHeadPayloadToStorage(options = {}) {
     const force = options.force === true;
     const now = Date.now();
@@ -10425,7 +10429,15 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     const payloadJson = JSON.stringify(buildArrowHeadPayload());
     if (!force && payloadJson === lastArrowHeadPayloadJson) return;
     lastArrowHeadPayloadJson = payloadJson;
-    localStorage.setItem(ARROWHEAD_IMPORT_STORAGE_KEY, payloadJson);
+    try {
+      localStorage.setItem(ARROWHEAD_IMPORT_STORAGE_KEY, payloadJson);
+    } catch (error) {
+      if (error?.name !== 'QuotaExceededError') throw error;
+      if (!arrowHeadStorageQuotaWarningShown) {
+        arrowHeadStorageQuotaWarningShown = true;
+        setStatus('Local storage is full. ArrowHead live-sync payload updates are paused until storage is cleared.', 'warn');
+      }
+    }
   }
 
   function openArrowHeadFromLineSmith() {

@@ -702,7 +702,7 @@
           "Crew"
         ],
         "summary": "Create or update a crew member",
-        "description": "Automatically broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "description": "Automatically broadcasts the change to all connected LocalStorage Sync WebSocket clients. New crew records require firstName or lastName. Existing records can also be updated by sending id plus lineSmithActiveDrawingByProject.",
         "operationId": "upsertCrewMember",
         "requestBody": {
           "required": true,
@@ -3802,6 +3802,12 @@
               {
                 "required": [
                   "lastName"
+                ]
+              },
+              {
+                "required": [
+                  "id",
+                  "lineSmithActiveDrawingByProject"
                 ]
               }
             ]

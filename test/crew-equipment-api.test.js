@@ -375,6 +375,36 @@ test('POST /api/crew preserves lineSmithActiveDrawingByProject preferences for c
   }
 });
 
+test('POST /api/crew allows id-only LineSmith drawing preference updates when names are blank', async () => {
+  const app = await startApiServer(buildSnapshot());
+  try {
+    const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/crew`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 'crew-1',
+        lineSmithActiveDrawingByProject: {
+          'project-gamma': 'topo-field-pass-2',
+        },
+      }),
+    });
+    assert.equal(updateRes.status, 201);
+    const updatedPayload = await updateRes.json();
+    assert.deepEqual(updatedPayload.member.lineSmithActiveDrawingByProject, {
+      'project-gamma': 'topo-field-pass-2',
+    });
+
+    const getRes = await fetch(`http://127.0.0.1:${app.port}/api/crew?id=crew-1`);
+    assert.equal(getRes.status, 200);
+    const getPayload = await getRes.json();
+    assert.deepEqual(getPayload.member.lineSmithActiveDrawingByProject, {
+      'project-gamma': 'topo-field-pass-2',
+    });
+  } finally {
+    app.server.close();
+  }
+});
+
 test('GET /api/equipment returns equipment inventory', async () => {
   const app = await startApiServer(buildSnapshot());
   try {
