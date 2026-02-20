@@ -20,6 +20,7 @@
 - [Worker Task Management](#worker-task-management)
 - [ROS OCR Extraction](#ros-ocr-extraction)
 - [Static Map Tiles](#static-map-tiles)
+- [Harvested MinIO Map Tiles](#harvested-minio-map-tiles)
 - [ROS PDF Proxy](#ros-pdf-proxy)
 - [Static File Serving](#static-file-serving)
 - [Error Handling](#error-handling)
@@ -1406,6 +1407,62 @@ Fetch a satellite/street map tile centered on coordinates. Attempts ArcGIS World
 **Response `200`:** `image/png` (tile image) or `image/svg+xml` (fallback).
 
 **Cache-Control:** `public, max-age=1800` (tile) or `public, max-age=300` (SVG fallback).
+
+---
+
+
+## Harvested MinIO Map Tiles
+
+### `GET /api/maptiles`
+
+List the currently exposed map-tile datasets and their URL templates.
+
+**Response `200`:**
+```json
+{
+  "datasets": [
+    {
+      "dataset": "parcels",
+      "tilejson": "http://<host>/api/maptiles/parcels/tilejson.json",
+      "tiles": "http://<host>/api/maptiles/parcels/{z}/{x}/{y}.geojson"
+    }
+  ]
+}
+```
+
+### `GET /api/maptiles/:dataset/tilejson.json`
+
+Return a [TileJSON 3.0.0](https://github.com/mapbox/tilejson-spec) document for the selected dataset.
+
+| Path Param | Type | Required | Description |
+|------------|------|----------|-------------|
+| `dataset` | `string` | Yes | Dataset key (default server config: `parcels`, `cpnf`) |
+
+**Response `200`:** JSON with `tilejson`, `scheme`, and `tiles` template values.
+
+**Response `404`:** Unknown dataset.
+
+### `GET /api/maptiles/:dataset/:z/:x/:y.geojson`
+
+Read a GeoJSON tile from MinIO/S3-compatible object storage.
+
+| Path Param | Type | Required | Description |
+|------------|------|----------|-------------|
+| `dataset` | `string` | Yes | Dataset key (for example `parcels`) |
+| `z` | `integer` | Yes | Tile zoom level |
+| `x` | `integer` | Yes | Tile X coordinate |
+| `y` | `integer` | Yes | Tile Y coordinate |
+
+**Response `200`:** `application/geo+json` tile body.
+
+**Response `404`:** Dataset or tile not found.
+
+**Response `503`:** Map tile object storage is not configured.
+
+**Environment variables:**
+- `MAPTILE_DATASETS` (comma-separated dataset list; default `parcels,cpnf`)
+- `MAPTILE_MINIO_PREFIX` (tile object-key prefix; default `surveycad/idaho-harvest/tiles/id`)
+- `IDAHO_HARVEST_MINIO_TILE_BUCKET` (bucket name; default `tile-server`)
 
 ---
 

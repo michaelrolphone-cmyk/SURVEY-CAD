@@ -49,6 +49,7 @@ test('app catalog publishes updated core app descriptions', () => {
   assert.equal(byName.get('BoundaryLab'), 'Traverse closure lab with ordered bearings/distances, live boundary preview, and misclosure metrics.');
   assert.equal(byName.get('EquipmentLog'), 'Record equipment setup logs: rodman, height, reference point, setup time, and job file.');
   assert.equal(byName.get('CrewManager'), 'Manage field crew team member profiles, job titles, contact info, and roles.');
+  assert.equal(byName.get('MapTile Browser'), 'Leaflet map for browsing harvested MinIO GeoJSON map tiles through the maptile API.');
 });
 
 

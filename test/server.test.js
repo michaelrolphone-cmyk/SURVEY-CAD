@@ -292,6 +292,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.ok(appsPayload.apps.length >= 10);
     assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/SurveyFoundry\.png$/i);
+    assert.ok(appsPayload.apps.some((entry) => entry.id === 'maptile-browser' && entry.entryHtml === 'MapTileBrowser.html'));
 
     const lookupRes = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('100 Main St, Boise')}`);
     assert.equal(lookupRes.status, 200);
@@ -713,6 +714,67 @@ test('server static map endpoint proxies upstream image, retries tile fallback, 
     assert.ok(mapCalls.some((url) => /services\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/17\//.test(url)));
     assert.ok(mapCalls.some((url) => /tile\.openstreetmap\.org\/17\//.test(url)));
     assert.match(mapCalls[0], /MapServer\/tile\/17\/47857\/23228$/);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+test('server exposes map tile dataset catalog and TileJSON endpoints', async () => {
+  const app = await startApiServer(new SurveyCadClient(), {
+    mapTileObjectStore: {
+      async getObject() {
+        throw new Error('not used');
+      },
+    },
+  });
+
+  try {
+    const catalogRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles`);
+    assert.equal(catalogRes.status, 200);
+    const catalogPayload = await catalogRes.json();
+    assert.ok(Array.isArray(catalogPayload.datasets));
+    assert.ok(catalogPayload.datasets.some((entry) => entry.dataset === 'parcels'));
+
+    const tileJsonRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles/parcels/tilejson.json`);
+    assert.equal(tileJsonRes.status, 200);
+    const tileJson = await tileJsonRes.json();
+    assert.equal(tileJson.tilejson, '3.0.0');
+    assert.equal(tileJson.scheme, 'xyz');
+    assert.ok(Array.isArray(tileJson.tiles));
+    assert.match(tileJson.tiles[0], /\/api\/maptiles\/parcels\/\{z\}\/\{x\}\/\{y\}\.geojson$/);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+test('server map tile endpoint returns GeoJSON tiles from object storage', async () => {
+  const calls = [];
+  const tilePayload = JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { id: 1 }, geometry: null }] });
+  const app = await startApiServer(new SurveyCadClient(), {
+    mapTileObjectStore: {
+      async getObject(key, options = {}) {
+        calls.push({ key, options });
+        if (key.endsWith('/15/11023/12345.geojson')) return Buffer.from(tilePayload, 'utf8');
+        throw new Error('missing');
+      },
+    },
+  });
+
+  try {
+    const tileRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles/parcels/15/11023/12345.geojson`);
+    assert.equal(tileRes.status, 200);
+    assert.match(tileRes.headers.get('content-type') || '', /application\/geo\+json/i);
+    const body = await tileRes.json();
+    assert.equal(body.type, 'FeatureCollection');
+    assert.equal(calls[0].key, 'surveycad/idaho-harvest/tiles/id/parcels/15/11023/12345.geojson');
+    assert.equal(calls[0].options.bucket, 'tile-server');
+
+    const missingTileRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles/parcels/15/11023/99999.geojson`);
+    assert.equal(missingTileRes.status, 404);
+
+    const unknownDatasetRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles/unknown/15/11023/12345.geojson`);
+    assert.equal(unknownDatasetRes.status, 404);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }
