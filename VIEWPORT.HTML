@@ -6899,6 +6899,16 @@ function paintBackground(ctx, w, h){
     cachedPointClusters = buildPointClusters();
     if (!pointDisplayVisibility.clustering && !clusterTooltip.classList.contains("hidden")) hideClusterTooltip();
     const clusteredPointIds = new Set(cachedPointClusters.flatMap((cluster) => cluster.ids));
+    const pointPhotoLookup = pointDisplayVisibility.names ? getPointPhotoResourceLookup(activeProjectId) : null;
+    const rosLookup = pointDisplayVisibility.names ? buildRosResourceLookup(activeProjectId) : null;
+    const pointDocumentLookup = new Map();
+    if (pointDisplayVisibility.names) {
+      for (const point of points.values()) {
+        if (pointHasDocumentAssociation(point, rosLookup)) {
+          pointDocumentLookup.set(String(point.num || "").trim(), true);
+        }
+      }
+    }
 
     for (const p of points.values()) {
       if (!isLayerVisible(p.layerId)) continue;
@@ -6952,8 +6962,11 @@ function paintBackground(ctx, w, h){
       if (pointDisplayVisibility.names) {
         ctx.fillStyle = "#ffffff";
         const numText = String(p.num);
-        ctx.fillText(numText, sp.x + 8, sp.y - 10);
-        blockedTextRects.push({ x: sp.x + 8, y: sp.y - 16, w: ctx.measureText(numText).width, h: 12 });
+        drawPointNumberLabel(ctx, numText, sp.x + 8, sp.y - 10, p.num, pointPhotoLookup, pointDocumentLookup);
+        const numberWidth = ctx.measureText(numText).width;
+        const iconWidth = pointPhotoLookup?.has(String(p.num || "").trim()) ? ctx.measureText(" 📷").width : 0;
+        const documentWidth = pointDocumentLookup.has(String(p.num || "").trim()) ? ctx.measureText(" 📄").width : 0;
+        blockedTextRects.push({ x: sp.x + 8, y: sp.y - 16, w: numberWidth + iconWidth + documentWidth, h: 12 });
       }
 
       if (pointDisplayVisibility.codes && p.code) {
@@ -7028,8 +7041,11 @@ function paintBackground(ctx, w, h){
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         const numText = String(member.point.num);
-        ctx.fillText(numText, labelX, labelY);
-        blockedTextRects.push({ x: labelX, y: labelY - 6, w: ctx.measureText(numText).width, h: 12 });
+        drawPointNumberLabel(ctx, numText, labelX, labelY, member.point.num, pointPhotoLookup, pointDocumentLookup);
+        const numberWidth = ctx.measureText(numText).width;
+        const iconWidth = pointPhotoLookup?.has(String(member.point.num || "").trim()) ? ctx.measureText(" 📷").width : 0;
+        const documentWidth = pointDocumentLookup.has(String(member.point.num || "").trim()) ? ctx.measureText(" 📄").width : 0;
+        blockedTextRects.push({ x: labelX, y: labelY - 6, w: numberWidth + iconWidth + documentWidth, h: 12 });
       }
     }
 
@@ -8275,6 +8291,16 @@ function paintBackground(ctx, w, h){
     return [...refs];
   }
 
+  function pointHasDocumentAssociation(point, rosLookup = null) {
+    if (!point) return false;
+    const cpfInstruments = parseCpfInstruments(point.notes || "");
+    if (cpfInstruments.length) return true;
+    const rosReferences = collectPointRosReferences(point);
+    if (!rosReferences.length) return false;
+    if (!rosLookup) return true;
+    return rosReferences.some((rosNumber) => rosLookup.has(normalizeRosNumber(rosNumber)));
+  }
+
   function buildRosResourceLookup(projectId) {
     if (!projectId) return new Map();
     let projectFile;
@@ -8339,6 +8365,44 @@ function paintBackground(ctx, w, h){
       }
     }
     return lookup;
+  }
+
+  let pointPhotoLookupCacheProjectId = "";
+  let pointPhotoLookupCacheRaw = null;
+  let pointPhotoLookupCache = new Map();
+
+  function getPointPhotoResourceLookup(projectId) {
+    if (!projectId) return new Map();
+    const storageKey = projectFileStorageKey(projectId);
+    const rawProjectFile = localStorage.getItem(storageKey);
+    if (pointPhotoLookupCacheProjectId === projectId && pointPhotoLookupCacheRaw === rawProjectFile) {
+      return pointPhotoLookupCache;
+    }
+    pointPhotoLookupCacheProjectId = projectId;
+    pointPhotoLookupCacheRaw = rawProjectFile;
+    pointPhotoLookupCache = buildPointPhotoResourceLookup(projectId);
+    return pointPhotoLookupCache;
+  }
+
+  function drawPointNumberLabel(ctx, numberText, x, y, pointNumber, pointPhotoLookup, pointDocumentLookup) {
+    ctx.fillText(numberText, x, y);
+    const normalizedPointNumber = String(pointNumber || "").trim();
+    if (!normalizedPointNumber) return;
+
+    let iconX = x + ctx.measureText(numberText).width + 4;
+    if (pointPhotoLookup?.has(normalizedPointNumber)) {
+      ctx.save();
+      ctx.fillStyle = "#ffd54a";
+      ctx.fillText("📷", iconX, y);
+      ctx.restore();
+      iconX += ctx.measureText(" 📷").width;
+    }
+    if (pointDocumentLookup?.has(normalizedPointNumber)) {
+      ctx.save();
+      ctx.fillStyle = "#9ec5ff";
+      ctx.fillText("📄", iconX, y);
+      ctx.restore();
+    }
   }
 
   function readPointFieldValues(basePoint, fields) {
@@ -8730,7 +8794,7 @@ function paintBackground(ctx, w, h){
       pointInspector.appendChild(links);
     }
 
-    const photoLookup = buildPointPhotoResourceLookup(activeProjectId);
+    const photoLookup = getPointPhotoResourceLookup(activeProjectId);
     const pointPhoto = photoLookup.get(String(p.num || "").trim()) || null;
     const photoRow = document.createElement("div");
     photoRow.className = "inspectorRow";
