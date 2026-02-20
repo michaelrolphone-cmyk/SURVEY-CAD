@@ -1042,13 +1042,20 @@ export function createSurveyServer({
   const inMemoryPdfThumbnailCache = new Map();
   const inFlightPdfThumbnailGenerations = new Map();
   const pdfThumbnailFailures = new Map();
+  const sharedRedisClient = (() => {
+    if (typeof localStorageSyncStore?.getRedisClient === 'function') {
+      return localStorageSyncStore.getRedisClient();
+    }
+    return localStorageSyncStore?.redisClient || localStorageSyncStore?.redis || localStorageSyncStore?.client || null;
+  })();
+
   let evidenceDeskStorePromise = evidenceDeskFileStore
     ? Promise.resolve({ store: evidenceDeskFileStore, redisClient: null, type: 'custom' })
     : null;
 
   async function resolveEvidenceDeskStore() {
     if (!evidenceDeskStorePromise) {
-      evidenceDeskStorePromise = createEvidenceDeskFileStore();
+      evidenceDeskStorePromise = createEvidenceDeskFileStore({ redisClient: sharedRedisClient });
     }
     return evidenceDeskStorePromise;
   }
@@ -1142,7 +1149,7 @@ export function createSurveyServer({
   };
 
   // optional reuse: if your localStorage sync store exposes the ioredis client, BEW will share it
-  const existingRedis = null // localStorageSyncStore?.redis || localStorageSyncStore?.client || null;
+  const existingRedis = sharedRedisClient;
 
   // ensure BEW redis closes on server close (only if we created it)
   let bewCloseHookInstalled = false;

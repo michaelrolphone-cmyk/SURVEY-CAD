@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createSurveyServer, startServer } from '../src/server.js';
 import SurveyCadClient from '../src/survey-api.js';
 import { RedisEvidenceDeskFileStore } from '../src/evidence-desk-file-store.js';
+import { LocalStorageSyncStore } from '../src/localstorage-sync-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1080,6 +1081,63 @@ test('server file upload and download endpoints work with redis-backed EvidenceD
     assert.equal(await downloadRes.text(), '%PDF-1.4 redis proof');
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+test('server reuses localstorage redis client for EvidenceDesk file persistence across restarts', async () => {
+  const priorRedisUrl = process.env.REDIS_URL;
+  process.env.REDIS_URL = '';
+
+  const sharedRedis = new FakeRedis();
+  const boundary = '----SharedRedisEvidenceBoundary';
+  const body = [
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="projectId"',
+    '',
+    'redis-restart-project',
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="folderKey"',
+    '',
+    'drawings',
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="file"; filename="persisted.txt"',
+    'Content-Type: text/plain',
+    '',
+    'persist through restart',
+    `--${boundary}--`,
+  ].join('\r\n');
+
+  const localStoreA = new LocalStorageSyncStore();
+  localStoreA.getRedisClient = () => sharedRedis;
+  const appA = await startApiServer(new SurveyCadClient(), { localStorageSyncStore: localStoreA });
+
+  let referencePath = '';
+  try {
+    const uploadRes = await fetch(`http://127.0.0.1:${appA.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+    assert.equal(uploadRes.status, 201);
+    const uploaded = await uploadRes.json();
+    referencePath = uploaded?.resource?.reference?.value || '';
+    assert.ok(referencePath, 'upload should return a download reference');
+  } finally {
+    await new Promise((resolve) => appA.server.close(resolve));
+  }
+
+  const localStoreB = new LocalStorageSyncStore();
+  localStoreB.getRedisClient = () => sharedRedis;
+  const appB = await startApiServer(new SurveyCadClient(), { localStorageSyncStore: localStoreB });
+
+  try {
+    const downloadRes = await fetch(`http://127.0.0.1:${appB.port}${referencePath}`);
+    assert.equal(downloadRes.status, 200);
+    assert.equal(await downloadRes.text(), 'persist through restart');
+  } finally {
+    await new Promise((resolve) => appB.server.close(resolve));
+    process.env.REDIS_URL = priorRedisUrl;
   }
 });
 

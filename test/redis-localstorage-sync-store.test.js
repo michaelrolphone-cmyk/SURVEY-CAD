@@ -56,6 +56,16 @@ test('redis localstorage sync store hydrates from redis and persists differentia
   assert.equal(persisted.snapshot.activeProject, 'boise');
 });
 
+
+test('redis localstorage sync store exposes the shared redis client for other stores', async () => {
+  const redisClient = new FakeRedisClient();
+  const store = new RedisLocalStorageSyncStore({ redisClient });
+  await store.ready();
+
+  assert.equal(store.getRedisClient(), redisClient);
+  await store.close();
+});
+
 test('createRedisLocalStorageSyncStore returns null without REDIS_URL', async () => {
   const store = await createRedisLocalStorageSyncStore({ redisUrl: '' });
   assert.equal(store, null);
