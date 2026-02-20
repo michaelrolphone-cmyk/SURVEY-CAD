@@ -157,6 +157,20 @@
       min-width: 0;
     }
 
+    .ros-number-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-left: 0.45rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid rgba(125, 211, 252, 0.55);
+      color: #bae6fd;
+      background: rgba(8, 47, 73, 0.7);
+      font-size: 0.72rem;
+      white-space: nowrap;
+    }
+
     .point-file-preview-thumb {
       width: 86px;
       height: 86px;
@@ -1033,6 +1047,12 @@
       });
     }
 
+
+    function normalizeRosNumber(value = '') {
+      return String(value || '').trim();
+    }
+
+
     async function uploadFilesToServer(files, folderKey, context) {
       const fileList = Array.from(files || []);
       if (!fileList.length) {
@@ -1123,6 +1143,7 @@
         folderSelect.appendChild(option);
       }
       actions.appendChild(folderSelect);
+
 
       const picker = document.createElement('input');
       picker.type = 'file';
@@ -1262,6 +1283,49 @@
       return panel;
     }
 
+
+    async function setRosNumberForUploadedResource(folder, entry, rosNumberRaw, projectContext = {}) {
+      const metadata = entry?.reference?.metadata || {};
+      const projectId = projectContext?.activeProjectId;
+      const folderKey = folder?.key;
+      const storedFileName = metadata?.storedName;
+      const downloadUrl = entry?.reference?.value;
+      if (!projectId || !folderKey || !storedFileName || !downloadUrl) {
+        renderError('Cannot update ROS number: missing upload metadata.');
+        return;
+      }
+
+      const rosNumber = normalizeRosNumber(rosNumberRaw);
+
+      projectContext.setUploadStatus(`Updating ROS number for ${entry?.title || storedFileName}…`);
+      const fileResponse = await fetch(downloadUrl);
+      if (!fileResponse.ok) {
+        renderError('Unable to reload uploaded PDF for metadata update.');
+        return;
+      }
+      const blob = await fileResponse.blob();
+      const fileName = metadata?.fileName || entry?.title || storedFileName;
+      const fileForUpdate = new File([blob], fileName, { type: blob.type || 'application/pdf' });
+      const formData = new FormData();
+      formData.append('projectId', projectId);
+      formData.append('folderKey', folderKey);
+      formData.append('fileName', storedFileName);
+      formData.append('file', fileForUpdate, fileForUpdate.name);
+      if (rosNumber) formData.append('rosNumber', rosNumber);
+
+      const response = await fetch('/api/project-files/upload', { method: 'PUT', body: formData });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload?.resource) {
+        renderError(payload?.error || 'Failed to update ROS number.');
+        return;
+      }
+      const replaced = removeResourceById(projectContext?.projectFile, folderKey, entry?.id);
+      if (replaced) appendResourceToFolder(projectContext?.projectFile, folderKey, payload.resource);
+      saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+      projectContext.setUploadStatus(`Saved ROS # ${rosNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
+      renderTree(projectContext.projectFile, projectContext);
+    }
+
     function renderTree(projectFile, projectContext = {}) {
       treeContainer.innerHTML = '';
       if (Array.isArray(projectContext.uploadStatusListeners)) {
@@ -1324,7 +1388,9 @@
           const configuredFileName = entry?.title || actualFileName;
           const leadingIcon = showThumbnailSlot ? '' : '<span class="icon">📄</span>';
           const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span></span></span>`;
+          const rosNumber = String(entry?.reference?.metadata?.rosNumber || '').trim();
+          const rosPillMarkup = rosNumber ? `<span class="ros-number-pill" title="Recorded map number for ROS linking">ROS # ${rosNumber}</span>` : '';
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span>${rosPillMarkup}</span></span>`;
 
           if (canLaunchPointForge) {
             attachPointFilePreview(resource, entry).catch(() => {});
@@ -1478,6 +1544,7 @@
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             resource.appendChild(renameButton);
+
           }
 
           const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;
@@ -1543,6 +1610,32 @@
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             resource.appendChild(renameButton);
+
+            if (isServerPdf && folder.key === 'ros') {
+              const rosInlineInput = document.createElement('input');
+              rosInlineInput.type = 'text';
+              rosInlineInput.className = 'launch-btn';
+              rosInlineInput.style.minWidth = '120px';
+              rosInlineInput.style.textAlign = 'left';
+              rosInlineInput.placeholder = 'ROS #';
+              rosInlineInput.value = String(entry?.reference?.metadata?.rosNumber || '');
+              rosInlineInput.title = 'Set Record Of Survey number for this PDF';
+              rosInlineInput.addEventListener('click', (event) => event.stopPropagation());
+              rosInlineInput.addEventListener('keydown', (event) => event.stopPropagation());
+              resource.appendChild(rosInlineInput);
+
+              const rosButton = document.createElement('button');
+              rosButton.type = 'button';
+              rosButton.className = 'launch-btn';
+              rosButton.textContent = 'Save ROS #';
+              rosButton.title = 'Save Record Of Survey number for LineSmith point-inspector linking';
+              rosButton.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                await setRosNumberForUploadedResource(folder, entry, rosInlineInput.value, projectContext);
+              });
+              resource.appendChild(rosButton);
+            }
+
           }
 
           if (!canLaunchPointForge && !canOpenLineSmithDrawing && !canOpenCpfPdf && !isServerUpload) {

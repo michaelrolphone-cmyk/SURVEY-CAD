@@ -1786,6 +1786,7 @@ export function createSurveyServer({
         const projectId = fields.projectId;
         const folderKey = fields.folderKey;
         const targetFileName = fields.fileName;
+        const rosNumber = String(fields.rosNumber || '').trim();
         if (!projectId || !folderKey) {
           sendJson(res, 400, { error: 'projectId and folderKey are required fields.' });
           return;
@@ -1825,6 +1826,7 @@ export function createSurveyServer({
             buffer: fileBuffer,
             extension: ext,
             mimeType: effectiveMimeType,
+            rosNumber,
             thumbnailBuffer,
             thumbnailMimeType: thumbnailBuffer ? 'image/png' : null,
           });
@@ -1843,6 +1845,7 @@ export function createSurveyServer({
           buffer: fileBuffer,
           extension: ext,
           mimeType: effectiveMimeType,
+          rosNumber,
           thumbnailBuffer,
           thumbnailMimeType: thumbnailBuffer ? 'image/png' : null,
         });

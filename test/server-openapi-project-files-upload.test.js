@@ -13,6 +13,11 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   assert.ok(uploadPath.post.responses?.['413'], 'POST upload should document oversized payload response');
   assert.ok(uploadPath.put.responses?.['413'], 'PUT upload should document oversized payload response');
 
+  const postUploadSchema = uploadPath.post.requestBody?.content?.['multipart/form-data']?.schema;
+  const putUploadSchema = uploadPath.put.requestBody?.content?.['multipart/form-data']?.schema;
+  assert.ok(postUploadSchema?.properties?.rosNumber, 'POST upload should allow optional rosNumber form field');
+  assert.ok(putUploadSchema?.properties?.rosNumber, 'PUT upload should allow optional rosNumber form field');
+
   const filePath = spec?.paths?.['/api/project-files/file'];
   assert.ok(filePath, 'spec should include file item path');
   assert.ok(filePath.delete, 'spec should include DELETE file endpoint');
@@ -36,4 +41,6 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
 
   const listSchema = spec?.components?.schemas?.ProjectFilesListResponse;
   assert.ok(listSchema?.properties?.filesByFolder, 'spec should include filesByFolder in list response');
+  const listItemSchema = listSchema?.properties?.files?.items;
+  assert.ok(listItemSchema?.properties?.rosNumber, 'list response should include optional rosNumber metadata');
 });

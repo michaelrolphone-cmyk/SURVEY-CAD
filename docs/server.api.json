@@ -473,6 +473,10 @@
                   "file": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "rosNumber": {
+                    "type": "string",
+                    "description": "Optional ROS map number to associate with uploaded PDF evidence for LineSmith point-inspector linking."
                   }
                 }
               }
@@ -539,6 +543,10 @@
                   "file": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "rosNumber": {
+                    "type": "string",
+                    "description": "Optional ROS map number to associate with uploaded PDF evidence for LineSmith point-inspector linking."
                   }
                 }
               }
@@ -3418,6 +3426,13 @@
                 "updatedAt": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "rosNumber": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Optional ROS map number assigned to the uploaded file."
                 }
               },
               "additionalProperties": false
@@ -3457,6 +3472,13 @@
                   "updatedAt": {
                     "type": "string",
                     "format": "date-time"
+                  },
+                  "rosNumber": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Optional ROS map number assigned to the uploaded file."
                   }
                 },
                 "additionalProperties": false
