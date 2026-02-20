@@ -185,6 +185,43 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(loadedPreserve.drawing.currentState.points[0].y, 202);
     assert.equal(loadedPreserve.drawing.currentState.points[0].z, 9.5);
 
+    const createLayerResetRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'Layer Reset on Relink',
+        drawingState: {
+          points: [{ id: 'shape-1', num: '500', x: 50, y: 60, code: 'OLD', layerId: 'layer-legacy' }],
+        },
+        pointFileLink: {
+          pointFileId: 'layer-reset-points',
+          pointFileName: 'Layer Reset Points.csv',
+        },
+      }),
+    });
+    assert.equal(createLayerResetRes.status, 201);
+    const createdLayerReset = await createLayerResetRes.json();
+
+    const mutateLayerResetPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/layer-reset-points`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileState: {
+          text: '500,51,61,,NEW,Updated code should re-run layer mapping',
+          exportFormat: 'csv',
+        },
+      }),
+    });
+    assert.equal(mutateLayerResetPointFileRes.status, 200);
+
+    const getLayerResetRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(createdLayerReset.drawing.drawingId)}`);
+    assert.equal(getLayerResetRes.status, 200);
+    const loadedLayerReset = await getLayerResetRes.json();
+    assert.equal(loadedLayerReset.drawing.currentState.points[0].id, 'shape-1');
+    assert.equal(loadedLayerReset.drawing.currentState.points[0].num, '500');
+    assert.equal(loadedLayerReset.drawing.currentState.points[0].code, 'NEW');
+    assert.equal(loadedLayerReset.drawing.currentState.points[0].layerId, undefined);
+
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
       method: 'DELETE',
     });
