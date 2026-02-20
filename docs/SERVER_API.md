@@ -1049,7 +1049,7 @@ Create a point-file record for a project.
 
 ### `GET /api/projects/:projectId/point-files/:pointFileId`
 
-Fetch the full point-file record and reconstructed latest state.
+Fetch the full point-file record and reconstructed latest state. Optional query parameter: `versionId=<versionId>` to reconstruct `currentState` at a specific saved version.
 
 **Response `200`:**
 ```json
@@ -1058,7 +1058,7 @@ Fetch the full point-file record and reconstructed latest state.
 }
 ```
 
-**Response `404`:** `{ "error": "Point file not found." }`
+**Response `404`:** `{ "error": "Point file not found." }` or `{ "error": "Point file version not found." }` when `versionId` is unknown.
 
 ### `PUT /api/projects/:projectId/point-files/:pointFileId`
 ### `PATCH /api/projects/:projectId/point-files/:pointFileId`
@@ -1076,7 +1076,7 @@ Delete a point-file record from a project.
 }
 ```
 
-**Response `404`:** `{ "error": "Point file not found." }`
+**Response `404`:** `{ "error": "Point file not found." }` or `{ "error": "Point file version not found." }` when `versionId` is unknown.
 
 ---
 

@@ -129,6 +129,31 @@ export async function getProjectPointFile(store, projectIdRaw, pointFileIdRaw) {
   };
 }
 
+export async function getProjectPointFileAtVersion(store, projectIdRaw, pointFileIdRaw, versionIdRaw) {
+  const projectId = normalizeProjectId(projectIdRaw);
+  const pointFileId = normalizePointFileId(pointFileIdRaw);
+  const versionId = String(versionIdRaw || '').trim();
+  if (!projectId) throw new Error('projectId is required.');
+  if (!pointFileId) throw new Error('pointFileId is required.');
+  if (!versionId) throw new Error('versionId is required.');
+
+  const state = await Promise.resolve(store.getState());
+  const snapshot = state?.snapshot || {};
+  const record = parseSnapshotJson(snapshot, pointFileKey(projectId, pointFileId));
+  if (!record) return null;
+
+  const versionIndex = Array.isArray(record?.versions)
+    ? record.versions.findIndex((entry) => String(entry?.versionId || '') === versionId)
+    : -1;
+  if (versionIndex < 0) return null;
+
+  return {
+    ...record,
+    currentState: materializePointFileState(record, versionIndex),
+    selectedVersionId: versionId,
+  };
+}
+
 export async function createOrUpdateProjectPointFile(store, {
   projectId: projectIdRaw,
   pointFileId: pointFileIdRaw,

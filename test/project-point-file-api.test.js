@@ -76,6 +76,16 @@ test('project point file CRUD API stores differential versions and supports list
     const loaded = await getRes.json();
     assert.equal(loaded.pointFile.currentState.text, '1,105,205\n2,300,400');
 
+    const firstVersionId = updated.pointFile.versions[0].versionId;
+    const versionRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/${encodeURIComponent(pointFileId)}?versionId=${encodeURIComponent(firstVersionId)}`);
+    assert.equal(versionRes.status, 200);
+    const versionPayload = await versionRes.json();
+    assert.equal(versionPayload.pointFile.selectedVersionId, firstVersionId);
+    assert.equal(versionPayload.pointFile.currentState.text, '1,100,200');
+
+    const missingVersionRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/${encodeURIComponent(pointFileId)}?versionId=missing-version`);
+    assert.equal(missingVersionRes.status, 404);
+
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/${encodeURIComponent(pointFileId)}`, {
       method: 'DELETE',
     });
