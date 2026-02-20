@@ -112,6 +112,12 @@ test('PointForge renders code-group explorer with thumbnails and BoundaryLab han
 });
 
 
+test('EquipmentLog syncs edited point-file links back to the equipment log API', async () => {
+  const html = await readFile(new URL('../EquipmentLog.html', import.meta.url), 'utf8');
+  assert.match(html, /if \(wasEditing\) \{[\s\S]*updatedLog\s*=\s*\{[\s\S]*pointFileId:[\s\S]*saveLogs\(\);[\s\S]*const apiJson = await postEquipmentLog\(updatedLog\);/, 'EquipmentLog should persist edited logs to the API so point-file linkage survives reloads.');
+});
+
+
 test('PointForge auto-focuses transformed point editor accordion and hides stats/log panels', async () => {
   const html = await readFile(new URL('../POINT_TRANSFORMER.HTML', import.meta.url), 'utf8');
   assert.match(html, /<section class="leftStack">[\s\S]*<div class="localizationPanel">[\s\S]*<section class="panel" id="ingestPanel">/, 'PointForge should place localization controls above the ingest console panel.');
