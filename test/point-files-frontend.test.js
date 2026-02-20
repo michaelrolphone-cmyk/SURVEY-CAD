@@ -19,6 +19,10 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /context\.setUploadStatus\(`Uploading point file \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\}…`\)/, 'EvidenceDesk should show per-file progress while point files upload.');
   assert.match(html, /async function\s+renameResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a rename helper for project resources');
   assert.match(html, /async function\s+deleteResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a shared delete helper for project resources');
+  assert.match(html, /function\s+moveResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a move helper for drag-and-drop reorganization.');
+  assert.match(html, /resource\.draggable\s*=\s*true;/, 'EvidenceDesk should mark movable rows as draggable.');
+  assert.match(html, /folderRow\.addEventListener\('drop',\s*async\s*\(event\)\s*=>\s*\{[\s\S]*moveResourceFromEvidenceDesk\(/, 'EvidenceDesk folder rows should accept dropped file rows and trigger move workflow.');
+  assert.match(html, /fetch\(moveUrl\.toString\(\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*targetFolderKey/, 'EvidenceDesk should move server-upload records through PATCH project-files endpoint.');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
   assert.match(html, /const\s+isPointFileFormat\s*=\s*pointFileFormat\s*===\s*'csv'\s*\|\|\s*pointFileFormat\s*===\s*'txt';/, 'EvidenceDesk should only launch PointForge for point-file formats.');

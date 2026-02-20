@@ -2415,6 +2415,74 @@
             "$ref": "#/components/responses/Error404"
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Project Files"
+        ],
+        "summary": "Move a previously uploaded file to another project folder",
+        "operationId": "moveProjectFileUpload",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectIdRequired"
+          },
+          {
+            "$ref": "#/components/parameters/folderKeyRequired"
+          },
+          {
+            "$ref": "#/components/parameters/fileNameRequired"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "targetFolderKey"
+                ],
+                "properties": {
+                  "targetFolderKey": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Move status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "moved",
+                    "resource"
+                  ],
+                  "properties": {
+                    "moved": {
+                      "type": "boolean"
+                    },
+                    "resource": {
+                      "$ref": "#/components/schemas/ProjectFileResource"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
       }
     },
     "/api/project-files/pdf-thumbnail": {

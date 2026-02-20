@@ -102,6 +102,26 @@ export function removeResourceById(projectFile, folderKey, resourceId) {
   return folder.index.length !== before;
 }
 
+export function moveResourceById(projectFile, sourceFolderKey, targetFolderKey, resourceId) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !sourceFolderKey || !targetFolderKey || !resourceId) return false;
+  if (sourceFolderKey === targetFolderKey) return true;
+
+  const sourceFolder = projectFile.folders.find((entry) => entry.key === sourceFolderKey);
+  const targetFolder = projectFile.folders.find((entry) => entry.key === targetFolderKey);
+  if (!sourceFolder || !targetFolder || !Array.isArray(sourceFolder.index)) return false;
+  if (!Array.isArray(targetFolder.index)) targetFolder.index = [];
+
+  const sourceIndex = sourceFolder.index.findIndex((entry) => entry?.id === resourceId);
+  if (sourceIndex < 0) return false;
+
+  const [resource] = sourceFolder.index.splice(sourceIndex, 1);
+  if (resource && typeof resource === 'object') {
+    resource.folder = targetFolderKey;
+  }
+  targetFolder.index.push(resource);
+  return true;
+}
+
 export function renameResourceTitle(projectFile, folderKey, resourceId, nextTitle) {
   if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey || !resourceId) return false;
   const title = String(nextTitle || '').trim();
