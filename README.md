@@ -44,6 +44,12 @@ The server now includes a restartable background worker that harvests Idaho parc
 - `POST /api/idaho-harvest/start`
 - `POST /api/idaho-harvest/stop`
 
+### Map tile API endpoints (Leaflet/TileJSON-compatible)
+
+- `GET /api/maptiles`
+- `GET /api/maptiles/:dataset/tilejson.json`
+- `GET /api/maptiles/:dataset/:z/:x/:y.geojson`
+
 ### Object store layout (GeoJSON)
 
 - Feature objects: `surveycad/idaho-harvest/features/id/<dataset>/<objectId>.geojson`
@@ -75,6 +81,8 @@ The server now includes a restartable background worker that harvests Idaho parc
 - `IDAHO_HARVEST_MINIO_PARCELS_BUCKET` (default: `tile-server`)
 - `IDAHO_HARVEST_MINIO_INDEX_BUCKET` (default: `tile-server`)
 - `IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET` (default: `tile-server`)
+- `MAPTILE_DATASETS` (comma-separated list of exposed tile datasets; default: `parcels,cpnf`)
+- `MAPTILE_MINIO_PREFIX` (MinIO object-key prefix for tile lookup; default: `surveycad/idaho-harvest/tiles/id`)
 
 ### Commands
 

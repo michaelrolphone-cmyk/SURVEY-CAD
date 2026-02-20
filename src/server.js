@@ -16,6 +16,7 @@ import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
 import { createCrewPresenceWsService } from './crew-presence-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
 import { createIdahoHarvestSupervisor } from './idaho-harvest-supervisor.js';
+import { createIdahoHarvestObjectStoreFromEnv } from './idaho-harvest-worker.js';
 import { createLmProxyHubWsService } from "./lmstudio-proxy-control-ws.js";
 import { createRedisClient as createBewRedisClient } from "./bew-redis.js";
 import { createEvidenceDeskFileStore } from './evidence-desk-file-store.js';
@@ -226,6 +227,22 @@ function parseProjectWorkbenchRoute(pathname = '') {
     projectId: decodeURIComponent(match[1]),
     action,
     traverseId: traverseMatch?.[1] ? decodeURIComponent(traverseMatch[1]) : '',
+  };
+}
+
+function parseMapTileRoute(pathname = '') {
+  const tileJsonMatch = String(pathname || '').match(/^\/api\/maptiles\/([^/]+)\/tilejson\.json\/?$/);
+  if (tileJsonMatch) {
+    return { dataset: decodeURIComponent(tileJsonMatch[1]), z: null, x: null, y: null, isTileJson: true };
+  }
+  const tileMatch = String(pathname || '').match(/^\/api\/maptiles\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\.geojson\/?$/);
+  if (!tileMatch) return null;
+  return {
+    dataset: decodeURIComponent(tileMatch[1]),
+    z: Number(tileMatch[2]),
+    x: Number(tileMatch[3]),
+    y: Number(tileMatch[4]),
+    isTileJson: false,
   };
 }
 
@@ -1100,6 +1117,7 @@ export function createSurveyServer({
   evidenceDeskFileStore,
   pdfThumbnailRenderer = renderPdfThumbnailFromBuffer,
   idahoHarvestSupervisor = createIdahoHarvestSupervisor(),
+  mapTileObjectStore = null,
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
@@ -1130,12 +1148,29 @@ export function createSurveyServer({
   let evidenceDeskStorePromise = evidenceDeskFileStore
     ? Promise.resolve({ store: evidenceDeskFileStore, redisClient: null, type: 'custom' })
     : null;
+  let mapTileStorePromise = mapTileObjectStore ? Promise.resolve(mapTileObjectStore) : null;
+
+  const mapTileSettings = {
+    bucket: String(process.env.IDAHO_HARVEST_MINIO_TILE_BUCKET || process.env.IDAHO_HARVEST_MINIO_DEFAULT_BUCKET || 'tile-server'),
+    prefix: String(process.env.MAPTILE_MINIO_PREFIX || 'surveycad/idaho-harvest/tiles/id').replace(/\/+$/, ''),
+    datasets: String(process.env.MAPTILE_DATASETS || 'parcels,cpnf')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  };
 
   async function resolveEvidenceDeskStore() {
     if (!evidenceDeskStorePromise) {
       evidenceDeskStorePromise = createEvidenceDeskFileStore({ redisClient: sharedRedisClient });
     }
     return evidenceDeskStorePromise;
+  }
+
+  async function resolveMapTileStore() {
+    if (!mapTileStorePromise) {
+      mapTileStorePromise = Promise.resolve().then(() => createIdahoHarvestObjectStoreFromEnv(process.env));
+    }
+    return mapTileStorePromise;
   }
 
   Promise.resolve()
@@ -2639,6 +2674,61 @@ export function createSurveyServer({
 
       if (urlObj.pathname === '/api/apps') {
         sendJson(res, 200, { apps: listApps() });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/maptiles') {
+        const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host || 'localhost'}`;
+        const datasets = mapTileSettings.datasets.map((dataset) => ({
+          dataset,
+          tilejson: `${origin}/api/maptiles/${encodeURIComponent(dataset)}/tilejson.json`,
+          tiles: `${origin}/api/maptiles/${encodeURIComponent(dataset)}/{z}/{x}/{y}.geojson`,
+        }));
+        sendJson(res, 200, { datasets });
+        return;
+      }
+
+      const mapTileRoute = parseMapTileRoute(urlObj.pathname);
+      if (mapTileRoute) {
+        const dataset = String(mapTileRoute.dataset || '').trim().toLowerCase();
+        if (!mapTileSettings.datasets.includes(dataset)) {
+          sendJson(res, 404, { error: `Unknown tile dataset: ${dataset}` });
+          return;
+        }
+
+        const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host || 'localhost'}`;
+        if (mapTileRoute.isTileJson) {
+          sendJson(res, 200, {
+            tilejson: '3.0.0',
+            name: `surveycad-idaho-${dataset}`,
+            scheme: 'xyz',
+            tiles: [`${origin}/api/maptiles/${encodeURIComponent(dataset)}/{z}/{x}/{y}.geojson`],
+            minzoom: 0,
+            maxzoom: 22,
+          });
+          return;
+        }
+
+        let mapTileStore;
+        try {
+          mapTileStore = await resolveMapTileStore();
+        } catch {
+          sendJson(res, 503, { error: 'Map tile object storage is not configured.' });
+          return;
+        }
+        const objectKey = `${mapTileSettings.prefix}/${dataset}/${mapTileRoute.z}/${mapTileRoute.x}/${mapTileRoute.y}.geojson`;
+        let payload;
+        try {
+          payload = await mapTileStore.getObject(objectKey, { bucket: mapTileSettings.bucket });
+        } catch {
+          sendJson(res, 404, { error: 'Map tile not found.' });
+          return;
+        }
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/geo+json; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=600');
+        res.end(Buffer.from(payload));
         return;
       }
 

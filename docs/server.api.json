@@ -87,6 +87,10 @@
     {
       "name": "Project Point Files",
       "description": "Project-scoped point file CRUD for PointForge/EvidenceDesk"
+    },
+    {
+      "name": "Map Tiles",
+      "description": "TileJSON and XYZ GeoJSON tile access from harvested MinIO buckets"
     }
   ],
   "paths": {
@@ -2808,6 +2812,204 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IdahoHarvestStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/maptiles": {
+      "get": {
+        "tags": [
+          "Map Tiles"
+        ],
+        "summary": "List exposed map tile datasets",
+        "responses": {
+          "200": {
+            "description": "Dataset list with TileJSON and tile URL templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datasets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dataset": {
+                            "type": "string"
+                          },
+                          "tilejson": {
+                            "type": "string"
+                          },
+                          "tiles": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "dataset",
+                          "tilejson",
+                          "tiles"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "datasets"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/maptiles/{dataset}/tilejson.json": {
+      "get": {
+        "tags": [
+          "Map Tiles"
+        ],
+        "summary": "Get TileJSON for a harvested tile dataset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tile dataset key (for example parcels or cpnf)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TileJSON document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tilejson": {
+                      "type": "string",
+                      "example": "3.0.0"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "scheme": {
+                      "type": "string",
+                      "example": "xyz"
+                    },
+                    "tiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "minzoom": {
+                      "type": "integer"
+                    },
+                    "maxzoom": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "tilejson",
+                    "name",
+                    "scheme",
+                    "tiles",
+                    "minzoom",
+                    "maxzoom"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Dataset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/maptiles/{dataset}/{z}/{x}/{y}.geojson": {
+      "get": {
+        "tags": [
+          "Map Tiles"
+        ],
+        "summary": "Fetch a harvested GeoJSON XYZ tile from object storage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "z",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "in": "path",
+            "name": "x",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "in": "path",
+            "name": "y",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GeoJSON tile payload",
+            "content": {
+              "application/geo+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Dataset or tile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Tile object storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
