@@ -275,15 +275,17 @@ function buildDrawingPointsFromPointFileText(text = '') {
     .map((parts) => {
       const [pointNumber, x, y, z, code, notes] = parts;
       const normalizedPointNumber = String(pointNumber || '').trim();
+      const normalizedCode = String(code || '').trim();
+      const normalizedNotes = String(notes || '').trim();
       const point = {
         num: normalizedPointNumber,
         x: toFiniteNumberOrRaw(x),
         y: toFiniteNumberOrRaw(y),
+        notes: normalizedNotes,
       };
       const normalizedZ = String(z || '').trim();
       if (normalizedZ) point.z = toFiniteNumberOrRaw(normalizedZ);
-      if (String(code || '').trim()) point.code = String(code || '').trim();
-      if (String(notes || '').trim()) point.notes = String(notes || '').trim();
+      if (normalizedCode) point.code = normalizedCode;
       return point;
     })
     .filter((point) => point.num);
