@@ -400,6 +400,8 @@
           metadata: {
             projectId,
             pointFileId,
+            source: pointFile.source || '',
+            sourceLabel: pointFile.sourceLabel || '',
           },
         },
       };
@@ -1582,7 +1584,12 @@
           const pointNumber = String(entry?.reference?.metadata?.pointNumber || '').trim();
           const rosPillMarkup = rosNumber ? `<span class="ros-number-pill" title="Recorded map number for ROS linking">ROS # ${rosNumber}</span>` : '';
           const pointPillMarkup = pointNumber ? `<span class="ros-number-pill" title="Linked photo point number">PT # ${pointNumber}</span>` : '';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}${pointPillMarkup}</span></span>`;
+          const pointFileSource = String(entry?.reference?.metadata?.source || '').trim();
+          const pointFileSourceLabel = String(entry?.reference?.metadata?.sourceLabel || '').trim();
+          const equipmentAuditPillMarkup = pointFileSource === 'equipment-log'
+            ? `<span class="ros-number-pill" title="${pointFileSourceLabel || 'Attached from Equipment Log'}">Equip Log</span>`
+            : '';
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}${pointPillMarkup}${equipmentAuditPillMarkup}</span></span>`;
           const actionButtons = document.createElement('div');
           actionButtons.className = 'file-actions';
           resource.appendChild(actionButtons);

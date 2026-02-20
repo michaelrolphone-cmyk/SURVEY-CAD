@@ -14,3 +14,16 @@ test('server OpenAPI spec documents equipment delete endpoint', async () => {
   assert.ok(equipmentPath.post, 'spec should include POST /api/equipment');
   assert.ok(equipmentPath.delete, 'spec should include DELETE /api/equipment');
 });
+
+
+test('server OpenAPI spec documents equipment log point-file linkage fields', async () => {
+  const raw = await readFile(OPENAPI_PATH, 'utf8');
+  const spec = JSON.parse(raw);
+
+  const equipmentLogSchema = spec?.components?.schemas?.EquipmentLog;
+  const equipmentLogUpsertSchema = spec?.components?.schemas?.EquipmentLogUpsert;
+  assert.ok(equipmentLogSchema?.properties?.pointFileId, 'EquipmentLog should expose pointFileId');
+  assert.ok(equipmentLogSchema?.properties?.pointFileName, 'EquipmentLog should expose pointFileName');
+  assert.ok(equipmentLogSchema?.properties?.pointFileProjectId, 'EquipmentLog should expose pointFileProjectId');
+  assert.ok(equipmentLogUpsertSchema?.properties?.pointFileId, 'EquipmentLogUpsert should accept pointFileId');
+});

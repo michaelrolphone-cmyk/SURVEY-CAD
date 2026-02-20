@@ -916,7 +916,7 @@
         "tags": [
           "Equipment Logs"
         ],
-        "summary": "Create or update an equipment log entry",
+        "summary": "Create or update an equipment log entry (optionally linked to a project point file)",
         "operationId": "upsertEquipmentLog",
         "requestBody": {
           "required": true,
@@ -942,7 +942,8 @@
           "400": {
             "$ref": "#/components/responses/Error400"
           }
-        }
+        },
+        "description": "Stores equipment log metadata and optional point-file linkage fields (pointFileId, pointFileName, pointFileProjectId)."
       }
     },
     "/api/localstorage-sync": {
@@ -4003,6 +4004,18 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "pointFileId": {
+            "type": "string",
+            "description": "Linked project point-file ID created from an attached Equipment Log point file."
+          },
+          "pointFileName": {
+            "type": "string",
+            "description": "Original point-file name attached to this equipment log entry."
+          },
+          "pointFileProjectId": {
+            "type": "string",
+            "description": "Project ID used when storing the attached point file into project point-files."
           }
         },
         "additionalProperties": true
@@ -4070,7 +4083,21 @@
               }
             ]
           }
-        ]
+        ],
+        "properties": {
+          "pointFileId": {
+            "type": "string",
+            "description": "Linked project point-file ID created from an attached Equipment Log point file."
+          },
+          "pointFileName": {
+            "type": "string",
+            "description": "Original point-file name attached to this equipment log entry."
+          },
+          "pointFileProjectId": {
+            "type": "string",
+            "description": "Project ID used when storing the attached point file into project point-files."
+          }
+        }
       },
       "EquipmentLogListResponse": {
         "type": "object",
