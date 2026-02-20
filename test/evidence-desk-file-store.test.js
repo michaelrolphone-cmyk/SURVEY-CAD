@@ -4,6 +4,7 @@ import {
   createEvidenceDeskFileStore,
   InMemoryEvidenceDeskFileStore,
   RedisEvidenceDeskFileStore,
+  S3EvidenceDeskFileStore,
 } from '../src/evidence-desk-file-store.js';
 
 class FakeRedis {
@@ -60,6 +61,30 @@ class FakeRedis {
     return tx;
   }
 }
+
+class FakeS3 {
+  constructor() {
+    this.objects = new Map();
+  }
+
+  async getObject(key) {
+    return this.objects.get(key) || null;
+  }
+
+  async putObject(key, body) {
+    const buffer = Buffer.isBuffer(body) ? body : Buffer.from(String(body || ''), 'utf8');
+    this.objects.set(key, buffer);
+  }
+
+  async deleteObject(key) {
+    this.objects.delete(key);
+  }
+
+  async listObjects(prefix = '') {
+    return [...this.objects.keys()].filter((key) => key.startsWith(prefix));
+  }
+}
+
 
 test('in-memory evidence desk store supports create/read/update/delete/list', async () => {
   const store = new InMemoryEvidenceDeskFileStore();
@@ -132,6 +157,53 @@ test('redis evidence desk store indexes files by folder', async () => {
   assert.equal(afterDelete.files.length, 0);
 });
 
+test('s3 evidence desk store supports file CRUD and thumbnail caching', async () => {
+  const s3 = new FakeS3();
+  const store = new S3EvidenceDeskFileStore(s3, { bucket: 'survey-foundry', prefix: 'test/evidence' });
+
+  const created = await store.createFile({
+    projectId: 'proj-s3',
+    folderKey: 'photos',
+    originalFileName: 'capture.jpg',
+    extension: 'jpg',
+    mimeType: 'image/jpeg',
+    buffer: Buffer.from('jpeg-data'),
+    thumbnailBuffer: Buffer.from('thumb-data'),
+    thumbnailMimeType: 'image/png',
+  });
+
+  const fileName = created.reference.metadata.storedName;
+  const loaded = await store.getFile('proj-s3', 'photos', fileName);
+  assert.equal(loaded.buffer.toString(), 'jpeg-data');
+  assert.equal(loaded.thumbnailBuffer.toString(), 'thumb-data');
+
+  await store.writeCachedPdfThumbnail('pdf-key', Buffer.from('pdf-thumb'));
+  const thumb = await store.readCachedPdfThumbnail('pdf-key');
+  assert.equal(thumb.toString(), 'pdf-thumb');
+
+  const list = await store.listFiles('proj-s3', ['photos']);
+  assert.equal(list.filesByFolder.photos.length, 1);
+
+  const moved = await store.moveFile('proj-s3', 'photos', fileName, 'deeds');
+  assert.equal(moved.folder, 'deeds');
+
+  const deleted = await store.deleteFile('proj-s3', 'deeds', fileName);
+  assert.equal(deleted, true);
+});
+
+test('createEvidenceDeskFileStore prefers configured S3 object storage over redis', async () => {
+  const sharedRedis = new FakeRedis();
+  const s3 = new FakeS3();
+  const result = await createEvidenceDeskFileStore({
+    redisClient: sharedRedis,
+    s3Client: s3,
+    s3Config: { bucket: 'survey-foundry', prefix: 'test/evidence', region: 'us-east-1' },
+  });
+
+  assert.equal(result.type, 's3');
+  assert.equal(result.redisClient, null);
+});
+
 test('createEvidenceDeskFileStore falls back to in-memory when redis connect stalls', async () => {
   let quitCalled = false;
   const neverConnectingClient = {
@@ -144,6 +216,7 @@ test('createEvidenceDeskFileStore falls back to in-memory when redis connect sta
     redisUrl: 'redis://example.invalid:6379',
     connectTimeoutMs: 5,
     createRedisClient: () => neverConnectingClient,
+    s3Config: null,
   });
 
   assert.equal(result.type, 'memory');
@@ -166,6 +239,7 @@ test('createEvidenceDeskFileStore returns quickly when redis quit hangs after co
     connectTimeoutMs: 5,
     disconnectTimeoutMs: 10,
     createRedisClient: () => hangingClient,
+    s3Config: null,
   });
   const elapsedMs = Date.now() - startedAt;
 
@@ -187,6 +261,7 @@ test('createEvidenceDeskFileStore uses redis when connection succeeds', async ()
   const result = await createEvidenceDeskFileStore({
     redisUrl: 'redis://localhost:6379',
     createRedisClient: () => connectedClient,
+    s3Config: null,
   });
 
   assert.equal(connected, true);
