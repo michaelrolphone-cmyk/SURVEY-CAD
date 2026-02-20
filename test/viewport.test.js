@@ -926,6 +926,7 @@ test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal 
   assert.match(html, /const\s+DEFAULT_LAYER_ID\s*=\s*"layer-1";/, 'LineSmith should define a default layer id for new drawings');
   assert.match(html, /const\s+layers\s*=\s*new\s+Map\(\);\s*\/\/ id -> \{id,name,color,locked,visible,lineWeight,fill\}/, 'LineSmith should maintain a first-class layer registry');
   assert.match(html, /id="quickLayerDropdown"[\s\S]*id="quickLayerDropdownButton"[\s\S]*id="quickLayerDropdownMenu"/, 'quick toolbar should expose an HTML layer dropdown for active drawing layer');
+  assert.match(html, /id="quickPointGroupDropdown"[\s\S]*id="quickPointGroupDropdownButton"[\s\S]*id="quickPointGroupDropdownMenu"/, 'quick toolbar should expose a point-group dropdown beside the layer picker');
   assert.match(html, /id="quickLayerManager"[\s\S]*fa-layer-group/, 'quick toolbar should include a layer-manager icon button');
   assert.match(html, /id="layersModal"\s+class="modalOverlay hidden"/, 'LineSmith should define a layer manager modal');
   assert.match(html, /<th>Name<\/th>[\s\S]*<th>Color<\/th>[\s\S]*<th>Line Weight<\/th>[\s\S]*<th>Lock<\/th>[\s\S]*<th>Visible<\/th>[\s\S]*<th>Fill<\/th>/, 'layer manager table should provide editable layer fields and flags');
@@ -934,6 +935,9 @@ test('VIEWPORT.HTML adds layer model, toolbar controls, and layer manager modal 
   assert.match(html, /if \(!isLayerVisible\(p\.layerId\)\) continue;/, 'rendering should hide point symbols for invisible layers');
   assert.match(html, /if \(!isLayerVisible\(ln\.layerId\)\) continue;/, 'rendering and selection should hide linework for invisible layers');
   assert.match(html, /function\s+setQuickLayerDropdownOpen\(open\)\s*\{[\s\S]*quickLayerDropdownMenu\.classList\.toggle\("hidden", !quickLayerDropdownOpen\);/, 'quick toolbar should drive an HTML dropdown open state instead of relying on native select widgets');
+  assert.match(html, /function\s+setQuickPointGroupDropdownOpen\(open\)\s*\{[\s\S]*quickPointGroupDropdownMenu\.classList\.toggle\("hidden", !quickPointGroupDropdownOpen\);/, 'point-group toolbar control should also manage an explicit HTML dropdown open state');
+  assert.match(html, /function\s+buildQuickPointGroups\(\)\s*\{[\s\S]*const\s+includeAllLayers\s*=\s*selectedLayerId === DEFAULT_LAYER_ID;[\s\S]*if \(!includeAllLayers && point\.layerId !== selectedLayerId\) continue;/, 'point-group dropdown should list all groups on Default layer and only active-layer groups otherwise');
+  assert.match(html, /function\s+selectQuickPointGroup\(group\)\s*\{[\s\S]*selectedPointIds\s*=\s*group\.pointIds\.filter\(\(pointId\) => points\.has\(pointId\)\);/, 'picking a point group from the toolbar should select all points in that group');
   assert.match(html, /function\s+getSelectionLayerDisplayState\(\)\s*\{[\s\S]*label:\s*"Multiple Layers"/, 'LineSmith should compute layer toolbar state from current selection and surface a Multiple Layers label for mixed-layer selections');
   assert.match(html, /const\s+layerDisplayState\s*=\s*getSelectionLayerDisplayState\(\);[\s\S]*const\s+toolbarLayerId\s*=\s*layerDisplayState\.mode === "single" \? layerDisplayState\.layerId : selectedLayerId;/, 'layer toolbar should temporarily reflect the selected entity layer without overwriting the drawing layer choice');
   assert.match(html, /const\s+toggles\s*=\s*\[[\s\S]*key:\s*"locked"[\s\S]*key:\s*"visible"[\s\S]*key:\s*"fill"/, 'each dropdown layer row should expose lock, visibility, and fill toggle controls');
