@@ -213,9 +213,15 @@ Request body for create/update:
 ```json
 {
   "pointFileName": "Boundary Export.csv",
-  "pointFileState": { "text": "1,100,200", "exportFormat": "csv" }
+  "pointFileState": { "text": "1,100,200", "exportFormat": "csv" },
+  "changeContext": {
+    "app": "pointforge",
+    "user": "casey"
+  }
 }
 ```
+
+Each point-file version now records timeline metadata in `versions[n].actor` (`app`, `user`) plus `savedAt`, allowing audit history and rollback context across Equipment Log uploads, PointForge edits, and LineSmith save syncs.
 
 
 ## API and CLI notes for shared FieldToFinish thumbnail rendering

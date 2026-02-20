@@ -4987,6 +4987,9 @@
           "diffFromPrevious": {
             "type": "object",
             "additionalProperties": true
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ProjectPointFileChangeContext"
           }
         }
       },
@@ -5109,6 +5112,9 @@
           },
           "sourceLabel": {
             "type": "string"
+          },
+          "changeContext": {
+            "$ref": "#/components/schemas/ProjectPointFileChangeContext"
           }
         },
         "required": [
@@ -5729,6 +5735,19 @@
           "pointFileId"
         ],
         "additionalProperties": false
+      },
+      "ProjectPointFileChangeContext": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "string",
+            "description": "App/tool identifier recording who made the point-file change (for example pointforge, linesmith-drawing, equipment-log)."
+          },
+          "user": {
+            "type": "string",
+            "description": "User identifier/name for the operator who made the change."
+          }
+        }
       }
     }
   }

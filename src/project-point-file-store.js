@@ -52,6 +52,12 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function normalizeVersionActor(actor = {}, { source = null } = {}) {
+  const app = String(actor?.app || '').trim() || String(source || '').trim() || 'unknown-app';
+  const user = String(actor?.user || '').trim() || 'unknown-user';
+  return { app, user };
+}
+
 function buildPointFileSummary(record) {
   return {
     pointFileId: record.pointFileId,
@@ -130,6 +136,7 @@ export async function createOrUpdateProjectPointFile(store, {
   pointFileState,
   source,
   sourceLabel,
+  changeContext,
 } = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
   const pointFileId = normalizePointFileId(pointFileIdRaw || pointFileName || `point-file-${Date.now()}`);
@@ -144,6 +151,7 @@ export async function createOrUpdateProjectPointFile(store, {
   const index = parseSnapshotJson(snapshot, pointFileIndexKey(projectId)) || {};
 
   let record;
+  const versionActor = normalizeVersionActor(changeContext, { source });
   if (!existing?.versions?.length) {
     record = {
       schemaVersion: '1.0.0',
@@ -159,6 +167,7 @@ export async function createOrUpdateProjectPointFile(store, {
         versionId: `v-${Date.now()}`,
         savedAt: now,
         label: normalizePointFileName(pointFileName || pointFileId),
+        actor: versionActor,
         baseState: pointFileState,
       }],
     };
@@ -178,6 +187,7 @@ export async function createOrUpdateProjectPointFile(store, {
       versionId: `v-${Date.now()}`,
       savedAt: now,
       label: record.pointFileName,
+      actor: versionActor,
       diffFromPrevious: diffFromPrevious === undefined ? {} : diffFromPrevious,
     });
   }

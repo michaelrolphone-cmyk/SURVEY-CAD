@@ -21,6 +21,10 @@ test('project point file CRUD API stores differential versions and supports list
         pointFileState: { text: '1,100,200', exportFormat: 'csv' },
         source: 'pointforge',
         sourceLabel: 'Boundary Export',
+        changeContext: {
+          app: 'pointforge',
+          user: 'casey',
+        },
       }),
     });
     assert.equal(createRes.status, 201);
@@ -46,11 +50,17 @@ test('project point file CRUD API stores differential versions and supports list
       body: JSON.stringify({
         pointFileName: 'Boundary Export Renamed.csv',
         pointFileState: { text: '1,105,205\n2,300,400', exportFormat: 'csv' },
+        changeContext: {
+          app: 'pointforge',
+          user: 'avery',
+        },
       }),
     });
     assert.equal(updateRes.status, 200);
     const updated = await updateRes.json();
     assert.equal(updated.pointFile.versions.length, 3);
+    assert.deepEqual(updated.pointFile.versions[0].actor, { app: 'pointforge', user: 'casey' });
+    assert.deepEqual(updated.pointFile.versions[2].actor, { app: 'pointforge', user: 'avery' });
 
     const listRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files`);
     assert.equal(listRes.status, 200);
