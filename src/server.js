@@ -438,6 +438,10 @@ async function syncDrawingLinkedPointFile(store, drawingRecord = {}, changeConte
 }
 
 function getErrorStatusCode(err) {
+  const explicitStatus = Number(err?.status);
+  if (Number.isFinite(explicitStatus) && explicitStatus >= 400 && explicitStatus <= 599) {
+    return explicitStatus;
+  }
   const message = err?.message || '';
   if (/^HTTP\s+\d{3}:/i.test(message)) return 502;
   return 400;

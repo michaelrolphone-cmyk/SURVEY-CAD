@@ -12,6 +12,8 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   assert.ok(uploadPath.put, 'spec should include PUT upload update');
   assert.ok(uploadPath.post.responses?.['413'], 'POST upload should document oversized payload response');
   assert.ok(uploadPath.put.responses?.['413'], 'PUT upload should document oversized payload response');
+  assert.ok(uploadPath.post.responses?.['507'], 'POST upload should document out-of-storage response');
+  assert.ok(uploadPath.put.responses?.['507'], 'PUT upload should document out-of-storage response');
 
   const postUploadSchema = uploadPath.post.requestBody?.content?.['multipart/form-data']?.schema;
   const putUploadSchema = uploadPath.put.requestBody?.content?.['multipart/form-data']?.schema;

@@ -193,3 +193,34 @@ test('createEvidenceDeskFileStore uses redis when connection succeeds', async ()
   assert.equal(result.type, 'redis');
   assert.equal(result.redisClient, connectedClient);
 });
+
+test('redis evidence desk store maps redis maxmemory OOM errors to HTTP 507 semantics', async () => {
+  const redis = new FakeRedis();
+  redis.multi = () => ({
+    set: () => redis.multi(),
+    sAdd: () => redis.multi(),
+    del: () => redis.multi(),
+    sRem: () => redis.multi(),
+    exec: async () => {
+      throw new Error("OOM command not allowed when used memory > 'maxmemory'.");
+    },
+  });
+
+  const store = new RedisEvidenceDeskFileStore(redis);
+
+  await assert.rejects(
+    () => store.createFile({
+      projectId: 'proj-oom',
+      folderKey: 'drawings',
+      originalFileName: 'overflow.pdf',
+      extension: 'pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('x'),
+    }),
+    (error) => {
+      assert.equal(error.status, 507);
+      assert.match(error.message, /storage is full/i);
+      return true;
+    },
+  );
+});

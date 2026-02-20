@@ -32,6 +32,17 @@ function buildResource({ projectId, folderKey, record }) {
   };
 }
 
+function normalizeRedisStorageError(error, fallbackMessage) {
+  const message = String(error?.message || '');
+  if (/OOM command not allowed when used memory > 'maxmemory'\./i.test(message)) {
+    const normalized = new Error(fallbackMessage || 'Upload storage is full. Please retry after cleanup or increase Redis maxmemory.');
+    normalized.status = 507;
+    normalized.cause = error;
+    return normalized;
+  }
+  return error;
+}
+
 export class InMemoryEvidenceDeskFileStore {
   constructor() {
     this.records = new Map();
@@ -211,7 +222,11 @@ export class RedisEvidenceDeskFileStore {
       .set(this.binaryKey(projectId, folderKey, storedName), Buffer.from(buffer).toString('base64'))
       .sAdd(this.folderIndexKey(projectId, folderKey), storedName);
     if (thumbnailBuffer) write.set(this.thumbnailBinaryKey(projectId, folderKey, storedName), Buffer.from(thumbnailBuffer).toString('base64'));
-    await write.exec();
+    try {
+      await write.exec();
+    } catch (error) {
+      throw normalizeRedisStorageError(error, 'Upload storage is full. Could not store project file.');
+    }
 
     return buildResource({ projectId, folderKey, record });
   }
@@ -259,18 +274,27 @@ export class RedisEvidenceDeskFileStore {
     } else {
       write.del(this.thumbnailBinaryKey(projectId, folderKey, fileName));
     }
-    await write.exec();
+    try {
+      await write.exec();
+    } catch (error) {
+      throw normalizeRedisStorageError(error, 'Upload storage is full. Could not update project file.');
+    }
 
     return buildResource({ projectId, folderKey, record: { ...record, storedName: fileName } });
   }
 
   async deleteFile(projectId, folderKey, fileName) {
-    const removed = await this.redis.multi()
-      .del(this.metadataKey(projectId, folderKey, fileName))
-      .del(this.binaryKey(projectId, folderKey, fileName))
-      .del(this.thumbnailBinaryKey(projectId, folderKey, fileName))
-      .sRem(this.folderIndexKey(projectId, folderKey), fileName)
-      .exec();
+    let removed;
+    try {
+      removed = await this.redis.multi()
+        .del(this.metadataKey(projectId, folderKey, fileName))
+        .del(this.binaryKey(projectId, folderKey, fileName))
+        .del(this.thumbnailBinaryKey(projectId, folderKey, fileName))
+        .sRem(this.folderIndexKey(projectId, folderKey), fileName)
+        .exec();
+    } catch (error) {
+      throw normalizeRedisStorageError(error, 'Upload storage is full. Could not delete project file.');
+    }
     return Array.isArray(removed) && removed.some((entry) => Number(entry?.[1] || 0) > 0);
   }
 
@@ -287,7 +311,11 @@ export class RedisEvidenceDeskFileStore {
     delete record.thumbnailBuffer;
     delete record.thumbnailBase64;
 
-    await this.redis.set(this.metadataKey(projectId, folderKey, fileName), JSON.stringify(record));
+    try {
+      await this.redis.set(this.metadataKey(projectId, folderKey, fileName), JSON.stringify(record));
+    } catch (error) {
+      throw normalizeRedisStorageError(error, 'Upload storage is full. Could not update project file metadata.');
+    }
     return buildResource({ projectId, folderKey, record: { ...record, storedName: fileName } });
   }
 
@@ -325,7 +353,11 @@ export class RedisEvidenceDeskFileStore {
     } else {
       write.del(this.thumbnailBinaryKey(projectId, targetFolderKey, fileName));
     }
-    await write.exec();
+    try {
+      await write.exec();
+    } catch (error) {
+      throw normalizeRedisStorageError(error, 'Upload storage is full. Could not move project file.');
+    }
 
     return buildResource({ projectId, folderKey: targetFolderKey, record: { ...record, storedName: fileName } });
   }
