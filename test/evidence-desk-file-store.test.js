@@ -228,6 +228,35 @@ test('createEvidenceDeskFileStore detects Stackhero MinIO env keys and defaults 
   }
 });
 
+test('createEvidenceDeskFileStore supports Stackhero root key env vars', async () => {
+  const originalEnv = { ...process.env };
+  process.env.STACKHERO_MINIO_HOST = 's3.stackhero.network';
+  process.env.STACKHERO_MINIO_ROOT_ACCESS_KEY = 'root-access';
+  process.env.STACKHERO_MINIO_ROOT_SECRET_KEY = 'root-secret';
+  delete process.env.STACKHERO_MINIO_ACCESS_KEY;
+  delete process.env.STACKHERO_MINIO_SECRET_KEY;
+  delete process.env.EVIDENCE_DESK_S3_ENDPOINT;
+  delete process.env.EVIDENCE_DESK_S3_ACCESS_KEY_ID;
+  delete process.env.EVIDENCE_DESK_S3_SECRET_ACCESS_KEY;
+  delete process.env.EVIDENCE_DESK_S3_REGION;
+  delete process.env.EVIDENCE_DESK_S3_BUCKET;
+  delete process.env.AH_S3_OBJECT_STORAGE_STACKHERO_URL;
+  delete process.env.AH_S3_OBJECT_STORAGE_STACKHERO;
+
+  try {
+    const result = await createEvidenceDeskFileStore({
+      redisClient: new FakeRedis(),
+      s3Client: new FakeS3(),
+    });
+
+    assert.equal(result.type, 's3');
+    assert.equal(result.redisClient, null);
+    assert.equal(result.store.bucket, 'survey-foundry');
+  } finally {
+    process.env = originalEnv;
+  }
+});
+
 test('createEvidenceDeskFileStore falls back to in-memory when redis connect stalls', async () => {
   let quitCalled = false;
   const neverConnectingClient = {

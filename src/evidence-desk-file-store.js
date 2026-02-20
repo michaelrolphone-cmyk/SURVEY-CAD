@@ -98,6 +98,7 @@ function resolveS3ConfigFromEnv(env = process.env) {
   const accessKeyId = String(
     env.EVIDENCE_DESK_S3_ACCESS_KEY_ID
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_ACCESS_KEY_ID
+    || env.STACKHERO_MINIO_ROOT_ACCESS_KEY
     || env.STACKHERO_MINIO_ACCESS_KEY
     || env.AWS_ACCESS_KEY_ID
     || fromUrl.accessKeyId
@@ -106,6 +107,7 @@ function resolveS3ConfigFromEnv(env = process.env) {
   const secretAccessKey = String(
     env.EVIDENCE_DESK_S3_SECRET_ACCESS_KEY
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_SECRET_ACCESS_KEY
+    || env.STACKHERO_MINIO_ROOT_SECRET_KEY
     || env.STACKHERO_MINIO_SECRET_KEY
     || env.AWS_SECRET_ACCESS_KEY
     || fromUrl.secretAccessKey
