@@ -5,6 +5,7 @@ import { runIdahoHarvestCycle } from './idaho-harvest-worker-core.js';
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_RANDOM_DELAY_MIN_MS = 2 * 60 * 1000;
 const DEFAULT_RANDOM_DELAY_MAX_MS = 10 * 60 * 1000;
+const DEFAULT_IDAHO_HARVEST_PARCEL_LAYER = 23;
 
 function randomIntBetween(minInclusive, maxInclusive, randomFn = Math.random) {
   const min = Math.ceil(Number(minInclusive));
@@ -100,7 +101,7 @@ export async function runIdahoHarvestWorker({
         batchSize: Number(env.IDAHO_HARVEST_BATCH_SIZE || 100),
         cpnfPdfBaseUrl: String(env.IDAHO_HARVEST_CPNF_PDF_BASE_URL || ''),
         datasets: [
-          { name: 'parcels', layerId: Number(env.IDAHO_HARVEST_PARCEL_LAYER || 24) },
+          { name: 'parcels', layerId: Number(env.IDAHO_HARVEST_PARCEL_LAYER || DEFAULT_IDAHO_HARVEST_PARCEL_LAYER) },
           { name: 'cpnf', layerId: Number(env.IDAHO_HARVEST_CPNF_LAYER || 18) },
         ],
         buckets: {
