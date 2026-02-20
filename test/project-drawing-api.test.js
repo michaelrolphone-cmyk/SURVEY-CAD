@@ -118,9 +118,47 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     const loadedAfterPointFileEdit = await getAfterPointFileEditRes.json();
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points.length, 1);
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].id, '200');
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].num, '200');
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].x, 1000.5);
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].y, 2000.5);
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].code, 'IP');
+
+    const createWithNumRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'Point Number Preserve',
+        drawingState: { points: [{ id: 'internal-1', num: '100', x: 11, y: 22 }] },
+        pointFileLink: {
+          pointFileId: 'point-num-preserve',
+          pointFileName: 'Point Number Preserve.csv',
+        },
+      }),
+    });
+    assert.equal(createWithNumRes.status, 201);
+    const createdWithNum = await createWithNumRes.json();
+
+    const patchPreservePointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/point-num-preserve`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileState: {
+          text: '100,101,202,9.5,CTRL,Adjusted',
+          exportFormat: 'csv',
+        },
+      }),
+    });
+    assert.equal(patchPreservePointFileRes.status, 200);
+
+    const getPreserveRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(createdWithNum.drawing.drawingId)}`);
+    assert.equal(getPreserveRes.status, 200);
+    const loadedPreserve = await getPreserveRes.json();
+    assert.equal(loadedPreserve.drawing.currentState.points.length, 1);
+    assert.equal(loadedPreserve.drawing.currentState.points[0].id, 'internal-1');
+    assert.equal(loadedPreserve.drawing.currentState.points[0].num, '100');
+    assert.equal(loadedPreserve.drawing.currentState.points[0].x, 101);
+    assert.equal(loadedPreserve.drawing.currentState.points[0].y, 202);
+    assert.equal(loadedPreserve.drawing.currentState.points[0].z, 9.5);
 
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
       method: 'DELETE',
