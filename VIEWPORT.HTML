@@ -4802,6 +4802,21 @@ function paintBackground(ctx, w, h){
     return `/assets/survey-symbols/${encodeURIComponent(symbolMapFile)}`;
   }
 
+  function getGroupLineworkThumbnailDataUrl(baseCode = "") {
+    if (!pointThumbnailClient?.renderLineworkThumbnailDataUrl || !baseCode) return "";
+    const allPoints = Array.from(points.values()).map((p) => ({ x: p.x, y: p.y, code: p.code }));
+    return pointThumbnailClient.renderLineworkThumbnailDataUrl(allPoints, {
+      lineworkCodes: new Set([baseCode]),
+      width: 48,
+      height: 48,
+    });
+  }
+
+  function getSymbolFallbackDotDataUrl() {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="#22d3ee"/></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+
   function getSymbolMarkerImage(symbolMapFile = "") {
     const file = String(symbolMapFile || "").trim();
     if (!file) return null;
@@ -12132,11 +12147,18 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       const rawCode = String(point.code || "").trim();
       const key = rawCode.toUpperCase() || "(NO CODE)";
       if (!groupsByKey.has(key)) {
+        const tokens = tokenizePointCode(rawCode);
+        const baseCode = tokens.find((t) => fieldToFinishRuleState.lineworkCodes.has(t) || fieldToFinishRuleState.symbolCodes.has(t)) || tokens[0] || "";
+        const type = fieldToFinishRuleState.lineworkCodes.has(baseCode) ? "linework"
+          : fieldToFinishRuleState.symbolCodes.has(baseCode) ? "symbol"
+          : "other";
         groupsByKey.set(key, {
           key,
           label: rawCode || "(No Code)",
           pointIds: [],
-          symbolUrl: getPointSymbolPreviewUrl(rawCode),
+          baseCode,
+          type,
+          symbolUrl: type === "symbol" ? getPointSymbolPreviewUrl(rawCode) : "",
           layerNames: new Set()
         });
       }
@@ -12188,11 +12210,16 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       rowBtn.setAttribute("role", "option");
       rowBtn.setAttribute("aria-selected", group.key === quickPointGroupSelectionKey ? "true" : "false");
 
-      if (group.symbolUrl) {
+      const thumbUrl = group.type === "linework"
+        ? getGroupLineworkThumbnailDataUrl(group.baseCode)
+        : group.type === "symbol"
+        ? (group.symbolUrl || getSymbolFallbackDotDataUrl())
+        : group.symbolUrl;
+      if (thumbUrl) {
         const thumb = document.createElement("img");
         thumb.className = "quickPointGroupThumb";
-        thumb.src = group.symbolUrl;
-        thumb.alt = `${group.label} symbol`;
+        thumb.src = thumbUrl;
+        thumb.alt = `${group.label} preview`;
         rowBtn.appendChild(thumb);
       } else {
         const fallback = document.createElement("span");
