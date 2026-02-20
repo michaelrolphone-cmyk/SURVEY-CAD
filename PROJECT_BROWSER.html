@@ -308,6 +308,60 @@
       flex: none;
     }
 
+
+    .point-file-version-details {
+      width: 100%;
+      margin-top: 0.35rem;
+      margin-left: 2.05rem;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.45);
+      color: #cbd5e1;
+      font-size: 0.76rem;
+    }
+
+    .point-file-version-summary {
+      cursor: pointer;
+      padding: 0.35rem 0.55rem;
+      user-select: none;
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    .point-file-version-summary:hover {
+      color: #f8fafc;
+    }
+
+    .point-file-version-list {
+      margin: 0;
+      padding: 0 0.55rem 0.55rem 1.1rem;
+      list-style: decimal;
+      display: grid;
+      gap: 0.28rem;
+    }
+
+    .point-file-version-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .point-file-version-label {
+      color: #cbd5e1;
+    }
+
+    .point-file-version-open {
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.85);
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+
     .launch-btn {
       border: 1px solid var(--border);
       background: rgba(15, 23, 42, 0.8);
@@ -550,7 +604,21 @@
       return storageKey;
     }
 
-    async function resolvePointFileText(resource) {
+    async function fetchProjectPointFileRecord(resource, { versionId = '' } = {}) {
+      const ref = resource?.reference;
+      const projectId = ref?.metadata?.projectId || resource?.projectId || '';
+      const pointFileId = ref?.metadata?.pointFileId || ref?.value || resource?.id || '';
+      if (!projectId || !pointFileId) return null;
+
+      const endpoint = new URL(buildProjectPointFileApiUrl(projectId, pointFileId), window.location.origin);
+      if (versionId) endpoint.searchParams.set('versionId', versionId);
+      const response = await fetch(endpoint);
+      if (!response.ok) return null;
+      const payload = await response.json();
+      return payload?.pointFile || null;
+    }
+
+    async function resolvePointFileText(resource, { versionId = '' } = {}) {
       const ref = resource?.reference;
       if (!ref?.value) return null;
 
@@ -569,13 +637,8 @@
       }
 
       if (ref.type === 'project-point-file') {
-        const projectId = ref.metadata?.projectId || resource?.projectId || '';
-        const pointFileId = ref.metadata?.pointFileId || ref.value || resource?.id || '';
-        if (!projectId || !pointFileId) return null;
-        const response = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId));
-        if (!response.ok) return null;
-        const payload = await response.json();
-        return String(payload?.pointFile?.currentState?.text || '');
+        const record = await fetchProjectPointFileRecord(resource, { versionId });
+        return String(record?.currentState?.text || '');
       }
 
       return null;
@@ -1535,14 +1598,95 @@
       projectContext.setUploadStatus(`Saved ROS # ${rosNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
     }
 
-    async function setPointNumberForUploadedResource(folder, entry, pointNumberRaw, projectContext = {}) {
-      const metadata = entry?.reference?.metadata || {};
-      const storedFileName = metadata?.storedName;
-      const pointNumber = normalizePointNumber(pointNumberRaw);
-      projectContext.setUploadStatus(`Updating point number for ${entry?.title || storedFileName}…`);
-      const resource = await saveUploadedResourceMetadata(folder, entry, { pointNumber }, projectContext);
-      if (!resource) return;
-      projectContext.setUploadStatus(`Saved point # ${pointNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
+    async function openProjectPointFileVersionInPointForge(resource, versionId, projectContext = {}) {
+      const text = await resolvePointFileText(resource, { versionId });
+      if (!text || !text.trim()) {
+        renderError(`Selected point-file version could not be opened. Unable to load text for ${resource?.title || 'resource'}.`);
+        return;
+      }
+
+      localStorage.setItem(POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY, JSON.stringify({
+        csv: text,
+        title: resource.title || resource.id || 'Point File',
+        pointFileId: resource?.reference?.metadata?.pointFileId || resource?.id || '',
+        versionId: String(versionId || '').trim() || null,
+      }));
+
+      const destination = new URL('/POINT_TRANSFORMER.HTML', window.location.origin);
+      destination.searchParams.set('source', 'project-browser');
+      if (projectContext.projectId) destination.searchParams.set('projectId', projectContext.projectId);
+      if (projectContext.projectName) destination.searchParams.set('projectName', projectContext.projectName);
+      openLinkedApp(`${destination.pathname}${destination.search}`);
+    }
+
+    function formatVersionTimelineStamp(value = '') {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Unknown date';
+      return date.toLocaleString();
+    }
+
+    async function attachProjectPointFileVersionTimeline(resource, entry, projectContext = {}) {
+      if (!resource || !entry || entry?.reference?.type !== 'project-point-file') return;
+
+      const details = document.createElement('details');
+      details.className = 'point-file-version-details';
+      details.innerHTML = '<summary class="point-file-version-summary">Version timeline (loading…)</summary>';
+      resource.appendChild(details);
+
+      details.addEventListener('click', (event) => event.stopPropagation());
+      details.addEventListener('keydown', (event) => event.stopPropagation());
+
+      details.addEventListener('toggle', async () => {
+        if (!details.open || details.dataset.loaded === 'true' || details.dataset.loading === 'true') return;
+        details.dataset.loading = 'true';
+
+        const summary = details.querySelector('.point-file-version-summary');
+        try {
+          const record = await fetchProjectPointFileRecord(entry);
+          const versions = Array.isArray(record?.versions) ? [...record.versions].reverse() : [];
+          summary.textContent = `Version timeline (${versions.length})`;
+
+          const list = document.createElement('ol');
+          list.className = 'point-file-version-list';
+          for (const version of versions) {
+            const actor = version?.actor || {};
+            const actorUser = String(actor?.user || 'unknown-user').trim() || 'unknown-user';
+            const actorTool = String(actor?.app || 'unknown-app').trim() || 'unknown-app';
+            const savedAt = formatVersionTimelineStamp(version?.savedAt);
+
+            const item = document.createElement('li');
+            item.className = 'point-file-version-item';
+
+            const label = document.createElement('span');
+            label.className = 'point-file-version-label';
+            label.textContent = `${savedAt} — ${actorUser} via ${actorTool}`;
+
+            const openButton = document.createElement('button');
+            openButton.type = 'button';
+            openButton.className = 'point-file-version-open';
+            openButton.textContent = 'Open in PointForge';
+            openButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await openProjectPointFileVersionInPointForge(entry, version?.versionId, projectContext);
+            });
+
+            item.append(label, openButton);
+            list.appendChild(item);
+          }
+
+          details.appendChild(list);
+          details.dataset.loaded = 'true';
+        } catch (err) {
+          summary.textContent = 'Version timeline (failed to load)';
+          const error = document.createElement('div');
+          error.className = 'muted';
+          error.style.padding = '0 0.55rem 0.55rem';
+          error.textContent = err?.message || 'Unable to load version timeline.';
+          details.appendChild(error);
+        } finally {
+          delete details.dataset.loading;
+        }
+      });
     }
 
     function renderTree(projectFile, projectContext = {}) {
@@ -1971,6 +2115,10 @@
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             actionButtons.appendChild(renameButton);
+          }
+
+          if (folder.key === 'point-files' && entry?.reference?.type === 'project-point-file') {
+            attachProjectPointFileVersionTimeline(resource, entry, projectContext).catch(() => {});
           }
 
           treeContainer.appendChild(resource);

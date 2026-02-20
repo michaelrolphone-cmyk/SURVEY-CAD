@@ -18,6 +18,9 @@ test('server OpenAPI spec documents project point file CRUD endpoints', async ()
   assert.ok(itemPath.patch, 'spec should include PATCH on item point file path');
   assert.ok(itemPath.delete, 'spec should include DELETE on item point file path');
 
+  const getParameters = itemPath.get.parameters || [];
+  assert.ok(getParameters.some((parameter) => parameter?.name === 'versionId' && parameter?.in === 'query'), 'GET point file should document optional versionId query parameter');
+
   assert.ok(spec?.components?.schemas?.ProjectPointFileMutationRequest, 'spec should include point file mutation request schema');
   assert.ok(spec?.components?.schemas?.ProjectPointFileResponse, 'spec should include point file response schema');
 });

@@ -205,6 +205,7 @@ PointForge/EvidenceDesk now use project-scoped point-file CRUD endpoints backed 
 - `GET /api/projects/:projectId/point-files` – list point-file summaries for a project.
 - `POST /api/projects/:projectId/point-files` – create a point-file record from `pointFileState`.
 - `GET /api/projects/:projectId/point-files/:pointFileId` – fetch full point-file record + reconstructed `currentState`.
+- `GET /api/projects/:projectId/point-files/:pointFileId?versionId=<versionId>` – fetch a specific historical version and reconstruct `currentState` at that version (used by EvidenceDesk timeline open-in-PointForge).
 - `PUT /api/projects/:projectId/point-files/:pointFileId` (or `PATCH`) – append a new differential version for an existing point file.
 - `DELETE /api/projects/:projectId/point-files/:pointFileId` – remove the point-file record from the project.
 
@@ -428,6 +429,7 @@ PointForge/EvidenceDesk now use project-scoped point-file CRUD endpoints backed 
 - `GET /api/projects/:projectId/point-files` – list point-file summaries for a project.
 - `POST /api/projects/:projectId/point-files` – create a point-file record from `pointFileState`.
 - `GET /api/projects/:projectId/point-files/:pointFileId` – fetch full point-file record + reconstructed `currentState`.
+- `GET /api/projects/:projectId/point-files/:pointFileId?versionId=<versionId>` – fetch a specific historical version and reconstruct `currentState` at that version (used by EvidenceDesk timeline open-in-PointForge).
 - `PUT /api/projects/:projectId/point-files/:pointFileId` (or `PATCH`) – append a new differential version for an existing point file.
 - `DELETE /api/projects/:projectId/point-files/:pointFileId` – remove the point-file record from the project.
 

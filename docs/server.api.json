@@ -1693,6 +1693,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "versionId",
+            "in": "query",
+            "required": false,
+            "description": "Optional point-file version identifier. When provided, currentState is reconstructed at that version.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5039,6 +5048,12 @@
           },
           "currentState": {
             "$ref": "#/components/schemas/ProjectPointFileState"
+          },
+          "selectedVersionId": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [

@@ -27,6 +27,11 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /firstAttempt\.response\.status\s*===\s*404[\s\S]*shouldRetryWithFallback[\s\S]*sendMoveRequest\(fallbackLocation\.folderKey,\s*fallbackLocation\.storedName\)/, 'EvidenceDesk should retry server-upload moves using fallback URL-derived location details when metadata is stale.');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
+  assert.match(html, /async function\s+attachProjectPointFileVersionTimeline\(/, 'EvidenceDesk should provide an expandable point-file version timeline helper.');
+  assert.match(html, /details\.className\s*=\s*'point-file-version-details'/, 'EvidenceDesk should render point-file version timelines in an expandable details element.');
+  assert.match(html, /label\.textContent\s*=\s*`\$\{savedAt\} — \$\{actorUser\} via \$\{actorTool\}`/, 'EvidenceDesk point-file timeline rows should display saved time, user, and tool.');
+  assert.match(html, /endpoint\.searchParams\.set\('versionId',\s*versionId\)/, 'EvidenceDesk should request a selected point-file version through versionId query parameter.');
+  assert.match(html, /openProjectPointFileVersionInPointForge\(entry,\s*version\?\.versionId,\s*projectContext\)/, 'EvidenceDesk timeline should open any selected point-file version in PointForge.');
   assert.match(html, /const\s+isPointFileFormat\s*=\s*pointFileFormat\s*===\s*'csv'\s*\|\|\s*pointFileFormat\s*===\s*'txt';/, 'EvidenceDesk should only launch PointForge for point-file formats.');
   assert.match(html, /import\s*\{\s*renderLineworkThumbnailDataUrl,\s*renderPointFileThumbnailDataUrl\s*\}\s*from\s*'\.\/src\/point-thumbnail-client\.js'/, 'EvidenceDesk should import the shared point thumbnail client.');
   assert.match(html, /async function\s+attachPointFilePreview\(/, 'EvidenceDesk should define a point-file preview hydration helper.');

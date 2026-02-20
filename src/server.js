@@ -27,6 +27,7 @@ import {
 import {
   listProjectPointFiles,
   getProjectPointFile,
+  getProjectPointFileAtVersion,
   createOrUpdateProjectPointFile,
   deleteProjectPointFile,
 } from './project-point-file-store.js';
@@ -1723,9 +1724,12 @@ export function createSurveyServer({
         }
 
         if (req.method === 'GET' && pointFileId) {
-          const pointFile = await getProjectPointFile(localStorageSyncStore, projectId, pointFileId);
+          const versionId = String(urlObj.searchParams.get('versionId') || '').trim();
+          const pointFile = versionId
+            ? await getProjectPointFileAtVersion(localStorageSyncStore, projectId, pointFileId, versionId)
+            : await getProjectPointFile(localStorageSyncStore, projectId, pointFileId);
           if (!pointFile) {
-            sendJson(res, 404, { error: 'Point file not found.' });
+            sendJson(res, 404, { error: versionId ? 'Point file version not found.' : 'Point file not found.' });
             return;
           }
           sendJson(res, 200, { pointFile });
