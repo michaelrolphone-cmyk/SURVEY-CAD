@@ -427,8 +427,9 @@
       try {
         if (wasEditing) {
           const idx = logs.findIndex((l) => l.id === editingId);
+          let updatedLog = null;
           if (idx !== -1) {
-            logs[idx] = {
+            updatedLog = {
               ...logs[idx],
               ...data,
               ...(attachmentSummary ? {
@@ -438,10 +439,28 @@
               } : {}),
               updatedAt: nowIso,
             };
+            logs[idx] = updatedLog;
           }
           saveLogs();
           clearForm();
           renderLogs();
+
+          if (updatedLog) {
+            try {
+              const apiJson = await postEquipmentLog(updatedLog);
+              const serverLog = normalizeServerLog(apiJson);
+              if (serverLog && serverLog.id) {
+                const mergedIdx = logs.findIndex((entry) => entry.id === serverLog.id);
+                if (mergedIdx !== -1) {
+                  logs[mergedIdx] = { ...logs[mergedIdx], ...serverLog };
+                  saveLogs();
+                  renderLogs();
+                }
+              }
+            } catch (err) {
+              console.warn('Equipment log edit POST failed; kept local copy:', err);
+            }
+          }
           return;
         }
 
