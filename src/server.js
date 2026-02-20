@@ -1117,6 +1117,9 @@ export function createSurveyServer({
   }
 
   async function readCachedPdfThumbnail(cacheKey, runtime) {
+    if (typeof runtime?.store?.readCachedPdfThumbnail === 'function') {
+      return runtime.store.readCachedPdfThumbnail(cacheKey);
+    }
     const redisClient = runtime?.redisClient;
     if (redisClient && typeof redisClient.get === 'function') {
       const encoded = await redisClient.get(cacheKey);
@@ -1127,6 +1130,10 @@ export function createSurveyServer({
   }
 
   async function writeCachedPdfThumbnail(cacheKey, pngBuffer, runtime) {
+    if (typeof runtime?.store?.writeCachedPdfThumbnail === 'function') {
+      await runtime.store.writeCachedPdfThumbnail(cacheKey, pngBuffer);
+      return;
+    }
     const redisClient = runtime?.redisClient;
     if (redisClient && typeof redisClient.set === 'function') {
       await redisClient.set(cacheKey, Buffer.from(pngBuffer).toString('base64'), { EX: PDF_THUMBNAIL_CACHE_TTL_SECONDS });

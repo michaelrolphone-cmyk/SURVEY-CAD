@@ -1185,21 +1185,29 @@ LineSmith now resolves sequential `END`/`CLO` directives from the nearest valid 
 
 ## EvidenceDesk file CRUD API
 
-EvidenceDesk uploads now support Redis-backed CRUD operations and folder-level listing. EvidenceDesk file rows can be dragged onto destination folders to reorganize project-file uploads directly in the UI.
-When the server already has a Redis-backed localStorage sync store, EvidenceDesk now reuses that same Redis client for `/api/project-files/*` binary+metadata persistence so uploads survive process restarts even if `REDIS_URL` is temporarily unset for a later boot.
+EvidenceDesk uploads now support object-store-backed CRUD operations and folder-level listing. EvidenceDesk file rows can be dragged onto destination folders to reorganize project-file uploads directly in the UI.
+When `ah-s3-object-storage-stackhero` (or equivalent S3-compatible env vars) is configured, `/api/project-files/*` uploads plus generated thumbnails are stored in the S3 bucket (default bucket fallback: `survey-foundry` when Stackhero URL vars are present). Redis continues to power non-upload APIs (for example localStorage sync and BEW storage). If no object store is configured, the upload store falls back to shared Redis (when available) and then in-memory storage.
 Uploaded image resources now generate a 512px-wide PNG thumbnail during upload/update, and EvidenceDesk image preview slots use `resource.reference.metadata.thumbnailUrl` before falling back to full-size downloads.
 EvidenceDesk now shows live upload progress in the upload status line (including per-file counters and percent complete when binary files are posted) so users get immediate feedback after starting an upload.
 EvidenceDesk photo uploads now support point-number metadata so LineSmith can show a matching point photo thumbnail and full-size link in the point inspector when a selected point number matches uploaded image metadata.
 
 ### API endpoints
-- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB and `507` when Redis-backed upload storage is out of memory.
-- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB and `507` when Redis-backed upload storage is out of memory.
+- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB and `507` when fallback Redis-backed upload storage is out of memory.
+- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB and `507` when fallback Redis-backed upload storage is out of memory.
 - `GET /api/project-files/download?projectId=...&folderKey=...&fileName=...` — read/download a stored file.
 - `GET /api/project-files/image-thumbnail?projectId=...&folderKey=...&fileName=...` — read a generated 512px-wide PNG thumbnail for uploaded image files (when available).
 - `DELETE /api/project-files/file?projectId=...&folderKey=...&fileName=...` — delete a stored file.
 - `PATCH /api/project-files/file?projectId=...&folderKey=...&fileName=...` — move a stored file to another folder (`application/json`: `{ "targetFolderKey": "deeds" }`).
 - `PATCH /api/project-files/metadata?projectId=...&folderKey=...&fileName=...` — update upload metadata (`application/json`: `{ "rosNumber": "...", "pointNumber": "..." }`, at least one field required).
 - `GET /api/project-files/list?projectId=...` — list files and grouped `filesByFolder` entries (including optional `rosNumber` and `pointNumber` metadata fields).
+
+
+
+### Object store configuration for uploads/thumbnails
+- `AH_S3_OBJECT_STORAGE_STACKHERO_URL` (Heroku Stackhero addon URL; parsed for endpoint + credentials)
+- `AH_S3_OBJECT_STORAGE_STACKHERO_BUCKET` (optional; defaults to `survey-foundry` when Stackhero URL vars are present)
+- `EVIDENCE_DESK_S3_BUCKET` (preferred explicit bucket override)
+- Optional overrides: `EVIDENCE_DESK_S3_ENDPOINT`, `EVIDENCE_DESK_S3_ACCESS_KEY_ID`, `EVIDENCE_DESK_S3_SECRET_ACCESS_KEY`, `EVIDENCE_DESK_S3_REGION`, `EVIDENCE_DESK_S3_PREFIX`, `EVIDENCE_DESK_S3_FORCE_PATH_STYLE`
 
 ### CLI and server commands
 - `npm start`
