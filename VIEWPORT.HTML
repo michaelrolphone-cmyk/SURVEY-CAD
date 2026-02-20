@@ -10018,6 +10018,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       record = payload?.drawing || null;
       setActiveDrawingPointFileLinkFromDrawingRecord(record);
       localStorage.setItem(storageKey, JSON.stringify(record));
+      if (record) restoreDrawingFromApiRecord(record);
     } catch {
       const now = new Date().toISOString();
       const existing = loadStoredDrawingRecord(storageKey);
