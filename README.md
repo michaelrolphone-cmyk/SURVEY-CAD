@@ -1204,10 +1204,10 @@ EvidenceDesk photo uploads now support point-number metadata so LineSmith can sh
 
 
 ### Object store configuration for uploads/thumbnails
-- `AH_S3_OBJECT_STORAGE_STACKHERO_URL` (Heroku Stackhero addon URL; parsed for endpoint + credentials)
-- `AH_S3_OBJECT_STORAGE_STACKHERO_BUCKET` (optional; defaults to `survey-foundry` when Stackhero URL vars are present)
-- `EVIDENCE_DESK_S3_BUCKET` (preferred explicit bucket override)
-- Optional overrides: `EVIDENCE_DESK_S3_ENDPOINT`, `EVIDENCE_DESK_S3_ACCESS_KEY_ID`, `EVIDENCE_DESK_S3_SECRET_ACCESS_KEY`, `EVIDENCE_DESK_S3_REGION`, `EVIDENCE_DESK_S3_PREFIX`, `EVIDENCE_DESK_S3_FORCE_PATH_STYLE`
+- `AH_S3_OBJECT_STORAGE_STACKHERO_URL` or `AH_S3_OBJECT_STORAGE_STACKHERO` (Heroku Stackhero addon URL; parsed for endpoint + credentials)
+- Stackhero MinIO keys are also supported directly: `STACKHERO_MINIO_HOST`, `STACKHERO_MINIO_ACCESS_KEY`, `STACKHERO_MINIO_SECRET_KEY` (host is normalized to `https://...` when no scheme is provided)
+- Optional bucket vars: `EVIDENCE_DESK_S3_BUCKET`, `AH_S3_OBJECT_STORAGE_STACKHERO_BUCKET`, or `STACKHERO_MINIO_BUCKET` (defaults to `survey-foundry` when Stackhero URL/host vars are present)
+- Optional overrides: `EVIDENCE_DESK_S3_ENDPOINT`, `EVIDENCE_DESK_S3_ACCESS_KEY_ID`, `EVIDENCE_DESK_S3_SECRET_ACCESS_KEY`, `EVIDENCE_DESK_S3_REGION`, `STACKHERO_MINIO_REGION`, `EVIDENCE_DESK_S3_PREFIX`, `EVIDENCE_DESK_S3_FORCE_PATH_STYLE`, `STACKHERO_MINIO_FORCE_PATH_STYLE`, `EVIDENCE_DESK_S3_SESSION_TOKEN`
 
 ### CLI and server commands
 - `npm start`
