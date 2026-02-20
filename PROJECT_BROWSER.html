@@ -1135,6 +1135,9 @@
       return String(value || '').trim();
     }
 
+    function normalizePointNumber(value = '') {
+      return String(value || '').trim();
+    }
 
     async function uploadFilesToServer(files, folderKey, context) {
       const fileList = Array.from(files || []);
@@ -1367,46 +1370,67 @@
     }
 
 
-    async function setRosNumberForUploadedResource(folder, entry, rosNumberRaw, projectContext = {}) {
+    async function saveUploadedResourceMetadata(folder, entry, updatesRaw, projectContext = {}) {
       const metadata = entry?.reference?.metadata || {};
       const projectId = projectContext?.activeProjectId;
       const folderKey = folder?.key;
       const storedFileName = metadata?.storedName;
-      const downloadUrl = entry?.reference?.value;
-      if (!projectId || !folderKey || !storedFileName || !downloadUrl) {
-        renderError('Cannot update ROS number: missing upload metadata.');
-        return;
+      if (!projectId || !folderKey || !storedFileName) {
+        renderError('Cannot update metadata: missing upload metadata.');
+        return null;
       }
 
-      const rosNumber = normalizeRosNumber(rosNumberRaw);
-
-      projectContext.setUploadStatus(`Updating ROS number for ${entry?.title || storedFileName}…`);
-      const fileResponse = await fetch(downloadUrl);
-      if (!fileResponse.ok) {
-        renderError('Unable to reload uploaded PDF for metadata update.');
-        return;
+      const updates = {};
+      if (Object.prototype.hasOwnProperty.call(updatesRaw || {}, 'rosNumber')) {
+        updates.rosNumber = normalizeRosNumber(updatesRaw.rosNumber);
       }
-      const blob = await fileResponse.blob();
-      const fileName = metadata?.fileName || entry?.title || storedFileName;
-      const fileForUpdate = new File([blob], fileName, { type: blob.type || 'application/pdf' });
-      const formData = new FormData();
-      formData.append('projectId', projectId);
-      formData.append('folderKey', folderKey);
-      formData.append('fileName', storedFileName);
-      formData.append('file', fileForUpdate, fileForUpdate.name);
-      if (rosNumber) formData.append('rosNumber', rosNumber);
+      if (Object.prototype.hasOwnProperty.call(updatesRaw || {}, 'pointNumber')) {
+        updates.pointNumber = normalizePointNumber(updatesRaw.pointNumber);
+      }
+      if (!Object.keys(updates).length) {
+        renderError('No metadata fields were provided.');
+        return null;
+      }
 
-      const response = await fetch('/api/project-files/upload', { method: 'PUT', body: formData });
+      const metadataUrl = new URL('/api/project-files/metadata', window.location.origin);
+      metadataUrl.searchParams.set('projectId', projectId);
+      metadataUrl.searchParams.set('folderKey', folderKey);
+      metadataUrl.searchParams.set('fileName', storedFileName);
+      const response = await fetch(metadataUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload?.resource) {
-        renderError(payload?.error || 'Failed to update ROS number.');
-        return;
+        renderError(payload?.error || 'Failed to update upload metadata.');
+        return null;
       }
       const replaced = removeResourceById(projectContext?.projectFile, folderKey, entry?.id);
       if (replaced) appendResourceToFolder(projectContext?.projectFile, folderKey, payload.resource);
       saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-      projectContext.setUploadStatus(`Saved ROS # ${rosNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
       renderTree(projectContext.projectFile, projectContext);
+      return payload.resource;
+    }
+
+    async function setRosNumberForUploadedResource(folder, entry, rosNumberRaw, projectContext = {}) {
+      const metadata = entry?.reference?.metadata || {};
+      const storedFileName = metadata?.storedName;
+      const rosNumber = normalizeRosNumber(rosNumberRaw);
+      projectContext.setUploadStatus(`Updating ROS number for ${entry?.title || storedFileName}…`);
+      const resource = await saveUploadedResourceMetadata(folder, entry, { rosNumber }, projectContext);
+      if (!resource) return;
+      projectContext.setUploadStatus(`Saved ROS # ${rosNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
+    }
+
+    async function setPointNumberForUploadedResource(folder, entry, pointNumberRaw, projectContext = {}) {
+      const metadata = entry?.reference?.metadata || {};
+      const storedFileName = metadata?.storedName;
+      const pointNumber = normalizePointNumber(pointNumberRaw);
+      projectContext.setUploadStatus(`Updating point number for ${entry?.title || storedFileName}…`);
+      const resource = await saveUploadedResourceMetadata(folder, entry, { pointNumber }, projectContext);
+      if (!resource) return;
+      projectContext.setUploadStatus(`Saved point # ${pointNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
     }
 
     function renderTree(projectFile, projectContext = {}) {
@@ -1516,8 +1540,10 @@
           const leadingIcon = showThumbnailSlot ? '' : '<span class="icon">📄</span>';
           const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
           const rosNumber = String(entry?.reference?.metadata?.rosNumber || '').trim();
+          const pointNumber = String(entry?.reference?.metadata?.pointNumber || '').trim();
           const rosPillMarkup = rosNumber ? `<span class="ros-number-pill" title="Recorded map number for ROS linking">ROS # ${rosNumber}</span>` : '';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}</span></span>`;
+          const pointPillMarkup = pointNumber ? `<span class="ros-number-pill" title="Linked photo point number">PT # ${pointNumber}</span>` : '';
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}${pointPillMarkup}</span></span>`;
           const actionButtons = document.createElement('div');
           actionButtons.className = 'file-actions';
           resource.appendChild(actionButtons);
@@ -1763,6 +1789,31 @@
                 await setRosNumberForUploadedResource(folder, entry, rosInlineInput.value, projectContext);
               });
               resource.appendChild(rosButton);
+            }
+
+            if (isImageUpload) {
+              const pointInlineInput = document.createElement('input');
+              pointInlineInput.type = 'text';
+              pointInlineInput.className = 'launch-btn';
+              pointInlineInput.style.minWidth = '120px';
+              pointInlineInput.style.textAlign = 'left';
+              pointInlineInput.placeholder = 'Point #';
+              pointInlineInput.value = String(entry?.reference?.metadata?.pointNumber || '');
+              pointInlineInput.title = 'Set linked point number for this photo';
+              pointInlineInput.addEventListener('click', (event) => event.stopPropagation());
+              pointInlineInput.addEventListener('keydown', (event) => event.stopPropagation());
+              resource.appendChild(pointInlineInput);
+
+              const pointButton = document.createElement('button');
+              pointButton.type = 'button';
+              pointButton.className = 'launch-btn';
+              pointButton.textContent = 'Save Point #';
+              pointButton.title = 'Save linked point number for LineSmith photo lookup';
+              pointButton.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                await setPointNumberForUploadedResource(folder, entry, pointInlineInput.value, projectContext);
+              });
+              resource.appendChild(pointButton);
             }
 
           }

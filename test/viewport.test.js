@@ -1116,3 +1116,14 @@ test('VIEWPORT.HTML scopes collaboration rooms to project drawing ids and persis
   assert.match(html, /await fetchProjectDrawingById\(activeProjectId, crewDrawingId\)/, 'startup restore flow should attempt loading the active crew drawing through project drawing CRUD API');
   assert.match(html, /saveCrewActiveDrawingPreference\(activeProjectId, drawingId\);/, 'saving drawings should update the active crew drawing preference for cross-device restore');
 });
+
+test('VIEWPORT.HTML point inspector shows linked EvidenceDesk point-photo thumbnails and full-size links', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+buildPointPhotoResourceLookup\(projectId\)/, 'LineSmith should build a project-file lookup of uploaded photos keyed by point number');
+  assert.match(html, /metadata\?\.pointNumber/, 'photo lookup should use uploaded file point-number metadata');
+  assert.match(html, /const\s+photoLookup\s*=\s*buildPointPhotoResourceLookup\(activeProjectId\);/, 'point inspector should resolve matching project photos for the selected point number');
+  assert.match(html, /photoLabel\.textContent\s*=\s*"Point photo"/, 'point inspector should render a Point photo summary row');
+  assert.match(html, /img\.className\s*=\s*"inspectorPointPhotoThumb"/, 'point inspector should render a thumbnail image for linked photos');
+  assert.match(html, /a\.textContent\s*=\s*`Open photo \$\{pointPhoto\.title \|\| pointPhoto\.pointNumber\}`/, 'point inspector should render a full-size photo link for linked images');
+});

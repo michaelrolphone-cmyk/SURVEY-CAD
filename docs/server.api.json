@@ -477,6 +477,10 @@
                   "rosNumber": {
                     "type": "string",
                     "description": "Optional ROS map number to associate with uploaded PDF evidence for LineSmith point-inspector linking."
+                  },
+                  "pointNumber": {
+                    "type": "string",
+                    "description": "Optional point number for image/photo lookup links in LineSmith."
                   }
                 }
               }
@@ -547,6 +551,10 @@
                   "rosNumber": {
                     "type": "string",
                     "description": "Optional ROS map number to associate with uploaded PDF evidence for LineSmith point-inspector linking."
+                  },
+                  "pointNumber": {
+                    "type": "string",
+                    "description": "Optional point number for image/photo lookup links in LineSmith."
                   }
                 }
               }
@@ -2648,6 +2656,74 @@
           }
         }
       }
+    },
+    "/api/project-files/metadata": {
+      "patch": {
+        "tags": [
+          "Project Files"
+        ],
+        "summary": "Update project upload metadata fields",
+        "operationId": "patchProjectFileMetadata",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "folderKey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rosNumber": {
+                    "type": "string",
+                    "description": "Optional ROS number metadata."
+                  },
+                  "pointNumber": {
+                    "type": "string",
+                    "description": "Optional point number metadata for uploaded photos."
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata updated successfully."
+          },
+          "400": {
+            "description": "Missing query parameters or invalid request body."
+          },
+          "404": {
+            "description": "File not found."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3501,6 +3577,10 @@
                     "null"
                   ],
                   "description": "Optional ROS map number assigned to the uploaded file."
+                },
+                "pointNumber": {
+                  "type": "string",
+                  "nullable": true
                 }
               },
               "additionalProperties": false

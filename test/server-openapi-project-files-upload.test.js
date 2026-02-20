@@ -17,11 +17,16 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   const putUploadSchema = uploadPath.put.requestBody?.content?.['multipart/form-data']?.schema;
   assert.ok(postUploadSchema?.properties?.rosNumber, 'POST upload should allow optional rosNumber form field');
   assert.ok(putUploadSchema?.properties?.rosNumber, 'PUT upload should allow optional rosNumber form field');
+  assert.ok(postUploadSchema?.properties?.pointNumber, 'POST upload should allow optional pointNumber form field');
+  assert.ok(putUploadSchema?.properties?.pointNumber, 'PUT upload should allow optional pointNumber form field');
 
   const filePath = spec?.paths?.['/api/project-files/file'];
   assert.ok(filePath, 'spec should include file item path');
   assert.ok(filePath.delete, 'spec should include DELETE file endpoint');
   assert.ok(filePath.patch, 'spec should include PATCH file move endpoint');
+
+  const metadataPath = spec?.paths?.['/api/project-files/metadata'];
+  assert.ok(metadataPath?.patch, 'spec should include metadata PATCH endpoint');
 
   const listPath = spec?.paths?.['/api/project-files/list'];
   assert.ok(listPath?.get, 'spec should include list endpoint');
@@ -44,4 +49,5 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   assert.ok(listSchema?.properties?.filesByFolder, 'spec should include filesByFolder in list response');
   const listItemSchema = listSchema?.properties?.files?.items;
   assert.ok(listItemSchema?.properties?.rosNumber, 'list response should include optional rosNumber metadata');
+  assert.ok(listItemSchema?.properties?.pointNumber, 'list response should include optional pointNumber metadata');
 });

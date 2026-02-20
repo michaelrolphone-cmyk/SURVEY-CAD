@@ -70,11 +70,13 @@ test('in-memory evidence desk store supports create/read/update/delete/list', as
     extension: 'dxf',
     mimeType: 'application/octet-stream',
     buffer: Buffer.from('abc'),
+    pointNumber: '17',
   });
 
   const fileName = created.reference.metadata.storedName;
   const loaded = await store.getFile('proj-1', 'drawings', fileName);
   assert.equal(loaded.buffer.toString(), 'abc');
+  assert.equal(loaded.pointNumber, '17');
 
   const updated = await store.updateFile({
     projectId: 'proj-1',
@@ -84,8 +86,13 @@ test('in-memory evidence desk store supports create/read/update/delete/list', as
     extension: 'dxf',
     mimeType: 'application/octet-stream',
     buffer: Buffer.from('xyz'),
+    pointNumber: '18',
   });
   assert.equal(updated.reference.metadata.fileName, 'plan-rev1.dxf');
+  assert.equal(updated.reference.metadata.pointNumber, '18');
+
+  const metadataUpdated = await store.updateFileMetadata('proj-1', 'drawings', fileName, { pointNumber: '19' });
+  assert.equal(metadataUpdated.reference.metadata.pointNumber, '19');
 
   const list = await store.listFiles('proj-1', ['drawings']);
   assert.equal(list.files.length, 1);
@@ -107,14 +114,17 @@ test('redis evidence desk store indexes files by folder', async () => {
     extension: 'pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('deed-content'),
+    pointNumber: '88',
   });
 
   const fileName = created.reference.metadata.storedName;
   const fetched = await store.getFile('proj-2', 'deeds', fileName);
   assert.equal(fetched.buffer.toString(), 'deed-content');
+  assert.equal(fetched.pointNumber, '88');
 
   const list = await store.listFiles('proj-2', ['deeds', 'drawings']);
   assert.equal(list.filesByFolder.deeds.length, 1);
+  assert.equal(list.filesByFolder.deeds[0].pointNumber, '88');
   assert.equal(list.filesByFolder.drawings.length, 0);
 
   await store.deleteFile('proj-2', 'deeds', fileName);

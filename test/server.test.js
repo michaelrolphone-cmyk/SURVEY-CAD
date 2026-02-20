@@ -782,6 +782,10 @@ test('server file upload CRUD and list endpoints', async () => {
       '',
       '84-123',
       `--${boundary}`,
+      'Content-Disposition: form-data; name="pointNumber"',
+      '',
+      '101',
+      `--${boundary}`,
       'Content-Disposition: form-data; name="file"; filename="test-drawing.dxf"',
       'Content-Type: application/octet-stream',
       '',
@@ -803,6 +807,7 @@ test('server file upload CRUD and list endpoints', async () => {
     assert.equal(uploadPayload.resource.reference.type, 'server-upload');
     assert.ok(uploadPayload.resource.reference.value.includes('/api/project-files/download'));
     assert.equal(uploadPayload.resource.reference.metadata.rosNumber, '84-123');
+    assert.equal(uploadPayload.resource.reference.metadata.pointNumber, '101');
 
     // Download the file
     const downloadUrl = `http://127.0.0.1:${app.port}${uploadPayload.resource.reference.value}`;
@@ -820,6 +825,7 @@ test('server file upload CRUD and list endpoints', async () => {
     assert.equal(listPayload.files[0].folderKey, 'drawings');
     assert.ok(Array.isArray(listPayload.filesByFolder.drawings));
     assert.equal(listPayload.files[0].rosNumber, '84-123');
+    assert.equal(listPayload.files[0].pointNumber, '101');
 
     const storedFileName = uploadPayload.resource.reference.metadata.storedName;
 
@@ -942,6 +948,15 @@ test('server file upload CRUD and list endpoints', async () => {
     });
     assert.equal(oversizedRes.statusCode, 413);
     assert.match(oversizedRes.payload, /File exceeds maximum size/);
+
+    const metadataRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/metadata?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pointNumber: '109' }),
+    });
+    assert.equal(metadataRes.status, 200);
+    const metadataPayload = await metadataRes.json();
+    assert.equal(metadataPayload?.resource?.reference?.metadata?.pointNumber, '109');
 
     const moveRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/file?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`, {
       method: 'PATCH',

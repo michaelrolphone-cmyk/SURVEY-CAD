@@ -287,6 +287,8 @@
     }
     .inspectorVariedPill:hover{ background:#dc2626; }
     .inspectorLinks{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .inspectorPointPhoto{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+    .inspectorPointPhotoThumb{ width:140px; height:140px; object-fit:cover; border:1px solid var(--line); border-radius:8px; background:#0f1726; }
     .inspectorLinks a{ color:var(--accent); text-decoration:none; border:1px solid #2a3550; border-radius:999px; padding:3px 8px; font-size:11px; }
     .inspectorLinks a:hover{ background:#182238; }
     .pointSymbolBadge{
@@ -8284,6 +8286,42 @@ function paintBackground(ctx, w, h){
     return lookup;
   }
 
+  function isImageEvidenceFormat(format = "") {
+    const normalized = String(format || "").trim().toLowerCase();
+    return ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(normalized);
+  }
+
+  function buildPointPhotoResourceLookup(projectId) {
+    if (!projectId) return new Map();
+    let projectFile;
+    try {
+      const raw = localStorage.getItem(projectFileStorageKey(projectId));
+      projectFile = raw ? JSON.parse(raw) : null;
+    } catch {
+      projectFile = null;
+    }
+    if (!Array.isArray(projectFile?.folders)) return new Map();
+
+    const lookup = new Map();
+    for (const folder of projectFile.folders) {
+      for (const entry of folder?.index || []) {
+        const metadata = entry?.reference?.metadata || {};
+        const pointNumber = String(metadata?.pointNumber || "").trim();
+        const href = String(entry?.reference?.value || "").trim();
+        const thumb = String(metadata?.thumbnailUrl || href).trim();
+        const exportFormat = String(entry?.exportFormat || "").toLowerCase();
+        if (!pointNumber || !href || !thumb || !isImageEvidenceFormat(exportFormat)) continue;
+        lookup.set(pointNumber, {
+          pointNumber,
+          title: String(entry?.title || metadata?.fileName || 'Photo').trim(),
+          href,
+          thumbnailUrl: thumb,
+        });
+      }
+    }
+    return lookup;
+  }
+
   function readPointFieldValues(basePoint, fields) {
     if (!basePoint) return null;
     const getValue = (key, fallback) => {
@@ -8675,6 +8713,37 @@ function paintBackground(ctx, w, h){
         links.appendChild(a);
       }
       pointInspector.appendChild(links);
+    }
+
+    const photoLookup = buildPointPhotoResourceLookup(activeProjectId);
+    const pointPhoto = photoLookup.get(String(p.num || "").trim()) || null;
+    const photoRow = document.createElement("div");
+    photoRow.className = "inspectorRow";
+    const photoLabel = document.createElement("span");
+    photoLabel.textContent = "Point photo";
+    const photoValue = document.createElement("b");
+    photoValue.textContent = pointPhoto ? `Linked to point #${pointPhoto.pointNumber}` : "None";
+    photoRow.append(photoLabel, photoValue);
+    pointInspector.appendChild(photoRow);
+
+    if (pointPhoto) {
+      const photoWrap = document.createElement("div");
+      photoWrap.className = "inspectorPointPhoto";
+      const img = document.createElement("img");
+      img.className = "inspectorPointPhotoThumb";
+      img.src = pointPhoto.thumbnailUrl;
+      img.alt = `${pointPhoto.title} thumbnail`;
+      img.loading = "lazy";
+      img.decoding = "async";
+      photoWrap.appendChild(img);
+
+      const a = document.createElement("a");
+      a.href = pointPhoto.href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = `Open photo ${pointPhoto.title || pointPhoto.pointNumber}`;
+      photoWrap.appendChild(a);
+      pointInspector.appendChild(photoWrap);
     }
   }
 

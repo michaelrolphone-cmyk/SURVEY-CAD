@@ -1787,6 +1787,7 @@ export function createSurveyServer({
         const folderKey = fields.folderKey;
         const targetFileName = fields.fileName;
         const rosNumber = String(fields.rosNumber || '').trim();
+        const pointNumber = String(fields.pointNumber || '').trim();
         if (!projectId || !folderKey) {
           sendJson(res, 400, { error: 'projectId and folderKey are required fields.' });
           return;
@@ -1827,6 +1828,7 @@ export function createSurveyServer({
             extension: ext,
             mimeType: effectiveMimeType,
             rosNumber,
+            pointNumber,
             thumbnailBuffer,
             thumbnailMimeType: thumbnailBuffer ? 'image/png' : null,
           });
@@ -1846,6 +1848,7 @@ export function createSurveyServer({
           extension: ext,
           mimeType: effectiveMimeType,
           rosNumber,
+          pointNumber,
           thumbnailBuffer,
           thumbnailMimeType: thumbnailBuffer ? 'image/png' : null,
         });
@@ -2022,6 +2025,48 @@ export function createSurveyServer({
           return;
         }
         sendJson(res, 200, { moved: true, resource: movedResource });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-files/metadata') {
+        if (req.method !== 'PATCH') {
+          sendJson(res, 405, { error: 'Only PATCH is supported.' });
+          return;
+        }
+        const projectId = urlObj.searchParams.get('projectId');
+        const folderKey = urlObj.searchParams.get('folderKey');
+        const requestedFileName = urlObj.searchParams.get('fileName');
+        if (!projectId || !folderKey || !requestedFileName) {
+          sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
+          return;
+        }
+        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+          sendJson(res, 400, { error: 'Invalid folderKey.' });
+          return;
+        }
+        const body = await readJsonBody(req);
+        const updates = {};
+        if (Object.prototype.hasOwnProperty.call(body || {}, 'rosNumber')) {
+          updates.rosNumber = String(body.rosNumber || '').trim();
+        }
+        if (Object.prototype.hasOwnProperty.call(body || {}, 'pointNumber')) {
+          updates.pointNumber = String(body.pointNumber || '').trim();
+        }
+        if (!Object.keys(updates).length) {
+          sendJson(res, 400, { error: 'At least one metadata field is required.' });
+          return;
+        }
+        const { store } = await resolveEvidenceDeskStore();
+        if (typeof store.updateFileMetadata !== 'function') {
+          sendJson(res, 501, { error: 'Metadata updates are not supported by this store.' });
+          return;
+        }
+        const resource = await store.updateFileMetadata(projectId, folderKey, path.basename(requestedFileName), updates);
+        if (!resource) {
+          sendJson(res, 404, { error: 'File not found.' });
+          return;
+        }
+        sendJson(res, 200, { resource });
         return;
       }
 
