@@ -8,6 +8,9 @@ test('PointForge uses project point file API endpoints for list/get/persist', as
   assert.match(html, /async function\s+fetchProjectPointFiles\(/, 'PointForge should fetch project point files from API for dropdown list');
   assert.match(html, /async function\s+fetchProjectPointFile\(/, 'PointForge should fetch selected point file state from API');
   assert.match(html, /persistPointFileToApi\(/, 'PointForge should persist import\/export point files through API endpoints');
+  assert.match(html, /function\s+buildPointFileActorMetadata\(/, 'PointForge should build actor metadata for point-file persistence requests');
+  assert.match(html, /'x-survey-app':\s*actorApp/, 'PointForge should include x-survey-app header when persisting point files');
+  assert.match(html, /changeContext:\s*body\?\.changeContext\s*\|\|\s*actorMetadata\.changeContext/, 'PointForge should ensure point-file API payloads include changeContext metadata');
 });
 
 test('EvidenceDesk uses project point file API endpoints for point-file list and deletion', async () => {
@@ -26,6 +29,9 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /const\s+sendMoveRequest\s*=\s*async\s*\(folderKey,\s*fileName\)\s*=>\s*\{[\s\S]*fetch\(moveUrl\.toString\(\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*targetFolderKey/, 'EvidenceDesk should move server-upload records through PATCH project-files endpoint.');
   assert.match(html, /firstAttempt\.response\.status\s*===\s*404[\s\S]*shouldRetryWithFallback[\s\S]*sendMoveRequest\(fallbackLocation\.folderKey,\s*fallbackLocation\.storedName\)/, 'EvidenceDesk should retry server-upload moves using fallback URL-derived location details when metadata is stale.');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*pointFileName:\s*nextTitle[\s\S]*pointFileState:\s*currentState/, 'EvidenceDesk should rename point files through PATCH point-file API while preserving state');
+  assert.match(html, /buildPointFileActorMetadata\('project-browser'\)/, 'EvidenceDesk rename should include explicit project-browser actor metadata');
+  assert.match(html, /source:\s*'project-browser'/, 'EvidenceDesk rename payloads should set source to project-browser');
+  assert.match(html, /changeContext:\s*actorMetadata\.changeContext/, 'EvidenceDesk point-file writes should include changeContext metadata');
   assert.match(html, /renamePointFileButton\.textContent\s*=\s*'Rename'/, 'EvidenceDesk point-file rows should expose a Rename button');
   assert.match(html, /async function\s+attachProjectPointFileVersionTimeline\(/, 'EvidenceDesk should provide an expandable point-file version timeline helper.');
   assert.match(html, /details\.className\s*=\s*'point-file-version-details'/, 'EvidenceDesk should render point-file version timelines in an expandable details element.');

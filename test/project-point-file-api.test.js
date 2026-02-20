@@ -97,3 +97,42 @@ test('project point file CRUD API stores differential versions and supports list
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+
+test('project point file API derives actor context from request headers and source when changeContext is missing', async () => {
+  const app = await startServer();
+
+  try {
+    const createRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-survey-app': 'project-browser',
+        'x-survey-user': 'michael',
+      },
+      body: JSON.stringify({
+        pointFileName: 'Header Driven.csv',
+        pointFileState: { text: '1,10,20', exportFormat: 'csv' },
+      }),
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    const pointFileId = created.pointFile.pointFileId;
+    assert.deepEqual(created.pointFile.versions.at(-1).actor, { app: 'project-browser', user: 'michael' });
+
+    const updateRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/${encodeURIComponent(pointFileId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileName: 'Header Driven.csv',
+        pointFileState: { text: '1,11,21', exportFormat: 'csv' },
+        source: 'pointforge-transformer',
+      }),
+    });
+    assert.equal(updateRes.status, 200);
+    const updated = await updateRes.json();
+    assert.deepEqual(updated.pointFile.versions.at(-1).actor, { app: 'pointforge-transformer', user: 'unknown-user' });
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
