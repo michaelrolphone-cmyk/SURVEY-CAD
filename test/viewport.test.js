@@ -1167,3 +1167,13 @@ test('VIEWPORT.HTML draws a document icon beside point numbers when points refer
   assert.match(html, /const\s+pointDocumentLookup\s*=\s*new Map\(\);[\s\S]*pointHasDocumentAssociation\(point, rosLookup\)/, 'point label rendering should build a lookup of point numbers that have associated ROS or CPNF documents');
   assert.match(html, /ctx\.fillText\("📄", iconX, y\);/, 'point-number label renderer should append a small document icon when a point has ROS/CPNF associations');
 });
+
+test('VIEWPORT.HTML loads selected linked point files into the active drawing state', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+
+  assert.match(html, /async\s+function\s+loadLinkedPointFileIntoDrawing\(projectId, pointFileId, pointFileName = pointFileId\)/, 'LineSmith should define a helper to fetch and apply linked point file content to the active drawing');
+  assert.match(html, /fetch\(buildProjectPointFileApiUrl\(projectId, pointFileId\)\)/, 'linked point-file helper should fetch the selected project point file via API');
+  assert.match(html, /points\.clear\(\);[\s\S]*lines\.clear\(\);/, 'linked point-file helper should clear existing points and lines before importing the newly selected file');
+  assert.match(html, /importCsvText\(text, `Linked point file import \(\$\{pointFileName\}\)`\)/, 'linked point-file helper should import selected point-file text into drawing geometry');
+  assert.match(html, /await\s+loadLinkedPointFileIntoDrawing\(activeProjectId, selectedPointFile\.pointFileId, selectedPointFile\.pointFileName\);/, 'point-file selection flow should immediately load the selected file into the drawing canvas');
+});
