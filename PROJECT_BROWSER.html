@@ -770,24 +770,63 @@
       return true;
     }
 
+    function resolveServerUploadLocation(entry, fallbackFolderKey = '') {
+      const metadata = entry?.reference?.metadata || {};
+      let folderKey = String(fallbackFolderKey || '').trim();
+      let storedName = String(metadata?.storedName || '').trim();
+      const referenceValue = String(entry?.reference?.value || '').trim();
+      if (!referenceValue) return { folderKey, storedName };
+
+      let parsed = null;
+      try {
+        parsed = new URL(referenceValue, window.location.origin);
+      } catch {
+        return { folderKey, storedName };
+      }
+
+      const queryFolderKey = String(parsed.searchParams.get('folderKey') || '').trim();
+      const queryFileName = String(parsed.searchParams.get('fileName') || '').trim();
+      if (queryFolderKey) folderKey = queryFolderKey;
+      if (queryFileName) storedName = queryFileName;
+      return { folderKey, storedName };
+    }
+
     async function moveServerUploadResource(projectContext, sourceFolderKey, targetFolderKey, entry) {
       const projectId = String(projectContext?.activeProjectId || '').trim();
-      const storedName = String(entry?.reference?.metadata?.storedName || '').trim();
-      if (!projectId || !storedName) throw new Error('Missing project upload metadata for move operation.');
+      const initialLocation = resolveServerUploadLocation(entry, sourceFolderKey);
+      if (!projectId || !initialLocation?.storedName) throw new Error('Missing project upload metadata for move operation.');
 
-      const moveUrl = new URL('/api/project-files/file', window.location.origin);
-      moveUrl.searchParams.set('projectId', projectId);
-      moveUrl.searchParams.set('folderKey', sourceFolderKey);
-      moveUrl.searchParams.set('fileName', storedName);
+      const sendMoveRequest = async (folderKey, fileName) => {
+        const moveUrl = new URL('/api/project-files/file', window.location.origin);
+        moveUrl.searchParams.set('projectId', projectId);
+        moveUrl.searchParams.set('folderKey', folderKey);
+        moveUrl.searchParams.set('fileName', fileName);
 
-      const response = await fetch(moveUrl.toString(), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetFolderKey }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || `Unable to move file (${response.status}).`);
-      return payload?.resource || null;
+        const response = await fetch(moveUrl.toString(), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetFolderKey }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        return { response, payload };
+      };
+
+      const firstAttempt = await sendMoveRequest(initialLocation.folderKey || sourceFolderKey, initialLocation.storedName);
+      if (firstAttempt.response.ok) return firstAttempt.payload?.resource || null;
+
+      const fallbackLocation = resolveServerUploadLocation(entry, '');
+      const shouldRetryWithFallback = firstAttempt.response.status === 404
+        && fallbackLocation.folderKey
+        && fallbackLocation.storedName
+        && (fallbackLocation.folderKey !== (initialLocation.folderKey || sourceFolderKey)
+          || fallbackLocation.storedName !== initialLocation.storedName);
+      if (shouldRetryWithFallback) {
+        const retryAttempt = await sendMoveRequest(fallbackLocation.folderKey, fallbackLocation.storedName);
+        if (retryAttempt.response.ok) return retryAttempt.payload?.resource || null;
+        throw new Error(retryAttempt.payload?.error || `Unable to move file (${retryAttempt.response.status}).`);
+      }
+
+      throw new Error(firstAttempt.payload?.error || `Unable to move file (${firstAttempt.response.status}).`);
     }
 
     async function moveResourceFromEvidenceDesk(sourceFolder, targetFolder, entry, projectContext = {}) {
