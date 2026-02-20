@@ -3687,6 +3687,14 @@
     resetLayers(Array.isArray(s.layers) ? s.layers : defaultLayerList());
     selectedLayerId = layers.has(s.selectedLayerId) ? s.selectedLayerId : (layers.keys().next().value || DEFAULT_LAYER_ID);
 
+    for (const point of points.values()) {
+      if (layers.has(point.layerId)) continue;
+      const ruleLayerId = resolveFieldToFinishLayerIdForCode(point.code || "");
+      point.layerId = (ruleLayerId && layers.has(ruleLayerId))
+        ? ruleLayerId
+        : (selectedLayerId || DEFAULT_LAYER_ID);
+    }
+
     selectedPointId = s.selection?.selectedPointId ?? null;
     if (selectedPointId != null && !points.has(selectedPointId)) selectedPointId = null;
     selectedPointIds = Array.isArray(s.selection?.selectedPointIds)
