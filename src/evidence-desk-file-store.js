@@ -67,18 +67,23 @@ function parseEnvUrl(urlRaw = '') {
 }
 
 function resolveS3ConfigFromEnv(env = process.env) {
-  const fromUrl = parseEnvUrl(
-    env.EVIDENCE_DESK_S3_URL
-      || env.AH_S3_OBJECT_STORAGE_STACKHERO_URL
-      || env.STACKHERO_S3_URL
-      || env.S3_URL,
-  ) || {};
+  const stackheroMinioHost = String(env.STACKHERO_MINIO_HOST || '').trim();
+  const stackheroMinioEndpoint = stackheroMinioHost
+    ? `${stackheroMinioHost.startsWith('http://') || stackheroMinioHost.startsWith('https://') ? '' : 'https://'}${stackheroMinioHost}`
+    : '';
+  const stackheroUrl = env.EVIDENCE_DESK_S3_URL
+    || env.AH_S3_OBJECT_STORAGE_STACKHERO_URL
+    || env.AH_S3_OBJECT_STORAGE_STACKHERO
+    || stackheroMinioEndpoint
+    || env.S3_URL;
+  const fromUrl = parseEnvUrl(stackheroUrl) || {};
 
   const bucket = String(
     env.EVIDENCE_DESK_S3_BUCKET
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_BUCKET
+    || env.STACKHERO_MINIO_BUCKET
     || fromUrl.bucket
-    || ((env.AH_S3_OBJECT_STORAGE_STACKHERO_URL || env.STACKHERO_S3_URL) ? 'survey-foundry' : '')
+    || (stackheroUrl ? 'survey-foundry' : '')
     || '',
   ).trim();
   const endpoint = String(
@@ -86,12 +91,14 @@ function resolveS3ConfigFromEnv(env = process.env) {
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_ENDPOINT
     || env.AWS_ENDPOINT_URL_S3
     || env.AWS_ENDPOINT_URL
+    || stackheroMinioEndpoint
     || fromUrl.endpoint
     || '',
   ).trim();
   const accessKeyId = String(
     env.EVIDENCE_DESK_S3_ACCESS_KEY_ID
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_ACCESS_KEY_ID
+    || env.STACKHERO_MINIO_ACCESS_KEY
     || env.AWS_ACCESS_KEY_ID
     || fromUrl.accessKeyId
     || '',
@@ -99,6 +106,7 @@ function resolveS3ConfigFromEnv(env = process.env) {
   const secretAccessKey = String(
     env.EVIDENCE_DESK_S3_SECRET_ACCESS_KEY
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_SECRET_ACCESS_KEY
+    || env.STACKHERO_MINIO_SECRET_KEY
     || env.AWS_SECRET_ACCESS_KEY
     || fromUrl.secretAccessKey
     || '',
@@ -106,6 +114,7 @@ function resolveS3ConfigFromEnv(env = process.env) {
   const region = String(
     env.EVIDENCE_DESK_S3_REGION
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_REGION
+    || env.STACKHERO_MINIO_REGION
     || env.AWS_REGION
     || env.AWS_DEFAULT_REGION
     || fromUrl.region
@@ -115,11 +124,18 @@ function resolveS3ConfigFromEnv(env = process.env) {
   const forcePathStyle = ['1', 'true', 'yes'].includes(String(
     env.EVIDENCE_DESK_S3_FORCE_PATH_STYLE
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_FORCE_PATH_STYLE
+    || env.STACKHERO_MINIO_FORCE_PATH_STYLE
     || (fromUrl.forcePathStyle ? 'true' : ''),
   ).toLowerCase());
+  const sessionToken = String(
+    env.EVIDENCE_DESK_S3_SESSION_TOKEN
+    || env.AH_S3_OBJECT_STORAGE_STACKHERO_SESSION_TOKEN
+    || env.AWS_SESSION_TOKEN
+    || '',
+  ).trim();
 
   if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) return null;
-  return { bucket, endpoint, accessKeyId, secretAccessKey, region, prefix, forcePathStyle };
+  return { bucket, endpoint, accessKeyId, secretAccessKey, region, prefix, forcePathStyle, sessionToken };
 }
 
 function sha256Hex(value) {
