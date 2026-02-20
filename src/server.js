@@ -206,7 +206,7 @@ function buildPointFileTextFromDrawingState(drawingState = {}) {
     : [];
   return points
     .map((point, index) => {
-      const number = point.number ?? point.pointNumber ?? point.name ?? point.id ?? index + 1;
+      const number = point.num ?? point.number ?? point.pointNumber ?? point.name ?? point.id ?? index + 1;
       const x = point.x ?? point.easting ?? '';
       const y = point.y ?? point.northing ?? '';
       const z = point.z ?? point.elevation ?? '';
@@ -250,6 +250,10 @@ function toFiniteNumberOrRaw(value = '') {
   return Number.isFinite(number) ? number : raw;
 }
 
+function normalizePointNumber(point = {}) {
+  return String(point?.num ?? point?.number ?? point?.pointNumber ?? point?.name ?? point?.id ?? '').trim();
+}
+
 function buildDrawingPointsFromPointFileText(text = '') {
   return String(text || '')
     .split(/\r?\n/)
@@ -258,9 +262,10 @@ function buildDrawingPointsFromPointFileText(text = '') {
     .map((line) => parseCsvLine(line))
     .filter((parts) => parts.length >= 3)
     .map((parts) => {
-      const [id, x, y, z, code, notes] = parts;
+      const [pointNumber, x, y, z, code, notes] = parts;
+      const normalizedPointNumber = String(pointNumber || '').trim();
       const point = {
-        id: String(id || '').trim(),
+        num: normalizedPointNumber,
         x: toFiniteNumberOrRaw(x),
         y: toFiniteNumberOrRaw(y),
       };
@@ -269,7 +274,8 @@ function buildDrawingPointsFromPointFileText(text = '') {
       if (String(code || '').trim()) point.code = String(code || '').trim();
       if (String(notes || '').trim()) point.notes = String(notes || '').trim();
       return point;
-    });
+    })
+    .filter((point) => point.num);
 }
 
 async function hydrateDrawingStateFromLinkedPointFile(store, drawing = null) {
@@ -282,11 +288,37 @@ async function hydrateDrawingStateFromLinkedPointFile(store, drawing = null) {
   if (!linkedPointFile?.currentState?.text) return drawing;
 
   const linkedPoints = buildDrawingPointsFromPointFileText(linkedPointFile.currentState.text);
+  const existingPoints = Array.isArray(drawing.currentState.points)
+    ? drawing.currentState.points.filter((point) => point && typeof point === 'object')
+    : [];
+  const existingByPointNumber = new Map();
+  for (const existingPoint of existingPoints) {
+    const pointNumber = normalizePointNumber(existingPoint);
+    if (!pointNumber || existingByPointNumber.has(pointNumber)) continue;
+    existingByPointNumber.set(pointNumber, existingPoint);
+  }
+
+  const hydratedPoints = linkedPoints.map((linkedPoint) => {
+    const existingPoint = existingByPointNumber.get(linkedPoint.num);
+    if (!existingPoint) {
+      return {
+        id: linkedPoint.num,
+        ...linkedPoint,
+      };
+    }
+    return {
+      ...existingPoint,
+      ...linkedPoint,
+      id: existingPoint.id ?? linkedPoint.num,
+      num: linkedPoint.num,
+    };
+  });
+
   return {
     ...drawing,
     currentState: {
       ...drawing.currentState,
-      points: linkedPoints,
+      points: hydratedPoints,
     },
   };
 }
