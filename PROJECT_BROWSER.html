@@ -166,6 +166,13 @@
       box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
     }
 
+    .file-list-container.file-list-drop-target {
+      border-radius: 8px;
+      background: rgba(56, 189, 248, 0.06);
+      outline: 1px dashed rgba(56, 189, 248, 0.45);
+      outline-offset: 2px;
+    }
+
     .file-meta {
       display: flex;
       align-items: center;
@@ -1791,11 +1798,42 @@
           treeContainer.appendChild(createPointFileUploadPanel(projectContext));
         }
 
+        const fileListContainer = document.createElement('div');
+        fileListContainer.className = 'file-list-container';
+        fileListContainer.addEventListener('dragover', (event) => {
+          const dragType = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
+          if (!dragType.includes('application/x-surveycad-resource-move')) return;
+          event.preventDefault();
+          fileListContainer.classList.add('file-list-drop-target');
+        });
+        fileListContainer.addEventListener('dragleave', (event) => {
+          if (fileListContainer.contains(event.relatedTarget)) return;
+          fileListContainer.classList.remove('file-list-drop-target');
+        });
+        fileListContainer.addEventListener('drop', async (event) => {
+          event.preventDefault();
+          fileListContainer.classList.remove('file-list-drop-target');
+          const payloadRaw = event.dataTransfer?.getData('application/x-surveycad-resource-move');
+          if (!payloadRaw) return;
+          let payload = null;
+          try {
+            payload = JSON.parse(payloadRaw);
+          } catch {
+            return;
+          }
+          if (!payload?.resourceId || !payload?.sourceFolderKey || payload.sourceFolderKey === folder.key) return;
+          const sourceFolder = projectFile.folders.find((candidate) => candidate.key === payload.sourceFolderKey);
+          const draggedEntry = sourceFolder?.index?.find((candidate) => candidate?.id === payload.resourceId);
+          if (!sourceFolder || !draggedEntry) return;
+          await moveResourceFromEvidenceDesk(sourceFolder, folder, draggedEntry, projectContext);
+        });
+        treeContainer.appendChild(fileListContainer);
+
         if (!folder.index.length) {
           const empty = document.createElement('div');
           empty.className = 'empty';
           empty.textContent = 'No linked resources yet.';
-          treeContainer.appendChild(empty);
+          fileListContainer.appendChild(empty);
           continue;
         }
 
@@ -2159,7 +2197,7 @@
             attachProjectPointFileVersionTimeline(resource, entry, projectContext).catch(() => {});
           }
 
-          treeContainer.appendChild(resource);
+          fileListContainer.appendChild(resource);
         }
       }
 
