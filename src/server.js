@@ -187,6 +187,25 @@ function parseProjectPointFileRoute(pathname = '') {
   };
 }
 
+function buildLineSmithDrawingObjectName(drawingId = '') {
+  const normalized = String(drawingId || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${normalized || 'drawing'}.linesmith.json`;
+}
+
+function buildPointFoundryObjectName(pointFileId = '', exportFormat = 'csv') {
+  const normalizedId = String(pointFileId || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const normalizedFormat = String(exportFormat || 'csv').trim().toLowerCase() || 'csv';
+  return `${normalizedId || 'point-file'}.${normalizedFormat}`;
+}
+
 
 function parsePointFileChangeContext(req, body = {}, fallbackApp = 'unknown-app') {
   const appFromHeader = String(req.headers['x-survey-app'] || req.headers['x-app-name'] || '').trim();
@@ -1201,6 +1220,148 @@ export function createSurveyServer({
     throw createHttpError(400, 'Unsupported PDF thumbnail source path.');
   }
 
+  async function findStoredProjectObjectFileName(runtime, projectId, folderKey, desiredFileName) {
+    const listing = await runtime.store.listFiles(projectId, PROJECT_FILE_FOLDERS.map((folder) => folder.key));
+    const files = Array.isArray(listing?.files) ? listing.files : [];
+    const match = files.find((file) => file?.folderKey === folderKey && String(file?.fileName || '').endsWith(`-${desiredFileName}`));
+    return match?.fileName || '';
+  }
+
+  async function upsertProjectObjectFile({
+    projectId,
+    folderKey,
+    fileName,
+    originalFileName,
+    buffer,
+    mimeType,
+    extension,
+  } = {}) {
+    const runtime = await resolveEvidenceDeskStore();
+    const storedFileName = await findStoredProjectObjectFileName(runtime, projectId, folderKey, fileName);
+    if (storedFileName) {
+      return runtime.store.updateFile({
+        projectId,
+        folderKey,
+        fileName: storedFileName,
+        originalFileName,
+        buffer,
+        extension,
+        mimeType,
+      });
+    }
+    return runtime.store.createFile({
+      projectId,
+      folderKey,
+      originalFileName,
+      buffer,
+      extension,
+      mimeType,
+    });
+  }
+
+  async function persistLineSmithDrawingObject(projectId, drawing) {
+    const drawingId = String(drawing?.drawingId || '').trim();
+    if (!drawingId || !drawing?.currentState || typeof drawing.currentState !== 'object') return;
+    const fileName = buildLineSmithDrawingObjectName(drawingId);
+    const payload = {
+      schemaVersion: '1.0.0',
+      projectId,
+      drawingId,
+      drawingName: drawing.drawingName || drawingId,
+      updatedAt: drawing.updatedAt || new Date().toISOString(),
+      drawingState: drawing.currentState,
+    };
+    await upsertProjectObjectFile({
+      projectId,
+      folderKey: 'drawings',
+      fileName,
+      originalFileName: fileName,
+      buffer: Buffer.from(JSON.stringify(payload), 'utf8'),
+      extension: 'json',
+      mimeType: 'application/json; charset=utf-8',
+    });
+  }
+
+  async function hydrateLineSmithDrawingFromObjectStore(projectId, drawing) {
+    const drawingId = String(drawing?.drawingId || '').trim();
+    if (!drawingId) return drawing;
+    const runtime = await resolveEvidenceDeskStore();
+    const fileName = buildLineSmithDrawingObjectName(drawingId);
+    const storedFileName = await findStoredProjectObjectFileName(runtime, projectId, 'drawings', fileName);
+    if (!storedFileName) return drawing;
+    const existing = await runtime.store.getFile(projectId, 'drawings', storedFileName);
+    if (!existing?.buffer) return drawing;
+    try {
+      const parsed = JSON.parse(existing.buffer.toString('utf8'));
+      if (!parsed?.drawingState || typeof parsed.drawingState !== 'object') return drawing;
+      return {
+        ...drawing,
+        currentState: parsed.drawingState,
+      };
+    } catch {
+      return drawing;
+    }
+  }
+
+  async function deleteLineSmithDrawingObject(projectId, drawingId) {
+    if (!projectId || !drawingId) return;
+    const runtime = await resolveEvidenceDeskStore();
+    const fileName = buildLineSmithDrawingObjectName(drawingId);
+    const storedFileName = await findStoredProjectObjectFileName(runtime, projectId, 'drawings', fileName);
+    if (!storedFileName) return;
+    await runtime.store.deleteFile(projectId, 'drawings', storedFileName);
+  }
+
+  async function persistPointFoundryPointFileObject(projectId, pointFile) {
+    const pointFileId = String(pointFile?.pointFileId || '').trim();
+    if (!pointFileId) return;
+    const text = String(pointFile?.currentState?.text || '').trim();
+    if (!text) return;
+    const extension = String(pointFile?.exportFormat || pointFile?.currentState?.exportFormat || 'csv').trim().toLowerCase() || 'csv';
+    const fileName = buildPointFoundryObjectName(pointFileId, extension);
+    await upsertProjectObjectFile({
+      projectId,
+      folderKey: 'point-files',
+      fileName,
+      originalFileName: fileName,
+      buffer: Buffer.from(text, 'utf8'),
+      extension,
+      mimeType: 'text/csv; charset=utf-8',
+    });
+  }
+
+  async function hydratePointFoundryPointFileFromObjectStore(projectId, pointFile) {
+    const pointFileId = String(pointFile?.pointFileId || '').trim();
+    if (!pointFileId) return pointFile;
+    const extension = String(pointFile?.exportFormat || pointFile?.currentState?.exportFormat || 'csv').trim().toLowerCase() || 'csv';
+    const runtime = await resolveEvidenceDeskStore();
+    const fileName = buildPointFoundryObjectName(pointFileId, extension);
+    const storedFileName = await findStoredProjectObjectFileName(runtime, projectId, 'point-files', fileName);
+    if (!storedFileName) return pointFile;
+    const existing = await runtime.store.getFile(projectId, 'point-files', storedFileName);
+    if (!existing?.buffer) return pointFile;
+    return {
+      ...pointFile,
+      currentState: {
+        ...(pointFile.currentState || {}),
+        text: existing.buffer.toString('utf8'),
+        exportFormat: extension,
+      },
+    };
+  }
+
+  async function deletePointFoundryPointFileObject(projectId, pointFileId) {
+    if (!projectId || !pointFileId) return;
+    const runtime = await resolveEvidenceDeskStore();
+    const knownExtensions = ['csv', 'txt'];
+    await Promise.all(knownExtensions.map(async (extension) => {
+      const desiredFileName = buildPointFoundryObjectName(pointFileId, extension);
+      const storedFileName = await findStoredProjectObjectFileName(runtime, projectId, 'point-files', desiredFileName);
+      if (!storedFileName) return;
+      await runtime.store.deleteFile(projectId, 'point-files', storedFileName);
+    }));
+  }
+
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
   const resolveFieldToFinishSettings = async () => {
@@ -1480,7 +1641,8 @@ export function createSurveyServer({
             sendJson(res, 404, { error: 'Drawing not found.' });
             return;
           }
-          const hydratedDrawing = await hydrateDrawingStateFromLinkedPointFile(localStorageSyncStore, drawing);
+          const objectHydratedDrawing = await hydrateLineSmithDrawingFromObjectStore(projectId, drawing);
+          const hydratedDrawing = await hydrateDrawingStateFromLinkedPointFile(localStorageSyncStore, objectHydratedDrawing);
           sendJson(res, 200, { drawing: hydratedDrawing });
           return;
         }
@@ -1529,6 +1691,7 @@ export function createSurveyServer({
             )
             : null;
           const hydratedDrawing = await hydrateDrawingStateFromLinkedPointFile(localStorageSyncStore, result.drawing);
+          await persistLineSmithDrawingObject(projectId, hydratedDrawing);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: [
@@ -1552,6 +1715,7 @@ export function createSurveyServer({
             sendJson(res, 404, { error: 'Drawing not found.' });
             return;
           }
+          await deleteLineSmithDrawingObject(projectId, drawingId);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: deletedResult?.sync?.allOperations || [],
@@ -1867,7 +2031,10 @@ export function createSurveyServer({
             sendJson(res, 404, { error: versionId ? 'Point file version not found.' : 'Point file not found.' });
             return;
           }
-          sendJson(res, 200, { pointFile });
+          const objectHydratedPointFile = versionId
+            ? pointFile
+            : await hydratePointFoundryPointFileFromObjectStore(projectId, pointFile);
+          sendJson(res, 200, { pointFile: objectHydratedPointFile });
           return;
         }
 
@@ -1883,6 +2050,7 @@ export function createSurveyServer({
             sourceLabel: body.sourceLabel,
             changeContext: parsePointFileChangeContext(req, body, 'point-file-api'),
           });
+          await persistPointFoundryPointFileObject(projectId, result.pointFile);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: result?.sync?.allOperations || [],
@@ -1903,6 +2071,7 @@ export function createSurveyServer({
             sendJson(res, 404, { error: 'Point file not found.' });
             return;
           }
+          await deletePointFoundryPointFileObject(projectId, pointFileId);
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: deletedResult?.sync?.allOperations || [],

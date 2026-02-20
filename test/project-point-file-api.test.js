@@ -76,6 +76,17 @@ test('project point file CRUD API stores differential versions and supports list
     const loaded = await getRes.json();
     assert.equal(loaded.pointFile.currentState.text, '1,105,205\n2,300,400');
 
+    const pointFileListRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/list?projectId=demo-project`);
+    assert.equal(pointFileListRes.status, 200);
+    const pointFileListPayload = await pointFileListRes.json();
+    const objectStorePointFile = pointFileListPayload.files.find((file) => file.folderKey === 'point-files' && String(file.fileName || '').endsWith(`${pointFileId}.csv`));
+    assert.ok(objectStorePointFile);
+
+    const objectStorePointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=demo-project&folderKey=point-files&fileName=${encodeURIComponent(objectStorePointFile.fileName)}`);
+    assert.equal(objectStorePointFileRes.status, 200);
+    const objectStorePointFileText = await objectStorePointFileRes.text();
+    assert.equal(objectStorePointFileText, '1,105,205\n2,300,400');
+
     const firstVersionId = updated.pointFile.versions[0].versionId;
     const versionRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/${encodeURIComponent(pointFileId)}?versionId=${encodeURIComponent(firstVersionId)}`);
     assert.equal(versionRes.status, 200);
@@ -93,6 +104,9 @@ test('project point file CRUD API stores differential versions and supports list
 
     const missingRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/${encodeURIComponent(pointFileId)}`);
     assert.equal(missingRes.status, 404);
+
+    const deletedObjectStorePointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=demo-project&folderKey=point-files&fileName=${encodeURIComponent(objectStorePointFile.fileName)}`);
+    assert.equal(deletedObjectStorePointFileRes.status, 404);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }
