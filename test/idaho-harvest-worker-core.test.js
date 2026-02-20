@@ -130,5 +130,49 @@ test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoin
   assert.ok(tileWrites.length > 0);
   assert.ok(tileWrites.every((write) => write.bucket === 'tile-server'));
 
-  assert.deepEqual(calls.map((c) => `${c.layer}:${c.offset}`), ['24:0', '24:1', '18:0', '18:1']);
+  assert.deepEqual(calls.map((c) => `${c.layer}:${c.offset}`), ['24:0', '18:0', '24:1', '18:1']);
+});
+
+
+test('runIdahoHarvestCycle rotates datasets so cpnf is harvested before parcels finish', async () => {
+  const objectStore = createMemoryObjectStore();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const parsed = new URL(url);
+    const layer = parsed.pathname.split('/').slice(-2, -1)[0];
+    const offset = Number(parsed.searchParams.get('resultOffset') || 0);
+    calls.push(`${layer}:${offset}`);
+
+    if (layer === '24') {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            attributes: { OBJECTID: offset + 1, PARCEL: `P-${offset + 1}` },
+            geometry: { x: -116.2, y: 43.6 },
+          }],
+        }),
+      };
+    }
+
+    if (layer === '18') {
+      return {
+        ok: true,
+        json: async () => ({
+          features: offset === 0
+            ? [{ attributes: { OBJECTID: 99, NAME: 'CPNF-99' }, geometry: { x: -116.1, y: 43.7 } }]
+            : [],
+        }),
+      };
+    }
+
+    return { ok: true, json: async () => ({ features: [] }) };
+  };
+
+  await runIdahoHarvestCycle({ fetchImpl, objectStore, adaMapServerBaseUrl: 'http://example.test/map', batchSize: 1 });
+  await runIdahoHarvestCycle({ fetchImpl, objectStore, adaMapServerBaseUrl: 'http://example.test/map', batchSize: 1 });
+
+  assert.deepEqual(calls, ['24:0', '18:0']);
+  const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/99.geojson', { bucket: 'cpnfs' });
+  assert.equal(cpnfFeature.properties.dataset, 'cpnf');
 });
