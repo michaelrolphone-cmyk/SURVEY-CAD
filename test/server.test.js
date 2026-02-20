@@ -943,7 +943,21 @@ test('server file upload CRUD and list endpoints', async () => {
     assert.equal(oversizedRes.statusCode, 413);
     assert.match(oversizedRes.payload, /File exceeds maximum size/);
 
-    const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/file?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`, {
+    const moveRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/file?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetFolderKey: 'deeds' }),
+    });
+    assert.equal(moveRes.status, 200);
+    const movePayload = await moveRes.json();
+    assert.equal(movePayload.moved, true);
+    assert.equal(movePayload.resource.folder, 'deeds');
+
+    const movedDownloadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=${encodeURIComponent(testProjectId)}&folderKey=deeds&fileName=${encodeURIComponent(storedFileName)}`);
+    assert.equal(movedDownloadRes.status, 200);
+    assert.equal(await movedDownloadRes.text(), 'updated drawing content');
+
+    const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/file?projectId=${encodeURIComponent(testProjectId)}&folderKey=deeds&fileName=${encodeURIComponent(storedFileName)}`, {
       method: 'DELETE',
     });
     assert.equal(deleteRes.status, 200);

@@ -150,11 +150,26 @@
       outline: none;
     }
 
+    .file-row.file-draggable {
+      cursor: grab;
+    }
+
+    .file-row.file-draggable.file-dragging {
+      opacity: 0.45;
+      cursor: grabbing;
+    }
+
+    .folder-row.folder-drop-target {
+      border-color: rgba(56, 189, 248, 0.6);
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+    }
+
     .file-meta {
       display: flex;
       align-items: center;
       gap: 0.4rem;
       min-width: 0;
+      flex: 1 1 auto;
     }
 
     .ros-number-pill {
@@ -253,15 +268,20 @@
     .file-name-configured {
       color: #f8fafc;
       font-weight: 600;
-      flex: none;
-    }
-
-    .file-name-actual {
-      color: var(--muted);
+      min-width: 0;
+      flex: 1 1 auto;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      min-width: 0;
+    }
+
+    .file-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.4rem;
+      margin-left: auto;
+      flex: none;
     }
 
     .launch-btn {
@@ -323,7 +343,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, renameResourceTitle, findCpfPointLinksAsync } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, moveResourceById, renameResourceTitle, findCpfPointLinksAsync } from './src/project-browser-state.js';
     import { renderLineworkThumbnailDataUrl, renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
@@ -756,6 +776,69 @@
       popup.opener = null;
       popup.location.replace(pdfUrl);
     }
+
+    function canMoveResourceBetweenFolders(entry, sourceFolderKey = '', targetFolderKey = '') {
+      if (!entry || !sourceFolderKey || !targetFolderKey || sourceFolderKey === targetFolderKey) return false;
+      const referenceType = String(entry?.reference?.type || '').trim();
+      if (referenceType === 'project-point-file' || referenceType === 'project-drawing') return false;
+      return true;
+    }
+
+    async function moveServerUploadResource(projectContext, sourceFolderKey, targetFolderKey, entry) {
+      const projectId = String(projectContext?.activeProjectId || '').trim();
+      const storedName = String(entry?.reference?.metadata?.storedName || '').trim();
+      if (!projectId || !storedName) throw new Error('Missing project upload metadata for move operation.');
+
+      const moveUrl = new URL('/api/project-files/file', window.location.origin);
+      moveUrl.searchParams.set('projectId', projectId);
+      moveUrl.searchParams.set('folderKey', sourceFolderKey);
+      moveUrl.searchParams.set('fileName', storedName);
+
+      const response = await fetch(moveUrl.toString(), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetFolderKey }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || `Unable to move file (${response.status}).`);
+      return payload?.resource || null;
+    }
+
+    async function moveResourceFromEvidenceDesk(sourceFolder, targetFolder, entry, projectContext = {}) {
+      const sourceFolderKey = String(sourceFolder?.key || '').trim();
+      const targetFolderKey = String(targetFolder?.key || '').trim();
+      if (!canMoveResourceBetweenFolders(entry, sourceFolderKey, targetFolderKey)) {
+        projectContext.setUploadStatus('Only uploaded/local project-file entries can be moved between folders.');
+        return false;
+      }
+
+      let moved = false;
+      try {
+        if (entry?.reference?.type === 'server-upload') {
+          const movedResource = await moveServerUploadResource(projectContext, sourceFolderKey, targetFolderKey, entry);
+          if (!movedResource) throw new Error('Move response was missing resource data.');
+          removeResourceById(projectContext?.projectFile, sourceFolderKey, entry?.id);
+          moved = appendResourceToFolder(projectContext?.projectFile, targetFolderKey, movedResource);
+        } else {
+          moved = moveResourceById(projectContext?.projectFile, sourceFolderKey, targetFolderKey, entry?.id);
+        }
+
+        if (!moved) {
+          projectContext.setUploadStatus('Unable to move this file.');
+          return false;
+        }
+
+        saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+        projectContext.setUploadStatus(`Moved ${entry?.title || entry?.id || 'file'} to ${targetFolder?.label || targetFolderKey}.`);
+        renderTree(projectContext.projectFile, projectContext);
+        return true;
+      } catch (error) {
+        projectContext.setUploadStatus(`Move failed: ${error.message || 'Unable to move this file.'}`);
+        renderTree(projectContext.projectFile, projectContext);
+        return false;
+      }
+    }
+
 
     function getPdfPreviewUrl(folder, entry) {
       if (folder?.key === 'cpfs') {
@@ -1342,7 +1425,34 @@
       for (const folder of projectFile.folders || []) {
         const folderRow = document.createElement('div');
         folderRow.className = 'folder-row';
+        folderRow.dataset.folderKey = folder.key;
         folderRow.innerHTML = `<span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
+        folderRow.addEventListener('dragover', (event) => {
+          const dragType = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
+          if (!dragType.includes('application/x-surveycad-resource-move')) return;
+          event.preventDefault();
+          folderRow.classList.add('folder-drop-target');
+        });
+        folderRow.addEventListener('dragleave', () => {
+          folderRow.classList.remove('folder-drop-target');
+        });
+        folderRow.addEventListener('drop', async (event) => {
+          event.preventDefault();
+          folderRow.classList.remove('folder-drop-target');
+          const payloadRaw = event.dataTransfer?.getData('application/x-surveycad-resource-move');
+          if (!payloadRaw) return;
+          let payload = null;
+          try {
+            payload = JSON.parse(payloadRaw);
+          } catch {
+            return;
+          }
+          if (!payload?.resourceId || !payload?.sourceFolderKey || payload.sourceFolderKey === folder.key) return;
+          const sourceFolder = projectFile.folders.find((candidate) => candidate.key === payload.sourceFolderKey);
+          const draggedEntry = sourceFolder?.index?.find((candidate) => candidate?.id === payload.resourceId);
+          if (!sourceFolder || !draggedEntry) return;
+          await moveResourceFromEvidenceDesk(sourceFolder, folder, draggedEntry, projectContext);
+        });
 
         if (folder.key === 'cpfs') {
           const printAllButton = document.createElement('button');
@@ -1373,6 +1483,23 @@
           const resource = document.createElement('div');
           resource.className = 'file-row';
 
+          const canDragToMove = canMoveResourceBetweenFolders(entry, folder.key, '__other__');
+          if (canDragToMove) {
+            resource.classList.add('file-draggable');
+            resource.draggable = true;
+            resource.addEventListener('dragstart', (event) => {
+              resource.classList.add('file-dragging');
+              event.dataTransfer?.setData('application/x-surveycad-resource-move', JSON.stringify({
+                resourceId: entry.id,
+                sourceFolderKey: folder.key,
+              }));
+              if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+            });
+            resource.addEventListener('dragend', () => {
+              resource.classList.remove('file-dragging');
+            });
+          }
+
           const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
           const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
           const canLaunchPointForge = folder.key === 'point-files'
@@ -1390,7 +1517,10 @@
           const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
           const rosNumber = String(entry?.reference?.metadata?.rosNumber || '').trim();
           const rosPillMarkup = rosNumber ? `<span class="ros-number-pill" title="Recorded map number for ROS linking">ROS # ${rosNumber}</span>` : '';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured">${configuredFileName}</span><span class="file-name-actual" title="${actualFileName}">— ${actualFileName}</span>${rosPillMarkup}</span></span>`;
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}</span></span>`;
+          const actionButtons = document.createElement('div');
+          actionButtons.className = 'file-actions';
+          resource.appendChild(actionButtons);
 
           if (canLaunchPointForge) {
             attachPointFilePreview(resource, entry).catch(() => {});
@@ -1429,7 +1559,7 @@
               event.stopPropagation();
               launchPointForgeFromResource(entry, projectContext);
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const deletePointFileButton = document.createElement('button');
             deletePointFileButton.type = 'button';
@@ -1440,7 +1570,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deletePointFileButton);
+            actionButtons.appendChild(deletePointFileButton);
 
             const renamePointFileButton = document.createElement('button');
             renamePointFileButton.type = 'button';
@@ -1451,7 +1581,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renamePointFileButton);
+            actionButtons.appendChild(renamePointFileButton);
           }
 
           if (canOpenLineSmithDrawing) {
@@ -1475,7 +1605,7 @@
               event.stopPropagation();
               launchLineSmithFromDrawingResource(entry, projectContext);
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const renameDrawingButton = document.createElement('button');
             renameDrawingButton.type = 'button';
@@ -1486,7 +1616,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renameDrawingButton);
+            actionButtons.appendChild(renameDrawingButton);
 
             const deleteDrawingButton = document.createElement('button');
             deleteDrawingButton.type = 'button';
@@ -1497,7 +1627,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteDrawingButton);
+            actionButtons.appendChild(deleteDrawingButton);
           }
 
           if (canOpenCpfPdf) {
@@ -1521,7 +1651,7 @@
               event.stopPropagation();
               openCpfPdfFromResource(entry);
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
@@ -1532,7 +1662,7 @@
               event.stopPropagation();
               deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteButton);
+            actionButtons.appendChild(deleteButton);
 
             const renameButton = document.createElement('button');
             renameButton.type = 'button';
@@ -1544,7 +1674,6 @@
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             resource.appendChild(renameButton);
-
           }
 
           const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;
@@ -1587,7 +1716,7 @@
               }
               window.open(downloadUrl, '_blank', 'noopener,noreferrer');
             });
-            resource.appendChild(openButton);
+            actionButtons.appendChild(openButton);
 
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
@@ -1598,7 +1727,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteButton);
+            actionButtons.appendChild(deleteButton);
 
             const renameButton = document.createElement('button');
             renameButton.type = 'button';
@@ -1648,7 +1777,7 @@
               event.stopPropagation();
               await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(deleteButton);
+            actionButtons.appendChild(deleteButton);
 
             const renameButton = document.createElement('button');
             renameButton.type = 'button';
@@ -1659,7 +1788,7 @@
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
-            resource.appendChild(renameButton);
+            actionButtons.appendChild(renameButton);
           }
 
           treeContainer.appendChild(resource);

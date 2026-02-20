@@ -100,6 +100,28 @@ export class InMemoryEvidenceDeskFileStore {
     return this.records.delete(this.key(projectId, folderKey, fileName));
   }
 
+
+  async moveFile(projectId, sourceFolderKey, fileName, targetFolderKey) {
+    if (!projectId || !sourceFolderKey || !fileName || !targetFolderKey) return null;
+    if (sourceFolderKey === targetFolderKey) return this.getFile(projectId, sourceFolderKey, fileName).then((record) => {
+      if (!record) return null;
+      return buildResource({ projectId, folderKey: sourceFolderKey, record: { ...record, storedName: fileName } });
+    });
+
+    const sourceKey = this.key(projectId, sourceFolderKey, fileName);
+    const record = this.records.get(sourceKey);
+    if (!record) return null;
+
+    const updatedRecord = {
+      ...record,
+      folderKey: targetFolderKey,
+      updatedAt: new Date().toISOString(),
+    };
+    this.records.delete(sourceKey);
+    this.records.set(this.key(projectId, targetFolderKey, fileName), updatedRecord);
+    return buildResource({ projectId, folderKey: targetFolderKey, record: { ...updatedRecord, storedName: fileName } });
+  }
+
   async listFiles(projectId, validFolderKeys = []) {
     const grouped = {};
     for (const folderKey of validFolderKeys) grouped[folderKey] = [];
@@ -229,6 +251,45 @@ export class RedisEvidenceDeskFileStore {
       .sRem(this.folderIndexKey(projectId, folderKey), fileName)
       .exec();
     return Array.isArray(removed) && removed.some((entry) => Number(entry?.[1] || 0) > 0);
+  }
+
+
+  async moveFile(projectId, sourceFolderKey, fileName, targetFolderKey) {
+    if (!projectId || !sourceFolderKey || !fileName || !targetFolderKey) return null;
+    if (sourceFolderKey === targetFolderKey) {
+      const existing = await this.getFile(projectId, sourceFolderKey, fileName);
+      if (!existing) return null;
+      return buildResource({ projectId, folderKey: sourceFolderKey, record: { ...existing, storedName: fileName } });
+    }
+
+    const existing = await this.getFile(projectId, sourceFolderKey, fileName);
+    if (!existing) return null;
+
+    const record = {
+      ...existing,
+      folderKey: targetFolderKey,
+      updatedAt: new Date().toISOString(),
+    };
+    delete record.buffer;
+    delete record.thumbnailBuffer;
+    delete record.thumbnailBase64;
+
+    const write = this.redis.multi()
+      .set(this.metadataKey(projectId, targetFolderKey, fileName), JSON.stringify(record))
+      .set(this.binaryKey(projectId, targetFolderKey, fileName), Buffer.from(existing.buffer).toString('base64'))
+      .sAdd(this.folderIndexKey(projectId, targetFolderKey), fileName)
+      .del(this.metadataKey(projectId, sourceFolderKey, fileName))
+      .del(this.binaryKey(projectId, sourceFolderKey, fileName))
+      .del(this.thumbnailBinaryKey(projectId, sourceFolderKey, fileName))
+      .sRem(this.folderIndexKey(projectId, sourceFolderKey), fileName);
+    if (existing.thumbnailBuffer) {
+      write.set(this.thumbnailBinaryKey(projectId, targetFolderKey, fileName), Buffer.from(existing.thumbnailBuffer).toString('base64'));
+    } else {
+      write.del(this.thumbnailBinaryKey(projectId, targetFolderKey, fileName));
+    }
+    await write.exec();
+
+    return buildResource({ projectId, folderKey: targetFolderKey, record: { ...record, storedName: fileName } });
   }
 
   async listFiles(projectId, validFolderKeys = []) {

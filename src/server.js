@@ -1978,8 +1978,8 @@ export function createSurveyServer({
       }
 
       if (urlObj.pathname === '/api/project-files/file') {
-        if (req.method !== 'DELETE') {
-          sendJson(res, 405, { error: 'Only DELETE is supported.' });
+        if (req.method !== 'DELETE' && req.method !== 'PATCH') {
+          sendJson(res, 405, { error: 'Only DELETE and PATCH are supported.' });
           return;
         }
         const projectId = urlObj.searchParams.get('projectId');
@@ -1994,12 +1994,34 @@ export function createSurveyServer({
           return;
         }
         const { store } = await resolveEvidenceDeskStore();
-        const deleted = await store.deleteFile(projectId, folderKey, path.basename(requestedFileName));
-        if (!deleted) {
+
+        if (req.method === 'DELETE') {
+          const deleted = await store.deleteFile(projectId, folderKey, path.basename(requestedFileName));
+          if (!deleted) {
+            sendJson(res, 404, { error: 'File not found.' });
+            return;
+          }
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        const body = await readJsonBody(req);
+        const targetFolderKey = String(body?.targetFolderKey || '').trim();
+        if (!targetFolderKey) {
+          sendJson(res, 400, { error: 'targetFolderKey is required.' });
+          return;
+        }
+        if (!VALID_FOLDER_KEYS.has(targetFolderKey)) {
+          sendJson(res, 400, { error: 'Invalid targetFolderKey.' });
+          return;
+        }
+
+        const movedResource = await store.moveFile(projectId, folderKey, path.basename(requestedFileName), targetFolderKey);
+        if (!movedResource) {
           sendJson(res, 404, { error: 'File not found.' });
           return;
         }
-        sendJson(res, 200, { deleted: true });
+        sendJson(res, 200, { moved: true, resource: movedResource });
         return;
       }
 
