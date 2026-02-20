@@ -6,6 +6,7 @@ SURVEY-CAD is a Node.js toolkit and web server for survey workflows. It includes
 - A web API server (`src/server.js`).
 - Command-line tools for survey lookups, project file generation, FLD parsing, point localization, and ROS basis-of-bearing extraction.
 - Static browser tools served from the repository root.
+  - MapTile Browser (`MapTileBrowser.html`) provides a Leaflet UI for browsing harvested MinIO GeoJSON tiles through `/api/maptiles`.
   - LineSmith (`VIEWPORT.HTML`) points manager includes row tinting by layer color and optional grouping by Layer or Code for large point sets.
   - LineSmith ROS evidence linking now parses `ROS <number>` tokens from point **Notes**, so ROS and CPNF references can be mixed in one notes field without a dedicated ROS column.
 - EvidenceDesk (`PROJECT_BROWSER.html`) supports inline ROS-number metadata on uploaded PDFs in the ROS folder and LineSmith point-inspector ROS evidence links.
@@ -49,6 +50,7 @@ The server now includes a restartable background worker that harvests Idaho parc
 - `GET /api/maptiles`
 - `GET /api/maptiles/:dataset/tilejson.json`
 - `GET /api/maptiles/:dataset/:z/:x/:y.geojson`
+- Launcher app route: `GET /MapTileBrowser.html`
 
 ### Object store layout (GeoJSON)
 
@@ -88,6 +90,7 @@ The server now includes a restartable background worker that harvests Idaho parc
 
 - Start server (autostarts worker unless disabled): `npm start`
 - Run tests: `npm test`
+- Open the maptile browser app: `http://localhost:3000/MapTileBrowser.html`
 
 
 
@@ -195,6 +198,7 @@ For a focused, implementation-level explanation of browser-to-browser sync over 
 - Startup bootstrap (no websocket wait): on first load, clients call `GET /api/localstorage-sync` immediately, compare server `version` + `checksum` against local sync metadata, and hydrate when storage is blank or server state is newer and there are no pending local diffs.
 - Run server: `npm start`
 - Run tests: `npm test`
+- Open the maptile browser app: `http://localhost:3000/MapTileBrowser.html`
 
 ### API and CLI notes for this localStorage realtime sync fix
 
@@ -419,6 +423,7 @@ For a focused, implementation-level explanation of browser-to-browser sync over 
 - Startup bootstrap (no websocket wait): on first load, clients call `GET /api/localstorage-sync` immediately, compare server `version` + `checksum` against local sync metadata, and hydrate when storage is blank or server state is newer and there are no pending local diffs.
 - Run server: `npm start`
 - Run tests: `npm test`
+- Open the maptile browser app: `http://localhost:3000/MapTileBrowser.html`
 
 ### API and CLI notes for this localStorage realtime sync fix
 

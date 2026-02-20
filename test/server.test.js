@@ -292,6 +292,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.ok(appsPayload.apps.length >= 10);
     assert.equal(appsPayload.apps[0].name, 'SurveyFoundry');
     assert.match(appsPayload.apps[0].iconPath, /assets\/icons\/SurveyFoundry\.png$/i);
+    assert.ok(appsPayload.apps.some((entry) => entry.id === 'maptile-browser' && entry.entryHtml === 'MapTileBrowser.html'));
 
     const lookupRes = await fetch(`http://127.0.0.1:${app.port}/api/lookup?address=${encodeURIComponent('100 Main St, Boise')}`);
     assert.equal(lookupRes.status, 200);

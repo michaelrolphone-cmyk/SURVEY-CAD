@@ -67,6 +67,18 @@ export const APP_CATALOG = [
     experimental: true,
   },
   {
+    id: 'maptile-browser',
+    name: 'MapTile Browser',
+    description: 'Leaflet map for browsing harvested MinIO GeoJSON map tiles through the maptile API.',
+    entryHtml: 'MapTileBrowser.html',
+    iconPath: '/assets/icons/cpnf-corners.svg',
+    color: '#1E3A8A',
+    accent: '#DBEAFE',
+    glyph: 'MT',
+    section: 'Research',
+    experimental: true,
+  },
+  {
     id: 'pointforge-transformer',
     name: 'PointForge',
     description: 'Builds the canonical point set (coords + provenance + weights).',
