@@ -156,3 +156,33 @@ test('runIdahoHarvestWorker exits immediately when WORKERS_ENABLED is false', as
   assert.equal(fetchCalls, 0);
 });
 
+test('runIdahoHarvestWorker defaults parcel harvest layer to 23 for lot features', async () => {
+  const store = createMemoryObjectStore();
+  const queriedLayers = [];
+  const fakeClient = {
+    fetchImpl: async (url) => {
+      const layer = new URL(url).pathname.split('/').slice(-2, -1)[0];
+      queriedLayers.push(layer);
+      return { ok: true, json: async () => ({ features: [] }) };
+    },
+    config: {
+      adaMapServer: 'http://example.test/map',
+    },
+  };
+
+  await runIdahoHarvestWorker({
+    env: {
+      IDAHO_HARVEST_BATCH_SIZE: '100',
+      IDAHO_HARVEST_MINIO_DEFAULT_BUCKET: 'tile-server',
+      IDAHO_HARVEST_MINIO_PARCELS_BUCKET: 'tile-server',
+      IDAHO_HARVEST_MINIO_CPNF_BUCKET: 'cpnfs',
+      IDAHO_HARVEST_MINIO_TILE_BUCKET: 'tile-server',
+      IDAHO_HARVEST_MINIO_INDEX_BUCKET: 'tile-server',
+      IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET: 'tile-server',
+    },
+    client: fakeClient,
+    store,
+  });
+
+  assert.deepEqual(queriedLayers, ['23', '18']);
+});

@@ -75,7 +75,7 @@ Harvest cycles now rotate dataset processing order between parcels and CPNF so C
 - `IDAHO_HARVEST_RANDOM_DELAY_MIN_MS` (default: `120000` = 2 minutes)
 - `IDAHO_HARVEST_RANDOM_DELAY_MAX_MS` (default: `600000` = 10 minutes)
 - `IDAHO_HARVEST_POLL_INTERVAL_MS` (fixed delay used only when randomized throttling is disabled; default: `1000`)
-- `IDAHO_HARVEST_PARCEL_LAYER` (default: `24`)
+- `IDAHO_HARVEST_PARCEL_LAYER` (default: `23`)
 - `IDAHO_HARVEST_CPNF_LAYER` (default: `18`)
 - `IDAHO_HARVEST_CPNF_PDF_BASE_URL` (optional base URL used to resolve relative CPNF PDF paths before download)
 - `STACKHERO_MINIO_HOST` (required; worker will fail fast when MinIO is not configured)
