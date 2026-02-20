@@ -215,8 +215,15 @@ export async function runIdahoHarvestCycle({
 
   const checkpoint = await readJsonObjectInBucket(objectStore, checkpointBucket, checkpointKey, {
     state: stateAbbr,
+    nextDatasetIndex: 0,
     datasets: Object.fromEntries(datasets.map((dataset) => [dataset.name, { offset: 0, done: false }])),
   });
+
+  const datasetCount = datasets.length;
+  const rawNextDatasetIndex = Number(checkpoint?.nextDatasetIndex);
+  const nextDatasetIndex = Number.isInteger(rawNextDatasetIndex) && rawNextDatasetIndex >= 0
+    ? (datasetCount ? (rawNextDatasetIndex % datasetCount) : 0)
+    : 0;
 
   const indexDoc = await readJsonObjectInBucket(objectStore, indexBucket, indexKey, {
     type: 'FeatureCollection',
@@ -259,7 +266,10 @@ export async function runIdahoHarvestCycle({
 
   let changed = false;
 
-  for (const dataset of datasets) {
+  const datasetOrder = datasets.map((_, index) => (nextDatasetIndex + index) % (datasetCount || 1));
+
+  for (const datasetIndex of datasetOrder) {
+    const dataset = datasets[datasetIndex];
     const state = checkpoint.datasets[dataset.name] || { offset: 0, done: false };
     if (state.done) continue;
 
@@ -325,6 +335,7 @@ export async function runIdahoHarvestCycle({
       done: false,
       updatedAt: new Date().toISOString(),
     };
+    checkpoint.nextDatasetIndex = datasetCount ? ((datasetIndex + 1) % datasetCount) : 0;
     changed = true;
     break;
   }
