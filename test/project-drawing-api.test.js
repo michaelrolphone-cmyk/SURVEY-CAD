@@ -100,6 +100,28 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(relinkedPointFile.pointFile.currentState.text, 'p-1,3,2,,,\np-2,5,8,,,');
     assert.equal(relinkedPointFile.pointFile.versions.length, 1);
 
+    const editLinkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points-relinked`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileName: 'Boundary Points Relinked.csv',
+        pointFileState: {
+          text: '200,1000.5,2000.5,5.25,IP,Imported from PointForge',
+          exportFormat: 'csv',
+        },
+      }),
+    });
+    assert.equal(editLinkedPointFileRes.status, 200);
+
+    const getAfterPointFileEditRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`);
+    assert.equal(getAfterPointFileEditRes.status, 200);
+    const loadedAfterPointFileEdit = await getAfterPointFileEditRes.json();
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points.length, 1);
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].id, '200');
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].x, 1000.5);
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].y, 2000.5);
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].code, 'IP');
+
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`, {
       method: 'DELETE',
     });

@@ -1504,7 +1504,8 @@
           "404": {
             "$ref": "#/components/responses/Error404"
           }
-        }
+        },
+        "description": "Returns the full drawing record. When linkedPointFileId is set, currentState.points is hydrated from the latest linked project point-file text so external point-file edits are reflected when LineSmith loads the drawing."
       },
       "put": {
         "tags": [

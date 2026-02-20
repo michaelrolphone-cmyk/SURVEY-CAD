@@ -16,6 +16,7 @@ test('server OpenAPI spec documents project drawing CRUD endpoints', async () =>
   const itemPath = spec?.paths?.['/api/projects/{projectId}/drawings/{drawingId}'];
   assert.ok(itemPath, 'spec should include item drawing path');
   assert.ok(itemPath.get, 'item path should include GET');
+  assert.match(itemPath.get.description || '', /hydrated from the latest linked project point-file text/i, 'GET drawing description should document point-file hydration semantics');
   assert.ok(itemPath.put, 'item path should include PUT');
   assert.ok(itemPath.patch, 'item path should include PATCH');
   assert.ok(itemPath.delete, 'item path should include DELETE');

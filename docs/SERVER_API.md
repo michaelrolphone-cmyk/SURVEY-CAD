@@ -934,7 +934,7 @@ Create a drawing record for a project. Optionally attach `pointFileLink` to keep
 
 ### `GET /api/projects/:projectId/drawings/:drawingId`
 
-Fetch the full drawing record and reconstructed latest state.
+Fetch the full drawing record and reconstructed latest state. If the drawing is linked to a point file, the response hydrates `drawing.currentState.points` from the latest linked point-file text so LineSmith opens with externally edited point-file changes.
 
 **Response `200`:**
 ```json

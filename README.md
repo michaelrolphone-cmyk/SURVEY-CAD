@@ -159,7 +159,7 @@ Dedicated drawing CRUD endpoints are now available for project-scoped LineSmith 
 
 - `GET /api/projects/:projectId/drawings` – list drawing summaries for a project.
 - `POST /api/projects/:projectId/drawings` – create a drawing record (or named drawing id) from `drawingState`; optional `pointFileLink` associates drawing points with a project point file for auto-versioned sync on every save.
-- `GET /api/projects/:projectId/drawings/:drawingId` – fetch full drawing record + reconstructed `currentState`.
+- `GET /api/projects/:projectId/drawings/:drawingId` – fetch full drawing record + reconstructed `currentState`; when a drawing is linked to a point file, `currentState.points` is hydrated from the latest linked point-file text so external point-file edits load in LineSmith.
 - `PUT /api/projects/:projectId/drawings/:drawingId` (or `PATCH`) – append a new differential version for an existing drawing.
 - `DELETE /api/projects/:projectId/drawings/:drawingId` – remove the drawing record from the project.
 
@@ -193,7 +193,7 @@ Request body for create/update:
 }
 ```
 
-When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points. You can switch which point file a drawing uses by sending a new `pointFileLink` in `PATCH /api/projects/:projectId/drawings/:drawingId` without resending `drawingState`.
+When `pointFileLink` is set, drawing saves also update `PUT/PATCH /api/projects/:projectId/point-files/:pointFileId` semantics automatically by appending a point-file version from the drawing's latest points. You can switch which point file a drawing uses by sending a new `pointFileLink` in `PATCH /api/projects/:projectId/drawings/:drawingId` without resending `drawingState`. If the linked point file is edited elsewhere in the app, the next `GET /api/projects/:projectId/drawings/:drawingId` returns drawing points hydrated from that updated point file.
 
 EvidenceDesk now hydrates its **Drawings** folder from the drawing CRUD API (`GET /api/projects/:projectId/drawings`) and fetches selected drawing history records from `GET /api/projects/:projectId/drawings/:drawingId` before launching LineSmith, so project browser drawing lists stay API-backed rather than relying only on legacy local-storage indexes.
 

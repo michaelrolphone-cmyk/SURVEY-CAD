@@ -217,6 +217,80 @@ function buildPointFileTextFromDrawingState(drawingState = {}) {
     .join('\n');
 }
 
+function parseCsvLine(line = '') {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      values.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  values.push(current);
+  return values;
+}
+
+function toFiniteNumberOrRaw(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const number = Number(raw);
+  return Number.isFinite(number) ? number : raw;
+}
+
+function buildDrawingPointsFromPointFileText(text = '') {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => parseCsvLine(line))
+    .filter((parts) => parts.length >= 3)
+    .map((parts) => {
+      const [id, x, y, z, code, notes] = parts;
+      const point = {
+        id: String(id || '').trim(),
+        x: toFiniteNumberOrRaw(x),
+        y: toFiniteNumberOrRaw(y),
+      };
+      const normalizedZ = String(z || '').trim();
+      if (normalizedZ) point.z = toFiniteNumberOrRaw(normalizedZ);
+      if (String(code || '').trim()) point.code = String(code || '').trim();
+      if (String(notes || '').trim()) point.notes = String(notes || '').trim();
+      return point;
+    });
+}
+
+async function hydrateDrawingStateFromLinkedPointFile(store, drawing = null) {
+  if (!drawing || !drawing.currentState || typeof drawing.currentState !== 'object') return drawing;
+  const linkedProjectId = String(drawing.linkedPointFileProjectId || '').trim();
+  const linkedPointFileId = String(drawing.linkedPointFileId || '').trim();
+  if (!linkedProjectId || !linkedPointFileId) return drawing;
+
+  const linkedPointFile = await getProjectPointFile(store, linkedProjectId, linkedPointFileId);
+  if (!linkedPointFile?.currentState?.text) return drawing;
+
+  const linkedPoints = buildDrawingPointsFromPointFileText(linkedPointFile.currentState.text);
+  return {
+    ...drawing,
+    currentState: {
+      ...drawing.currentState,
+      points: linkedPoints,
+    },
+  };
+}
+
 async function syncDrawingLinkedPointFile(store, drawingRecord = {}) {
   const linkedProjectId = String(drawingRecord?.linkedPointFileProjectId || '').trim();
   const linkedPointFileId = String(drawingRecord?.linkedPointFileId || '').trim();
@@ -1247,7 +1321,8 @@ export function createSurveyServer({
             sendJson(res, 404, { error: 'Drawing not found.' });
             return;
           }
-          sendJson(res, 200, { drawing });
+          const hydratedDrawing = await hydrateDrawingStateFromLinkedPointFile(localStorageSyncStore, drawing);
+          sendJson(res, 200, { drawing: hydratedDrawing });
           return;
         }
 
