@@ -173,6 +173,18 @@
       outline-offset: 2px;
     }
 
+    .folder-row.folder-upload-drop-target {
+      border-color: rgba(74, 222, 128, 0.6);
+      box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.35);
+    }
+
+    .file-list-container.file-list-upload-drop-target {
+      border-radius: 8px;
+      background: rgba(74, 222, 128, 0.06);
+      outline: 1px dashed rgba(74, 222, 128, 0.45);
+      outline-offset: 2px;
+    }
+
     .file-meta {
       display: flex;
       align-items: center;
@@ -1755,30 +1767,43 @@
         folderRow.dataset.folderKey = folder.key;
         folderRow.innerHTML = `<span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
         folderRow.addEventListener('dragover', (event) => {
-          const dragType = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-          if (!dragType.includes('application/x-surveycad-resource-move')) return;
-          event.preventDefault();
-          folderRow.classList.add('folder-drop-target');
+          const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
+          if (dragTypes.includes('application/x-surveycad-resource-move')) {
+            event.preventDefault();
+            folderRow.classList.add('folder-drop-target');
+            return;
+          }
+          if (dragTypes.includes('Files')) {
+            event.preventDefault();
+            folderRow.classList.add('folder-upload-drop-target');
+          }
         });
         folderRow.addEventListener('dragleave', () => {
           folderRow.classList.remove('folder-drop-target');
+          folderRow.classList.remove('folder-upload-drop-target');
         });
         folderRow.addEventListener('drop', async (event) => {
           event.preventDefault();
           folderRow.classList.remove('folder-drop-target');
+          folderRow.classList.remove('folder-upload-drop-target');
           const payloadRaw = event.dataTransfer?.getData('application/x-surveycad-resource-move');
-          if (!payloadRaw) return;
-          let payload = null;
-          try {
-            payload = JSON.parse(payloadRaw);
-          } catch {
+          if (payloadRaw) {
+            let payload = null;
+            try {
+              payload = JSON.parse(payloadRaw);
+            } catch {
+              return;
+            }
+            if (!payload?.resourceId || !payload?.sourceFolderKey || payload.sourceFolderKey === folder.key) return;
+            const sourceFolder = projectFile.folders.find((candidate) => candidate.key === payload.sourceFolderKey);
+            const draggedEntry = sourceFolder?.index?.find((candidate) => candidate?.id === payload.resourceId);
+            if (!sourceFolder || !draggedEntry) return;
+            await moveResourceFromEvidenceDesk(sourceFolder, folder, draggedEntry, projectContext);
             return;
           }
-          if (!payload?.resourceId || !payload?.sourceFolderKey || payload.sourceFolderKey === folder.key) return;
-          const sourceFolder = projectFile.folders.find((candidate) => candidate.key === payload.sourceFolderKey);
-          const draggedEntry = sourceFolder?.index?.find((candidate) => candidate?.id === payload.resourceId);
-          if (!sourceFolder || !draggedEntry) return;
-          await moveResourceFromEvidenceDesk(sourceFolder, folder, draggedEntry, projectContext);
+          if (event.dataTransfer?.files?.length) {
+            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext);
+          }
         });
 
         if (folder.key === 'cpfs') {
@@ -1801,31 +1826,44 @@
         const fileListContainer = document.createElement('div');
         fileListContainer.className = 'file-list-container';
         fileListContainer.addEventListener('dragover', (event) => {
-          const dragType = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-          if (!dragType.includes('application/x-surveycad-resource-move')) return;
-          event.preventDefault();
-          fileListContainer.classList.add('file-list-drop-target');
+          const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
+          if (dragTypes.includes('application/x-surveycad-resource-move')) {
+            event.preventDefault();
+            fileListContainer.classList.add('file-list-drop-target');
+            return;
+          }
+          if (dragTypes.includes('Files')) {
+            event.preventDefault();
+            fileListContainer.classList.add('file-list-upload-drop-target');
+          }
         });
         fileListContainer.addEventListener('dragleave', (event) => {
           if (fileListContainer.contains(event.relatedTarget)) return;
           fileListContainer.classList.remove('file-list-drop-target');
+          fileListContainer.classList.remove('file-list-upload-drop-target');
         });
         fileListContainer.addEventListener('drop', async (event) => {
           event.preventDefault();
           fileListContainer.classList.remove('file-list-drop-target');
+          fileListContainer.classList.remove('file-list-upload-drop-target');
           const payloadRaw = event.dataTransfer?.getData('application/x-surveycad-resource-move');
-          if (!payloadRaw) return;
-          let payload = null;
-          try {
-            payload = JSON.parse(payloadRaw);
-          } catch {
+          if (payloadRaw) {
+            let payload = null;
+            try {
+              payload = JSON.parse(payloadRaw);
+            } catch {
+              return;
+            }
+            if (!payload?.resourceId || !payload?.sourceFolderKey || payload.sourceFolderKey === folder.key) return;
+            const sourceFolder = projectFile.folders.find((candidate) => candidate.key === payload.sourceFolderKey);
+            const draggedEntry = sourceFolder?.index?.find((candidate) => candidate?.id === payload.resourceId);
+            if (!sourceFolder || !draggedEntry) return;
+            await moveResourceFromEvidenceDesk(sourceFolder, folder, draggedEntry, projectContext);
             return;
           }
-          if (!payload?.resourceId || !payload?.sourceFolderKey || payload.sourceFolderKey === folder.key) return;
-          const sourceFolder = projectFile.folders.find((candidate) => candidate.key === payload.sourceFolderKey);
-          const draggedEntry = sourceFolder?.index?.find((candidate) => candidate?.id === payload.resourceId);
-          if (!sourceFolder || !draggedEntry) return;
-          await moveResourceFromEvidenceDesk(sourceFolder, folder, draggedEntry, projectContext);
+          if (event.dataTransfer?.files?.length) {
+            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext);
+          }
         });
         treeContainer.appendChild(fileListContainer);
 
