@@ -1085,6 +1085,23 @@
       return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(format);
     }
 
+    function getMimeTypeFromFormat(format) {
+      const mimeMap = {
+        pdf: 'application/pdf',
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        bmp: 'image/bmp',
+        svg: 'image/svg+xml',
+        csv: 'text/csv',
+        txt: 'text/plain',
+        json: 'application/json',
+      };
+      return mimeMap[String(format).toLowerCase()] || 'application/octet-stream';
+    }
+
     function attachImagePreview(resource, entry) {
       if (entry?.reference?.type !== 'server-upload') return;
       if (!isImageResource(entry)) return;
@@ -1889,7 +1906,16 @@
                 resourceId: entry.id,
                 sourceFolderKey: folder.key,
               }));
-              if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+              if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copyMove';
+              if (entry?.reference?.type === 'server-upload' && event.dataTransfer) {
+                const serverDownloadUrl = String(entry.reference.value || '').trim();
+                if (serverDownloadUrl) {
+                  const mimeType = getMimeTypeFromFormat(entry?.exportFormat || '');
+                  const fileName = entry?.title || `${entry.id}.${entry.exportFormat}`;
+                  const absoluteUrl = new URL(serverDownloadUrl, window.location.origin).href;
+                  event.dataTransfer.setData('DownloadURL', `${mimeType}:${fileName}:${absoluteUrl}`);
+                }
+              }
             });
             resource.addEventListener('dragend', () => {
               resource.classList.remove('file-dragging');
