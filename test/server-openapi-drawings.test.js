@@ -16,10 +16,20 @@ test('server OpenAPI spec documents project drawing CRUD endpoints', async () =>
   const itemPath = spec?.paths?.['/api/projects/{projectId}/drawings/{drawingId}'];
   assert.ok(itemPath, 'spec should include item drawing path');
   assert.ok(itemPath.get, 'item path should include GET');
+  assert.match(itemPath.get.description || '', /hydrated from the latest linked project point-file text/i, 'GET drawing description should document point-file hydration semantics');
   assert.ok(itemPath.put, 'item path should include PUT');
   assert.ok(itemPath.patch, 'item path should include PATCH');
   assert.ok(itemPath.delete, 'item path should include DELETE');
 
   assert.ok(spec?.components?.schemas?.LineSmithDrawingRecord, 'spec should include LineSmithDrawingRecord schema');
   assert.ok(spec?.components?.schemas?.LineSmithDrawingMutationRequest, 'spec should include drawing mutation request schema');
+  assert.ok(spec?.components?.schemas?.LineSmithDrawingPointFileLink, 'spec should include drawing point-file link schema');
+
+  const drawingMutation = spec.components.schemas.LineSmithDrawingMutationRequest;
+  assert.equal(drawingMutation?.properties?.pointFileLink?.$ref, '#/components/schemas/LineSmithDrawingPointFileLink');
+
+  const drawingRecord = spec.components.schemas.LineSmithDrawingRecord;
+  assert.equal(drawingRecord?.properties?.linkedPointFileId?.type, 'string');
+
+  assert.ok(!Array.isArray(drawingMutation?.required) || !drawingMutation.required.includes('drawingState'), 'drawingState should be optional in mutation schema for relink PATCH flows');
 });

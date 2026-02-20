@@ -888,7 +888,7 @@ List drawing summaries for a project.
 
 ### `POST /api/projects/:projectId/drawings`
 
-Create a drawing record for a project.
+Create a drawing record for a project. Optionally attach `pointFileLink` to keep drawing point edits synchronized into a project point file with version history.
 
 **Request Body:**
 ```json
@@ -897,6 +897,10 @@ Create a drawing record for a project.
   "drawingState": {
     "points": [{ "id": "p-1", "x": 1000, "y": 2000 }],
     "mapGeoreference": { "origin": [0, 0] }
+  },
+  "pointFileLink": {
+    "pointFileId": "boundary-points",
+    "pointFileName": "Boundary Points.csv"
   }
 }
 ```
@@ -912,6 +916,9 @@ Create a drawing record for a project.
     "createdAt": "2026-02-18T00:00:00.000Z",
     "updatedAt": "2026-02-18T00:00:00.000Z",
     "latestMapGeoreference": { "origin": [0, 0] },
+    "linkedPointFileProjectId": "proj-1",
+    "linkedPointFileId": "boundary-points",
+    "linkedPointFileName": "Boundary Points.csv",
     "versions": [
       {
         "versionId": "v-1739836800000",
@@ -927,7 +934,7 @@ Create a drawing record for a project.
 
 ### `GET /api/projects/:projectId/drawings/:drawingId`
 
-Fetch the full drawing record and reconstructed latest state.
+Fetch the full drawing record and reconstructed latest state. If the drawing is linked to a point file, the response hydrates `drawing.currentState.points` from the latest linked point-file text so LineSmith opens with externally edited point-file changes.
 
 **Response `200`:**
 ```json
@@ -941,7 +948,7 @@ Fetch the full drawing record and reconstructed latest state.
 ### `PUT /api/projects/:projectId/drawings/:drawingId`
 ### `PATCH /api/projects/:projectId/drawings/:drawingId`
 
-Append a new drawing version using differential patching from the prior version.
+Append a new drawing version using differential patching from the prior version. If the drawing has a linked point file (from `pointFileLink`), every save also appends a new version in that point file using the latest drawing point rows. `drawingState` may be omitted for PUT/PATCH to keep existing geometry while only changing `drawingName` and/or `pointFileLink` (for relinking).
 
 **Request Body:**
 ```json

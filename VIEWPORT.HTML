@@ -1507,6 +1507,11 @@
         <button id="openProjectDrawing">Open Project Drawing…</button>
         <button id="restoreDrawingVersion">Restore Saved Version…</button>
       </div>
+      <div class="row" style="margin-top:8px; gap:8px;">
+        <button id="chooseDrawingPointFile" type="button">Choose Point File…</button>
+        <button id="clearDrawingPointFile" type="button">Clear Point File Link</button>
+      </div>
+      <div class="hint mini" id="drawingPointFileHint">Point file link: none</div>
       <div class="row" style="margin-top:8px;">
         <button id="openArrowHead" class="ok" style="flex:1;">Open ArrowHead AR</button>
       </div>
@@ -2096,6 +2101,7 @@
   const collabRoomParam = queryParams.get("drawingId") || queryParams.get("collabRoom") || "";
   let activeDrawingStorageKey = "";
   let activeDrawingId = "";
+  let activeDrawingPointFileLink = null;
   let lastSavedDrawingSnapshot = "";
 
   const collab = {
@@ -9556,6 +9562,109 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     return `/api/projects/${encodedProjectId}/drawings/${encodeURIComponent(drawingId)}`;
   }
 
+  function normalizePointFileId(pointFileId = "") {
+    return String(pointFileId || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function buildProjectPointFileApiUrl(projectId, pointFileId = "") {
+    if (!projectId) return "";
+    const encodedProjectId = encodeURIComponent(projectId);
+    if (!pointFileId) return `/api/projects/${encodedProjectId}/point-files`;
+    return `/api/projects/${encodedProjectId}/point-files/${encodeURIComponent(pointFileId)}`;
+  }
+
+  function renderDrawingPointFileHint() {
+    const hint = $("#drawingPointFileHint");
+    if (!hint) return;
+    const pointFileId = String(activeDrawingPointFileLink?.pointFileId || "").trim();
+    if (!pointFileId) {
+      hint.textContent = "Point file link: none";
+      return;
+    }
+    const pointFileName = String(activeDrawingPointFileLink?.pointFileName || pointFileId).trim();
+    hint.textContent = `Point file link: ${pointFileName} (${pointFileId})`;
+  }
+
+  function setActiveDrawingPointFileLink(link = null) {
+    const normalizedPointFileId = normalizePointFileId(link?.pointFileId || "");
+    if (!normalizedPointFileId) {
+      activeDrawingPointFileLink = null;
+      renderDrawingPointFileHint();
+      return;
+    }
+    activeDrawingPointFileLink = {
+      projectId: String(link?.projectId || activeProjectId || "").trim(),
+      pointFileId: normalizedPointFileId,
+      pointFileName: String(link?.pointFileName || normalizedPointFileId).trim(),
+    };
+    renderDrawingPointFileHint();
+  }
+
+  function setActiveDrawingPointFileLinkFromDrawingRecord(drawing = null) {
+    const pointFileId = String(drawing?.linkedPointFileId || "").trim();
+    if (!pointFileId) {
+      setActiveDrawingPointFileLink(null);
+      return;
+    }
+    setActiveDrawingPointFileLink({
+      projectId: drawing?.linkedPointFileProjectId || activeProjectId,
+      pointFileId,
+      pointFileName: drawing?.linkedPointFileName || pointFileId,
+    });
+  }
+
+  async function listProjectPointFilesForDrawingLink(projectId) {
+    if (!projectId) return [];
+    try {
+      const response = await fetch(buildProjectPointFileApiUrl(projectId));
+      if (!response.ok) return [];
+      const payload = await response.json();
+      if (!Array.isArray(payload?.pointFiles)) return [];
+      return payload.pointFiles
+        .filter((pointFile) => pointFile && typeof pointFile === "object")
+        .map((pointFile) => ({
+          pointFileId: String(pointFile.pointFileId || "").trim(),
+          pointFileName: String(pointFile.pointFileName || pointFile.pointFileId || "").trim(),
+        }))
+        .filter((pointFile) => pointFile.pointFileId);
+    } catch {
+      return [];
+    }
+  }
+
+  async function promptChooseDrawingPointFile() {
+    if (!activeProjectId) {
+      setStatus("Open LineSmith from an active project to choose linked point files.", "warn");
+      return false;
+    }
+    const pointFiles = await listProjectPointFilesForDrawingLink(activeProjectId);
+    if (!pointFiles.length) {
+      setStatus("No project point files are available to link for this drawing.", "warn");
+      return false;
+    }
+    const optionList = pointFiles.map((pointFile, index) => `${index + 1}. ${pointFile.pointFileName} (${pointFile.pointFileId})`).join("\n");
+    const selection = window.prompt(`Use which point file for this drawing?\n${optionList}`, "1");
+    if (selection == null) return false;
+    const selectedIndex = Number.parseInt(String(selection).trim(), 10) - 1;
+    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= pointFiles.length) {
+      setStatus("Enter a valid point-file number from the list.", "warn");
+      return false;
+    }
+    const selectedPointFile = pointFiles[selectedIndex];
+    setActiveDrawingPointFileLink({
+      projectId: activeProjectId,
+      pointFileId: selectedPointFile.pointFileId,
+      pointFileName: selectedPointFile.pointFileName,
+    });
+    setStatus(`Linked drawing to point file "${selectedPointFile.pointFileName}". Save the drawing to persist.`, "ok");
+    return true;
+  }
+
   async function fetchProjectDrawingById(projectId, drawingId) {
     if (!projectId || !drawingId) return null;
     const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId));
@@ -9717,6 +9826,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     const state = materializeDrawingVersion(record, versionIndex);
     if (!state) return false;
     restoreState(JSON.stringify(state));
+    setActiveDrawingPointFileLinkFromDrawingRecord(record);
     markDrawingAsSaved();
     return true;
   }
@@ -9725,6 +9835,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     const state = drawing?.currentState;
     if (!state || typeof state !== 'object') return false;
     restoreState(JSON.stringify(state));
+    setActiveDrawingPointFileLinkFromDrawingRecord(drawing);
     markDrawingAsSaved();
     return true;
   }
@@ -9814,11 +9925,12 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       const response = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ drawingId, drawingName, drawingState: currentState }),
+        body: JSON.stringify({ drawingId, drawingName, drawingState: currentState, pointFileLink: activeDrawingPointFileLink || null }),
       });
       if (!response.ok) throw new Error('api-save-failed');
       const payload = await response.json();
       record = payload?.drawing || null;
+      setActiveDrawingPointFileLinkFromDrawingRecord(record);
       localStorage.setItem(storageKey, JSON.stringify(record));
     } catch {
       const now = new Date().toISOString();
@@ -9853,6 +9965,15 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
         });
       }
       record.latestMapGeoreference = sanitizeMapGeoreference(currentState.mapGeoreference);
+      if (activeDrawingPointFileLink?.pointFileId) {
+        record.linkedPointFileProjectId = activeDrawingPointFileLink.projectId || activeProjectId;
+        record.linkedPointFileId = activeDrawingPointFileLink.pointFileId;
+        record.linkedPointFileName = activeDrawingPointFileLink.pointFileName || activeDrawingPointFileLink.pointFileId;
+      } else {
+        record.linkedPointFileProjectId = null;
+        record.linkedPointFileId = null;
+        record.linkedPointFileName = null;
+      }
       localStorage.setItem(storageKey, JSON.stringify(record));
     }
 
@@ -10001,7 +10122,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       let restored = false;
       if (payloadDrawingId && activeProjectId) {
         const drawing = await fetchProjectDrawingById(activeProjectId, payloadDrawingId);
-        if (drawing) {
+      if (drawing) {
           restored = restoreDrawingFromApiRecord(drawing);
           if (restored) {
             activeDrawingId = drawing.drawingId || payloadDrawingId;
@@ -10023,6 +10144,10 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       if (activeDrawingId) saveCrewActiveDrawingPreference(activeProjectId, activeDrawingId);
       const drawingName = String(payload?.drawingName || "").trim();
       if (drawingName) $("#drawingName").value = drawingName;
+      if (!payloadDrawingId && storageKey) {
+        const storedRecord = loadStoredDrawingRecord(storageKey);
+        if (storedRecord) setActiveDrawingPointFileLinkFromDrawingRecord(storedRecord);
+      }
       localStorage.removeItem(PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY);
       setStatus(`Opened drawing "${drawingName || "Project Drawing"}" from Project Browser.`, "ok");
       return true;
@@ -10060,6 +10185,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     const record = loadStoredDrawingRecord(storageKey);
     const drawingName = String(record?.drawingName || "").trim();
     if (drawingName) $("#drawingName").value = drawingName;
+    setActiveDrawingPointFileLinkFromDrawingRecord(record);
     reconnectCollaborationForActiveDrawing();
     setStatus(`Opened last drawing for project ${activeProjectName || activeProjectId}.`, "ok");
     return true;
@@ -10068,6 +10194,11 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   $("#saveDrawingToProject").addEventListener("click", () => { void saveDrawingToProject(); });
   $("#openProjectDrawing").addEventListener("click", () => { void promptOpenProjectDrawing(); });
   $("#restoreDrawingVersion").addEventListener("click", promptRestoreDrawingVersion);
+  $("#chooseDrawingPointFile")?.addEventListener("click", () => { void promptChooseDrawingPointFile(); });
+  $("#clearDrawingPointFile")?.addEventListener("click", () => {
+    setActiveDrawingPointFileLink(null);
+    setStatus("Cleared drawing point-file link. Save the drawing to persist.", "ok");
+  });
   $("#openArrowHead")?.addEventListener("click", openArrowHeadFromLineSmith);
 
   $("#csvIn").addEventListener("change", async (e) => {
@@ -12506,6 +12637,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
           ? `Project-linked saves enabled for ${activeProjectName || activeProjectId}.`
           : "Open LineSmith from an active SurveyFoundry project to enable project-linked drawing saves.";
       }
+      renderDrawingPointFileHint();
 
       setLineSmithLoadingStage("Restoring saved drawing state…");
       const openedFromProjectBrowser = await tryImportProjectBrowserDrawingPayload();
