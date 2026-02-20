@@ -46,6 +46,34 @@ test('computeFeatureCenter supports ring geometries', () => {
   assert.equal(center.lat, 1);
 });
 
+test('arcgisGeometryToGeoJson normalizes Web Mercator geometries to lon/lat', () => {
+  const geometry = arcgisGeometryToGeoJson({
+    x: -12935580.863206567,
+    y: 5406054.57397459,
+    spatialReference: { wkid: 3857 },
+  });
+
+  assert.equal(geometry.type, 'Point');
+  assert.ok(Math.abs(geometry.coordinates[0] - (-116.2023)) < 0.001);
+  assert.ok(Math.abs(geometry.coordinates[1] - 43.615) < 0.001);
+});
+
+test('computeFeatureCenter normalizes Web Mercator rings to lon/lat center', () => {
+  const center = computeFeatureCenter({
+    geometry: {
+      spatialReference: { wkid: 3857 },
+      rings: [[
+        [-12935680.863206567, 5405954.57397459],
+        [-12935480.863206567, 5405954.57397459],
+        [-12935480.863206567, 5406154.57397459],
+        [-12935680.863206567, 5406154.57397459],
+      ]],
+    },
+  });
+
+  assert.ok(Math.abs(center.lon - (-116.2023)) < 0.001);
+  assert.ok(Math.abs(center.lat - 43.615) < 0.001);
+});
 test('createMinioObjectStore uses MinIO bucket-aware getObject/putObject', async () => {
   const calls = [];
   const minioClient = {
