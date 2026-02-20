@@ -28,6 +28,9 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /function\s+stopDragAutoScroll\(\)\s*\{[\s\S]*document\.removeEventListener\('dragover',[\s\S]*cancelAnimationFrame/, 'EvidenceDesk should provide a stopDragAutoScroll helper that cancels the scroll loop and cleans up the dragover listener.');
   assert.match(html, /resource\.addEventListener\('dragstart',[\s\S]*startDragAutoScroll\(\)/, 'EvidenceDesk should start auto-scroll when a file drag begins.');
   assert.match(html, /resource\.addEventListener\('dragend',[\s\S]*stopDragAutoScroll\(\)/, 'EvidenceDesk should stop auto-scroll when a file drag ends.');
+  assert.match(html, /function\s+buildFileDragImage\(resource\)\s*\{[\s\S]*querySelector\('\.file-preview-slot img'\)/, 'EvidenceDesk should provide a drag image builder that reads the thumbnail from the file preview slot.');
+  assert.match(html, /event\.dataTransfer\.setDragImage\(dragImage,/, 'EvidenceDesk should apply a thumbnail-based drag image when a file preview is available.');
+  assert.match(html, /\.file-drag-ghost\s*\{[\s\S]*border-radius/, 'EvidenceDesk should style the thumbnail drag ghost as a rounded card.');
   assert.match(html, /folderRow\.addEventListener\('drop',\s*async\s*\(event\)\s*=>\s*\{[\s\S]*moveResourceFromEvidenceDesk\(/, 'EvidenceDesk folder rows should accept dropped file rows and trigger move workflow.');
   assert.match(html, /function\s+resolveServerUploadLocation\(entry,\s*fallbackFolderKey\s*=\s*''\)\s*\{[\s\S]*searchParams\.get\('folderKey'\)[\s\S]*searchParams\.get\('fileName'\)/, 'EvidenceDesk should derive server-upload folder/file metadata from download URLs when needed.');
   assert.match(html, /const\s+sendMoveRequest\s*=\s*async\s*\(folderKey,\s*fileName\)\s*=>\s*\{[\s\S]*fetch\(moveUrl\.toString\(\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*targetFolderKey/, 'EvidenceDesk should move server-upload records through PATCH project-files endpoint.');

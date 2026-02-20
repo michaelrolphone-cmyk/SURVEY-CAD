@@ -310,6 +310,25 @@
       flex: none;
     }
 
+    .file-drag-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      background: #0f172a;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+    }
+
+    .file-drag-ghost img {
+      display: block;
+      width: 86px;
+      height: 86px;
+      border-radius: 6px;
+      object-fit: cover;
+    }
+
     .file-name-configured {
       color: #f8fafc;
       font-weight: 600;
@@ -1069,6 +1088,21 @@
         cancelAnimationFrame(_dragScrollRaf);
         _dragScrollRaf = null;
       }
+    }
+
+    function buildFileDragImage(resource) {
+      const thumbImg = resource.querySelector('.file-preview-slot img');
+      if (!thumbImg || !thumbImg.src) return null;
+      const ghost = document.createElement('div');
+      ghost.className = 'file-drag-ghost';
+      ghost.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+      const img = document.createElement('img');
+      img.src = thumbImg.src;
+      img.width = 86;
+      img.height = 86;
+      ghost.appendChild(img);
+      document.body.appendChild(ghost);
+      return ghost;
     }
 
     async function moveResourceFromEvidenceDesk(sourceFolder, targetFolder, entry, projectContext = {}) {
@@ -1955,6 +1989,11 @@
                 sourceFolderKey: folder.key,
               }));
               if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copyMove';
+              const dragImage = buildFileDragImage(resource);
+              if (dragImage && event.dataTransfer) {
+                event.dataTransfer.setDragImage(dragImage, 49, 49);
+                requestAnimationFrame(() => dragImage.remove());
+              }
               if (entry?.reference?.type === 'server-upload' && event.dataTransfer) {
                 const serverDownloadUrl = String(entry.reference.value || '').trim();
                 if (serverDownloadUrl) {
