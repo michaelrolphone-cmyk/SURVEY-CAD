@@ -58,6 +58,8 @@ test('project point file CRUD API stores differential versions and supports list
     assert.equal(listed.pointFiles.length, 1);
     assert.equal(listed.pointFiles[0].versionCount, 3);
     assert.equal(listed.pointFiles[0].pointFileName, 'Boundary Export Renamed.csv');
+    assert.equal(listed.pointFiles[0].source, 'pointforge');
+    assert.equal(listed.pointFiles[0].sourceLabel, 'Boundary Export');
 
     const getRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/${encodeURIComponent(pointFileId)}`);
     assert.equal(getRes.status, 200);

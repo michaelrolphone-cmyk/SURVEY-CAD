@@ -1742,6 +1742,9 @@ export function createSurveyServer({
             jobFileName: body.jobFileName || '',
             equipmentType: body.equipmentType || '',
             notes: body.notes || '',
+            pointFileId: body.pointFileId || '',
+            pointFileName: body.pointFileName || '',
+            pointFileProjectId: body.pointFileProjectId || '',
             createdAt: body.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };

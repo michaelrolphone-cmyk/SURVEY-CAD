@@ -729,6 +729,9 @@ List all equipment logs, or retrieve one by ID.
       "jobFileName": "site-survey-2026.job",
       "equipmentType": "Total Station",
       "notes": "Clear conditions",
+      "pointFileId": "audit-control",
+      "pointFileName": "Audit-Control.csv",
+      "pointFileProjectId": "audit-project",
       "createdAt": "2026-02-15T08:30:00.000Z",
       "updatedAt": "2026-02-15T16:00:00.000Z"
     }
@@ -749,7 +752,7 @@ List all equipment logs, or retrieve one by ID.
 
 ### `POST /api/equipment-logs`
 
-Create or update an equipment log entry.
+Create or update an equipment log entry, including optional linked project point-file metadata for EquipmentLog audit trails.
 
 **Request Body:**
 ```json
@@ -761,7 +764,10 @@ Create or update an equipment log entry.
   "teardownTime": "16:00",
   "jobFileName": "site-survey-2026.job",
   "equipmentType": "Total Station",
-  "notes": "Clear conditions"
+  "notes": "Clear conditions",
+  "pointFileId": "audit-control",
+  "pointFileName": "Audit-Control.csv",
+  "pointFileProjectId": "audit-project"
 }
 ```
 
@@ -776,6 +782,9 @@ Create or update an equipment log entry.
 | `jobFileName` | `string` | Yes* | `""` | Job/data collector filename |
 | `equipmentType` | `string` | No | `""` | Equipment category |
 | `notes` | `string` | No | `""` | Free-form notes |
+| `pointFileId` | `string` | No | `""` | Linked project point-file ID (from EquipmentLog attachment workflow) |
+| `pointFileName` | `string` | No | `""` | Attached point-file name shown in audit logs |
+| `pointFileProjectId` | `string` | No | `""` | Project ID where the attached point-file record is stored |
 | `createdAt` | `string` | No | Now (ISO 8601) | Creation timestamp |
 
 **Response `201`:**
@@ -1551,6 +1560,9 @@ EquipmentLog {
   jobFileName:     string
   equipmentType:   string
   notes:           string
+  pointFileId:     string
+  pointFileName:   string
+  pointFileProjectId: string
   createdAt:       string              // ISO 8601
   updatedAt:       string              // ISO 8601
 }

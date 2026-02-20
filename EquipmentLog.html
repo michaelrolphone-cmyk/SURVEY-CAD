@@ -102,6 +102,10 @@
             <input id="jobFileName" type="text" placeholder="e.g. 2024-0312_BoiseSurvey.job" />
           </div>
           <div class="form-group">
+            <label for="pointFileAttachment">Point File Attachment</label>
+            <input id="pointFileAttachment" type="file" accept=".csv,text/csv,.txt,text/plain" />
+          </div>
+          <div class="form-group">
             <label for="equipmentType">Equipment Type</label>
             <select id="equipmentType">
               <option value="">Select equipment…</option>
@@ -132,6 +136,7 @@
 
   <script type="module">
     import { buildEquipmentLogOptions } from './src/equipment-log-options.js';
+    import { buildEquipmentLogPointFilePayload } from './src/equipment-log-point-files.js';
 
     const STORAGE_KEY = 'surveyfoundryEquipmentLogs';
     const CREW_PROFILES_STORAGE_KEY = 'surveyfoundryCrewProfiles';
@@ -141,6 +146,7 @@
     const EQUIPMENT_LOGS_API_URL = '/api/equipment-logs';
     const CREW_API_URL = '/api/crew';
     const EQUIPMENT_API_URL = '/api/equipment';
+    const activeProjectId = new URLSearchParams(window.location.search).get('activeProjectId') || '';
 
     const fields = {
       rodman: document.getElementById('rodman'),
@@ -149,6 +155,7 @@
       setupTime: document.getElementById('setupTime'),
       teardownTime: document.getElementById('teardownTime'),
       jobFileName: document.getElementById('jobFileName'),
+      pointFileAttachment: document.getElementById('pointFileAttachment'),
       equipmentType: document.getElementById('equipmentType'),
       notes: document.getElementById('notes'),
     };
@@ -290,6 +297,7 @@
       fields.setupTime.value = log.setupTime || '';
       fields.teardownTime.value = log.teardownTime || '';
       fields.jobFileName.value = log.jobFileName || '';
+      fields.pointFileAttachment.value = '';
       renderEquipmentOptions(log.equipmentType || '');
       fields.equipmentType.value = log.equipmentType || '';
       fields.notes.value = log.notes || '';
@@ -331,6 +339,7 @@
             <div class="log-card-field"><strong>Teardown Time:</strong> ${formatDateTime(log.teardownTime)}</div>
             ${log.equipmentType ? `<div class="log-card-field"><span class="badge">${esc(log.equipmentType)}</span></div>` : ''}
           </div>
+          ${log.pointFileName ? `<div style="margin-top:8px;font-size:0.82rem;color:#9fb0cc;"><strong>Point File:</strong> ${esc(log.pointFileName)}</div>` : ''}
           ${log.notes ? `<div style="margin-top:8px;font-size:0.82rem;color:#9fb0cc;">${esc(log.notes)}</div>` : ''}
           <div style="margin-top:10px;display:flex;gap:6px;">
             <button class="teardown-btn${log.teardownTime ? ' teardown-btn' : ''}" data-id="${log.id}" data-action="teardown" type="button"${log.teardownTime ? ' disabled' : ''}>${log.teardownTime ? 'Teardown Recorded' : 'Record Teardown'}</button>
@@ -354,6 +363,43 @@
       };
     }
 
+
+    function normalizeServerPointFile(json) {
+      if (json && typeof json === 'object') {
+        if (json.pointFile && typeof json.pointFile === 'object') return json.pointFile;
+      }
+      return null;
+    }
+
+    async function uploadAttachmentToProjectPointFiles(log) {
+      const file = fields.pointFileAttachment.files?.[0];
+      if (!file) return null;
+      if (!activeProjectId) {
+        alert('Attach point files from Equipment Log requires an active project (open with ?activeProjectId=<project-id>).');
+        return null;
+      }
+
+      const text = await file.text();
+      const payload = buildEquipmentLogPointFilePayload({
+        projectId: activeProjectId,
+        fileName: file.name,
+        text,
+        log,
+      });
+      if (!payload) return null;
+
+      const response = await fetch(`/api/projects/${encodeURIComponent(activeProjectId)}/point-files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const err = await response.text().catch(() => '');
+        throw new Error(`Point file upload failed (${response.status}) ${err}`.trim());
+      }
+      const json = await response.json().catch(() => ({}));
+      return normalizeServerPointFile(json);
+    }
     saveBtn.addEventListener('click', async () => {
       const data = getFormData();
 
@@ -365,6 +411,14 @@
       const nowIso = new Date().toISOString();
       const wasEditing = !!editingId;
 
+      let attachmentSummary = null;
+      try {
+        attachmentSummary = await uploadAttachmentToProjectPointFiles(data);
+      } catch (error) {
+        alert(error.message || 'Unable to attach the selected point file.');
+        return;
+      }
+
       // UI lock
       const prevText = saveBtn.textContent;
       saveBtn.disabled = true;
@@ -374,7 +428,16 @@
         if (wasEditing) {
           const idx = logs.findIndex((l) => l.id === editingId);
           if (idx !== -1) {
-            logs[idx] = { ...logs[idx], ...data, updatedAt: nowIso };
+            logs[idx] = {
+              ...logs[idx],
+              ...data,
+              ...(attachmentSummary ? {
+                pointFileId: attachmentSummary.pointFileId || '',
+                pointFileName: attachmentSummary.pointFileName || '',
+                pointFileProjectId: activeProjectId || '',
+              } : {}),
+              updatedAt: nowIso,
+            };
           }
           saveLogs();
           clearForm();
@@ -387,6 +450,11 @@
         const newLocal = {
           id: localId,
           ...data,
+          ...(attachmentSummary ? {
+            pointFileId: attachmentSummary.pointFileId || '',
+            pointFileName: attachmentSummary.pointFileName || '',
+            pointFileProjectId: activeProjectId || '',
+          } : {}),
           createdAt: nowIso,
           updatedAt: nowIso,
         };
@@ -482,10 +550,10 @@
 
     exportCsvBtn.addEventListener('click', () => {
       if (logs.length === 0) return;
-      const headers = ['Job File', 'Rodman', 'Equipment Height', 'Reference Point', 'Setup Time', 'Teardown Time', 'Equipment Type', 'Notes', 'Created At'];
+      const headers = ['Job File', 'Rodman', 'Equipment Height', 'Reference Point', 'Setup Time', 'Teardown Time', 'Equipment Type', 'Point File', 'Notes', 'Created At'];
       const rows = logs.map((l) => [
         l.jobFileName, l.rodman, l.equipmentHeight, l.referencePoint,
-        l.setupTime, l.teardownTime, l.equipmentType, l.notes, l.createdAt,
+        l.setupTime, l.teardownTime, l.equipmentType, l.pointFileName, l.notes, l.createdAt,
       ].map((v) => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
 
       const csv = [headers.join(','), ...rows].join('\n');
