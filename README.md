@@ -168,7 +168,7 @@ LineSmith now uses these drawing CRUD endpoints as the primary load/save path fo
 Crew active-drawing restore uses existing crew profile APIs:
 
 - `GET /api/crew?id=:crewMemberId` – resolve a crew member's persisted `lineSmithActiveDrawingByProject` preference.
-- `POST /api/crew` – upsert crew profile fields (including `lineSmithActiveDrawingByProject`) when LineSmith saves/opens a project drawing.
+- `POST /api/crew` – upsert crew profile fields (including `lineSmithActiveDrawingByProject`) when LineSmith saves/opens a project drawing; new records require `firstName` or `lastName`, while existing records can update drawing preferences with `id` + `lineSmithActiveDrawingByProject`.
 
 Crew preference payload fragment:
 
@@ -392,7 +392,7 @@ LineSmith now uses these drawing CRUD endpoints as the primary load/save path fo
 Crew active-drawing restore uses existing crew profile APIs:
 
 - `GET /api/crew?id=:crewMemberId` – resolve a crew member's persisted `lineSmithActiveDrawingByProject` preference.
-- `POST /api/crew` – upsert crew profile fields (including `lineSmithActiveDrawingByProject`) when LineSmith saves/opens a project drawing.
+- `POST /api/crew` – upsert crew profile fields (including `lineSmithActiveDrawingByProject`) when LineSmith saves/opens a project drawing; new records require `firstName` or `lastName`, while existing records can update drawing preferences with `id` + `lineSmithActiveDrawingByProject`.
 
 Crew preference payload fragment:
 

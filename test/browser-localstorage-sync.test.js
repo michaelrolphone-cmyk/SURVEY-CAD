@@ -17,6 +17,7 @@ import {
   shouldRunHttpFallbackSync,
   buildSocketEndpointCandidates,
   buildApiEndpointCandidates,
+  shrinkQueuedDifferentialsForStorage,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -232,6 +233,34 @@ test('buildApiEndpointCandidates includes root and base-path API URLs', () => {
   ]);
 });
 
+
+test('shrinkQueuedDifferentialsForStorage compacts and halves queued operations to relieve storage pressure', () => {
+  const queue = [{
+    requestId: 'sync-1',
+    baseChecksum: 'fnv1a-prev',
+    operations: [
+      { type: 'set', key: 'a', value: '1' },
+      { type: 'set', key: 'b', value: '2' },
+      { type: 'set', key: 'c', value: '3' },
+      { type: 'set', key: 'd', value: '4' },
+    ],
+  }];
+
+  const reduced = shrinkQueuedDifferentialsForStorage(queue);
+
+  assert.equal(reduced.length, 1);
+  assert.equal(reduced[0].requestId, 'sync-1');
+  assert.equal(reduced[0].baseChecksum, 'fnv1a-prev');
+  assert.deepEqual(reduced[0].operations, [
+    { type: 'set', key: 'c', value: '3' },
+    { type: 'set', key: 'd', value: '4' },
+  ]);
+});
+
+test('shrinkQueuedDifferentialsForStorage returns empty queue for invalid input', () => {
+  assert.deepEqual(shrinkQueuedDifferentialsForStorage(null), []);
+  assert.deepEqual(shrinkQueuedDifferentialsForStorage([]), []);
+});
 
 test('shouldRunHttpFallbackSync runs only while online and websocket is not open', () => {
   assert.equal(shouldRunHttpFallbackSync({ socketReadyState: 3, online: true }), true);

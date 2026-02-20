@@ -1901,8 +1901,13 @@ export function createSurveyServer({
       if (urlObj.pathname === '/api/crew' || urlObj.pathname === '/api/crew/') {
         if (req.method === 'POST') {
           const body = await readJsonBody(req);
-          if (!body || typeof body !== 'object' || (!body.firstName && !body.lastName)) {
-            sendJson(res, 400, { error: 'firstName or lastName is required.' });
+          const hasPreferredDrawingUpdate = body && typeof body === 'object'
+            && body.id
+            && body.lineSmithActiveDrawingByProject
+            && typeof body.lineSmithActiveDrawingByProject === 'object'
+            && !Array.isArray(body.lineSmithActiveDrawingByProject);
+          if (!body || typeof body !== 'object' || ((!body.firstName && !body.lastName) && !hasPreferredDrawingUpdate)) {
+            sendJson(res, 400, { error: 'firstName or lastName is required unless updating an existing member preference by id.' });
             return;
           }
           const member = {

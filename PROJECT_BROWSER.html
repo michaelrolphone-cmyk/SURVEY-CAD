@@ -2314,7 +2314,11 @@
               pointButton.title = 'Save linked point number for LineSmith photo lookup';
               pointButton.addEventListener('click', async (event) => {
                 event.stopPropagation();
-                await setPointNumberForUploadedResource(folder, entry, pointInlineInput.value, projectContext);
+                if (typeof setPointNumberForUploadedResource === 'function') {
+                  await setPointNumberForUploadedResource(folder, entry, pointInlineInput.value, projectContext);
+                  return;
+                }
+                projectContext.setUploadStatus('Point-number helper unavailable in this browser session; retry after refresh.');
               });
               resource.appendChild(pointButton);
             }
