@@ -9723,6 +9723,38 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     }
   }
 
+  async function loadLinkedPointFileIntoDrawing(projectId, pointFileId, pointFileName = pointFileId) {
+    if (!projectId || !pointFileId) return false;
+    try {
+      const response = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId));
+      if (!response.ok) {
+        setStatus(`Unable to load point file "${pointFileName}" (${response.status}).`, "warn");
+        return false;
+      }
+      const payload = await response.json();
+      const text = String(payload?.pointFile?.currentState?.text || "").trim();
+      if (!text) {
+        setStatus(`Point file "${pointFileName}" is empty.`, "warn");
+        return false;
+      }
+
+      points.clear();
+      lines.clear();
+      selectedPointId = null;
+      selectedPointIds = [];
+      selectedLines = [];
+      lastSelectedLineId = null;
+
+      const imported = importCsvText(text, `Linked point file import (${pointFileName})`);
+      if (!imported) return false;
+      setStatus(`Loaded linked point file "${pointFileName}" into the drawing. Save to persist this link.`, "ok");
+      return true;
+    } catch {
+      setStatus(`Unable to load point file "${pointFileName}".`, "warn");
+      return false;
+    }
+  }
+
   async function promptChooseDrawingPointFile() {
     if (!activeProjectId) {
       setStatus("Open LineSmith from an active project to choose linked point files.", "warn");
@@ -9747,7 +9779,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       pointFileId: selectedPointFile.pointFileId,
       pointFileName: selectedPointFile.pointFileName,
     });
-    setStatus(`Linked drawing to point file "${selectedPointFile.pointFileName}". Save the drawing to persist.`, "ok");
+    await loadLinkedPointFileIntoDrawing(activeProjectId, selectedPointFile.pointFileId, selectedPointFile.pointFileName);
     return true;
   }
 
