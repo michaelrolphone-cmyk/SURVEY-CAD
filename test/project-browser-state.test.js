@@ -346,6 +346,7 @@ test('Project Browser allows tagging uploaded photos with point numbers for Line
   assert.match(projectBrowserHtml, /async function saveUploadedResourceMetadata\(folder, entry, updatesRaw, projectContext = \{\}\)/, 'Project Browser should centralize server-upload metadata PATCH updates');
   assert.match(projectBrowserHtml, /const metadataUrl = new URL\('\/api\/project-files\/metadata', window\.location\.origin\)/, 'Project Browser should call metadata PATCH endpoint for uploaded file metadata');
   assert.match(projectBrowserHtml, /function normalizePointNumber\(value = ''\)/, 'Project Browser should normalize point-number metadata input values');
+  assert.match(projectBrowserHtml, /async function setPointNumberForUploadedResource\(folder, entry, pointNumberRaw, projectContext = \{\}\)/, 'Project Browser should define a point-number metadata save helper used by upload rows');
   assert.match(projectBrowserHtml, /setPointNumberForUploadedResource\(folder, entry, pointInlineInput\.value, projectContext\)/, 'image upload rows should save point-number metadata through dedicated helper');
   assert.match(projectBrowserHtml, /pointInlineInput\.placeholder = 'Point #'/, 'image upload rows should provide a point number inline input');
   assert.match(projectBrowserHtml, /pointButton\.textContent = 'Save Point #'/, 'image upload rows should provide a Save Point action for point metadata');

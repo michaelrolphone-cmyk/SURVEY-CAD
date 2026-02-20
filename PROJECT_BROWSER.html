@@ -1709,6 +1709,16 @@
       projectContext.setUploadStatus(`Saved ROS # ${rosNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
     }
 
+    async function setPointNumberForUploadedResource(folder, entry, pointNumberRaw, projectContext = {}) {
+      const metadata = entry?.reference?.metadata || {};
+      const storedFileName = metadata?.storedName;
+      const pointNumber = normalizePointNumber(pointNumberRaw);
+      projectContext.setUploadStatus(`Updating point number for ${entry?.title || storedFileName}…`);
+      const resource = await saveUploadedResourceMetadata(folder, entry, { pointNumber }, projectContext);
+      if (!resource) return;
+      projectContext.setUploadStatus(`Saved point # ${pointNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
+    }
+
     async function openProjectPointFileVersionInPointForge(resource, versionId, projectContext = {}) {
       const text = await resolvePointFileText(resource, { versionId });
       if (!text || !text.trim()) {
