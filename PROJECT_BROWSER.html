@@ -917,6 +917,10 @@
           const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId), { method: 'DELETE' });
           if (!response.ok) throw new Error(`Unable to delete drawing (${response.status}).`);
           await syncProjectDrawingsFromApi(projectContext);
+        } else if (entry?.reference?.type === 'server-upload') {
+          await deleteServerUploadResource(projectContext, folder?.key, entry);
+          const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
+          if (!removed) throw new Error('File delete could not be applied.');
         } else {
           const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
           if (!removed) throw new Error('File delete could not be applied.');
@@ -1051,6 +1055,40 @@
       }
 
       throw new Error(firstAttempt.payload?.error || `Unable to move file (${firstAttempt.response.status}).`);
+    }
+
+    async function deleteServerUploadResource(projectContext, sourceFolderKey, entry) {
+      const projectId = String(projectContext?.activeProjectId || '').trim();
+      const initialLocation = resolveServerUploadLocation(entry, sourceFolderKey);
+      if (!projectId || !initialLocation?.storedName) throw new Error('Missing project upload metadata for delete operation.');
+
+      const sendDeleteRequest = async (folderKey, fileName) => {
+        const deleteUrl = new URL('/api/project-files/file', window.location.origin);
+        deleteUrl.searchParams.set('projectId', projectId);
+        deleteUrl.searchParams.set('folderKey', folderKey);
+        deleteUrl.searchParams.set('fileName', fileName);
+
+        const response = await fetch(deleteUrl.toString(), { method: 'DELETE' });
+        const payload = await response.json().catch(() => ({}));
+        return { response, payload };
+      };
+
+      const firstAttempt = await sendDeleteRequest(initialLocation.folderKey || sourceFolderKey, initialLocation.storedName);
+      if (firstAttempt.response.ok) return true;
+
+      const fallbackLocation = resolveServerUploadLocation(entry, '');
+      const shouldRetryWithFallback = firstAttempt.response.status === 404
+        && fallbackLocation.folderKey
+        && fallbackLocation.storedName
+        && (fallbackLocation.folderKey !== (initialLocation.folderKey || sourceFolderKey)
+          || fallbackLocation.storedName !== initialLocation.storedName);
+      if (shouldRetryWithFallback) {
+        const retryAttempt = await sendDeleteRequest(fallbackLocation.folderKey, fallbackLocation.storedName);
+        if (retryAttempt.response.ok) return true;
+        throw new Error(retryAttempt.payload?.error || `Unable to delete file (${retryAttempt.response.status}).`);
+      }
+
+      throw new Error(firstAttempt.payload?.error || `Unable to delete file (${firstAttempt.response.status}).`);
     }
 
     let _dragScrollY = 0;
