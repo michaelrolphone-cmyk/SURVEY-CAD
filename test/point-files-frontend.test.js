@@ -24,6 +24,10 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /async function\s+deleteResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a shared delete helper for project resources');
   assert.match(html, /function\s+moveResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a move helper for drag-and-drop reorganization.');
   assert.match(html, /resource\.draggable\s*=\s*true;/, 'EvidenceDesk should mark movable rows as draggable.');
+  assert.match(html, /function\s+startDragAutoScroll\(\)\s*\{[\s\S]*document\.addEventListener\('dragover',[\s\S]*requestAnimationFrame\(tickDragScroll\)/, 'EvidenceDesk should provide a startDragAutoScroll helper that tracks cursor position and starts a scroll loop.');
+  assert.match(html, /function\s+stopDragAutoScroll\(\)\s*\{[\s\S]*document\.removeEventListener\('dragover',[\s\S]*cancelAnimationFrame/, 'EvidenceDesk should provide a stopDragAutoScroll helper that cancels the scroll loop and cleans up the dragover listener.');
+  assert.match(html, /resource\.addEventListener\('dragstart',[\s\S]*startDragAutoScroll\(\)/, 'EvidenceDesk should start auto-scroll when a file drag begins.');
+  assert.match(html, /resource\.addEventListener\('dragend',[\s\S]*stopDragAutoScroll\(\)/, 'EvidenceDesk should stop auto-scroll when a file drag ends.');
   assert.match(html, /folderRow\.addEventListener\('drop',\s*async\s*\(event\)\s*=>\s*\{[\s\S]*moveResourceFromEvidenceDesk\(/, 'EvidenceDesk folder rows should accept dropped file rows and trigger move workflow.');
   assert.match(html, /function\s+resolveServerUploadLocation\(entry,\s*fallbackFolderKey\s*=\s*''\)\s*\{[\s\S]*searchParams\.get\('folderKey'\)[\s\S]*searchParams\.get\('fileName'\)/, 'EvidenceDesk should derive server-upload folder/file metadata from download URLs when needed.');
   assert.match(html, /const\s+sendMoveRequest\s*=\s*async\s*\(folderKey,\s*fileName\)\s*=>\s*\{[\s\S]*fetch\(moveUrl\.toString\(\),\s*\{[\s\S]*method:\s*'PATCH'[\s\S]*targetFolderKey/, 'EvidenceDesk should move server-upload records through PATCH project-files endpoint.');
