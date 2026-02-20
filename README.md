@@ -37,7 +37,7 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 ## Idaho Parcel/CPNF harvest worker
 
-The server now includes a restartable background worker that harvests Idaho parcel + CPNF features, writes each record as GeoJSON, stores Mapbox/Leaflet-style GeoJSON tile buckets in object storage, and maintains a resume-safe master geolocation index GeoJSON file.
+The server now includes a restartable background worker that harvests Idaho parcel + CPNF features, writes each record as GeoJSON, stores Mapbox/Leaflet-style GeoJSON tile buckets in object storage (parcels are materialized across zoom levels 0-22), and maintains a resume-safe master geolocation index GeoJSON file.
 
 Harvest cycles now rotate dataset processing order between parcels and CPNF so CP&F records begin harvesting even while parcel backlogs are still in progress.
 
@@ -60,6 +60,7 @@ Harvest cycles now rotate dataset processing order between parcels and CPNF so C
   - `cpnf` dataset writes into MinIO bucket `cpnfs`
   - `parcels` dataset writes into MinIO bucket `tile-server`
 - Tile buckets: `surveycad/idaho-harvest/tiles/id/<dataset>/<z>/<x>/<y>.geojson` (MinIO bucket `tile-server`)
+  - Tile feature properties include harvested survey-number fields (when present) as `surveyNumbers` and computed centroid coordinates as `location`
 - Master index: `surveycad/idaho-harvest/indexes/id-master-index.geojson` (MinIO bucket `tile-server`)
 - Checkpoint state: `surveycad/idaho-harvest/checkpoints/id.json` (MinIO bucket `tile-server`)
 

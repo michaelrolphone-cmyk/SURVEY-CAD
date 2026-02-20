@@ -139,7 +139,41 @@ function lonLatToTile(lon, lat, zoom = 14) {
   return { z, x, y };
 }
 
-function toGeoJsonFeature(feature = {}, { id, dataset }) {
+function resolveTileZoomLevels(dataset = {}) {
+  if (Array.isArray(dataset.tileZoomLevels) && dataset.tileZoomLevels.length) {
+    return [...new Set(dataset.tileZoomLevels
+      .map((zoom) => Number(zoom))
+      .filter((zoom) => Number.isInteger(zoom) && zoom >= 0 && zoom <= 22))]
+      .sort((a, b) => a - b);
+  }
+
+  if (dataset.name === 'parcels') {
+    return Array.from({ length: 23 }, (_, zoom) => zoom);
+  }
+
+  const fallback = Number(dataset.tileZoom ?? 14);
+  return [Number.isInteger(fallback) && fallback >= 0 ? fallback : 14];
+}
+
+function extractSurveyNumbers(attributes = {}) {
+  const values = [];
+  for (const [rawKey, rawValue] of Object.entries(attributes || {})) {
+    const key = String(rawKey || '');
+    if (!/(^ros$|survey|record.*survey|ros.*(no|num|number))/i.test(key)) continue;
+    if (rawValue === null || rawValue === undefined || rawValue === '') continue;
+    values.push(rawValue);
+  }
+
+  return [...new Set(values
+    .flatMap((value) => String(value)
+      .split(/[,;|/]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)))];
+}
+
+function toGeoJsonFeature(feature = {}, { id, dataset, center }) {
+  const attributes = feature?.attributes || {};
+  const surveyNumbers = extractSurveyNumbers(attributes);
   return {
     type: 'Feature',
     id: `${dataset}:${id}`,
@@ -147,7 +181,11 @@ function toGeoJsonFeature(feature = {}, { id, dataset }) {
     properties: {
       dataset,
       objectId: id,
-      ...(feature?.attributes || {}),
+      surveyNumbers,
+      location: Number.isFinite(center?.lon) && Number.isFinite(center?.lat)
+        ? { lon: center.lon, lat: center.lat }
+        : null,
+      ...attributes,
     },
   };
 }
@@ -298,22 +336,29 @@ export async function runIdahoHarvestCycle({
       const objectId = toObjectId(feature);
       if (objectId === '') continue;
 
-      const geojsonFeature = toGeoJsonFeature(feature, { id: objectId, dataset: dataset.name });
+      const center = computeFeatureCenter(feature);
+      const hasCenter = Number.isFinite(center.lon) && Number.isFinite(center.lat);
+      const geojsonFeature = toGeoJsonFeature(feature, {
+        id: objectId,
+        dataset: dataset.name,
+        center: hasCenter ? center : null,
+      });
       const featureKey = `${prefix}/features/${stateAbbr.toLowerCase()}/${dataset.name}/${encodeURIComponent(String(objectId))}.geojson`;
       const featureBucket = bucketFor('features', dataset.name);
       await writeJsonObjectInBucket(objectStore, featureBucket, featureKey, geojsonFeature);
 
-      const center = computeFeatureCenter(feature);
-      const hasCenter = Number.isFinite(center.lon) && Number.isFinite(center.lat);
-      const tile = hasCenter ? lonLatToTile(center.lon, center.lat, Number(dataset.tileZoom || 14)) : null;
-      const tileKey = tile
-        ? `${prefix}/tiles/${stateAbbr.toLowerCase()}/${dataset.name}/${tile.z}/${tile.x}/${tile.y}.geojson`
-        : null;
+      const tileKeys = hasCenter
+        ? resolveTileZoomLevels(dataset).map((zoom) => {
+          const tile = lonLatToTile(center.lon, center.lat, zoom);
+          return `${prefix}/tiles/${stateAbbr.toLowerCase()}/${dataset.name}/${tile.z}/${tile.x}/${tile.y}.geojson`;
+        })
+        : [];
 
-      if (tileKey) {
+      for (const tileKey of tileKeys) {
         const tileDoc = await getTileDoc(tileKey);
         const featureId = `${dataset.name}:${objectId}`;
-        tileDoc.features = (Array.isArray(tileDoc.features) ? tileDoc.features : []).filter((existing) => String(existing?.id || '') !== featureId);
+        tileDoc.features = (Array.isArray(tileDoc.features) ? tileDoc.features : [])
+          .filter((existing) => String(existing?.id || '') !== featureId);
         tileDoc.features.push(geojsonFeature);
       }
 
@@ -325,7 +370,8 @@ export async function runIdahoHarvestCycle({
           dataset: dataset.name,
           objectId,
           key: featureKey,
-          tileKey,
+          tileKey: tileKeys[0] || null,
+          tileKeys,
         },
       });
     }
