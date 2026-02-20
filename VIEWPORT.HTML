@@ -4758,6 +4758,7 @@ function paintBackground(ctx, w, h){
     fieldToFinishRuleState.companionToLineworkCodes = companionToLineworkCodes;
     fieldToFinishRuleState.source = sourceLabel;
     fieldToFinishRuleState.loaded = true;
+    reapplyFieldToFinishLayerMappings();
     preloadMappedPointSymbolMarkers();
   }
 
@@ -5218,9 +5219,35 @@ function paintBackground(ctx, w, h){
       line.generatedBy = "field-to-finish";
       line.fieldToFinishType = type;
       line.fieldToFinishBaseCode = String(baseCode || "").trim().toUpperCase();
+      line.fieldToFinishSourcePointId = Number.isFinite(Number(sourcePointId)) ? Number(sourcePointId) : null;
       line.fieldToFinishCurveMiddlePointId = Number.isFinite(Number(middlePointId)) ? Number(middlePointId) : null;
     }
     return lineId;
+  }
+
+  function reapplyFieldToFinishLayerMappings() {
+    let pointsUpdated = 0;
+    let linesUpdated = 0;
+
+    for (const point of points.values()) {
+      const ruleLayerId = resolveFieldToFinishLayerIdForCode(point.code || "");
+      if (!ruleLayerId || !layers.has(ruleLayerId) || point.layerId === ruleLayerId) continue;
+      point.layerId = ruleLayerId;
+      pointsUpdated++;
+    }
+
+    for (const line of lines.values()) {
+      if (line.generatedBy !== "field-to-finish") continue;
+      const type = line.fieldToFinishType === "jpn" ? "jpn" : (line.fieldToFinishType === "curve" ? "curve" : "sequential");
+      const baseCode = String(line.fieldToFinishBaseCode || "").trim().toUpperCase();
+      const sourcePointId = Number.isFinite(Number(line.fieldToFinishSourcePointId)) ? Number(line.fieldToFinishSourcePointId) : null;
+      const layerId = resolveAutoLineLayerId(line.a, line.b, { type, baseCode, sourcePointId });
+      if (!layerId || !layers.has(layerId) || line.layerId === layerId) continue;
+      line.layerId = layerId;
+      linesUpdated++;
+    }
+
+    return { pointsUpdated, linesUpdated };
   }
 
   function ensureLegacyAutoFieldToFinishLineMetadata() {
@@ -5281,19 +5308,28 @@ function paintBackground(ctx, w, h){
       if (!points.has(cmd.a) || !points.has(cmd.b) || cmd.a === cmd.b) continue;
       const existingLine = findDirectConnectionLine(cmd.a, cmd.b);
       if (existingLine) {
+        const previousType = existingLine.fieldToFinishType;
+        const previousBaseCode = existingLine.fieldToFinishBaseCode;
+        const expectedType = cmd.type === "jpn" ? "jpn" : (cmd.type === "curve" ? "curve" : "sequential");
+        const expectedBaseCode = String(cmd.baseCode || "").trim().toUpperCase();
+        const expectedSourcePointId = Number.isFinite(Number(cmd.sourcePointId)) ? Number(cmd.sourcePointId) : null;
+        const expectedLayerId = resolveAutoLineLayerId(cmd.a, cmd.b, { type: expectedType, baseCode: expectedBaseCode, sourcePointId: expectedSourcePointId });
+        if (expectedLayerId && layers.has(expectedLayerId)) existingLine.layerId = expectedLayerId;
+        existingLine.fieldToFinishType = expectedType;
+        existingLine.fieldToFinishBaseCode = expectedBaseCode;
+        existingLine.fieldToFinishSourcePointId = expectedSourcePointId;
         if (cmd.type === "curve" && existingLine.generatedBy === "field-to-finish") {
           const nextMiddlePointId = Number.isFinite(Number(cmd.middlePointId)) ? Number(cmd.middlePointId) : null;
           const prevMiddlePointId = Number.isFinite(Number(existingLine.fieldToFinishCurveMiddlePointId))
             ? Number(existingLine.fieldToFinishCurveMiddlePointId)
             : null;
-          const nextBaseCode = String(cmd.baseCode || "").trim().toUpperCase();
           if (
-            existingLine.fieldToFinishType !== "curve"
-            || existingLine.fieldToFinishBaseCode !== nextBaseCode
+            previousType !== "curve"
+            || previousBaseCode !== expectedBaseCode
             || prevMiddlePointId !== nextMiddlePointId
           ) {
             existingLine.fieldToFinishType = "curve";
-            existingLine.fieldToFinishBaseCode = nextBaseCode;
+            existingLine.fieldToFinishBaseCode = expectedBaseCode;
             existingLine.fieldToFinishCurveMiddlePointId = nextMiddlePointId;
             addedCurve++;
           }
