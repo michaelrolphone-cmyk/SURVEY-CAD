@@ -25,6 +25,7 @@ function buildResource({ projectId, folderKey, record }) {
         updatedAt: record.updatedAt,
         sizeBytes: record.sizeBytes,
         rosNumber: record.rosNumber || null,
+        pointNumber: record.pointNumber || null,
         thumbnailUrl: record.thumbnailBase64 ? buildImageThumbnailPath(projectId, folderKey, record.storedName) : null,
       },
     },
@@ -40,7 +41,7 @@ export class InMemoryEvidenceDeskFileStore {
     return `${projectId}::${folderKey}::${fileName}`;
   }
 
-  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, rosNumber = '', pointNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const timestamp = Date.now();
     const storedName = `${timestamp}-${sanitizeSegment(originalFileName)}`;
     const id = `upload-${sanitizeSegment(originalFileName.replace(/\.[^.]+$/, '')).replace(/_/g, '-')}-${timestamp}`;
@@ -55,6 +56,7 @@ export class InMemoryEvidenceDeskFileStore {
       mimeType,
       sizeBytes: buffer.length,
       rosNumber: String(rosNumber || '').trim() || null,
+      pointNumber: String(pointNumber || '').trim() || null,
       createdAt: now,
       updatedAt: now,
       dataBase64: Buffer.from(buffer).toString('base64'),
@@ -75,7 +77,7 @@ export class InMemoryEvidenceDeskFileStore {
     };
   }
 
-  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, rosNumber = '', pointNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const existing = await this.getFile(projectId, folderKey, fileName);
     if (!existing) return null;
     const updatedAt = new Date().toISOString();
@@ -86,6 +88,7 @@ export class InMemoryEvidenceDeskFileStore {
       mimeType: mimeType || existing.mimeType,
       sizeBytes: buffer.length,
       rosNumber: String(rosNumber || '').trim() || null,
+      pointNumber: String(pointNumber || '').trim() || null,
       updatedAt,
       dataBase64: Buffer.from(buffer).toString('base64'),
       thumbnailBase64: thumbnailBuffer ? Buffer.from(thumbnailBuffer).toString('base64') : null,
@@ -98,6 +101,21 @@ export class InMemoryEvidenceDeskFileStore {
 
   async deleteFile(projectId, folderKey, fileName) {
     return this.records.delete(this.key(projectId, folderKey, fileName));
+  }
+
+  async updateFileMetadata(projectId, folderKey, fileName, { rosNumber, pointNumber } = {}) {
+    const existing = await this.getFile(projectId, folderKey, fileName);
+    if (!existing) return null;
+    const record = {
+      ...existing,
+      updatedAt: new Date().toISOString(),
+    };
+    if (rosNumber !== undefined) record.rosNumber = String(rosNumber || '').trim() || null;
+    if (pointNumber !== undefined) record.pointNumber = String(pointNumber || '').trim() || null;
+    delete record.buffer;
+    delete record.thumbnailBuffer;
+    this.records.set(this.key(projectId, folderKey, fileName), record);
+    return buildResource({ projectId, folderKey, record: { ...record, storedName: fileName } });
   }
 
 
@@ -134,6 +152,7 @@ export class InMemoryEvidenceDeskFileStore {
         title: record.originalFileName,
         sizeBytes: record.sizeBytes,
         rosNumber: record.rosNumber || null,
+        pointNumber: record.pointNumber || null,
         uploadedAt: record.createdAt,
         updatedAt: record.updatedAt,
       });
@@ -166,7 +185,7 @@ export class RedisEvidenceDeskFileStore {
     return `${this.prefix}:index:${projectId}:${folderKey}`;
   }
 
-  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, rosNumber = '', pointNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const timestamp = Date.now();
     const storedName = `${timestamp}-${sanitizeSegment(originalFileName)}`;
     const id = `upload-${sanitizeSegment(originalFileName.replace(/\.[^.]+$/, '')).replace(/_/g, '-')}-${timestamp}`;
@@ -181,6 +200,7 @@ export class RedisEvidenceDeskFileStore {
       mimeType,
       sizeBytes: buffer.length,
       rosNumber: String(rosNumber || '').trim() || null,
+      pointNumber: String(pointNumber || '').trim() || null,
       createdAt: now,
       updatedAt: now,
       thumbnailMimeType: thumbnailMimeType || null,
@@ -212,7 +232,7 @@ export class RedisEvidenceDeskFileStore {
     };
   }
 
-  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, rosNumber = '', pointNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const existing = await this.getFile(projectId, folderKey, fileName);
     if (!existing) return null;
     const record = {
@@ -222,6 +242,7 @@ export class RedisEvidenceDeskFileStore {
       mimeType: mimeType || existing.mimeType,
       sizeBytes: buffer.length,
       rosNumber: String(rosNumber || '').trim() || null,
+      pointNumber: String(pointNumber || '').trim() || null,
       updatedAt: new Date().toISOString(),
       thumbnailMimeType: thumbnailMimeType || null,
     };
@@ -251,6 +272,23 @@ export class RedisEvidenceDeskFileStore {
       .sRem(this.folderIndexKey(projectId, folderKey), fileName)
       .exec();
     return Array.isArray(removed) && removed.some((entry) => Number(entry?.[1] || 0) > 0);
+  }
+
+  async updateFileMetadata(projectId, folderKey, fileName, { rosNumber, pointNumber } = {}) {
+    const existing = await this.getFile(projectId, folderKey, fileName);
+    if (!existing) return null;
+    const record = {
+      ...existing,
+      updatedAt: new Date().toISOString(),
+    };
+    if (rosNumber !== undefined) record.rosNumber = String(rosNumber || '').trim() || null;
+    if (pointNumber !== undefined) record.pointNumber = String(pointNumber || '').trim() || null;
+    delete record.buffer;
+    delete record.thumbnailBuffer;
+    delete record.thumbnailBase64;
+
+    await this.redis.set(this.metadataKey(projectId, folderKey, fileName), JSON.stringify(record));
+    return buildResource({ projectId, folderKey, record: { ...record, storedName: fileName } });
   }
 
 
@@ -308,6 +346,7 @@ export class RedisEvidenceDeskFileStore {
           title: parsed.originalFileName,
           sizeBytes: parsed.sizeBytes,
           rosNumber: parsed.rosNumber || null,
+          pointNumber: parsed.pointNumber || null,
           uploadedAt: parsed.createdAt,
           updatedAt: parsed.updatedAt,
         });

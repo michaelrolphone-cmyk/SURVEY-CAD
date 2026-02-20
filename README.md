@@ -1162,15 +1162,17 @@ LineSmith now resolves sequential `END`/`CLO` directives from the nearest valid 
 EvidenceDesk uploads now support Redis-backed CRUD operations and folder-level listing. EvidenceDesk file rows can be dragged onto destination folders to reorganize project-file uploads directly in the UI.
 Uploaded image resources now generate a 512px-wide PNG thumbnail during upload/update, and EvidenceDesk image preview slots use `resource.reference.metadata.thumbnailUrl` before falling back to full-size downloads.
 EvidenceDesk now shows live upload progress in the upload status line (including per-file counters and percent complete when binary files are posted) so users get immediate feedback after starting an upload.
+EvidenceDesk photo uploads now support point-number metadata so LineSmith can show a matching point photo thumbnail and full-size link in the point inspector when a selected point number matches uploaded image metadata.
 
 ### API endpoints
-- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`); returns `413` when declared payload size exceeds 50 MB.
-- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`); returns `413` when declared payload size exceeds 50 MB.
+- `POST /api/project-files/upload` — create/upload a file (`multipart/form-data`: `projectId`, `folderKey`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB.
+- `PUT /api/project-files/upload` — update/replace an existing stored file (`multipart/form-data`: `projectId`, `folderKey`, `fileName`, `file`, optional `rosNumber`, optional `pointNumber`); returns `413` when declared payload size exceeds 50 MB.
 - `GET /api/project-files/download?projectId=...&folderKey=...&fileName=...` — read/download a stored file.
 - `GET /api/project-files/image-thumbnail?projectId=...&folderKey=...&fileName=...` — read a generated 512px-wide PNG thumbnail for uploaded image files (when available).
 - `DELETE /api/project-files/file?projectId=...&folderKey=...&fileName=...` — delete a stored file.
 - `PATCH /api/project-files/file?projectId=...&folderKey=...&fileName=...` — move a stored file to another folder (`application/json`: `{ "targetFolderKey": "deeds" }`).
-- `GET /api/project-files/list?projectId=...` — list files and grouped `filesByFolder` entries.
+- `PATCH /api/project-files/metadata?projectId=...&folderKey=...&fileName=...` — update upload metadata (`application/json`: `{ "rosNumber": "...", "pointNumber": "..." }`, at least one field required).
+- `GET /api/project-files/list?projectId=...` — list files and grouped `filesByFolder` entries (including optional `rosNumber` and `pointNumber` metadata fields).
 
 ### CLI and server commands
 - `npm start`

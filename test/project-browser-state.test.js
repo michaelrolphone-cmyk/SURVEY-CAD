@@ -339,3 +339,15 @@ test('Project Browser can open drawing resources directly in LineSmith', async (
   assert.match(projectBrowserHtml, /resource\.addEventListener\('click',\s*\(\)\s*=>\s*launchLineSmithFromDrawingResource\(entry, projectContext\)\)/, 'drawing row tap should launch LineSmith directly');
   assert.match(projectBrowserHtml, /openButton\.textContent\s*=\s*'Open in LineSmith'/, 'Project Browser should render an Open in LineSmith button for drawing resources');
 });
+
+test('Project Browser allows tagging uploaded photos with point numbers for LineSmith lookup', async () => {
+  const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+
+  assert.match(projectBrowserHtml, /async function saveUploadedResourceMetadata\(folder, entry, updatesRaw, projectContext = \{\}\)/, 'Project Browser should centralize server-upload metadata PATCH updates');
+  assert.match(projectBrowserHtml, /const metadataUrl = new URL\('\/api\/project-files\/metadata', window\.location\.origin\)/, 'Project Browser should call metadata PATCH endpoint for uploaded file metadata');
+  assert.match(projectBrowserHtml, /function normalizePointNumber\(value = ''\)/, 'Project Browser should normalize point-number metadata input values');
+  assert.match(projectBrowserHtml, /setPointNumberForUploadedResource\(folder, entry, pointInlineInput\.value, projectContext\)/, 'image upload rows should save point-number metadata through dedicated helper');
+  assert.match(projectBrowserHtml, /pointInlineInput\.placeholder = 'Point #'/, 'image upload rows should provide a point number inline input');
+  assert.match(projectBrowserHtml, /pointButton\.textContent = 'Save Point #'/, 'image upload rows should provide a Save Point action for point metadata');
+  assert.match(projectBrowserHtml, /metadata\?\.pointNumber/, 'rendered resources should read point-number metadata for badges and editing state');
+});
