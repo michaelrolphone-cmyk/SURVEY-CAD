@@ -9555,6 +9555,30 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     return String(localStorage.getItem('surveyfoundryActiveCrewMemberId') || '').trim();
   }
 
+
+  function resolveActiveCrewUserLabel() {
+    const crewMemberId = resolveActiveCrewMemberId();
+    if (!crewMemberId) return 'unknown-user';
+    try {
+      const profiles = JSON.parse(localStorage.getItem('surveyfoundryCrewProfiles') || '[]');
+      const member = Array.isArray(profiles) ? profiles.find((entry) => entry?.id === crewMemberId) : null;
+      const displayName = [member?.firstName, member?.lastName]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+        .join(' ');
+      return displayName || crewMemberId;
+    } catch {
+      return crewMemberId;
+    }
+  }
+
+  function buildPointFileActorHeaders() {
+    return {
+      'x-survey-app': 'linesmith-drawing',
+      'x-survey-user': resolveActiveCrewUserLabel(),
+    };
+  }
+
   function buildProjectDrawingApiUrl(projectId, drawingId = "") {
     if (!projectId) return "";
     const encodedProjectId = encodeURIComponent(projectId);
@@ -9924,7 +9948,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
         : buildProjectDrawingApiUrl(activeProjectId);
       const response = await fetch(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildPointFileActorHeaders() },
         body: JSON.stringify({ drawingId, drawingName, drawingState: currentState, pointFileLink: activeDrawingPointFileLink || null }),
       });
       if (!response.ok) throw new Error('api-save-failed');
