@@ -1034,6 +1034,43 @@
       throw new Error(firstAttempt.payload?.error || `Unable to move file (${firstAttempt.response.status}).`);
     }
 
+    let _dragScrollY = 0;
+    let _dragScrollActive = false;
+    let _dragScrollRaf = null;
+
+    function onDragOverForScroll(event) {
+      _dragScrollY = event.clientY;
+    }
+
+    function tickDragScroll() {
+      if (!_dragScrollActive) return;
+      const edgeZone = 100;
+      const maxSpeed = 14;
+      const vh = window.innerHeight;
+      if (_dragScrollY < edgeZone) {
+        window.scrollBy(0, -Math.round(maxSpeed * (1 - _dragScrollY / edgeZone)));
+      } else if (_dragScrollY > vh - edgeZone) {
+        window.scrollBy(0, Math.round(maxSpeed * (1 - (vh - _dragScrollY) / edgeZone)));
+      }
+      _dragScrollRaf = requestAnimationFrame(tickDragScroll);
+    }
+
+    function startDragAutoScroll() {
+      _dragScrollY = window.innerHeight / 2;
+      _dragScrollActive = true;
+      document.addEventListener('dragover', onDragOverForScroll);
+      _dragScrollRaf = requestAnimationFrame(tickDragScroll);
+    }
+
+    function stopDragAutoScroll() {
+      _dragScrollActive = false;
+      document.removeEventListener('dragover', onDragOverForScroll);
+      if (_dragScrollRaf !== null) {
+        cancelAnimationFrame(_dragScrollRaf);
+        _dragScrollRaf = null;
+      }
+    }
+
     async function moveResourceFromEvidenceDesk(sourceFolder, targetFolder, entry, projectContext = {}) {
       const sourceFolderKey = String(sourceFolder?.key || '').trim();
       const targetFolderKey = String(targetFolder?.key || '').trim();
@@ -1902,6 +1939,7 @@
             resource.draggable = true;
             resource.addEventListener('dragstart', (event) => {
               resource.classList.add('file-dragging');
+              startDragAutoScroll();
               event.dataTransfer?.setData('application/x-surveycad-resource-move', JSON.stringify({
                 resourceId: entry.id,
                 sourceFolderKey: folder.key,
@@ -1919,6 +1957,7 @@
             });
             resource.addEventListener('dragend', () => {
               resource.classList.remove('file-dragging');
+              stopDragAutoScroll();
             });
           }
 
