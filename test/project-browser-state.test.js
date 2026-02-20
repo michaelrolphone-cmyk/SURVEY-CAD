@@ -10,6 +10,7 @@ import {
   appendResourceToFolder,
   saveStoredProjectFile,
   removeResourceById,
+  moveResourceById,
   renameResourceTitle,
   extractCpfInstrumentsFromPointNote,
   findCpfPointLinks,
@@ -105,6 +106,22 @@ test('removeResourceById removes matching resources from the requested folder', 
 
   assert.equal(removed, true);
   assert.deepEqual(projectFile.folders[0].index.map((entry) => entry.id), ['cpf-1']);
+});
+
+test('moveResourceById moves resources between folders and rewrites folder metadata', () => {
+  const projectFile = {
+    folders: [
+      { key: 'drawings', index: [{ id: 'draw-1', folder: 'drawings', title: 'Boundary' }] },
+      { key: 'other', index: [] },
+    ],
+  };
+
+  const moved = moveResourceById(projectFile, 'drawings', 'other', 'draw-1');
+
+  assert.equal(moved, true);
+  assert.equal(projectFile.folders[0].index.length, 0);
+  assert.equal(projectFile.folders[1].index.length, 1);
+  assert.equal(projectFile.folders[1].index[0].folder, 'other');
 });
 
 test('renameResourceTitle updates resource title and metadata filename for project references', () => {

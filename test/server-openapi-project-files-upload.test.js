@@ -16,6 +16,7 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   const filePath = spec?.paths?.['/api/project-files/file'];
   assert.ok(filePath, 'spec should include file item path');
   assert.ok(filePath.delete, 'spec should include DELETE file endpoint');
+  assert.ok(filePath.patch, 'spec should include PATCH file move endpoint');
 
   const listPath = spec?.paths?.['/api/project-files/list'];
   assert.ok(listPath?.get, 'spec should include list endpoint');
