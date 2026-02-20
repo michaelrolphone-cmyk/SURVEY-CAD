@@ -122,6 +122,8 @@ test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoin
 
   const parcelFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/parcels/1.geojson', { bucket: 'tile-server' });
   assert.equal(parcelFeature.type, 'Feature');
+  assert.deepEqual(parcelFeature.properties.location, { lon: -116.16, lat: 43.64 });
+  assert.equal(Array.isArray(parcelFeature.properties.surveyNumbers), true);
 
   const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/11.geojson', { bucket: 'cpnfs' });
   assert.equal(cpnfFeature.properties.dataset, 'cpnf');
@@ -130,7 +132,47 @@ test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoin
   assert.ok(tileWrites.length > 0);
   assert.ok(tileWrites.every((write) => write.bucket === 'tile-server'));
 
+  const parcelTileWrites = tileWrites.filter((write) => write.key.includes('/parcels/'));
+  assert.equal(parcelTileWrites.length, 23);
+
+  const cpnfTileWrites = tileWrites.filter((write) => write.key.includes('/cpnf/'));
+  assert.equal(cpnfTileWrites.length, 1);
+
+  const parcelIndexFeature = index.features.find((feature) => feature.id === 'parcels:1');
+  assert.equal(Array.isArray(parcelIndexFeature.properties.tileKeys), true);
+  assert.equal(parcelIndexFeature.properties.tileKeys.length, 23);
+  assert.equal(parcelIndexFeature.properties.tileKey, parcelIndexFeature.properties.tileKeys[0]);
+
   assert.deepEqual(calls.map((c) => `${c.layer}:${c.offset}`), ['24:0', '18:0', '24:1', '18:1']);
+});
+
+test('runIdahoHarvestCycle includes survey number metadata in tile features', async () => {
+  const objectStore = createMemoryObjectStore();
+  const fetchImpl = async () => ({
+    ok: true,
+    json: async () => ({
+      features: [{
+        attributes: { OBJECTID: 12, ROS: '1234, 1235', SURVEY_NUM: 'A-1' },
+        geometry: { x: -116.2, y: 43.6 },
+      }],
+    }),
+  });
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+    datasets: [{ name: 'parcels', layerId: 24 }],
+  });
+
+  const parcelTileKey = objectStore.writes.find((write) => write.key.includes('/tiles/id/parcels/14/'))?.key;
+  assert.ok(parcelTileKey, 'expected a parcel zoom-14 tile write');
+
+  const parcelTile = objectStore.readJson(parcelTileKey, { bucket: 'tile-server' });
+  assert.equal(parcelTile.type, 'FeatureCollection');
+  assert.deepEqual(parcelTile.features[0].properties.surveyNumbers, ['1234', '1235', 'A-1']);
+  assert.deepEqual(parcelTile.features[0].properties.location, { lon: -116.2, lat: 43.6 });
 });
 
 
