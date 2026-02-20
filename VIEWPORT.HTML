@@ -8919,8 +8919,12 @@ function paintBackground(ctx, w, h){
       $("#ptCode").value = p.code;
       $("#ptNotes").value = p.notes;
     } else {
+      $("#ptNum").value = "";
       $("#ptX").value = "";
       $("#ptY").value = "";
+      $("#ptZ").value = "";
+      $("#ptCode").value = "";
+      $("#ptNotes").value = "";
     }
 
     if (pointEditorSymbolRow) {
@@ -9764,6 +9768,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
       selectedPointIds = [];
       selectedLines = [];
       lastSelectedLineId = null;
+      updatePointEditorFromSelection();
 
       const imported = importCsvText(text, `Linked point file import (${pointFileName})`);
       if (!imported) return false;

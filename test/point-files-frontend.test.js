@@ -161,3 +161,9 @@ test('LineSmith reuses shared field-to-finish parsing engine for sequential dire
   assert.match(html, /const\s+pointThumbnailClient\s*=\s*window\.SurveyCadPointThumbnailClient\s*\|\|\s*null;/, 'LineSmith should read shared field-to-finish helpers from window scope.');
   assert.match(html, /if\s*\(pointThumbnailClient\?\.resolveSequentialDirectiveBaseCode\)/, 'LineSmith should delegate directive base-code resolution to the shared rules engine.');
 });
+
+test('LineSmith clears point editor fields and refreshes editor state when relinking point files', async () => {
+  const html = await readFile(new URL('../VIEWPORT.HTML', import.meta.url), 'utf8');
+  assert.match(html, /selectedLines = \[\];[\s\S]*lastSelectedLineId = null;[\s\S]*updatePointEditorFromSelection\(\);[\s\S]*const imported = importCsvText\(text, `Linked point file import \(\$\{pointFileName\}\)`\);/, 'LineSmith should refresh point-editor selection state before importing linked point-file points so stale editor values do not persist.');
+  assert.match(html, /if \(p\) \{[\s\S]*\$\("#ptNotes"\)\.value = p\.notes;[\s\S]*\} else \{[\s\S]*\$\("#ptNum"\)\.value = "";[\s\S]*\$\("#ptX"\)\.value = "";[\s\S]*\$\("#ptY"\)\.value = "";[\s\S]*\$\("#ptZ"\)\.value = "";[\s\S]*\$\("#ptCode"\)\.value = "";[\s\S]*\$\("#ptNotes"\)\.value = "";[\s\S]*\}/, 'LineSmith should clear all primary point-editor fields when no point is selected.');
+});

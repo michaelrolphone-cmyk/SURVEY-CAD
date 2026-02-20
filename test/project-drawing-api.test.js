@@ -239,3 +239,65 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+test('relinking a drawing without drawingState rehydrates persisted points from the selected point file', async () => {
+  const app = await startServer();
+
+  try {
+    const createDrawingRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'Relink Without Drawing State',
+        drawingState: { points: [{ id: 'old-1', num: '1', x: 10, y: 20 }] },
+        pointFileLink: {
+          pointFileId: 'source-points',
+          pointFileName: 'Source Points.csv',
+        },
+      }),
+    });
+    assert.equal(createDrawingRes.status, 201);
+    const createdDrawing = await createDrawingRes.json();
+
+    const seedTargetPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/relinked-target`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileName: 'Relinked Target.csv',
+        pointFileState: {
+          text: '88,1000,2000,,NEW,Relinked source point',
+          exportFormat: 'csv',
+        },
+      }),
+    });
+    assert.equal(seedTargetPointFileRes.status, 201);
+
+    const relinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(createdDrawing.drawing.drawingId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileLink: {
+          pointFileId: 'Relinked Target.csv',
+          pointFileName: 'Relinked Target.csv',
+        },
+      }),
+    });
+    assert.equal(relinkRes.status, 200);
+    const relinked = await relinkRes.json();
+    assert.equal(relinked.drawing.linkedPointFileId, 'relinked-target');
+    assert.equal(relinked.drawing.currentState.points.length, 1);
+    assert.equal(relinked.drawing.currentState.points[0].num, '88');
+    assert.equal(relinked.drawing.currentState.points[0].x, 1000);
+    assert.equal(relinked.drawing.currentState.points[0].y, 2000);
+
+    const getAfterRelinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(createdDrawing.drawing.drawingId)}`);
+    assert.equal(getAfterRelinkRes.status, 200);
+    const loadedAfterRelink = await getAfterRelinkRes.json();
+    assert.equal(loadedAfterRelink.drawing.currentState.points.length, 1);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].num, '88');
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].x, 1000);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].y, 2000);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});

@@ -270,6 +270,15 @@ function normalizePointCode(point = {}) {
   return String(point?.code || '').trim().toUpperCase();
 }
 
+function normalizePointFileId(pointFileId = '') {
+  return String(pointFileId || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function normalizeLinkedPointFileReference(drawing = null) {
   return {
     projectId: String(drawing?.linkedPointFileProjectId || '').trim(),
@@ -1405,6 +1414,28 @@ export function createSurveyServer({
           const existingDrawing = payloadDrawingId
             ? await getProjectDrawing(localStorageSyncStore, projectId, payloadDrawingId)
             : null;
+          const hasDrawingState = hasDrawingStatePayload(body);
+          const normalizedPointFileLink = body?.pointFileLink && typeof body.pointFileLink === 'object'
+            ? {
+              projectId: String(body.pointFileLink.projectId || projectId).trim(),
+              pointFileId: normalizePointFileId(body.pointFileLink.pointFileId),
+              pointFileName: String(body.pointFileLink.pointFileName || '').trim(),
+            }
+            : null;
+          const shouldHydrateFromLinkedPointFile = !hasDrawingState && !!existingDrawing
+            && !!normalizedPointFileLink?.projectId
+            && !!normalizedPointFileLink?.pointFileId;
+          if (shouldHydrateFromLinkedPointFile) {
+            const hydratedSource = await hydrateDrawingStateFromLinkedPointFile(localStorageSyncStore, {
+              ...existingDrawing,
+              linkedPointFileProjectId: normalizedPointFileLink.projectId,
+              linkedPointFileId: normalizedPointFileLink.pointFileId,
+              linkedPointFileName: normalizedPointFileLink.pointFileName || normalizedPointFileLink.pointFileId,
+            });
+            if (hydratedSource?.currentState && typeof hydratedSource.currentState === 'object') {
+              body.drawingState = hydratedSource.currentState;
+            }
+          }
           const result = await createOrUpdateProjectDrawing(localStorageSyncStore, {
             projectId,
             drawingId: payloadDrawingId,
