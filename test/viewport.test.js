@@ -696,6 +696,9 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
 
   assert.match(html, /id="saveDrawingToProject"\s+class="ok"/, 'LineSmith should include a save-to-project action for drawings');
   assert.match(html, /id="openProjectDrawing"/, 'LineSmith should include an open-project drawing picker action in the project save section');
+  assert.match(html, /id="chooseDrawingPointFile"/, 'LineSmith should include a point-file chooser action for drawing linkage');
+  assert.match(html, /id="clearDrawingPointFile"/, 'LineSmith should include a clear point-file link action');
+  assert.match(html, /id="drawingPointFileHint"/, 'LineSmith should display current drawing point-file link status');
   assert.match(html, /id="quickOpenDrawing"\s+class="quickToolBtn"[\s\S]*fa-folder-open/, 'LineSmith quick toolbar should expose an open-project drawing icon button');
   assert.match(html, /id="restoreDrawingVersion"/, 'LineSmith should include a restore saved version action');
   assert.match(html, /const\s+PROJECT_DRAWING_STORAGE_PREFIX\s*=\s*"surveyfoundryLineSmithDrawing"/, 'LineSmith should persist drawing history using a dedicated local storage namespace');
@@ -703,14 +706,19 @@ test('VIEWPORT.HTML supports project-linked named differential drawing saves and
   assert.match(html, /function\s+applyStateDiff\(base, diff\)/, 'LineSmith should reconstruct drawing versions from differential history');
   assert.match(html, /async\s+function\s+saveDrawingToProject\(\)/, 'LineSmith should define drawing save handler');
   assert.match(html, /async\s+function\s+listProjectDrawings\(projectId\)/, 'LineSmith should define a project drawing listing helper for open-dialog choices');
+  assert.match(html, /async\s+function\s+listProjectPointFilesForDrawingLink\(projectId\)/, 'LineSmith should define a project point-file listing helper for drawing links');
+  assert.match(html, /async\s+function\s+promptChooseDrawingPointFile\(\)/, 'LineSmith should define a drawing point-file picker workflow');
+  assert.match(html, /function\s+setActiveDrawingPointFileLink\(link\s*=\s*null\)/, 'LineSmith should normalize and persist active drawing point-file link metadata in memory');
   assert.match(html, /async\s+function\s+promptOpenProjectDrawing\(\)/, 'LineSmith should define a drawing-open picker workflow');
   assert.ok(html.includes("const selection = window.prompt(`Open which drawing?\\n${optionList}`, '1');"), 'open drawing picker should present numbered drawing options in a prompt');
   assert.match(html, /const\s+selectedIndex\s*=\s*Number\.parseInt\(String\(selection\)\.trim\(\),\s*10\)\s*-\s*1;/, 'open drawing picker should parse selected option index from prompt input');
   assert.match(html, /if \(hasUnsavedDrawingChanges\(\)\) \{[\s\S]*window\.confirm\('You have unsaved changes in the current drawing\. Open another project drawing anyway\?'\);/, 'open drawing picker should confirm when the current drawing has unsaved edits');
   assert.match(html, /\$\("#openProjectDrawing"\)\.addEventListener\("click", \(\) => \{ void promptOpenProjectDrawing\(\); \}\);/, 'LineSmith should wire the panel open-project action to the drawing picker workflow');
+  assert.match(html, /\$\("#chooseDrawingPointFile"\)\?\.addEventListener\("click", \(\) => \{ void promptChooseDrawingPointFile\(\); \}\);/, 'LineSmith should wire drawing point-file chooser button to the picker workflow');
   assert.match(html, /\$\("#quickOpenDrawing"\)\?\.addEventListener\("click", \(\) => \$\("#openProjectDrawing"\)\?\.click\(\)\);/, 'quick toolbar open icon should route to the shared project drawing picker action');
   assert.match(html, /window\.prompt\("Name this drawing before saving:",\s*"Boundary Base Map"\)/, 'save workflow should prompt for a drawing name when blank');
   assert.match(html, /if \(drawingNameInput\) drawingNameInput\.value = drawingName;/, 'save workflow should write prompted drawing name back to input');
+  assert.match(html, /body:\s*JSON\.stringify\(\{ drawingId, drawingName, drawingState: currentState, pointFileLink: activeDrawingPointFileLink \|\| null \}\)/, 'drawing save payload should include selected point-file link metadata');
   assert.match(html, /versions\.push\(\{[\s\S]*diffFromPrevious:/, 'subsequent saves should append differential revisions');
   assert.match(html, /function\s+promptRestoreDrawingVersion\(\)/, 'LineSmith should expose saved version restore workflow');
   assert.ok(html.includes('.join("\\n")'), 'restore workflow should join version choices with escaped newline separators');
