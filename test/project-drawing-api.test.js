@@ -71,7 +71,7 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     const linkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points`);
     assert.equal(linkedPointFileRes.status, 200);
     const linkedPointFile = await linkedPointFileRes.json();
-    assert.equal(linkedPointFile.pointFile.currentState.text, 'p-1,3,2,,,\np-2,5,8,,,');
+    assert.equal(linkedPointFile.pointFile.currentState.text, 'p-1,2,3,,,\np-2,8,5,,,');
     assert.equal(linkedPointFile.pointFile.versions.length, 3);
     assert.equal(linkedPointFile.pointFile.source, 'linesmith-drawing');
     assert.deepEqual(linkedPointFile.pointFile.versions[0].actor, { app: 'linesmith-drawing', user: 'Jordan' });
@@ -121,8 +121,8 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     const loadedAfterRelink = await getAfterRelinkRes.json();
     assert.equal(loadedAfterRelink.drawing.currentState.points.length, 1);
     assert.equal(loadedAfterRelink.drawing.currentState.points[0].num, '900');
-    assert.equal(loadedAfterRelink.drawing.currentState.points[0].x, 700);
-    assert.equal(loadedAfterRelink.drawing.currentState.points[0].y, 800);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].x, 800);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].y, 700);
 
     const relinkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points-relinked`);
     assert.equal(relinkedPointFileRes.status, 200);
@@ -149,8 +149,8 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points.length, 1);
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].id, '200');
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].num, '200');
-    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].x, 1000.5);
-    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].y, 2000.5);
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].x, 2000.5);
+    assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].y, 1000.5);
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].code, 'IP');
     assert.equal(loadedAfterPointFileEdit.drawing.currentState.points[0].notes, 'Imported from PointForge');
 
@@ -187,8 +187,8 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     assert.equal(loadedPreserve.drawing.currentState.points.length, 1);
     assert.equal(loadedPreserve.drawing.currentState.points[0].id, 'internal-1');
     assert.equal(loadedPreserve.drawing.currentState.points[0].num, '100');
-    assert.equal(loadedPreserve.drawing.currentState.points[0].x, 101);
-    assert.equal(loadedPreserve.drawing.currentState.points[0].y, 202);
+    assert.equal(loadedPreserve.drawing.currentState.points[0].x, 202);
+    assert.equal(loadedPreserve.drawing.currentState.points[0].y, 101);
     assert.equal(loadedPreserve.drawing.currentState.points[0].z, 9.5);
 
     const createLayerResetRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
@@ -287,16 +287,68 @@ test('relinking a drawing without drawingState rehydrates persisted points from 
     assert.equal(relinked.drawing.linkedPointFileId, 'relinked-target');
     assert.equal(relinked.drawing.currentState.points.length, 1);
     assert.equal(relinked.drawing.currentState.points[0].num, '88');
-    assert.equal(relinked.drawing.currentState.points[0].x, 1000);
-    assert.equal(relinked.drawing.currentState.points[0].y, 2000);
+    assert.equal(relinked.drawing.currentState.points[0].x, 2000);
+    assert.equal(relinked.drawing.currentState.points[0].y, 1000);
 
     const getAfterRelinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(createdDrawing.drawing.drawingId)}`);
     assert.equal(getAfterRelinkRes.status, 200);
     const loadedAfterRelink = await getAfterRelinkRes.json();
     assert.equal(loadedAfterRelink.drawing.currentState.points.length, 1);
     assert.equal(loadedAfterRelink.drawing.currentState.points[0].num, '88');
-    assert.equal(loadedAfterRelink.drawing.currentState.points[0].x, 1000);
-    assert.equal(loadedAfterRelink.drawing.currentState.points[0].y, 2000);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].x, 2000);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].y, 1000);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
+
+
+test('linked point-file hydration honors Northing/Easting headers when re-associating drawings', async () => {
+  const app = await startServer();
+
+  try {
+    const createDrawingRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'Header Driven Relink',
+        drawingState: { points: [{ id: 'seed', num: '1', x: 10, y: 20 }] },
+      }),
+    });
+    assert.equal(createDrawingRes.status, 201);
+    const createdDrawing = await createDrawingRes.json();
+
+    const seedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/header-ne`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileName: 'Header NE.csv',
+        pointFileState: {
+          text: 'Point,Northing,Easting,Elevation,Code,Notes\n77,4444.25,3333.5,12.6,IP,Header mapping',
+          exportFormat: 'csv',
+        },
+      }),
+    });
+    assert.equal(seedPointFileRes.status, 201);
+
+    const relinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(createdDrawing.drawing.drawingId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileLink: {
+          pointFileId: 'header-ne',
+          pointFileName: 'Header NE.csv',
+        },
+      }),
+    });
+    assert.equal(relinkRes.status, 200);
+
+    const relinked = await relinkRes.json();
+    assert.equal(relinked.drawing.currentState.points.length, 1);
+    assert.equal(relinked.drawing.currentState.points[0].num, '77');
+    assert.equal(relinked.drawing.currentState.points[0].x, 3333.5);
+    assert.equal(relinked.drawing.currentState.points[0].y, 4444.25);
+    assert.equal(relinked.drawing.currentState.points[0].z, 12.6);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
   }

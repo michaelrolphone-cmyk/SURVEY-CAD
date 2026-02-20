@@ -219,14 +219,18 @@ function buildPointFileTextFromDrawingState(drawingState = {}) {
   return points
     .map((point, index) => {
       const number = point.num ?? point.number ?? point.pointNumber ?? point.name ?? point.id ?? index + 1;
-      const x = point.x ?? point.easting ?? '';
-      const y = point.y ?? point.northing ?? '';
+      const northing = point.y ?? point.northing ?? '';
+      const easting = point.x ?? point.easting ?? '';
       const z = point.z ?? point.elevation ?? '';
       const code = point.code ?? '';
       const notes = point.notes ?? point.description ?? '';
-      return [number, x, y, z, code, notes].map(toCsvValue).join(',');
+      return [number, northing, easting, z, code, notes].map(toCsvValue).join(',');
     })
     .join('\n');
+}
+
+function normalizePointFileHeader(value = '') {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
 function parseCsvLine(line = '') {
@@ -294,21 +298,64 @@ function hasLinkedPointFileReferenceChanged(previousDrawing = null, nextDrawing 
 }
 
 function buildDrawingPointsFromPointFileText(text = '') {
-  return String(text || '')
+  const rows = String(text || '')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'))
     .map((line) => parseCsvLine(line))
-    .filter((parts) => parts.length >= 3)
+    .filter((parts) => parts.length >= 3);
+  if (!rows.length) return [];
+
+  let startRow = 0;
+  let idx = { num: 0, northing: 1, easting: 2, z: 3, code: 4, notes: 5 };
+  const firstRowHeaders = rows[0].map((value) => normalizePointFileHeader(value));
+  const looksLikeHeader = firstRowHeaders.some((header) => new Set([
+    'point',
+    'pointnumber',
+    'number',
+    'num',
+    'northing',
+    'easting',
+    'n',
+    'e',
+    'x',
+    'y',
+  ]).has(header));
+  if (looksLikeHeader) {
+    const headerMap = new Map(firstRowHeaders.map((value, index) => [value, index]));
+    const pick = (...names) => {
+      for (const name of names) {
+        if (headerMap.has(name)) return headerMap.get(name);
+      }
+      return null;
+    };
+    startRow = 1;
+    idx = {
+      num: pick('pointnumber', 'number', 'num', 'point') ?? 0,
+      northing: pick('northing', 'north', 'n', 'y') ?? 1,
+      easting: pick('easting', 'east', 'e', 'x') ?? 2,
+      z: pick('elevation', 'elev', 'z') ?? 3,
+      code: pick('code', 'desc', 'description') ?? 4,
+      notes: pick('notes', 'note', 'comment', 'comments') ?? 5,
+    };
+  }
+
+  return rows
+    .slice(startRow)
     .map((parts) => {
-      const [pointNumber, x, y, z, code, notes] = parts;
+      const pointNumber = parts[idx.num];
+      const northing = parts[idx.northing];
+      const easting = parts[idx.easting];
+      const z = parts[idx.z];
+      const code = parts[idx.code];
+      const notes = parts[idx.notes];
       const normalizedPointNumber = String(pointNumber || '').trim();
       const normalizedCode = String(code || '').trim();
       const normalizedNotes = String(notes || '').trim();
       const point = {
         num: normalizedPointNumber,
-        x: toFiniteNumberOrRaw(x),
-        y: toFiniteNumberOrRaw(y),
+        x: toFiniteNumberOrRaw(easting),
+        y: toFiniteNumberOrRaw(northing),
         notes: normalizedNotes,
       };
       const normalizedZ = String(z || '').trim();
