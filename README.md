@@ -34,6 +34,50 @@ npm start
 
 The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
+## Idaho Parcel/CPNF harvest worker
+
+The server now includes a restartable background worker that harvests Idaho parcel + CPNF features, writes each record as GeoJSON, stores Mapbox/Leaflet-style GeoJSON tile buckets in object storage, and maintains a resume-safe master geolocation index GeoJSON file.
+
+### Worker API endpoints
+
+- `GET /api/idaho-harvest/status`
+- `POST /api/idaho-harvest/start`
+- `POST /api/idaho-harvest/stop`
+
+### Object store layout (GeoJSON)
+
+- Feature objects: `surveycad/idaho-harvest/features/id/<dataset>/<objectId>.geojson`
+  - `cpnf` dataset writes into MinIO bucket `cpnfs`
+  - `parcels` dataset writes into MinIO bucket `tile-server`
+- Tile buckets: `surveycad/idaho-harvest/tiles/id/<dataset>/<z>/<x>/<y>.geojson` (MinIO bucket `tile-server`)
+- Master index: `surveycad/idaho-harvest/indexes/id-master-index.geojson` (MinIO bucket `tile-server`)
+- Checkpoint state: `surveycad/idaho-harvest/checkpoints/id.json` (MinIO bucket `tile-server`)
+
+### Worker runtime environment
+
+- `IDAHO_HARVEST_AUTOSTART` (set to `1` to auto-start the worker on server boot)
+- `IDAHO_HARVEST_BATCH_SIZE` (ArcGIS page size, default: `100`)
+- `IDAHO_HARVEST_POLL_INTERVAL_MS` (delay between batches, default: `1000`)
+- `IDAHO_HARVEST_PARCEL_LAYER` (default: `24`)
+- `IDAHO_HARVEST_CPNF_LAYER` (default: `18`)
+- `STACKHERO_MINIO_HOST` (required; worker will fail fast when MinIO is not configured)
+- `STACKHERO_MINIO_ACCESS_KEY`
+- `STACKHERO_MINIO_SECRET_KEY`
+- `STACKHERO_MINIO_PORT` (default: `443`)
+- `STACKHERO_MINIO_USE_SSL` (default: `true`)
+- `IDAHO_HARVEST_MINIO_DEFAULT_BUCKET` (default: `tile-server`)
+- `IDAHO_HARVEST_MINIO_CPNF_BUCKET` (default: `cpnfs`)
+- `IDAHO_HARVEST_MINIO_TILE_BUCKET` (default: `tile-server`)
+- `IDAHO_HARVEST_MINIO_PARCELS_BUCKET` (default: `tile-server`)
+- `IDAHO_HARVEST_MINIO_INDEX_BUCKET` (default: `tile-server`)
+- `IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET` (default: `tile-server`)
+
+### Commands
+
+- Start server (autostarts worker unless disabled): `npm start`
+- Run tests: `npm test`
+
+
 
 ## API and CLI notes for Marks LLM long-running chat streaming
 
