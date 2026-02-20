@@ -332,8 +332,8 @@ function buildDrawingPointsFromPointFileText(text = '') {
     startRow = 1;
     idx = {
       num: pick('pointnumber', 'number', 'num', 'point') ?? 0,
-      northing: pick('northing', 'north', 'n', 'y') ?? 1,
-      easting: pick('easting', 'east', 'e', 'x') ?? 2,
+      northing: pick('northing', 'north', 'n', 'x', 'y') ?? 1,
+      easting: pick('easting', 'east', 'e', 'y', 'x') ?? 2,
       z: pick('elevation', 'elev', 'z') ?? 3,
       code: pick('code', 'desc', 'description') ?? 4,
       notes: pick('notes', 'note', 'comment', 'comments') ?? 5,

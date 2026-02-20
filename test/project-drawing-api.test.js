@@ -353,3 +353,54 @@ test('linked point-file hydration honors Northing/Easting headers when re-associ
     await new Promise((resolve) => app.server.close(resolve));
   }
 });
+
+test('linked point-file hydration treats X/Y headers as Northing/Easting order when re-associating drawings', async () => {
+  const app = await startServer();
+
+  try {
+    const createDrawingRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drawingName: 'XY Header Relink',
+        drawingState: { points: [{ id: 'seed', num: '1', x: 10, y: 20 }] },
+      }),
+    });
+    assert.equal(createDrawingRes.status, 201);
+    const createdDrawing = await createDrawingRes.json();
+
+    const seedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/header-xy`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileName: 'Header XY.csv',
+        pointFileState: {
+          text: 'Point,X,Y,Elevation,Code,Notes\n77,4444.25,3333.5,12.6,IP,Header mapping',
+          exportFormat: 'csv',
+        },
+      }),
+    });
+    assert.equal(seedPointFileRes.status, 201);
+
+    const relinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(createdDrawing.drawing.drawingId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileLink: {
+          pointFileId: 'header-xy',
+          pointFileName: 'Header XY.csv',
+        },
+      }),
+    });
+    assert.equal(relinkRes.status, 200);
+
+    const relinked = await relinkRes.json();
+    assert.equal(relinked.drawing.currentState.points.length, 1);
+    assert.equal(relinked.drawing.currentState.points[0].num, '77');
+    assert.equal(relinked.drawing.currentState.points[0].x, 3333.5);
+    assert.equal(relinked.drawing.currentState.points[0].y, 4444.25);
+    assert.equal(relinked.drawing.currentState.points[0].z, 12.6);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+  }
+});
