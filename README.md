@@ -7,6 +7,7 @@ SURVEY-CAD is a Node.js toolkit and web server for survey workflows. It includes
 - Command-line tools for survey lookups, project file generation, FLD parsing, point localization, and ROS basis-of-bearing extraction.
 - Static browser tools served from the repository root.
   - LineSmith (`VIEWPORT.HTML`) points manager includes row tinting by layer color and optional grouping by Layer or Code for large point sets.
+- EvidenceDesk (`PROJECT_BROWSER.html`) supports inline ROS-number metadata on uploaded PDFs in the ROS folder and LineSmith point-inspector ROS evidence links.
 
 ## Requirements
 

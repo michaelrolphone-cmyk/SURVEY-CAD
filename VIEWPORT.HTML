@@ -8234,6 +8234,56 @@ function paintBackground(ctx, w, h){
     return [...merged];
   }
 
+  function normalizeRosNumber(value = "") {
+    return String(value || "").trim().toUpperCase();
+  }
+
+  function parseRosNumbers(value = "") {
+    const raw = String(value ?? "").trim();
+    if (!raw) return [];
+    const parts = raw
+      .split(/[\,;|\n]+/)
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+    return [...new Set(parts)];
+  }
+
+  function collectPointRosReferences(point) {
+    if (!point) return [];
+    const refs = new Set(parseRosNumbers(point.rosRefs || ""));
+    return [...refs];
+  }
+
+  function buildRosResourceLookup(projectId) {
+    if (!projectId) return new Map();
+    let projectFile;
+    try {
+      const raw = localStorage.getItem(projectFileStorageKey(projectId));
+      projectFile = raw ? JSON.parse(raw) : null;
+    } catch {
+      projectFile = null;
+    }
+    if (!Array.isArray(projectFile?.folders)) return new Map();
+
+    const lookup = new Map();
+    for (const folder of projectFile.folders) {
+      if (folder?.key !== "ros") continue;
+      for (const entry of folder?.index || []) {
+        const metadata = entry?.reference?.metadata || {};
+        const rosNumber = String(metadata?.rosNumber || "").trim();
+        const downloadUrl = String(entry?.reference?.value || "").trim();
+        const exportFormat = String(entry?.exportFormat || "").toLowerCase();
+        if (!rosNumber || !downloadUrl || exportFormat !== "pdf") continue;
+        lookup.set(normalizeRosNumber(rosNumber), {
+          rosNumber,
+          title: String(entry?.title || metadata?.fileName || 'ROS PDF').trim(),
+          href: downloadUrl,
+        });
+      }
+    }
+    return lookup;
+  }
+
   function readPointFieldValues(basePoint, fields) {
     if (!basePoint) return null;
     const getValue = (key, fallback) => {
@@ -8247,7 +8297,8 @@ function paintBackground(ctx, w, h){
       y: getValue("y", basePoint.y),
       z: getValue("z", basePoint.z),
       code: getValue("code", basePoint.code),
-      notes: getValue("notes", basePoint.notes)
+      notes: getValue("notes", basePoint.notes),
+      rosRefs: getValue("rosRefs", basePoint.rosRefs || "")
     };
   }
 
@@ -8319,6 +8370,7 @@ function paintBackground(ctx, w, h){
         point.z = parseNum(values.z, point.z);
         if (setPointCode(point, String(values.code ?? point.code))) pointCodeChanged = true;
         point.notes = String(values.notes ?? point.notes);
+        point.rosRefs = String(values.rosRefs ?? point.rosRefs ?? "");
       }
 
       if (pointCodeChanged) {
@@ -8414,8 +8466,8 @@ function paintBackground(ctx, w, h){
         point[key] = parseNum(rawValue, point[key]);
       } else if (key === "code") {
         if (setPointCode(point, String(rawValue ?? point[key]))) pointCodeChanged = true;
-      } else if (key === "notes") {
-        point[key] = String(rawValue ?? point[key]);
+      } else if (key === "notes" || key === "rosRefs") {
+        point[key] = String(rawValue ?? point[key] ?? "");
       }
     }
     if (pointCodeChanged) {
@@ -8441,7 +8493,8 @@ function paintBackground(ctx, w, h){
       ["Y", "y"],
       ["Z", "z"],
       ["Code", "code"],
-      ["Notes", "notes"]
+["Notes", "notes"],
+      ["ROS Refs", "rosRefs"]
     ];
     const summary = summarizeSelectedPointValues(selectedPoints, fieldSpecs.map(([, key]) => key));
 
@@ -8531,7 +8584,8 @@ function paintBackground(ctx, w, h){
       ["Y", "y", p.y],
       ["Z", "z", p.z],
       ["Code", "code", p.code || ""],
-      ["Notes", "notes", p.notes || ""]
+      ["Notes", "notes", p.notes || ""],
+      ["ROS Refs", "rosRefs", p.rosRefs || ""]
     ];
 
     const inspectorFields = {};
@@ -8590,6 +8644,34 @@ function paintBackground(ctx, w, h){
         a.target = "_blank";
         a.rel = "noopener noreferrer";
         a.textContent = `Open ${instrument}`;
+        links.appendChild(a);
+      }
+      pointInspector.appendChild(links);
+    }
+
+    const rosReferences = collectPointRosReferences(p);
+    const rosRow = document.createElement("div");
+    rosRow.className = "inspectorRow";
+    const rosLabel = document.createElement("span");
+    rosLabel.textContent = "ROS refs";
+    const rosValue = document.createElement("b");
+    rosValue.textContent = rosReferences.length ? rosReferences.join(", ") : "None";
+    rosRow.append(rosLabel, rosValue);
+    pointInspector.appendChild(rosRow);
+
+    const rosLookup = buildRosResourceLookup(activeProjectId);
+    const linkedRos = rosReferences
+      .map((rosNumber) => rosLookup.get(normalizeRosNumber(rosNumber)))
+      .filter(Boolean);
+    if (linkedRos.length) {
+      const links = document.createElement("div");
+      links.className = "inspectorLinks";
+      for (const ros of linkedRos) {
+        const a = document.createElement("a");
+        a.href = ros.href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = `Open ROS ${ros.rosNumber}`;
         links.appendChild(a);
       }
       pointInspector.appendChild(links);

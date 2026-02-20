@@ -24,6 +24,7 @@ function buildResource({ projectId, folderKey, record }) {
         uploadedAt: record.createdAt,
         updatedAt: record.updatedAt,
         sizeBytes: record.sizeBytes,
+        rosNumber: record.rosNumber || null,
         thumbnailUrl: record.thumbnailBase64 ? buildImageThumbnailPath(projectId, folderKey, record.storedName) : null,
       },
     },
@@ -39,7 +40,7 @@ export class InMemoryEvidenceDeskFileStore {
     return `${projectId}::${folderKey}::${fileName}`;
   }
 
-  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const timestamp = Date.now();
     const storedName = `${timestamp}-${sanitizeSegment(originalFileName)}`;
     const id = `upload-${sanitizeSegment(originalFileName.replace(/\.[^.]+$/, '')).replace(/_/g, '-')}-${timestamp}`;
@@ -53,6 +54,7 @@ export class InMemoryEvidenceDeskFileStore {
       extension,
       mimeType,
       sizeBytes: buffer.length,
+      rosNumber: String(rosNumber || '').trim() || null,
       createdAt: now,
       updatedAt: now,
       dataBase64: Buffer.from(buffer).toString('base64'),
@@ -73,7 +75,7 @@ export class InMemoryEvidenceDeskFileStore {
     };
   }
 
-  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const existing = await this.getFile(projectId, folderKey, fileName);
     if (!existing) return null;
     const updatedAt = new Date().toISOString();
@@ -83,6 +85,7 @@ export class InMemoryEvidenceDeskFileStore {
       extension: extension || existing.extension,
       mimeType: mimeType || existing.mimeType,
       sizeBytes: buffer.length,
+      rosNumber: String(rosNumber || '').trim() || null,
       updatedAt,
       dataBase64: Buffer.from(buffer).toString('base64'),
       thumbnailBase64: thumbnailBuffer ? Buffer.from(thumbnailBuffer).toString('base64') : null,
@@ -130,6 +133,7 @@ export class InMemoryEvidenceDeskFileStore {
         fileName: record.storedName,
         title: record.originalFileName,
         sizeBytes: record.sizeBytes,
+        rosNumber: record.rosNumber || null,
         uploadedAt: record.createdAt,
         updatedAt: record.updatedAt,
       });
@@ -162,7 +166,7 @@ export class RedisEvidenceDeskFileStore {
     return `${this.prefix}:index:${projectId}:${folderKey}`;
   }
 
-  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async createFile({ projectId, folderKey, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const timestamp = Date.now();
     const storedName = `${timestamp}-${sanitizeSegment(originalFileName)}`;
     const id = `upload-${sanitizeSegment(originalFileName.replace(/\.[^.]+$/, '')).replace(/_/g, '-')}-${timestamp}`;
@@ -176,6 +180,7 @@ export class RedisEvidenceDeskFileStore {
       extension,
       mimeType,
       sizeBytes: buffer.length,
+      rosNumber: String(rosNumber || '').trim() || null,
       createdAt: now,
       updatedAt: now,
       thumbnailMimeType: thumbnailMimeType || null,
@@ -207,7 +212,7 @@ export class RedisEvidenceDeskFileStore {
     };
   }
 
-  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, thumbnailBuffer = null, thumbnailMimeType = null }) {
+  async updateFile({ projectId, folderKey, fileName, originalFileName, buffer, extension, mimeType, rosNumber = '', thumbnailBuffer = null, thumbnailMimeType = null }) {
     const existing = await this.getFile(projectId, folderKey, fileName);
     if (!existing) return null;
     const record = {
@@ -216,6 +221,7 @@ export class RedisEvidenceDeskFileStore {
       extension: extension || existing.extension,
       mimeType: mimeType || existing.mimeType,
       sizeBytes: buffer.length,
+      rosNumber: String(rosNumber || '').trim() || null,
       updatedAt: new Date().toISOString(),
       thumbnailMimeType: thumbnailMimeType || null,
     };
@@ -301,6 +307,7 @@ export class RedisEvidenceDeskFileStore {
           fileName,
           title: parsed.originalFileName,
           sizeBytes: parsed.sizeBytes,
+          rosNumber: parsed.rosNumber || null,
           uploadedAt: parsed.createdAt,
           updatedAt: parsed.updatedAt,
         });

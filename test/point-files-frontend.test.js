@@ -38,6 +38,11 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /Uploading \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\} \(\$\{progress\}%\)/, 'EvidenceDesk should include percentage progress updates for uploaded files.');
   assert.match(html, /className\s*=\s*'upload-progress'/, 'EvidenceDesk should render a dedicated upload progress bar element.');
   assert.match(html, /context\.setUploadProgress\(progress\);/, 'EvidenceDesk should drive upload progress updates from XHR progress events.');
+  assert.match(html, /class="ros-number-pill"/, 'EvidenceDesk should display assigned ROS numbers inline on uploaded file rows.');
+  assert.match(html, /if \(isServerPdf && folder\.key === 'ros'\)/, 'EvidenceDesk should only expose ROS metadata controls inline inside the ROS folder.');
+  assert.match(html, /rosInlineInput\.placeholder\s*=\s*'ROS #'/, 'EvidenceDesk should render an inline ROS number input on ROS PDF rows.');
+  assert.match(html, /rosButton\.textContent\s*=\s*'Save ROS #'/, 'EvidenceDesk should persist ROS numbers via an inline Save ROS # action.');
+  assert.match(html, /setRosNumberForUploadedResource\(folder, entry, rosInlineInput\.value, projectContext\)/, 'EvidenceDesk should save the inline ROS input value without prompting during upload.');
   assert.match(html, /addUploadStatusListener\(listener\)\s*\{[\s\S]*listener\(this\.uploadStatus,\s*this\.uploadProgress\);/, 'EvidenceDesk should immediately hydrate upload status/progress listeners so indicators update live.');
   assert.match(html, /const\s+canLaunchPointForge\s*=\s*folder\.key\s*===\s*'point-files'[\s\S]*isPointFileFormat/, 'EvidenceDesk should gate PointForge launch behavior behind point-file format checks.');
 });

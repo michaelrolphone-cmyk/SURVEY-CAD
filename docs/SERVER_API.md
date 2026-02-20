@@ -385,10 +385,11 @@ Create a new uploaded file in EvidenceDesk project storage.
 | `projectId` | `string` | Yes | Target project ID |
 | `folderKey` | `string` | Yes | Target folder (see valid keys below) |
 | `file` | `binary` | Yes | The file to upload (max 50 MB) |
+| `rosNumber` | `string` | No | Optional ROS map number stored with uploaded PDF metadata for LineSmith point-inspector linking |
 
 **Valid `folderKey` values:** `drawings`, `ros`, `cpfs`, `point-files`, `deeds`, `plats`, `invoices`, `other`
 
-**Response `201`:** Returns `resource` metadata with `reference.value` download URL. Image uploads also include `reference.metadata.thumbnailUrl`, pointing to a generated 512px-wide PNG preview.
+**Response `201`:** Returns `resource` metadata with `reference.value` download URL. Image uploads also include `reference.metadata.thumbnailUrl`, pointing to a generated 512px-wide PNG preview. When provided, `reference.metadata.rosNumber` stores the ROS map number for downstream LineSmith linking.
 
 **Response `413`:** Returned immediately when `Content-Length` exceeds the 50 MB upload limit.
 
@@ -406,6 +407,7 @@ Update an existing uploaded file (replace file contents in Redis).
 | `folderKey` | `string` | Yes | Folder containing the file |
 | `fileName` | `string` | Yes | Stored filename to update |
 | `file` | `binary` | Yes | New file content |
+| `rosNumber` | `string` | No | Optional ROS map number to set or clear while updating the file |
 
 **Response `200`:** Returns updated `resource` metadata. Image updates regenerate `reference.metadata.thumbnailUrl` previews.
 
@@ -479,7 +481,8 @@ List uploaded files for a project, grouped by folder.
       "title": "my-drawing.dxf",
       "sizeBytes": 1024,
       "uploadedAt": "2026-02-16T00:00:00.000Z",
-      "updatedAt": "2026-02-16T00:00:00.000Z"
+      "updatedAt": "2026-02-16T00:00:00.000Z",
+      "rosNumber": "84-123"
     }
   ],
   "filesByFolder": {
@@ -490,7 +493,8 @@ List uploaded files for a project, grouped by folder.
         "title": "my-drawing.dxf",
         "sizeBytes": 1024,
         "uploadedAt": "2026-02-16T00:00:00.000Z",
-        "updatedAt": "2026-02-16T00:00:00.000Z"
+        "updatedAt": "2026-02-16T00:00:00.000Z",
+        "rosNumber": "84-123"
       }
     ]
   }

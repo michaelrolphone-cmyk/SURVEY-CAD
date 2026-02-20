@@ -778,6 +778,10 @@ test('server file upload CRUD and list endpoints', async () => {
       '',
       'drawings',
       `--${boundary}`,
+      'Content-Disposition: form-data; name="rosNumber"',
+      '',
+      '84-123',
+      `--${boundary}`,
       'Content-Disposition: form-data; name="file"; filename="test-drawing.dxf"',
       'Content-Type: application/octet-stream',
       '',
@@ -798,6 +802,7 @@ test('server file upload CRUD and list endpoints', async () => {
     assert.equal(uploadPayload.resource.exportFormat, 'dxf');
     assert.equal(uploadPayload.resource.reference.type, 'server-upload');
     assert.ok(uploadPayload.resource.reference.value.includes('/api/project-files/download'));
+    assert.equal(uploadPayload.resource.reference.metadata.rosNumber, '84-123');
 
     // Download the file
     const downloadUrl = `http://127.0.0.1:${app.port}${uploadPayload.resource.reference.value}`;
@@ -814,6 +819,7 @@ test('server file upload CRUD and list endpoints', async () => {
     assert.equal(listPayload.files.length, 1);
     assert.equal(listPayload.files[0].folderKey, 'drawings');
     assert.ok(Array.isArray(listPayload.filesByFolder.drawings));
+    assert.equal(listPayload.files[0].rosNumber, '84-123');
 
     const storedFileName = uploadPayload.resource.reference.metadata.storedName;
 
@@ -832,6 +838,10 @@ test('server file upload CRUD and list endpoints', async () => {
       '',
       storedFileName,
       `--${updateBoundary}`,
+      'Content-Disposition: form-data; name="rosNumber"',
+      '',
+      '84-456',
+      `--${updateBoundary}`,
       'Content-Disposition: form-data; name="file"; filename="test-drawing-updated.dxf"',
       'Content-Type: application/octet-stream',
       '',
@@ -845,6 +855,8 @@ test('server file upload CRUD and list endpoints', async () => {
       body: updatedBody,
     });
     assert.equal(updateRes.status, 200);
+    const updatedUploadPayload = await updateRes.json();
+    assert.equal(updatedUploadPayload?.resource?.reference?.metadata?.rosNumber, '84-456');
 
     const updatedDownloadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/download?projectId=${encodeURIComponent(testProjectId)}&folderKey=drawings&fileName=${encodeURIComponent(storedFileName)}`);
     assert.equal(updatedDownloadRes.status, 200);
