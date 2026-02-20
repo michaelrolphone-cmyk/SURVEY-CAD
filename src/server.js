@@ -2724,6 +2724,10 @@ export function createSurveyServer({
           sendJson(res, 404, { error: 'Map tile not found.' });
           return;
         }
+        if (payload == null) {
+          sendJson(res, 404, { error: 'Map tile not found.' });
+          return;
+        }
 
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/geo+json; charset=utf-8');

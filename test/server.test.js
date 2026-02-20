@@ -756,6 +756,7 @@ test('server map tile endpoint returns GeoJSON tiles from object storage', async
       async getObject(key, options = {}) {
         calls.push({ key, options });
         if (key.endsWith('/15/11023/12345.geojson')) return Buffer.from(tilePayload, 'utf8');
+        if (key.endsWith('/15/11023/55555.geojson')) return null;
         throw new Error('missing');
       },
     },
@@ -772,6 +773,9 @@ test('server map tile endpoint returns GeoJSON tiles from object storage', async
 
     const missingTileRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles/parcels/15/11023/99999.geojson`);
     assert.equal(missingTileRes.status, 404);
+
+    const nullTileRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles/parcels/15/11023/55555.geojson`);
+    assert.equal(nullTileRes.status, 404);
 
     const unknownDatasetRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles/unknown/15/11023/12345.geojson`);
     assert.equal(unknownDatasetRes.status, 404);
