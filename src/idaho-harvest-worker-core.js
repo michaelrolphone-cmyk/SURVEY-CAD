@@ -47,20 +47,68 @@ function pointInRing(point, ring = []) {
   return inside;
 }
 
+function mercatorToLonLat(x, y) {
+  const lon = (x / 20037508.34) * 180;
+  const latRadians = Math.atan(Math.sinh((Number(y) / 20037508.34) * Math.PI));
+  const lat = (latRadians * 180) / Math.PI;
+  return { lon, lat };
+}
+
+function detectGeometryWkid(geometry = {}) {
+  const candidate = geometry?.spatialReference?.latestWkid
+    ?? geometry?.spatialReference?.wkid
+    ?? geometry?.latestWkid
+    ?? geometry?.wkid;
+  const wkid = Number(candidate);
+  return Number.isInteger(wkid) ? wkid : null;
+}
+
+function normalizeGeometryCoord(x, y, wkid = null) {
+  const numericX = Number(x);
+  const numericY = Number(y);
+  if (!Number.isFinite(numericX) || !Number.isFinite(numericY)) return null;
+
+  const isWebMercator = wkid === 102100 || wkid === 3857 || wkid === 102113;
+  const likelyWebMercator = (Math.abs(numericX) > 180 || Math.abs(numericY) > 90)
+    && Math.abs(numericX) <= 20037508.342789244
+    && Math.abs(numericY) <= 20037508.342789244;
+
+  if (isWebMercator || likelyWebMercator) {
+    return mercatorToLonLat(numericX, numericY);
+  }
+
+  return { lon: numericX, lat: numericY };
+}
+
 export function arcgisGeometryToGeoJson(geometry = {}) {
+  const wkid = detectGeometryWkid(geometry);
+
   if (Number.isFinite(Number(geometry.x)) && Number.isFinite(Number(geometry.y))) {
-    return { type: 'Point', coordinates: [Number(geometry.x), Number(geometry.y)] };
+    const normalized = normalizeGeometryCoord(geometry.x, geometry.y, wkid);
+    if (!normalized) return null;
+    return { type: 'Point', coordinates: [normalized.lon, normalized.lat] };
   }
 
   if (Array.isArray(geometry.paths) && geometry.paths.length) {
-    const lines = geometry.paths.map((line) => normalizeRing(line).slice(0, -1)).filter((line) => line.length >= 2);
+    const lines = geometry.paths
+      .map((line) => normalizeRing(line)
+        .map((coord) => normalizeGeometryCoord(coord[0], coord[1], wkid))
+        .filter(Boolean)
+        .map((coord) => [coord.lon, coord.lat])
+        .slice(0, -1))
+      .filter((line) => line.length >= 2);
     if (!lines.length) return null;
     if (lines.length === 1) return { type: 'LineString', coordinates: lines[0] };
     return { type: 'MultiLineString', coordinates: lines };
   }
 
   if (Array.isArray(geometry.rings) && geometry.rings.length) {
-    const rings = geometry.rings.map((ring) => normalizeRing(ring)).filter((ring) => ring.length >= 4);
+    const rings = geometry.rings
+      .map((ring) => normalizeRing(ring)
+        .map((coord) => normalizeGeometryCoord(coord[0], coord[1], wkid))
+        .filter(Boolean)
+        .map((coord) => [coord.lon, coord.lat]))
+      .filter((ring) => ring.length >= 4);
     if (!rings.length) return null;
 
     const outers = [];
@@ -93,8 +141,9 @@ export function arcgisGeometryToGeoJson(geometry = {}) {
 
 export function computeFeatureCenter(feature = {}) {
   const geometry = feature?.geometry || {};
+  const wkid = detectGeometryWkid(geometry);
   if (Number.isFinite(Number(geometry.x)) && Number.isFinite(Number(geometry.y))) {
-    return { lon: Number(geometry.x), lat: Number(geometry.y) };
+    return normalizeGeometryCoord(geometry.x, geometry.y, wkid) || { lon: null, lat: null };
   }
 
   const collect = [];
@@ -103,9 +152,8 @@ export function computeFeatureCenter(feature = {}) {
       if (!Array.isArray(part)) continue;
       for (const coord of part) {
         if (!Array.isArray(coord) || coord.length < 2) continue;
-        const x = Number(coord[0]);
-        const y = Number(coord[1]);
-        if (Number.isFinite(x) && Number.isFinite(y)) collect.push({ x, y });
+        const normalized = normalizeGeometryCoord(coord[0], coord[1], wkid);
+        if (normalized) collect.push({ x: normalized.lon, y: normalized.lat });
       }
     }
   };
