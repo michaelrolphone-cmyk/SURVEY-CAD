@@ -179,6 +179,13 @@
         let crewItems = crew.map((member)=> `<option value="${member.id}">${member.firstName} ${member.lastName}</option>`);
         rodman.innerHTML = crewItems.join("\n");
     }
+
+    function getRodmanName(rodmanId) {
+      if (!rodmanId) return '—';
+      const member = crew.find((m) => m.id === rodmanId);
+      if (member) return `${member.firstName} ${member.lastName}`.trim();
+      return rodmanId; // fallback: display raw value for legacy data
+    }
     function loadLogs() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -332,7 +339,7 @@
             <span class="log-card-time">${formatDateTime(log.createdAt)}</span>
           </div>
           <div class="log-card-details">
-            <div class="log-card-field"><strong>Rodman:</strong> ${esc(log.rodman) || '—'}</div>
+            <div class="log-card-field"><strong>Rodman:</strong> ${esc(getRodmanName(log.rodman))}</div>
             <div class="log-card-field"><strong>Height:</strong> ${esc(log.equipmentHeight) || '—'}</div>
             <div class="log-card-field"><strong>Ref Point:</strong> ${esc(log.referencePoint) || '—'}</div>
             <div class="log-card-field"><strong>Setup Time:</strong> ${formatDateTime(log.setupTime)}</div>
