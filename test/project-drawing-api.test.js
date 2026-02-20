@@ -97,10 +97,31 @@ test('project drawing CRUD API stores drawing versions and supports list/get/del
     const oldPointFile = await oldPointFileRes.json();
     assert.equal(oldPointFile.pointFile.versions.length, 3);
 
+    const seededRelinkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points-relinked`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pointFileName: 'Boundary Points Relinked.csv',
+        pointFileState: {
+          text: '900,700,800,9,NEW,Relink Target',
+          exportFormat: 'csv',
+        },
+      }),
+    });
+    assert.equal(seededRelinkedPointFileRes.status, 201);
+
+    const getAfterRelinkRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/drawings/${encodeURIComponent(drawingId)}`);
+    assert.equal(getAfterRelinkRes.status, 200);
+    const loadedAfterRelink = await getAfterRelinkRes.json();
+    assert.equal(loadedAfterRelink.drawing.currentState.points.length, 1);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].num, '900');
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].x, 700);
+    assert.equal(loadedAfterRelink.drawing.currentState.points[0].y, 800);
+
     const relinkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points-relinked`);
     assert.equal(relinkedPointFileRes.status, 200);
     const relinkedPointFile = await relinkedPointFileRes.json();
-    assert.equal(relinkedPointFile.pointFile.currentState.text, 'p-1,3,2,,,\np-2,5,8,,,');
+    assert.equal(relinkedPointFile.pointFile.currentState.text, '900,700,800,9,NEW,Relink Target');
     assert.equal(relinkedPointFile.pointFile.versions.length, 1);
 
     const editLinkedPointFileRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/point-files/boundary-points-relinked`, {
