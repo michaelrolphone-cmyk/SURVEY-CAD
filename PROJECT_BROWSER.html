@@ -254,9 +254,33 @@
 
     .file-name {
       display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.2rem;
+      min-width: 0;
+    }
+
+    .file-name-primary {
+      display: flex;
       align-items: baseline;
       gap: 0.3rem;
       min-width: 0;
+    }
+
+    .association-list {
+      margin: 0.1rem 0 0 1.25rem;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.1rem;
+      font-size: 0.76rem;
+      color: #cbd5e1;
+    }
+
+    .association-list-item {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .file-preview-slot {
@@ -439,10 +463,57 @@
             versionCount: Number(drawing.versionCount) || 0,
             latestVersionId: drawing.latestVersionId || null,
             latestMapGeoreference: drawing.latestMapGeoreference || null,
+            linkedPointFileProjectId: drawing.linkedPointFileProjectId || null,
+            linkedPointFileId: drawing.linkedPointFileId || null,
+            linkedPointFileName: drawing.linkedPointFileName || null,
             updatedAt: drawing.updatedAt || null,
             storageKey: buildProjectDrawingStorageKey(projectId, drawingId),
           },
         },
+      };
+    }
+
+    function normalizeAssociationId(value = '') {
+      return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\.([a-z0-9]+)$/i, '')
+        .replace(/^linesmith-/, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function buildDrawingAssociationIndex(projectFile = {}) {
+      const folders = Array.isArray(projectFile?.folders) ? projectFile.folders : [];
+      const pointFolder = folders.find((folder) => folder?.key === 'point-files');
+      const drawingFolder = folders.find((folder) => folder?.key === 'drawings');
+
+      const pointFileNameById = new Map();
+      for (const pointFile of pointFolder?.index || []) {
+        const pointFileId = normalizeAssociationId(pointFile?.reference?.metadata?.pointFileId || pointFile?.reference?.value || pointFile?.id || '');
+        if (!pointFileId) continue;
+        pointFileNameById.set(pointFileId, pointFile?.title || pointFile?.id || 'Point File');
+      }
+
+      const drawingsByPointFileId = new Map();
+      const pointFileByDrawingId = new Map();
+      for (const drawing of drawingFolder?.index || []) {
+        const drawingId = normalizeAssociationId(drawing?.reference?.metadata?.drawingId || drawing?.reference?.value || drawing?.id || '');
+        const linkedPointFileId = normalizeAssociationId(drawing?.reference?.metadata?.linkedPointFileId || '');
+        if (!drawingId || !linkedPointFileId) continue;
+        const drawingTitle = drawing?.title || drawing?.id || 'Drawing';
+        const linkedPointFileName = drawing?.reference?.metadata?.linkedPointFileName
+          || pointFileNameById.get(linkedPointFileId)
+          || linkedPointFileId;
+        const associatedDrawings = drawingsByPointFileId.get(linkedPointFileId) || [];
+        associatedDrawings.push(drawingTitle);
+        drawingsByPointFileId.set(linkedPointFileId, associatedDrawings);
+        pointFileByDrawingId.set(drawingId, linkedPointFileName);
+      }
+
+      return {
+        drawingsByPointFileId,
+        pointFileByDrawingId,
       };
     }
 
@@ -1487,6 +1558,8 @@
 
       treeContainer.appendChild(createFileUploadPanel(projectContext));
 
+      const associationIndex = buildDrawingAssociationIndex(projectFile);
+
       for (const folder of projectFile.folders || []) {
         const folderRow = document.createElement('div');
         folderRow.className = 'folder-row';
@@ -1589,7 +1662,19 @@
           const equipmentAuditPillMarkup = pointFileSource === 'equipment-log'
             ? `<span class="ros-number-pill" title="${pointFileSourceLabel || 'Attached from Equipment Log'}">Equip Log</span>`
             : '';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}${pointPillMarkup}${equipmentAuditPillMarkup}</span></span>`;
+          const pointFileAssociations = associationIndex.drawingsByPointFileId.get(
+            normalizeAssociationId(entry?.reference?.metadata?.pointFileId || entry?.reference?.value || entry?.id || ''),
+          ) || [];
+          const drawingAssociationName = associationIndex.pointFileByDrawingId.get(
+            normalizeAssociationId(entry?.reference?.metadata?.drawingId || entry?.reference?.value || entry?.id || ''),
+          ) || '';
+          const pointFileAssociationMarkup = folder.key === 'point-files' && pointFileAssociations.length
+            ? `<ul class="association-list" title="LineSmith drawings associated with this point file">${pointFileAssociations.map((title) => `<li class="association-list-item">↳ Drawing: ${title}</li>`).join('')}</ul>`
+            : '';
+          const drawingAssociationMarkup = folder.key === 'drawings' && drawingAssociationName
+            ? `<ul class="association-list" title="Point file associated with this drawing"><li class="association-list-item">↳ Point file: ${drawingAssociationName}</li></ul>`
+            : '';
+          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-primary"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}${pointPillMarkup}${equipmentAuditPillMarkup}</span>${pointFileAssociationMarkup}${drawingAssociationMarkup}</span></span>`;
           const actionButtons = document.createElement('div');
           actionButtons.className = 'file-actions';
           resource.appendChild(actionButtons);
