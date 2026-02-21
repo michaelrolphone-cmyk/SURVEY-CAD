@@ -1,3 +1,14 @@
+/*
+  Name Ideas:
+    - PointFold
+    - PlotSheet
+    - ThreadLine
+    - GeoFabric
+    - FoldPoint
+    - VectorPoint
+    - TileScribe
+    - WayPoint
+*/
 export const APP_CATALOG = [
   {
     id: 'launcher',
@@ -68,7 +79,7 @@ export const APP_CATALOG = [
   },
   {
     id: 'maptile-browser',
-    name: 'MapTile Browser',
+    name: 'TileScribe',
     description: 'Leaflet map for browsing harvested MinIO GeoJSON map tiles through the maptile API.',
     entryHtml: 'MapTileBrowser.html',
     iconPath: '/assets/icons/TileBrowser.png',
@@ -203,6 +214,7 @@ export const APP_CATALOG = [
     glyph: 'OCR',
     experimental: true,
   },
+
 ];
 
 export function listApps() {
