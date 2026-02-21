@@ -1,6 +1,6 @@
 const PROJECT_FILE_SCHEMA_VERSION = '1.0.0';
 
-export const PROJECT_FILE_FOLDERS = [
+export const DEFAULT_PROJECT_FILE_FOLDERS = [
   {
     key: 'drawings',
     label: 'Drawings',
@@ -50,6 +50,8 @@ export const PROJECT_FILE_FOLDERS = [
     defaultFormat: 'bin',
   },
 ];
+
+export const PROJECT_FILE_FOLDERS = DEFAULT_PROJECT_FILE_FOLDERS;
 
 function slugify(value, fallback) {
   const slug = String(value || '')

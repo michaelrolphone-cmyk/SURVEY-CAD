@@ -455,6 +455,49 @@
       background: rgba(127, 29, 29, 0.24);
       padding: 0.75rem;
     }
+
+    .add-folder-panel {
+      display: flex;
+      gap: 0.45rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+      padding: 0.65rem 0.75rem;
+      border: 1px dashed rgba(148, 163, 184, 0.3);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .add-folder-input {
+      flex: 1 1 160px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.83rem;
+      padding: 0.28rem 0.55rem;
+      min-width: 0;
+    }
+
+    .add-folder-input::placeholder {
+      color: var(--muted);
+    }
+
+    .remove-folder-btn {
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      background: rgba(127, 29, 29, 0.18);
+      color: #fca5a5;
+      border-radius: 7px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      flex: none;
+    }
+
+    .remove-folder-btn:hover {
+      border-color: rgba(239, 68, 68, 0.75);
+      background: rgba(127, 29, 29, 0.35);
+    }
   </style>
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
@@ -468,7 +511,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, moveResourceById, renameResourceTitle, findCpfPointLinksAsync } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, moveResourceById, renameResourceTitle, findCpfPointLinksAsync, addCustomFolder, removeCustomFolder } from './src/project-browser-state.js';
     import { renderLineworkThumbnailDataUrl, renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
@@ -1991,6 +2034,30 @@
           folderRow.appendChild(printAllButton);
         }
 
+        if (folder.custom) {
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'remove-folder-btn';
+          removeBtn.textContent = 'Remove';
+          removeBtn.title = 'Remove this custom folder (only allowed when empty)';
+          removeBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (Array.isArray(folder.index) && folder.index.length > 0) {
+              projectContext.setUploadStatus(`Cannot remove "${folder.label}" — move or delete its files first.`);
+              return;
+            }
+            if (!confirm(`Remove the custom folder "${folder.label}"?`)) return;
+            const removed = removeCustomFolder(projectContext.projectFile, folder.key);
+            if (!removed) {
+              projectContext.setUploadStatus(`Could not remove "${folder.label}".`);
+              return;
+            }
+            saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+            renderTree(projectContext.projectFile, projectContext);
+          });
+          folderRow.appendChild(removeBtn);
+        }
+
         treeContainer.appendChild(folderRow);
 
         const folderUploadFeedback = document.createElement('div');
@@ -2444,6 +2511,44 @@
       manifest.style.marginLeft = '0';
       manifest.innerHTML = '<span class="icon">📄</span>project-file.json';
       treeContainer.appendChild(manifest);
+
+      const addFolderPanel = document.createElement('div');
+      addFolderPanel.className = 'add-folder-panel';
+
+      const addFolderLabel = document.createElement('span');
+      addFolderLabel.className = 'muted';
+      addFolderLabel.textContent = 'Add folder:';
+      addFolderPanel.appendChild(addFolderLabel);
+
+      const addFolderInput = document.createElement('input');
+      addFolderInput.type = 'text';
+      addFolderInput.className = 'add-folder-input';
+      addFolderInput.placeholder = 'Folder name…';
+      addFolderInput.maxLength = 60;
+      addFolderInput.addEventListener('keydown', (event) => event.stopPropagation());
+      addFolderPanel.appendChild(addFolderInput);
+
+      const addFolderBtn = document.createElement('button');
+      addFolderBtn.type = 'button';
+      addFolderBtn.className = 'launch-btn';
+      addFolderBtn.textContent = 'Add';
+      addFolderBtn.addEventListener('click', () => {
+        const label = addFolderInput.value.trim();
+        if (!label) {
+          projectContext.setUploadStatus('Enter a folder name first.');
+          return;
+        }
+        const folder = addCustomFolder(projectContext.projectFile, { label });
+        if (!folder) {
+          projectContext.setUploadStatus(`Could not create folder "${label}".`);
+          return;
+        }
+        saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+        renderTree(projectContext.projectFile, projectContext);
+      });
+      addFolderPanel.appendChild(addFolderBtn);
+
+      treeContainer.appendChild(addFolderPanel);
     }
 
     function renderError(message) {

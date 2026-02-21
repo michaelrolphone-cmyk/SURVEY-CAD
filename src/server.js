@@ -9,6 +9,7 @@ import SurveyCadClient from './survey-api.js';
 import { createRosOcrApp } from './ros-ocr-api.js';
 import { listApps } from './app-catalog.js';
 import { buildProjectArchivePlan, createProjectFile, PROJECT_FILE_FOLDERS } from './project-file.js';
+import { PROJECT_FILE_STORAGE_PREFIX } from './project-browser-state.js';
 import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
@@ -1161,6 +1162,20 @@ export function createSurveyServer({
       : [],
   };
 
+  function getProjectFolderKeys(projectId) {
+    const { snapshot } = localStorageSyncStore.getState();
+    const raw = snapshot[`${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`];
+    if (!raw) return VALID_FOLDER_KEYS;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed?.folders)) return VALID_FOLDER_KEYS;
+      const keys = parsed.folders.map((f) => String(f?.key || '').trim()).filter(Boolean);
+      return keys.length ? new Set(keys) : VALID_FOLDER_KEYS;
+    } catch {
+      return VALID_FOLDER_KEYS;
+    }
+  }
+
   async function resolveEvidenceDeskStore() {
     if (!evidenceDeskStorePromise) {
       evidenceDeskStorePromise = createEvidenceDeskFileStore({ redisClient: sharedRedisClient });
@@ -1892,7 +1907,7 @@ export function createSurveyServer({
 
           const sources = await collectProjectWorkbenchSources(localStorageSyncStore, projectId, {
             uploadsDir: UPLOADS_DIR,
-            validFolderKeys: VALID_FOLDER_KEYS,
+            validFolderKeys: getProjectFolderKeys(projectId),
           });
           const sync = await syncProjectSourcesToCasefile(bew.store, link.casefileId, projectId, sources);
           casefile = await bew.store.getCasefile(link.casefileId);
@@ -1928,7 +1943,7 @@ export function createSurveyServer({
         if (req.method === 'GET' && action === 'sources') {
           const sources = await collectProjectWorkbenchSources(localStorageSyncStore, projectId, {
             uploadsDir: UPLOADS_DIR,
-            validFolderKeys: VALID_FOLDER_KEYS,
+            validFolderKeys: getProjectFolderKeys(projectId),
           });
           sendJson(res, 200, { projectId, sources });
           return;
@@ -2358,8 +2373,8 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId and folderKey are required fields.' });
           return;
         }
-        if (!VALID_FOLDER_KEYS.has(folderKey)) {
-          sendJson(res, 400, { error: `Invalid folderKey. Must be one of: ${[...VALID_FOLDER_KEYS].join(', ')}` });
+        if (!getProjectFolderKeys(projectId).has(folderKey)) {
+          sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
         if (!fileBuffer || !fileName) {
@@ -2435,7 +2450,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+        if (!getProjectFolderKeys(projectId).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2468,7 +2483,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+        if (!getProjectFolderKeys(projectId).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2558,7 +2573,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+        if (!getProjectFolderKeys(projectId).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2580,7 +2595,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'targetFolderKey is required.' });
           return;
         }
-        if (!VALID_FOLDER_KEYS.has(targetFolderKey)) {
+        if (!getProjectFolderKeys(projectId).has(targetFolderKey)) {
           sendJson(res, 400, { error: 'Invalid targetFolderKey.' });
           return;
         }
@@ -2606,7 +2621,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!VALID_FOLDER_KEYS.has(folderKey)) {
+        if (!getProjectFolderKeys(projectId).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2647,7 +2662,7 @@ export function createSurveyServer({
           return;
         }
         const { store } = await resolveEvidenceDeskStore();
-        const listing = await store.listFiles(projectId, [...VALID_FOLDER_KEYS]);
+        const listing = await store.listFiles(projectId, [...getProjectFolderKeys(projectId)]);
         sendJson(res, 200, listing);
         return;
       }

@@ -15,6 +15,8 @@ import {
   extractCpfInstrumentsFromPointNote,
   findCpfPointLinks,
   findCpfPointLinksAsync,
+  addCustomFolder,
+  removeCustomFolder,
 } from '../src/project-browser-state.js';
 
 function makeStorage(entries = {}) {
@@ -351,4 +353,107 @@ test('Project Browser allows tagging uploaded photos with point numbers for Line
   assert.match(projectBrowserHtml, /pointInlineInput\.placeholder = 'Point #'/, 'image upload rows should provide a point number inline input');
   assert.match(projectBrowserHtml, /pointButton\.textContent = 'Save Point #'/, 'image upload rows should provide a Save Point action for point metadata');
   assert.match(projectBrowserHtml, /metadata\?\.pointNumber/, 'rendered resources should read point-number metadata for badges and editing state');
+});
+
+test('addCustomFolder appends a new folder with a slugified key and custom marker', () => {
+  const projectFile = { folders: [{ key: 'drawings', index: [] }, { key: 'other', index: [] }] };
+
+  const folder = addCustomFolder(projectFile, { label: 'Field Photos', description: 'Site photos', defaultFormat: 'jpg' });
+
+  assert.ok(folder, 'should return the new folder');
+  assert.equal(folder.key, 'field-photos');
+  assert.equal(folder.label, 'Field Photos');
+  assert.equal(folder.description, 'Site photos');
+  assert.equal(folder.defaultFormat, 'jpg');
+  assert.equal(folder.custom, true);
+  assert.deepEqual(folder.index, []);
+  assert.equal(projectFile.folders.length, 3);
+  assert.equal(projectFile.folders[2].key, 'field-photos');
+});
+
+test('addCustomFolder deduplicates keys when a collision exists', () => {
+  const projectFile = { folders: [{ key: 'field-photos', index: [] }] };
+
+  const folder = addCustomFolder(projectFile, { label: 'Field Photos' });
+
+  assert.equal(folder.key, 'field-photos-1');
+  assert.equal(projectFile.folders.length, 2);
+});
+
+test('addCustomFolder uses default format bin and empty description when omitted', () => {
+  const projectFile = { folders: [] };
+
+  const folder = addCustomFolder(projectFile, { label: 'Misc' });
+
+  assert.equal(folder.key, 'misc');
+  assert.equal(folder.defaultFormat, 'bin');
+  assert.equal(folder.description, '');
+});
+
+test('addCustomFolder returns null for empty or missing label', () => {
+  const projectFile = { folders: [] };
+
+  assert.equal(addCustomFolder(projectFile, { label: '' }), null);
+  assert.equal(addCustomFolder(projectFile, {}), null);
+  assert.equal(projectFile.folders.length, 0);
+});
+
+test('addCustomFolder returns null for invalid projectFile', () => {
+  assert.equal(addCustomFolder(null, { label: 'Test' }), null);
+  assert.equal(addCustomFolder({ folders: null }, { label: 'Test' }), null);
+});
+
+test('removeCustomFolder removes an empty custom folder', () => {
+  const projectFile = {
+    folders: [
+      { key: 'drawings', index: [] },
+      { key: 'field-photos', index: [], custom: true },
+    ],
+  };
+
+  const result = removeCustomFolder(projectFile, 'field-photos');
+
+  assert.equal(result, true);
+  assert.equal(projectFile.folders.length, 1);
+  assert.equal(projectFile.folders[0].key, 'drawings');
+});
+
+test('removeCustomFolder refuses to remove a folder that has items', () => {
+  const projectFile = {
+    folders: [
+      { key: 'field-photos', index: [{ id: 'photo-1' }], custom: true },
+    ],
+  };
+
+  const result = removeCustomFolder(projectFile, 'field-photos');
+
+  assert.equal(result, false);
+  assert.equal(projectFile.folders.length, 1);
+});
+
+test('removeCustomFolder refuses to remove a non-custom folder', () => {
+  const projectFile = {
+    folders: [{ key: 'drawings', index: [] }],
+  };
+
+  const result = removeCustomFolder(projectFile, 'drawings');
+
+  assert.equal(result, false);
+  assert.equal(projectFile.folders.length, 1);
+});
+
+test('removeCustomFolder returns false for unknown folder key', () => {
+  const projectFile = { folders: [{ key: 'drawings', index: [], custom: true }] };
+
+  assert.equal(removeCustomFolder(projectFile, 'nonexistent'), false);
+});
+
+test('Project Browser includes custom folder management UI', async () => {
+  const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+
+  assert.match(projectBrowserHtml, /addCustomFolder/, 'Project Browser should import and use addCustomFolder');
+  assert.match(projectBrowserHtml, /removeCustomFolder/, 'Project Browser should import and use removeCustomFolder');
+  assert.match(projectBrowserHtml, /add-folder-panel/, 'Project Browser should render the add-folder UI panel');
+  assert.match(projectBrowserHtml, /remove-folder-btn/, 'Project Browser should render remove buttons for custom folders');
+  assert.match(projectBrowserHtml, /folder\.custom/, 'Project Browser should check folder.custom to show remove controls');
 });
