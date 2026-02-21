@@ -76,7 +76,6 @@ export const APP_CATALOG = [
     accent: '#DBEAFE',
     glyph: 'MT',
     section: 'Research',
-    experimental: true,
   },
   {
     id: 'pointforge-transformer',
