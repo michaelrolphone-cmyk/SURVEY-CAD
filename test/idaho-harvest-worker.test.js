@@ -4,6 +4,7 @@ import {
   createIdahoHarvestObjectStoreFromEnv,
   resolveInterBatchDelayMs,
   runIdahoHarvestWorker,
+  resolveHarvestDatasets,
 } from '../src/idaho-harvest-worker.js';
 
 function createMemoryObjectStore() {
@@ -87,11 +88,18 @@ test('resolveInterBatchDelayMs returns fixed poll interval when random delay dis
 
 test('runIdahoHarvestWorker uses randomized delay between non-complete batches', async () => {
   const store = createMemoryObjectStore();
-  let calls = 0;
+  let queryCalls = 0;
   const fakeClient = {
-    fetchImpl: async () => {
-      calls += 1;
-      if (calls === 1) {
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('f') === 'json' && !parsed.pathname.endsWith('/query')) {
+        return {
+          ok: true,
+          json: async () => ({ layers: [{ id: 23, name: 'Parcel Lots' }, { id: 18, name: 'CP&F Records' }] }),
+        };
+      }
+      queryCalls += 1;
+      if (queryCalls === 1) {
         return {
           ok: true,
           json: async () => ({
@@ -156,12 +164,51 @@ test('runIdahoHarvestWorker exits immediately when WORKERS_ENABLED is false', as
   assert.equal(fetchCalls, 0);
 });
 
-test('runIdahoHarvestWorker defaults parcel harvest layer to 23 for lot features', async () => {
+test('resolveHarvestDatasets discovers all parcel and cpnf-like layers from map metadata', async () => {
+  const datasets = await resolveHarvestDatasets({
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        layers: [
+          { id: 18, name: 'CP&F Records' },
+          { id: 23, name: 'Parcel Lots' },
+          { id: 24, name: 'Parcel Polygons' },
+          { id: 25, name: 'Corner Monuments' },
+          { id: 30, name: 'Road Centerlines' },
+        ],
+      }),
+    }),
+    adaMapServerBaseUrl: 'http://example.test/map',
+    env: {},
+  });
+
+  assert.deepEqual(datasets, [
+    { name: 'parcels-layer-23', layerId: 23 },
+    { name: 'parcels-layer-24', layerId: 24 },
+    { name: 'cpnf-layer-18', layerId: 18 },
+    { name: 'cpnf-layer-25', layerId: 25 },
+  ]);
+});
+
+test('runIdahoHarvestWorker scrapes all discovered parcel/cpnf layers', async () => {
   const store = createMemoryObjectStore();
   const queriedLayers = [];
   const fakeClient = {
     fetchImpl: async (url) => {
-      const layer = new URL(url).pathname.split('/').slice(-2, -1)[0];
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('f') === 'json' && !parsed.pathname.endsWith('/query')) {
+        return {
+          ok: true,
+          json: async () => ({
+            layers: [
+              { id: 18, name: 'CP&F Records' },
+              { id: 23, name: 'Parcel Lots' },
+              { id: 24, name: 'Parcel Polygons' },
+            ],
+          }),
+        };
+      }
+      const layer = parsed.pathname.split('/').slice(-2, -1)[0];
       queriedLayers.push(layer);
       return { ok: true, json: async () => ({ features: [] }) };
     },
@@ -184,5 +231,5 @@ test('runIdahoHarvestWorker defaults parcel harvest layer to 23 for lot features
     store,
   });
 
-  assert.deepEqual(queriedLayers, ['23', '18']);
+  assert.deepEqual(queriedLayers, ['23', '24', '18']);
 });

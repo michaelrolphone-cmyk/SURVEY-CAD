@@ -1422,9 +1422,9 @@ List the currently exposed map-tile datasets and their URL templates.
 {
   "datasets": [
     {
-      "dataset": "parcels",
-      "tilejson": "http://<host>/api/maptiles/parcels/tilejson.json",
-      "tiles": "http://<host>/api/maptiles/parcels/{z}/{x}/{y}.geojson"
+      "dataset": "parcels-layer-24",
+      "tilejson": "http://<host>/api/maptiles/parcels-layer-24/tilejson.json",
+      "tiles": "http://<host>/api/maptiles/parcels-layer-24/{z}/{x}/{y}.geojson"
     }
   ]
 }
@@ -1436,7 +1436,7 @@ Return a [TileJSON 3.0.0](https://github.com/mapbox/tilejson-spec) document for 
 
 | Path Param | Type | Required | Description |
 |------------|------|----------|-------------|
-| `dataset` | `string` | Yes | Dataset key (default server config: `parcels`, `cpnf`) |
+| `dataset` | `string` | Yes | Dataset key (for example `parcels-layer-24` or `cpnf-layer-18`) |
 
 **Response `200`:** JSON with `tilejson`, `scheme`, and `tiles` template values.
 
@@ -1448,7 +1448,7 @@ Read a GeoJSON tile from MinIO/S3-compatible object storage.
 
 | Path Param | Type | Required | Description |
 |------------|------|----------|-------------|
-| `dataset` | `string` | Yes | Dataset key (for example `parcels`) |
+| `dataset` | `string` | Yes | Dataset key (for example `parcels-layer-24`) |
 | `z` | `integer` | Yes | Tile zoom level |
 | `x` | `integer` | Yes | Tile X coordinate |
 | `y` | `integer` | Yes | Tile Y coordinate |
@@ -1460,7 +1460,8 @@ Read a GeoJSON tile from MinIO/S3-compatible object storage.
 **Response `503`:** Map tile object storage is not configured.
 
 **Environment variables:**
-- `MAPTILE_DATASETS` (comma-separated dataset list; default `parcels,cpnf`)
+- `MAPTILE_DATASETS` (comma-separated dataset list; default `auto`, which discovers dataset names from the master index)
+- `MAPTILE_INDEX_KEY` (master index key used by dataset auto-discovery; default `surveycad/idaho-harvest/indexes/id-master-index.geojson`)
 - `MAPTILE_MINIO_PREFIX` (tile object-key prefix; default `surveycad/idaho-harvest/tiles/id`)
 - `IDAHO_HARVEST_MINIO_TILE_BUCKET` (bucket name; default `tile-server`)
 

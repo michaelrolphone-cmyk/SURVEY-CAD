@@ -721,6 +721,8 @@ test('server static map endpoint proxies upstream image, retries tile fallback, 
 
 
 test('server exposes map tile dataset catalog and TileJSON endpoints', async () => {
+  const previousDatasets = process.env.MAPTILE_DATASETS;
+  process.env.MAPTILE_DATASETS = 'parcels,cpnf';
   const app = await startApiServer(new SurveyCadClient(), {
     mapTileObjectStore: {
       async getObject() {
@@ -745,10 +747,48 @@ test('server exposes map tile dataset catalog and TileJSON endpoints', async () 
     assert.match(tileJson.tiles[0], /\/api\/maptiles\/parcels\/\{z\}\/\{x\}\/\{y\}\.geojson$/);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
+    if (previousDatasets === undefined) delete process.env.MAPTILE_DATASETS;
+    else process.env.MAPTILE_DATASETS = previousDatasets;
+  }
+});
+
+
+test('server auto-discovers map tile datasets from index when MAPTILE_DATASETS is auto', async () => {
+  const previousDatasets = process.env.MAPTILE_DATASETS;
+  delete process.env.MAPTILE_DATASETS;
+  const app = await startApiServer(new SurveyCadClient(), {
+    mapTileObjectStore: {
+      async getObject(key) {
+        if (key.endsWith('/indexes/id-master-index.geojson')) {
+          return Buffer.from(JSON.stringify({
+            type: 'FeatureCollection',
+            features: [
+              { type: 'Feature', properties: { dataset: 'parcels-layer-23' }, geometry: null },
+              { type: 'Feature', properties: { dataset: 'cpnf-layer-18' }, geometry: null },
+              { type: 'Feature', properties: { dataset: 'parcels-layer-23' }, geometry: null },
+            ],
+          }), 'utf8');
+        }
+        throw new Error('not found');
+      },
+    },
+  });
+
+  try {
+    const catalogRes = await fetch(`http://127.0.0.1:${app.port}/api/maptiles`);
+    assert.equal(catalogRes.status, 200);
+    const catalogPayload = await catalogRes.json();
+    assert.deepEqual(catalogPayload.datasets.map((entry) => entry.dataset), ['cpnf-layer-18', 'parcels-layer-23']);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+    if (previousDatasets === undefined) delete process.env.MAPTILE_DATASETS;
+    else process.env.MAPTILE_DATASETS = previousDatasets;
   }
 });
 
 test('server map tile endpoint returns GeoJSON tiles from object storage', async () => {
+  const previousDatasets = process.env.MAPTILE_DATASETS;
+  process.env.MAPTILE_DATASETS = 'parcels,cpnf';
   const calls = [];
   const tilePayload = JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { id: 1 }, geometry: null }] });
   const app = await startApiServer(new SurveyCadClient(), {
@@ -781,6 +821,8 @@ test('server map tile endpoint returns GeoJSON tiles from object storage', async
     assert.equal(unknownDatasetRes.status, 404);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
+    if (previousDatasets === undefined) delete process.env.MAPTILE_DATASETS;
+    else process.env.MAPTILE_DATASETS = previousDatasets;
   }
 });
 

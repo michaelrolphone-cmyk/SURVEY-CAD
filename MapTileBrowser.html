@@ -16,7 +16,7 @@
     .layout { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
     .toolbar {
       display: grid;
-      grid-template-columns: 1fr auto auto auto auto;
+      grid-template-columns: minmax(360px, 1fr) auto auto auto;
       gap: 0.6rem;
       padding: 0.75rem;
       border-bottom: 1px solid #334155;
@@ -42,9 +42,9 @@
 <body>
   <div class="layout">
     <div class="toolbar">
-      <label>
-        Dataset
-        <select id="datasetSelect"></select>
+      <label style="min-width:320px;">
+        Datasets
+        <div id="datasetList" style="display:flex; gap:0.5rem; flex-wrap:wrap;"></div>
       </label>
       <label>
         Min Zoom
@@ -73,34 +73,36 @@
       opacity: 0.35,
     }).addTo(map);
 
-    const datasetSelect = document.getElementById('datasetSelect');
+    const datasetList = document.getElementById('datasetList');
     const refreshBtn = document.getElementById('refreshBtn');
     const statusEl = document.getElementById('status');
     const minZoomInput = document.getElementById('minZoomInput');
     const maxZoomInput = document.getElementById('maxZoomInput');
 
-    const activeTileLayer = L.layerGroup().addTo(map);
+    const activeTileLayers = new Map();
     const tileCache = new Map();
-    const tilePane = map.createPane('parcelOverlayPane');
+    const tilePane = map.createPane('maptileOverlayPane');
     tilePane.style.zIndex = '450';
     tilePane.style.pointerEvents = 'none';
-    let tileTemplate = '';
+    const tileTemplates = new Map();
     let renderSequence = 0;
 
     const datasetPaint = {
-      parcels: {
-        stroke: '#f97316',
-        fill: '#fbff12',
-      },
-      cpnf: {
-        stroke: '#ff00ff',
-        fill: '#39ff14',
-      },
       fallback: {
         stroke: '#ff2d95',
         fill: '#00fff7',
       },
     };
+
+    function colorForDataset(dataset) {
+      let hash = 0;
+      for (let i = 0; i < dataset.length; i += 1) hash = ((hash * 31) + dataset.charCodeAt(i)) >>> 0;
+      const hue = hash % 360;
+      return {
+        stroke: `hsl(${hue} 90% 60%)`,
+        fill: `hsl(${(hue + 35) % 360} 95% 55%)`,
+      };
+    }
 
     function setStatus(text, isError = false) {
       statusEl.textContent = text;
@@ -120,17 +122,22 @@
       return `${dataset}:${z}:${x}:${y}`;
     }
 
-    function tileUrl(z, x, y) {
-      return tileTemplate
+    function tileUrl(dataset, z, x, y) {
+      const template = tileTemplates.get(dataset) || '';
+      return template
         .replace('{z}', String(z))
         .replace('{x}', String(x))
         .replace('{y}', String(y));
     }
 
+    function selectedDatasets() {
+      return [...datasetList.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+    }
+
     async function fetchTile(dataset, z, x, y) {
       const key = tileKey(dataset, z, x, y);
       if (tileCache.has(key)) return tileCache.get(key);
-      const url = tileUrl(z, x, y);
+      const url = tileUrl(dataset, z, x, y);
       const promise = fetch(url).then(async (res) => {
         if (!res.ok) return null;
         return res.json();
@@ -140,8 +147,8 @@
     }
 
     async function renderVisibleTiles() {
-      const dataset = datasetSelect.value;
-      if (!dataset || !tileTemplate) return;
+      const datasets = selectedDatasets();
+      if (!datasets.length || !tileTemplates.size) return;
       const localRenderSequence = ++renderSequence;
       const zoom = Math.round(map.getZoom());
       const minZoom = Math.max(0, Number(minZoomInput.value || 0));
@@ -157,63 +164,67 @@
       const yMin = lat2tile(bounds.getNorth(), zoom);
       const yMax = lat2tile(bounds.getSouth(), zoom);
 
-      const paint = datasetPaint[dataset] || datasetPaint.fallback;
-      const fetchQueue = [];
-      for (let x = xMin; x <= xMax; x += 1) {
-        for (let y = yMin; y <= yMax; y += 1) {
-          fetchQueue.push(fetchTile(dataset, zoom, x, y));
-        }
-      }
-      const tiles = await Promise.all(fetchQueue);
-      if (localRenderSequence !== renderSequence) return;
-
-      activeTileLayer.clearLayers();
+      for (const layer of activeTileLayers.values()) layer.clearLayers();
 
       let loaded = 0;
       let drawnFeatures = 0;
-      for (const tile of tiles) {
-        if (!tile || tile.type !== 'FeatureCollection') continue;
-        const features = Array.isArray(tile.features) ? tile.features : [];
-        loaded += 1;
-        drawnFeatures += features.length;
-        L.geoJSON(tile, {
-          pane: 'parcelOverlayPane',
-          style: {
-            color: paint.stroke,
-            weight: 3,
-            fillColor: paint.fill,
-            fillOpacity: 0.45,
-          },
-          pointToLayer(_feature, latlng) {
-            return L.circleMarker(latlng, {
-              radius: 7,
+      let attempted = 0;
+      for (const dataset of datasets) {
+        const paint = colorForDataset(dataset);
+        const layerGroup = activeTileLayers.get(dataset) || L.layerGroup().addTo(map);
+        activeTileLayers.set(dataset, layerGroup);
+        const fetchQueue = [];
+        for (let x = xMin; x <= xMax; x += 1) {
+          for (let y = yMin; y <= yMax; y += 1) {
+            attempted += 1;
+            fetchQueue.push(fetchTile(dataset, zoom, x, y));
+          }
+        }
+        const tiles = await Promise.all(fetchQueue);
+        if (localRenderSequence !== renderSequence) return;
+
+        for (const tile of tiles) {
+          if (!tile || tile.type !== 'FeatureCollection') continue;
+          const features = Array.isArray(tile.features) ? tile.features : [];
+          loaded += 1;
+          drawnFeatures += features.length;
+          L.geoJSON(tile, {
+            pane: 'maptileOverlayPane',
+            style: {
               color: paint.stroke,
-              weight: 2,
+              weight: 3,
               fillColor: paint.fill,
-              fillOpacity: 0.95,
-              pane: 'parcelOverlayPane',
-            });
-          },
-          onEachFeature(feature, layer) {
-            const props = feature?.properties || {};
-            const title = props.PARCEL || props.PROP_ID || props.objectid || 'Feature';
-            layer.bindPopup(`<strong>${title}</strong><br/><pre style="margin:0;white-space:pre-wrap">${JSON.stringify(props, null, 2)}</pre>`);
-          },
-        }).addTo(activeTileLayer);
+              fillOpacity: 0.45,
+            },
+            pointToLayer(_feature, latlng) {
+              return L.circleMarker(latlng, {
+                radius: 7,
+                color: paint.stroke,
+                weight: 2,
+                fillColor: paint.fill,
+                fillOpacity: 0.95,
+                pane: 'maptileOverlayPane',
+              });
+            },
+            onEachFeature(feature, layer) {
+              const props = feature?.properties || {};
+              const title = props.PARCEL || props.PROP_ID || props.objectid || 'Feature';
+              layer.bindPopup(`<strong>${dataset}: ${title}</strong><br/><pre style="margin:0;white-space:pre-wrap">${JSON.stringify(props, null, 2)}</pre>`);
+            },
+          }).addTo(layerGroup);
+        }
       }
 
-      setStatus(`Loaded ${loaded}/${fetchQueue.length} tiles at z${zoom} for ${dataset}. Drew ${drawnFeatures} features.`);
+      setStatus(`Loaded ${loaded}/${attempted} tiles at z${zoom}. Drew ${drawnFeatures} features across ${datasets.length} layer(s).`);
     }
 
     async function loadDataset(dataset) {
-      setStatus(`Loading TileJSON for ${dataset}…`);
       const res = await fetch(`/api/maptiles/${encodeURIComponent(dataset)}/tilejson.json`);
-      if (!res.ok) throw new Error(`TileJSON request failed (${res.status}).`);
+      if (!res.ok) throw new Error(`TileJSON request failed for ${dataset} (${res.status}).`);
       const tilejson = await res.json();
-      tileTemplate = Array.isArray(tilejson.tiles) ? String(tilejson.tiles[0] || '') : '';
-      minZoomInput.value = Number(tilejson.minzoom ?? 0);
-      maxZoomInput.value = Number(tilejson.maxzoom ?? 22);
-      await renderVisibleTiles();
+      tileTemplates.set(dataset, Array.isArray(tilejson.tiles) ? String(tilejson.tiles[0] || '') : '');
+      minZoomInput.value = Math.min(Number(minZoomInput.value || 22), Number(tilejson.minzoom ?? 0));
+      maxZoomInput.value = Math.max(Number(maxZoomInput.value || 0), Number(tilejson.maxzoom ?? 22));
     }
 
     async function init() {
@@ -228,26 +239,29 @@
         }
 
         for (const entry of datasets) {
-          const option = document.createElement('option');
-          option.value = entry.dataset;
-          option.textContent = entry.dataset;
-          datasetSelect.appendChild(option);
+          const label = document.createElement('label');
+          label.style.display = 'inline-flex';
+          label.style.gap = '0.25rem';
+          label.style.alignItems = 'center';
+          label.style.fontSize = '0.8rem';
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.value = entry.dataset;
+          input.checked = true;
+          input.addEventListener('change', () => {
+            renderVisibleTiles().catch((error) => setStatus(error?.message || 'Failed to render tiles.', true));
+          });
+          label.appendChild(input);
+          label.appendChild(document.createTextNode(entry.dataset));
+          datasetList.appendChild(label);
+          await loadDataset(entry.dataset);
         }
 
-        await loadDataset(datasetSelect.value);
+        await renderVisibleTiles();
       } catch (error) {
         setStatus(error?.message || 'Failed to initialize map tile browser.', true);
       }
     }
-
-    datasetSelect.addEventListener('change', async () => {
-      tileCache.clear();
-      try {
-        await loadDataset(datasetSelect.value);
-      } catch (error) {
-        setStatus(error?.message || 'Failed to switch dataset.', true);
-      }
-    });
 
     refreshBtn.addEventListener('click', async () => {
       tileCache.clear();
