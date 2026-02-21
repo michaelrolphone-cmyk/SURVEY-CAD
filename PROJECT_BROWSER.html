@@ -2637,7 +2637,7 @@
 
     async function initialize() {
       const params = new URLSearchParams(window.location.search);
-      const activeProjectId = params.get('activeProjectId') || '';
+      const activeProjectId = params.get('activeProjectId') || params.get('projectId') || '';
       const activeProjectName = params.get('activeProjectName') || '';
       const activeProject = activeProjectId ? loadActiveProjectContext(activeProjectId) : null;
       const projectName = activeProject?.name || activeProjectName || 'Untitled Project';

@@ -990,6 +990,8 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         return {
           distanceMeters,
           instrument,
+          pdfUrl,
+          pdfName,
           links: buildCpfPdfLinks(instrument, pdfUrl, pdfName),
         };
       }).filter((record) => record.links.length && (record.distanceMeters == null || record.distanceMeters <= (radius + 0.5)));
@@ -1000,11 +1002,45 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return [];
   }
 
+  function extractInstrumentFromCpfIdentifier(rawValue) {
+    const raw = String(rawValue || '').trim();
+    if (!raw) return '';
+    const withoutQuery = raw.split(/[?#]/, 1)[0];
+    const decoded = (() => {
+      try {
+        return decodeURIComponent(withoutQuery);
+      } catch {
+        return withoutQuery;
+      }
+    })();
+    const baseName = decoded.split('/').pop() || decoded;
+    const withoutExtension = baseName.replace(/\.pdf$/i, '');
+    return normalizeCpInstrumentNumber(withoutExtension);
+  }
+
+  function resolveCpfRecordInstrument(record = {}) {
+    const direct = normalizeCpInstrumentNumber(record?.instrument);
+    if (direct) return direct;
+
+    const fromName = extractInstrumentFromCpfIdentifier(record?.pdfName);
+    if (fromName) return fromName;
+
+    const fromUrl = extractInstrumentFromCpfIdentifier(record?.pdfUrl);
+    if (fromUrl) return fromUrl;
+
+    for (const link of (record?.links || [])) {
+      const fromLink = extractInstrumentFromCpfIdentifier(link);
+      if (fromLink) return fromLink;
+    }
+    return '';
+  }
+
   function cpfLinksHtml(records = []) {
     if (!records.length) return '<span class="small">No CP&amp;F PDF links found near this corner.</span>';
     return records.slice(0, 8).map((record, idx) => {
-      const instrument = record.instrument != null && String(record.instrument).trim()
-        ? escapeHtml(String(record.instrument))
+      const resolvedInstrument = resolveCpfRecordInstrument(record);
+      const instrument = resolvedInstrument
+        ? escapeHtml(resolvedInstrument)
         : `Record ${idx + 1}`;
       const links = record.links.map((url, i) => (
         `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(url))}">CP&amp;F PDF${record.links.length > 1 ? ` ${i + 1}` : ''}</a>`
@@ -1017,7 +1053,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     const values = [];
     const seen = new Set();
     for (const record of records) {
-      const inst = normalizeCpInstrumentNumber(record?.instrument);
+      const inst = resolveCpfRecordInstrument(record);
       if (!inst || seen.has(inst)) continue;
       seen.add(inst);
       values.push(inst);
