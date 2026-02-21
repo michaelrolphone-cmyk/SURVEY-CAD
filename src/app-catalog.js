@@ -22,17 +22,6 @@ export const APP_CATALOG = [
     glyph: 'SC',
   },
   {
-    id: 'ros-lookup',
-    name: 'RecordQuarry',
-    description: 'Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.',
-    entryHtml: 'RecordQuarry.html',
-    iconPath: '/assets/icons/RecordQuarry.png',
-    color: '#2A9D8F',
-    accent: '#E9F5DB',
-    glyph: 'ROS',
-    section: 'Research',
-  },
-  {
     id: 'project-browser',
     name: 'EvidenceDesk',
     description: 'Browse the symbolic project-file folder structure as a standalone app.',
@@ -44,6 +33,17 @@ export const APP_CATALOG = [
     section: 'Research',
   },
   {
+    id: 'ros-lookup',
+    name: 'RecordQuarry',
+    description: 'Harvests plats, ROS, CP&F, parcels, and subdivisions into structured evidence.',
+    entryHtml: 'RecordQuarry.html',
+    iconPath: '/assets/icons/RecordQuarry.png',
+    color: '#2A9D8F',
+    accent: '#E9F5DB',
+    glyph: 'ROS',
+    section: 'Research',
+  },
+  {
     id: 'equipment-log',
     name: 'EquipmentLog',
     description: 'Record equipment setup logs: rodman, height, reference point, setup time, and job file.',
@@ -52,7 +52,7 @@ export const APP_CATALOG = [
     color: '#7C3AED',
     accent: '#EDE9FE',
     glyph: 'EL',
-    section: 'Research',
+    section: 'Field Tools',
   },
   {
     id: 'glo-records',
@@ -76,7 +76,7 @@ export const APP_CATALOG = [
     accent: '#DBEAFE',
     glyph: 'UP',
     section: 'Research',
-    experimental: true,
+    experimental: false,
   },
   {
     id: 'maptile-browser',
