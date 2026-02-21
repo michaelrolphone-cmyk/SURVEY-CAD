@@ -321,7 +321,7 @@
       <div class="subtitle">Address → Parcel → Subdivision / Section / Township + nearby ROS (JSONP, no CORS failures)</div>
     </div>
     <div class="row">
-      <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends unique parcel, subdivision, and aliquot vertices to PointForge">Export to PointForge</button>
+      <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
     </div>
   </header>
 
@@ -2441,12 +2441,12 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       const selectedAliquotFeatures2243 = filterAliquotFeaturesForExport(state.aliquotFeatures2243, state.selectedAliquotKeys);
       const baseExport = buildRosBoundaryCsvRowsPNEZD({
         parcelFeature2243: filterParcelFeatureForExport(state.parcelFeature2243, state.selectedParcel),
-        subdivisionFeature2243: state.subdivisionFeature2243,
+        subdivisionFeature2243: null,
         sectionFeature2243: state.sectionFeature2243,
         aliquotFeatures2243: selectedAliquotFeatures2243,
         startPoint: 1,
       });
-      if (!baseExport.count) throw new Error('No boundary vertices available to export to PointForge.');
+      if (!baseExport.count) throw new Error('No parcel or aliquot corners available to export to PointForge.');
 
       const plssPoints = new Map([...baseExport.points.entries()].filter(([, point]) => (
         !point.sources.has('parcel') && !point.sources.has('subdivision')
@@ -2457,14 +2457,14 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
 
       const uniquePart = buildRosBoundaryCsvRowsPNEZD({
         parcelFeature2243: filterParcelFeatureForExport(state.parcelFeature2243, state.selectedParcel),
-        subdivisionFeature2243: state.subdivisionFeature2243,
+        subdivisionFeature2243: null,
         sectionFeature2243: state.sectionFeature2243,
         aliquotFeatures2243: selectedAliquotFeatures2243,
         startPoint: 1,
         notesByCoordinate,
         includePlssWithoutNotes: false,
       });
-      if (!uniquePart.count) throw new Error('No parcel/subdivision points or CP&F-backed PLSS points available to export to PointForge.');
+      if (!uniquePart.count) throw new Error('No parcel points or CP&F-backed aliquot corners available to export to PointForge.');
 
       const utilityMarkers = buildPowerUtilityMarkersForPointForge(state.utilityLocations, uniquePart.nextPoint);
       const utilityRows = buildPointMarkerCsvRowsPNEZD(utilityMarkers, uniquePart.nextPoint, '');
