@@ -40,6 +40,7 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 The server now includes a restartable background worker that harvests Idaho parcel + CPNF features, writes each record as GeoJSON, stores Mapbox/Leaflet-style GeoJSON tile buckets in object storage (parcels are materialized across zoom levels 0-22), and maintains a resume-safe master geolocation index GeoJSON file.
 
 Harvest cycles now rotate dataset processing order between parcels and CPNF so CP&F records begin harvesting even while parcel backlogs are still in progress.
+CP&F PDF scraping now runs as its own paged checkpoint flow, so the worker continues downloading every CP&F PDF even when parcel/feature-map harvesting checkpoints are already complete.
 
 ### Worker API endpoints
 

@@ -352,7 +352,15 @@ export async function runIdahoHarvestCycle({
     state: stateAbbr,
     nextDatasetIndex: 0,
     datasets: Object.fromEntries(datasets.map((dataset) => [dataset.name, { offset: 0, done: false }])),
+    cpnfPdfScrape: {
+      offset: 0,
+      done: false,
+    },
   });
+
+  if (!checkpoint.cpnfPdfScrape || typeof checkpoint.cpnfPdfScrape !== 'object') {
+    checkpoint.cpnfPdfScrape = { offset: 0, done: false };
+  }
 
   const datasetCount = datasets.length;
   const rawNextDatasetIndex = Number(checkpoint?.nextDatasetIndex);
@@ -400,6 +408,85 @@ export async function runIdahoHarvestCycle({
   };
 
   let changed = false;
+
+  const cpnfDataset = datasets.find((dataset) => String(dataset?.name || '').toLowerCase() === 'cpnf');
+  const cpnfPdfState = checkpoint.cpnfPdfScrape || { offset: 0, done: false };
+
+  if (cpnfDataset && !cpnfPdfState.done) {
+    const pdfQueryUrl = buildLayerQueryUrl(adaMapServerBaseUrl, cpnfDataset.layerId, {
+      where: '1=1',
+      outFields: '*',
+      returnGeometry: 'false',
+      orderByFields: 'OBJECTID ASC',
+      resultOffset: Number(cpnfPdfState.offset || 0),
+      resultRecordCount: Math.max(1, Number(batchSize) || 100),
+    });
+
+    const pdfQueryResponse = await fetchImpl(pdfQueryUrl);
+    if (!pdfQueryResponse.ok) throw new Error(`Harvest PDF query failed for ${cpnfDataset.name}: HTTP ${pdfQueryResponse.status}`);
+    const pdfQueryPayload = await pdfQueryResponse.json();
+    const pdfFeatures = Array.isArray(pdfQueryPayload?.features) ? pdfQueryPayload.features : [];
+    const cpnfBucket = bucketFor('features', cpnfDataset.name);
+
+    if (!pdfFeatures.length) {
+      checkpoint.cpnfPdfScrape = {
+        ...cpnfPdfState,
+        done: true,
+        updatedAt: new Date().toISOString(),
+      };
+      changed = true;
+    } else {
+      for (const feature of pdfFeatures) {
+        const objectId = toObjectId(feature);
+        if (objectId === '') continue;
+        const attributes = feature?.attributes || {};
+        const pdfUrls = extractPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
+        if (!pdfUrls.length) continue;
+
+        const featureKey = `${prefix}/features/${stateAbbr.toLowerCase()}/${cpnfDataset.name}/${encodeURIComponent(String(objectId))}.geojson`;
+        const existingFeature = await readJsonObjectInBucket(objectStore, cpnfBucket, featureKey, null);
+        const existingKeys = Array.isArray(existingFeature?.properties?.cpnfPdfKeys)
+          ? existingFeature.properties.cpnfPdfKeys
+          : [];
+
+        const nextKeys = [...existingKeys];
+        for (const [pdfIndex, pdfUrl] of pdfUrls.entries()) {
+          const pdfKey = buildPdfObjectKey({
+            prefix,
+            stateAbbr,
+            dataset: cpnfDataset.name,
+            objectId,
+            pdfUrl,
+            index: pdfIndex,
+          });
+
+          if (!nextKeys.includes(pdfKey)) nextKeys.push(pdfKey);
+
+          const pdfResponse = await fetchImpl(pdfUrl);
+          if (!pdfResponse.ok) continue;
+          const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+          if (!pdfBuffer.length) continue;
+          await objectStore.putObject(pdfKey, pdfBuffer, {
+            contentType: pdfResponse.headers?.get?.('content-type') || 'application/pdf',
+            bucket: cpnfBucket,
+          });
+        }
+
+        if (existingFeature && nextKeys.length) {
+          existingFeature.properties = existingFeature.properties || {};
+          existingFeature.properties.cpnfPdfKeys = [...new Set(nextKeys)];
+          await writeJsonObjectInBucket(objectStore, cpnfBucket, featureKey, existingFeature);
+        }
+      }
+
+      checkpoint.cpnfPdfScrape = {
+        offset: Number(cpnfPdfState.offset || 0) + pdfFeatures.length,
+        done: false,
+        updatedAt: new Date().toISOString(),
+      };
+      changed = true;
+    }
+  }
 
   const datasetOrder = datasets.map((_, index) => (nextDatasetIndex + index) % (datasetCount || 1));
 
@@ -525,17 +612,18 @@ export async function runIdahoHarvestCycle({
   const nextFeatures = [...indexByKey.values()]
     .sort((a, b) => String(a?.id || '').localeCompare(String(b?.id || '')));
   const allDone = datasets.every((dataset) => checkpoint.datasets[dataset.name]?.done);
+  const cpnfPdfDone = !cpnfDataset || checkpoint.cpnfPdfScrape?.done;
 
   await writeJsonObjectInBucket(objectStore, indexBucket, indexKey, {
     type: 'FeatureCollection',
     state: stateAbbr,
     generatedAt: new Date().toISOString(),
-    complete: allDone,
+    complete: allDone && cpnfPdfDone,
     features: nextFeatures,
   });
   await writeJsonObjectInBucket(objectStore, checkpointBucket, checkpointKey, checkpoint);
 
-  return { done: allDone, checkpoint, indexKey };
+  return { done: allDone && cpnfPdfDone, checkpoint, indexKey };
 }
 
 export function createFileObjectStore(rootDir) {
