@@ -110,6 +110,13 @@
       display: none;
     }
 
+    .folder-upload-feedback {
+      margin-left: 1.65rem;
+      padding: 0 0.75rem;
+      display: grid;
+      gap: 0.3rem;
+    }
+
     .tree-root,
     .folder-row {
       background: var(--panel);
@@ -1497,18 +1504,29 @@
       return String(value || '').trim();
     }
 
-    async function uploadFilesToServer(files, folderKey, context) {
+    async function uploadFilesToServer(files, folderKey, context, onStatus) {
       const fileList = Array.from(files || []);
+
+      function setStatus(message) {
+        if (onStatus) { onStatus(message, null); } else { context.setUploadStatus(message); }
+      }
+      function setProgress(percent) {
+        if (onStatus) { onStatus(null, percent); } else { context.setUploadProgress(percent); }
+      }
+      function setStatusAndProgress(message, percent) {
+        if (onStatus) { onStatus(message, percent); } else { context.setUploadProgress(percent); context.setUploadStatus(message); }
+      }
+
       if (!fileList.length) {
-        context.setUploadStatus('No files selected.');
+        setStatus('No files selected.');
         return;
       }
       if (!context.activeProjectId || !context.projectFile) {
-        context.setUploadStatus('Select an active project before uploading files.');
+        setStatus('Select an active project before uploading files.');
         return;
       }
       if (!folderKey) {
-        context.setUploadStatus('Please select a folder to upload into.');
+        setStatus('Please select a folder to upload into.');
         return;
       }
 
@@ -1523,41 +1541,40 @@
         formData.append('file', file, file.name);
 
         try {
-          context.setUploadProgress(null);
+          setProgress(null);
           const response = await uploadFileViaXhr(formData, (event) => {
             if (event.lengthComputable) {
               const progress = Math.round((event.loaded / event.total) * 100);
-              context.setUploadProgress(progress);
-              context.setUploadStatus(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name} (${progress}%)`);
+              setStatusAndProgress(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name} (${progress}%)`, progress);
               return;
             }
-            context.setUploadStatus(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name}…`);
+            setStatus(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name}…`);
           });
           if (!response.ok) {
             const err = response.payload || { error: 'Upload failed.' };
-            context.setUploadStatus(`Failed to upload ${file.name}: ${err.error}`);
+            setStatus(`Failed to upload ${file.name}: ${err.error}`);
             continue;
           }
           const { resource } = response.payload || {};
           const appended = appendResourceToFolder(context.projectFile, folderKey, resource);
           if (appended) {
             uploadedCount += 1;
-            context.setUploadStatus(`Uploaded ${uploadedCount}/${totalFiles}: ${file.name}`);
+            setStatus(`Uploaded ${uploadedCount}/${totalFiles}: ${file.name}`);
           }
         } catch (err) {
-          context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
+          setStatus(`Network error uploading ${file.name}: ${err.message}`);
         }
       }
 
       if (!uploadedCount) {
-        context.setUploadProgress(null);
-        context.setUploadStatus('No files were uploaded successfully.');
+        setProgress(null);
+        setStatus('No files were uploaded successfully.');
         return;
       }
 
       saveStoredProjectFile(window.localStorage, context.activeProjectId, context.projectFile);
-      context.setUploadProgress(null);
-      context.setUploadStatus(`Uploaded ${uploadedCount} file${uploadedCount === 1 ? '' : 's'} to project.`);
+      setProgress(null);
+      setStatus(`Uploaded ${uploadedCount} file${uploadedCount === 1 ? '' : 's'} to project.`);
       renderTree(context.projectFile, context);
     }
 
@@ -1898,6 +1915,27 @@
       const associationIndex = buildDrawingAssociationIndex(projectFile);
 
       for (const folder of projectFile.folders || []) {
+        const folderUploadStatusText = document.createElement('div');
+        folderUploadStatusText.className = 'upload-status';
+        folderUploadStatusText.hidden = true;
+        const folderUploadProgressBar = document.createElement('progress');
+        folderUploadProgressBar.className = 'upload-progress';
+        folderUploadProgressBar.max = 100;
+        folderUploadProgressBar.hidden = true;
+        const onFolderUploadStatus = (message, percent) => {
+          if (message !== null) {
+            folderUploadStatusText.textContent = message || '';
+            folderUploadStatusText.hidden = !message;
+          }
+          if (typeof percent === 'number' && Number.isFinite(percent)) {
+            folderUploadProgressBar.hidden = false;
+            folderUploadProgressBar.value = Math.max(0, Math.min(100, percent));
+          } else {
+            folderUploadProgressBar.hidden = true;
+            folderUploadProgressBar.removeAttribute('value');
+          }
+        };
+
         const folderRow = document.createElement('div');
         folderRow.className = 'folder-row';
         folderRow.dataset.folderKey = folder.key;
@@ -1938,7 +1976,7 @@
             return;
           }
           if (event.dataTransfer?.files?.length) {
-            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext);
+            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus);
           }
         });
 
@@ -1954,6 +1992,12 @@
         }
 
         treeContainer.appendChild(folderRow);
+
+        const folderUploadFeedback = document.createElement('div');
+        folderUploadFeedback.className = 'folder-upload-feedback';
+        folderUploadFeedback.appendChild(folderUploadStatusText);
+        folderUploadFeedback.appendChild(folderUploadProgressBar);
+        treeContainer.appendChild(folderUploadFeedback);
 
         if (folder.key === 'point-files') {
           treeContainer.appendChild(createPointFileUploadPanel(projectContext));
@@ -1998,7 +2042,7 @@
             return;
           }
           if (event.dataTransfer?.files?.length) {
-            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext);
+            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus);
           }
         });
         treeContainer.appendChild(fileListContainer);
