@@ -47,20 +47,68 @@ function pointInRing(point, ring = []) {
   return inside;
 }
 
+function mercatorToLonLat(x, y) {
+  const lon = (x / 20037508.34) * 180;
+  const latRadians = Math.atan(Math.sinh((Number(y) / 20037508.34) * Math.PI));
+  const lat = (latRadians * 180) / Math.PI;
+  return { lon, lat };
+}
+
+function detectGeometryWkid(geometry = {}) {
+  const candidate = geometry?.spatialReference?.latestWkid
+    ?? geometry?.spatialReference?.wkid
+    ?? geometry?.latestWkid
+    ?? geometry?.wkid;
+  const wkid = Number(candidate);
+  return Number.isInteger(wkid) ? wkid : null;
+}
+
+function normalizeGeometryCoord(x, y, wkid = null) {
+  const numericX = Number(x);
+  const numericY = Number(y);
+  if (!Number.isFinite(numericX) || !Number.isFinite(numericY)) return null;
+
+  const isWebMercator = wkid === 102100 || wkid === 3857 || wkid === 102113;
+  const likelyWebMercator = (Math.abs(numericX) > 180 || Math.abs(numericY) > 90)
+    && Math.abs(numericX) <= 20037508.342789244
+    && Math.abs(numericY) <= 20037508.342789244;
+
+  if (isWebMercator || likelyWebMercator) {
+    return mercatorToLonLat(numericX, numericY);
+  }
+
+  return { lon: numericX, lat: numericY };
+}
+
 export function arcgisGeometryToGeoJson(geometry = {}) {
+  const wkid = detectGeometryWkid(geometry);
+
   if (Number.isFinite(Number(geometry.x)) && Number.isFinite(Number(geometry.y))) {
-    return { type: 'Point', coordinates: [Number(geometry.x), Number(geometry.y)] };
+    const normalized = normalizeGeometryCoord(geometry.x, geometry.y, wkid);
+    if (!normalized) return null;
+    return { type: 'Point', coordinates: [normalized.lon, normalized.lat] };
   }
 
   if (Array.isArray(geometry.paths) && geometry.paths.length) {
-    const lines = geometry.paths.map((line) => normalizeRing(line).slice(0, -1)).filter((line) => line.length >= 2);
+    const lines = geometry.paths
+      .map((line) => normalizeRing(line)
+        .map((coord) => normalizeGeometryCoord(coord[0], coord[1], wkid))
+        .filter(Boolean)
+        .map((coord) => [coord.lon, coord.lat])
+        .slice(0, -1))
+      .filter((line) => line.length >= 2);
     if (!lines.length) return null;
     if (lines.length === 1) return { type: 'LineString', coordinates: lines[0] };
     return { type: 'MultiLineString', coordinates: lines };
   }
 
   if (Array.isArray(geometry.rings) && geometry.rings.length) {
-    const rings = geometry.rings.map((ring) => normalizeRing(ring)).filter((ring) => ring.length >= 4);
+    const rings = geometry.rings
+      .map((ring) => normalizeRing(ring)
+        .map((coord) => normalizeGeometryCoord(coord[0], coord[1], wkid))
+        .filter(Boolean)
+        .map((coord) => [coord.lon, coord.lat]))
+      .filter((ring) => ring.length >= 4);
     if (!rings.length) return null;
 
     const outers = [];
@@ -93,8 +141,9 @@ export function arcgisGeometryToGeoJson(geometry = {}) {
 
 export function computeFeatureCenter(feature = {}) {
   const geometry = feature?.geometry || {};
+  const wkid = detectGeometryWkid(geometry);
   if (Number.isFinite(Number(geometry.x)) && Number.isFinite(Number(geometry.y))) {
-    return { lon: Number(geometry.x), lat: Number(geometry.y) };
+    return normalizeGeometryCoord(geometry.x, geometry.y, wkid) || { lon: null, lat: null };
   }
 
   const collect = [];
@@ -103,9 +152,8 @@ export function computeFeatureCenter(feature = {}) {
       if (!Array.isArray(part)) continue;
       for (const coord of part) {
         if (!Array.isArray(coord) || coord.length < 2) continue;
-        const x = Number(coord[0]);
-        const y = Number(coord[1]);
-        if (Number.isFinite(x) && Number.isFinite(y)) collect.push({ x, y });
+        const normalized = normalizeGeometryCoord(coord[0], coord[1], wkid);
+        if (normalized) collect.push({ x: normalized.lon, y: normalized.lat });
       }
     }
   };
@@ -267,7 +315,7 @@ export async function runIdahoHarvestCycle({
   stateAbbr = 'ID',
   cpnfPdfBaseUrl = '',
   datasets = [
-    { name: 'parcels', layerId: 24, tileZoom: 14 },
+    { name: 'parcels', layerId: 23, tileZoom: 14 },
     { name: 'cpnf', layerId: 18, tileZoom: 12 },
   ],
   buckets = {
@@ -307,7 +355,15 @@ export async function runIdahoHarvestCycle({
     state: stateAbbr,
     nextDatasetIndex: 0,
     datasets: Object.fromEntries(datasets.map((dataset) => [dataset.name, { offset: 0, done: false }])),
+    cpnfPdfScrape: {
+      offset: 0,
+      done: false,
+    },
   });
+
+  if (!checkpoint.cpnfPdfScrape || typeof checkpoint.cpnfPdfScrape !== 'object') {
+    checkpoint.cpnfPdfScrape = { offset: 0, done: false };
+  }
 
   const datasetCount = datasets.length;
   const rawNextDatasetIndex = Number(checkpoint?.nextDatasetIndex);
@@ -355,6 +411,85 @@ export async function runIdahoHarvestCycle({
   };
 
   let changed = false;
+
+  const cpnfDataset = datasets.find((dataset) => String(dataset?.name || '').toLowerCase() === 'cpnf');
+  const cpnfPdfState = checkpoint.cpnfPdfScrape || { offset: 0, done: false };
+
+  if (cpnfDataset && !cpnfPdfState.done) {
+    const pdfQueryUrl = buildLayerQueryUrl(adaMapServerBaseUrl, cpnfDataset.layerId, {
+      where: '1=1',
+      outFields: '*',
+      returnGeometry: 'false',
+      orderByFields: 'OBJECTID ASC',
+      resultOffset: Number(cpnfPdfState.offset || 0),
+      resultRecordCount: Math.max(1, Number(batchSize) || 100),
+    });
+
+    const pdfQueryResponse = await fetchImpl(pdfQueryUrl);
+    if (!pdfQueryResponse.ok) throw new Error(`Harvest PDF query failed for ${cpnfDataset.name}: HTTP ${pdfQueryResponse.status}`);
+    const pdfQueryPayload = await pdfQueryResponse.json();
+    const pdfFeatures = Array.isArray(pdfQueryPayload?.features) ? pdfQueryPayload.features : [];
+    const cpnfBucket = bucketFor('features', cpnfDataset.name);
+
+    if (!pdfFeatures.length) {
+      checkpoint.cpnfPdfScrape = {
+        ...cpnfPdfState,
+        done: true,
+        updatedAt: new Date().toISOString(),
+      };
+      changed = true;
+    } else {
+      for (const feature of pdfFeatures) {
+        const objectId = toObjectId(feature);
+        if (objectId === '') continue;
+        const attributes = feature?.attributes || {};
+        const pdfUrls = extractPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
+        if (!pdfUrls.length) continue;
+
+        const featureKey = `${prefix}/features/${stateAbbr.toLowerCase()}/${cpnfDataset.name}/${encodeURIComponent(String(objectId))}.geojson`;
+        const existingFeature = await readJsonObjectInBucket(objectStore, cpnfBucket, featureKey, null);
+        const existingKeys = Array.isArray(existingFeature?.properties?.cpnfPdfKeys)
+          ? existingFeature.properties.cpnfPdfKeys
+          : [];
+
+        const nextKeys = [...existingKeys];
+        for (const [pdfIndex, pdfUrl] of pdfUrls.entries()) {
+          const pdfKey = buildPdfObjectKey({
+            prefix,
+            stateAbbr,
+            dataset: cpnfDataset.name,
+            objectId,
+            pdfUrl,
+            index: pdfIndex,
+          });
+
+          if (!nextKeys.includes(pdfKey)) nextKeys.push(pdfKey);
+
+          const pdfResponse = await fetchImpl(pdfUrl);
+          if (!pdfResponse.ok) continue;
+          const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+          if (!pdfBuffer.length) continue;
+          await objectStore.putObject(pdfKey, pdfBuffer, {
+            contentType: pdfResponse.headers?.get?.('content-type') || 'application/pdf',
+            bucket: cpnfBucket,
+          });
+        }
+
+        if (existingFeature && nextKeys.length) {
+          existingFeature.properties = existingFeature.properties || {};
+          existingFeature.properties.cpnfPdfKeys = [...new Set(nextKeys)];
+          await writeJsonObjectInBucket(objectStore, cpnfBucket, featureKey, existingFeature);
+        }
+      }
+
+      checkpoint.cpnfPdfScrape = {
+        offset: Number(cpnfPdfState.offset || 0) + pdfFeatures.length,
+        done: false,
+        updatedAt: new Date().toISOString(),
+      };
+      changed = true;
+    }
+  }
 
   const datasetOrder = datasets.map((_, index) => (nextDatasetIndex + index) % (datasetCount || 1));
 
@@ -480,17 +615,18 @@ export async function runIdahoHarvestCycle({
   const nextFeatures = [...indexByKey.values()]
     .sort((a, b) => String(a?.id || '').localeCompare(String(b?.id || '')));
   const allDone = datasets.every((dataset) => checkpoint.datasets[dataset.name]?.done);
+  const cpnfPdfDone = !cpnfDataset || checkpoint.cpnfPdfScrape?.done;
 
   await writeJsonObjectInBucket(objectStore, indexBucket, indexKey, {
     type: 'FeatureCollection',
     state: stateAbbr,
     generatedAt: new Date().toISOString(),
-    complete: allDone,
+    complete: allDone && cpnfPdfDone,
     features: nextFeatures,
   });
   await writeJsonObjectInBucket(objectStore, checkpointBucket, checkpointKey, checkpoint);
 
-  return { done: allDone, checkpoint, indexKey };
+  return { done: allDone && cpnfPdfDone, checkpoint, indexKey };
 }
 
 export function createFileObjectStore(rootDir) {
