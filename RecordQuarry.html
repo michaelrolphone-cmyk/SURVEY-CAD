@@ -673,8 +673,9 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     for (const note of notesByCoordinate.values()) {
       const raw = String(note || '').trim();
       if (!raw) continue;
-      const normalized = raw.replace(/^CPNFS:\s*/i, '');
-      for (const item of normalized.split('...')) {
+      const normalized = raw.replace(/^CPNFS?:\s*/i, '');
+      const parts = normalized.split(/(?:\.{3}|…|,|;|\n)+/g);
+      for (const item of parts) {
         const instrument = normalizeCpInstrumentNumber(item);
         if (instrument) instruments.add(instrument);
       }
@@ -718,10 +719,23 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     }
   }
 
-  function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount }) {
-    if (!projectContext.projectId) return null;
+  function resolveProjectContextForProjectFile(projectContext = {}) {
+    if (projectContext?.projectId) return projectContext;
+    const runtimeContext = getProjectContext();
+    if (runtimeContext?.projectId) {
+      return {
+        ...projectContext,
+        ...runtimeContext,
+      };
+    }
+    return projectContext;
+  }
 
-    const projectFile = loadProjectFileSnapshot(projectContext) || defaultProjectFile(projectContext);
+  function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount }) {
+    const resolvedProjectContext = resolveProjectContextForProjectFile(projectContext);
+    if (!resolvedProjectContext.projectId) return null;
+
+    const projectFile = loadProjectFileSnapshot(resolvedProjectContext) || defaultProjectFile(resolvedProjectContext);
     const exportTimestamp = new Date().toISOString();
     const cpfInstruments = parseCpfInstrumentsFromNotesMap(notesByCoordinate);
 
@@ -759,7 +773,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     });
 
     projectFile.generatedAt = exportTimestamp;
-    saveProjectFileSnapshot(projectContext, projectFile);
+    saveProjectFileSnapshot(resolvedProjectContext, projectFile);
     return { projectFile, cpfCount: cpfInstruments.length };
   }
 
@@ -2484,7 +2498,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       if (projectFileUpdate) {
         log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references).`);
       }
-      openLinkedApp('/POINT_TRANSFORMER.HTML?source=ros');
+      openLinkedApp(buildPointForgeLaunchPath());
       log(`Sent ${uniquePart.count + utilityRows.count} points to PointForge (${utilityRows.count} utility point(s)).`);
     } catch (e) {
       log(`PointForge export failed: ${e.message || e}`, "bad");
@@ -2507,6 +2521,15 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       // If parent access is blocked, fallback to same-tab navigation.
     }
     window.location.assign(path);
+  }
+
+  function buildPointForgeLaunchPath() {
+    const params = new URLSearchParams({ source: 'ros' });
+    const projectId = String(state?.projectContext?.projectId || '').trim();
+    const projectName = String(state?.projectContext?.projectName || '').trim();
+    if (projectId) params.set('projectId', projectId);
+    if (projectName) params.set('projectName', projectName);
+    return `/POINT_TRANSFORMER.HTML?${params.toString()}`;
   }
 
   $("btnScanPdf").addEventListener("click", async () => {

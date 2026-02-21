@@ -103,7 +103,7 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   assert.match(html, /const\s+projectFileUpdate\s*=\s*persistPointForgeExportProjectFile\(\{[\s\S]*notesByCoordinate,[\s\S]*pointCount:\s*uniquePart\.count/, 'PointForge export should save CP&F and point-file references to the project file when a project is active');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'ROS should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*'survey-cad:navigate-app'[\s\S]*path,/, 'ROS should notify launcher iframe host to navigate embedded app');
-  assert.match(html, /openLinkedApp\('\/POINT_TRANSFORMER\.HTML\?source=ros'\)/, 'ROS should navigate PointForge using launcher-aware helper');
+  assert.match(html, /openLinkedApp\(buildPointForgeLaunchPath\(\)\)/, 'ROS should navigate PointForge using launcher-aware helper');
 });
 
 test('RecordQuarry.html shows a busy processing modal while CPNF instrument numbers are gathered for exports', async () => {
@@ -224,4 +224,24 @@ test('RecordQuarry.html creates project-file folders with Drawings before RoS', 
     /folders:\s*\[[\s\S]*createProjectFileFolder\('drawings',\s*'Drawings'[\s\S]*createProjectFileFolder\('ros',\s*'RoS'/,
     'Drawings should be listed before RoS in project-file folder defaults',
   );
+});
+
+
+
+test('RecordQuarry.html hardens CP&F persistence parsing and project-context resolution during PointForge handoff', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /function\s+resolveProjectContextForProjectFile\s*\(/, 'RecordQuarry should define a helper to recover project context before saving handoff artifacts');
+  assert.match(html, /const\s+runtimeContext\s*=\s*getProjectContext\(\);/, 'project-context recovery should inspect runtime launch params when state context is missing');
+  assert.match(html, /const\s+resolvedProjectContext\s*=\s*resolveProjectContextForProjectFile\(projectContext\);/, 'PointForge export persistence should always use resolved project context');
+  assert.match(html, /replace\(\/\^CPNFS\?:\\s\*\/i, ''\)/, 'CP&F note parsing should accept both CPNF and CPNFS prefixes');
+  assert.match(html, /split\(\/\(\?:\\\.\{3\}\|…\|,\|;\|\\n\)\+\/g\)/, 'CP&F note parsing should tolerate multiple separators to avoid dropping instrument references');
+});
+test('RecordQuarry.html passes active project context when opening PointForge from export handoff', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /openLinkedApp\(buildPointForgeLaunchPath\(\)\);/, 'PointForge handoff should build launch URLs from a shared helper so project context is preserved');
+  assert.match(html, /function\s+buildPointForgeLaunchPath\s*\(\)\s*\{[\s\S]*const\s+params\s*=\s*new\s+URLSearchParams\(\{\s*source:\s*'ros'\s*\}\);/, 'PointForge handoff helper should include the ros source marker');
+  assert.match(html, /if \(projectId\) params\.set\('projectId', projectId\);/, 'PointForge handoff helper should include active project id when available');
+  assert.match(html, /if \(projectName\) params\.set\('projectName', projectName\);/, 'PointForge handoff helper should include active project name when available');
 });
