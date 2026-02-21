@@ -315,7 +315,7 @@ export async function runIdahoHarvestCycle({
   stateAbbr = 'ID',
   cpnfPdfBaseUrl = '',
   datasets = [
-    { name: 'parcels', layerId: 24, tileZoom: 14 },
+    { name: 'parcels', layerId: 23, tileZoom: 14 },
     { name: 'cpnf', layerId: 18, tileZoom: 12 },
   ],
   buckets = {
