@@ -78,7 +78,11 @@ test('RecordQuarry.html loads CP&F PDF links when a corner marker is selected', 
   assert.match(html, /buildCpfPdfLinks\(/, 'CP&F lookup should build candidate PDF links from instrument/url/name fields');
   assert.match(html, /buildRosPdfProxyUrl\(url\)/, 'CP&F links should route through API PDF proxy');
   assert.match(html, /marker\.on\('click', async \(\) => \{[\s\S]*queryCpfRecordsNearCorner\(corner\.north, corner\.east\)/, 'corner marker click handler should trigger CP&F lookup');
+  assert.match(html, /function\s+extractInstrumentFromCpfIdentifier\s*\(/, 'CP&F export should derive instrument ids from linked PDF names when instrument fields are missing');
+  assert.match(html, /function\s+resolveCpfRecordInstrument\s*\(/, 'CP&F export should resolve instruments from attributes, names, or links');
+  assert.match(html, /const\s+fromLink\s*=\s*extractInstrumentFromCpfIdentifier\(link\);/, 'CP&F resolution should fallback to PDF links to recover instrument numbers');
   assert.match(html, /function\s+uniqueCpInstrumentNote\s*\(/, 'export should format CP&F instrument notes for CSV notes column');
+  assert.match(html, /const\s+inst\s*=\s*resolveCpfRecordInstrument\(record\);/, 'CP&F notes should be generated from resolved instrument values so PDF-only records are persisted');
   assert.match(html, /CPNFS:\s*\$\{values\.join\('\.\.\.'\)\}/, 'CP&F notes should use CPNFS prefix and ... separator');
 });
 

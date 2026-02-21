@@ -388,6 +388,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(projectBrowserStaticRes.status, 200);
     const projectBrowserHtml = await projectBrowserStaticRes.text();
     assert.match(projectBrowserHtml, /SurveyFoundry EvidenceDesk/i);
+    assert.match(projectBrowserHtml, /params\.get\('activeProjectId'\) \|\| params\.get\('projectId'\) \|\| ''/);
   } finally {
     await new Promise((resolve) => app.server.close(resolve));
     await new Promise((resolve) => upstream.server.close(resolve));
