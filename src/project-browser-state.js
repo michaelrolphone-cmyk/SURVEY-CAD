@@ -84,6 +84,49 @@ export function appendPointFileResource(projectFile, resource) {
   return true;
 }
 
+function slugifyFolderKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+export function addCustomFolder(projectFile, { label, description = '', defaultFormat = 'bin' } = {}) {
+  if (!projectFile || !Array.isArray(projectFile.folders)) return null;
+  const trimmedLabel = String(label || '').trim();
+  if (!trimmedLabel) return null;
+
+  const baseKey = slugifyFolderKey(trimmedLabel) || 'custom';
+  let key = baseKey;
+  let attempt = 1;
+  while (projectFile.folders.some((f) => f.key === key)) {
+    key = `${baseKey}-${attempt}`;
+    attempt += 1;
+  }
+
+  const folder = {
+    key,
+    label: trimmedLabel,
+    description: String(description || '').trim(),
+    defaultFormat: String(defaultFormat || 'bin').trim() || 'bin',
+    index: [],
+    custom: true,
+  };
+  projectFile.folders.push(folder);
+  return folder;
+}
+
+export function removeCustomFolder(projectFile, folderKey) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey) return false;
+  const folderIndex = projectFile.folders.findIndex((f) => f.key === folderKey);
+  if (folderIndex < 0) return false;
+  const folder = projectFile.folders[folderIndex];
+  if (!folder.custom) return false;
+  if (Array.isArray(folder.index) && folder.index.length > 0) return false;
+  projectFile.folders.splice(folderIndex, 1);
+  return true;
+}
+
 export function appendResourceToFolder(projectFile, folderKey, resource) {
   if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey || !resource) return false;
   const folder = projectFile.folders.find((f) => f.key === folderKey);

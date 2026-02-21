@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildProjectArchivePlan, createProjectFile } from '../src/project-file.js';
+import { buildProjectArchivePlan, createProjectFile, DEFAULT_PROJECT_FILE_FOLDERS, PROJECT_FILE_FOLDERS } from '../src/project-file.js';
 
 test('createProjectFile builds symbolic folder indexes for SurveyFoundry archive output', () => {
   const projectFile = createProjectFile({
@@ -144,4 +144,20 @@ test('createProjectFile places Drawings first and sorts drawing resources by lat
 
   const drawingsFolder = projectFile.folders.find((folder) => folder.key === 'drawings');
   assert.deepEqual(drawingsFolder.index.map((entry) => entry.id), ['drawing-newer', 'drawing-older']);
+});
+
+test('DEFAULT_PROJECT_FILE_FOLDERS exports the same built-in folder list as PROJECT_FILE_FOLDERS', () => {
+  assert.ok(Array.isArray(DEFAULT_PROJECT_FILE_FOLDERS), 'DEFAULT_PROJECT_FILE_FOLDERS should be an array');
+  assert.ok(DEFAULT_PROJECT_FILE_FOLDERS.length > 0, 'DEFAULT_PROJECT_FILE_FOLDERS should not be empty');
+  assert.strictEqual(DEFAULT_PROJECT_FILE_FOLDERS, PROJECT_FILE_FOLDERS, 'DEFAULT_PROJECT_FILE_FOLDERS should be the same reference as PROJECT_FILE_FOLDERS');
+
+  const keys = DEFAULT_PROJECT_FILE_FOLDERS.map((f) => f.key);
+  assert.ok(keys.includes('drawings'), 'default folders should include drawings');
+  assert.ok(keys.includes('point-files'), 'default folders should include point-files');
+  assert.ok(keys.includes('other'), 'default folders should include other');
+  for (const folder of DEFAULT_PROJECT_FILE_FOLDERS) {
+    assert.ok(folder.key, 'each default folder should have a key');
+    assert.ok(folder.label, 'each default folder should have a label');
+    assert.ok(folder.defaultFormat, 'each default folder should have a defaultFormat');
+  }
 });
