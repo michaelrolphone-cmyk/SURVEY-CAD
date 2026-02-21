@@ -46,6 +46,34 @@ test('computeFeatureCenter supports ring geometries', () => {
   assert.equal(center.lat, 1);
 });
 
+test('arcgisGeometryToGeoJson normalizes Web Mercator geometries to lon/lat', () => {
+  const geometry = arcgisGeometryToGeoJson({
+    x: -12935580.863206567,
+    y: 5406054.57397459,
+    spatialReference: { wkid: 3857 },
+  });
+
+  assert.equal(geometry.type, 'Point');
+  assert.ok(Math.abs(geometry.coordinates[0] - (-116.2023)) < 0.001);
+  assert.ok(Math.abs(geometry.coordinates[1] - 43.615) < 0.001);
+});
+
+test('computeFeatureCenter normalizes Web Mercator rings to lon/lat center', () => {
+  const center = computeFeatureCenter({
+    geometry: {
+      spatialReference: { wkid: 3857 },
+      rings: [[
+        [-12935680.863206567, 5405954.57397459],
+        [-12935480.863206567, 5405954.57397459],
+        [-12935480.863206567, 5406154.57397459],
+        [-12935680.863206567, 5406154.57397459],
+      ]],
+    },
+  });
+
+  assert.ok(Math.abs(center.lon - (-116.2023)) < 0.001);
+  assert.ok(Math.abs(center.lat - 43.615) < 0.001);
+});
 test('createMinioObjectStore uses MinIO bucket-aware getObject/putObject', async () => {
   const calls = [];
   const minioClient = {
@@ -72,6 +100,26 @@ test('createMinioObjectStore uses MinIO bucket-aware getObject/putObject', async
   assert.equal(calls[1].meta['Content-Type'], 'application/json');
 });
 
+
+
+test('runIdahoHarvestCycle default datasets harvest property lots parcel layer by default', async () => {
+  const objectStore = createMemoryObjectStore();
+  const layers = [];
+  const fetchImpl = async (url) => {
+    const layer = new URL(url).pathname.split('/').slice(-2, -1)[0];
+    layers.push(layer);
+    return { ok: true, json: async () => ({ features: [] }) };
+  };
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+  });
+
+  assert.equal(layers[0], '23');
+});
 test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoints in tile-server bucket', async () => {
   const objectStore = createMemoryObjectStore();
   const calls = [];
@@ -82,7 +130,7 @@ test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoin
     calls.push({ layer, offset });
 
     const records = {
-      '24': [
+      '23': [
         {
           attributes: { OBJECTID: 1, PARCEL: 'R1' },
           geometry: { rings: [[[-116.2, 43.6], [-116.1, 43.6], [-116.1, 43.7], [-116.2, 43.7], [-116.2, 43.6]]] },
@@ -143,7 +191,7 @@ test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoin
   assert.equal(parcelIndexFeature.properties.tileKeys.length, 23);
   assert.equal(parcelIndexFeature.properties.tileKey, parcelIndexFeature.properties.tileKeys[0]);
 
-  assert.deepEqual(calls.map((c) => `${c.layer}:${c.offset}`), ['24:0', '18:0', '24:1', '18:1']);
+  assert.deepEqual(calls.map((c) => `${c.layer}:${c.offset}`), ['23:0', '18:0', '23:1', '18:1']);
 });
 
 test('runIdahoHarvestCycle includes survey number metadata in tile features', async () => {
@@ -163,7 +211,7 @@ test('runIdahoHarvestCycle includes survey number metadata in tile features', as
     objectStore,
     adaMapServerBaseUrl: 'http://example.test/map',
     batchSize: 1,
-    datasets: [{ name: 'parcels', layerId: 24 }],
+    datasets: [{ name: 'parcels', layerId: 23 }],
   });
 
   const parcelTileKey = objectStore.writes.find((write) => write.key.includes('/tiles/id/parcels/14/'))?.key;
@@ -179,7 +227,7 @@ test('runIdahoHarvestCycle keeps parcels out of cpnf bucket when default bucket 
   const objectStore = createMemoryObjectStore();
   const fetchImpl = async (url) => {
     const layer = new URL(url).pathname.split('/').slice(-2, -1)[0];
-    if (layer === '24') {
+    if (layer === '23') {
       return {
         ok: true,
         json: async () => ({
@@ -196,7 +244,7 @@ test('runIdahoHarvestCycle keeps parcels out of cpnf bucket when default bucket 
     objectStore,
     adaMapServerBaseUrl: 'http://example.test/map',
     batchSize: 1,
-    datasets: [{ name: 'parcels', layerId: 24 }],
+    datasets: [{ name: 'parcels', layerId: 23 }],
     buckets: {
       default: 'cpnfs',
       cpnf: 'cpnfs',
@@ -273,7 +321,7 @@ test('runIdahoHarvestCycle rotates datasets so cpnf is harvested before parcels 
     const offset = Number(parsed.searchParams.get('resultOffset') || 0);
     calls.push(`${layer}:${offset}`);
 
-    if (layer === '24') {
+    if (layer === '23') {
       return {
         ok: true,
         json: async () => ({
@@ -302,7 +350,7 @@ test('runIdahoHarvestCycle rotates datasets so cpnf is harvested before parcels 
   await runIdahoHarvestCycle({ fetchImpl, objectStore, adaMapServerBaseUrl: 'http://example.test/map', batchSize: 1 });
   await runIdahoHarvestCycle({ fetchImpl, objectStore, adaMapServerBaseUrl: 'http://example.test/map', batchSize: 1 });
 
-  assert.deepEqual(calls, ['24:0', '18:0']);
+  assert.deepEqual(calls, ['23:0', '18:0']);
   const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/99.geojson', { bucket: 'cpnfs' });
   assert.equal(cpnfFeature.properties.dataset, 'cpnf');
 });
