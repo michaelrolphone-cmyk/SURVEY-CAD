@@ -39,7 +39,7 @@ The server binds to `PORT` (default: `3000`) on `0.0.0.0`.
 
 The server now includes a restartable background worker that harvests Idaho parcel + CPNF features, writes each record as GeoJSON, stores Mapbox/Leaflet-style GeoJSON tile buckets in object storage (parcels are materialized across zoom levels 0-22), and maintains a resume-safe master geolocation index GeoJSON file.
 
-Harvest cycles now rotate dataset processing order between parcels and CPNF so CP&F records begin harvesting even while parcel backlogs are still in progress.
+Harvest cycles now rotate dataset processing order across all discovered parcel and CPNF-related ArcGIS layers so CP&F records begin harvesting even while parcel backlogs are still in progress.
 
 ### Worker API endpoints
 
@@ -57,8 +57,8 @@ Harvest cycles now rotate dataset processing order between parcels and CPNF so C
 ### Object store layout (GeoJSON)
 
 - Feature objects: `surveycad/idaho-harvest/features/id/<dataset>/<objectId>.geojson`
-  - `cpnf` dataset writes into MinIO bucket `cpnfs`
-  - `parcels` dataset writes into MinIO bucket `tile-server`
+  - `cpnf*` datasets (for example `cpnf-layer-18`) write into MinIO bucket `cpnfs`
+  - `parcels*` datasets (for example `parcels-layer-24`) write into MinIO bucket `tile-server`
   - CPNF features include `properties.cpnfPdfKeys` when PDF links are discovered and downloaded
 - CPNF PDF objects: `surveycad/idaho-harvest/pdfs/id/cpnf/<objectId>/<index>-<fileName>.pdf` (MinIO bucket `cpnfs`)
 - Tile buckets: `surveycad/idaho-harvest/tiles/id/<dataset>/<z>/<x>/<y>.geojson` (MinIO bucket `tile-server`)
@@ -75,8 +75,10 @@ Harvest cycles now rotate dataset processing order between parcels and CPNF so C
 - `IDAHO_HARVEST_RANDOM_DELAY_MIN_MS` (default: `120000` = 2 minutes)
 - `IDAHO_HARVEST_RANDOM_DELAY_MAX_MS` (default: `600000` = 10 minutes)
 - `IDAHO_HARVEST_POLL_INTERVAL_MS` (fixed delay used only when randomized throttling is disabled; default: `1000`)
-- `IDAHO_HARVEST_PARCEL_LAYER` (default: `23`)
-- `IDAHO_HARVEST_CPNF_LAYER` (default: `18`)
+- `IDAHO_HARVEST_PARCEL_LAYERS` (optional comma-separated layer list override for parcel harvest)
+- `IDAHO_HARVEST_CPNF_LAYERS` (optional comma-separated layer list override for CPNF harvest)
+- `IDAHO_HARVEST_PARCEL_LAYER` (fallback when parcel layer discovery is unavailable; default: `23`)
+- `IDAHO_HARVEST_CPNF_LAYER` (fallback when CPNF layer discovery is unavailable; default: `18`)
 - `IDAHO_HARVEST_CPNF_PDF_BASE_URL` (optional base URL used to resolve relative CPNF PDF paths before download)
 - `STACKHERO_MINIO_HOST` (required; worker will fail fast when MinIO is not configured)
 - `STACKHERO_MINIO_ACCESS_KEY`
@@ -89,7 +91,8 @@ Harvest cycles now rotate dataset processing order between parcels and CPNF so C
 - `IDAHO_HARVEST_MINIO_PARCELS_BUCKET` (default: `tile-server`)
 - `IDAHO_HARVEST_MINIO_INDEX_BUCKET` (default: `tile-server`)
 - `IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET` (default: `tile-server`)
-- `MAPTILE_DATASETS` (comma-separated list of exposed tile datasets; default: `parcels,cpnf`)
+- `MAPTILE_DATASETS` (comma-separated list of exposed tile datasets; default: `auto`, which discovers dataset names from the master index)
+- `MAPTILE_INDEX_KEY` (master index object-key used for dataset auto-discovery; default: `surveycad/idaho-harvest/indexes/id-master-index.geojson`)
 - `MAPTILE_MINIO_PREFIX` (MinIO object-key prefix for tile lookup; default: `surveycad/idaho-harvest/tiles/id`)
 
 ### Commands

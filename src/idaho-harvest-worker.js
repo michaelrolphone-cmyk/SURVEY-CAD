@@ -6,6 +6,80 @@ const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_RANDOM_DELAY_MIN_MS = 2 * 60 * 1000;
 const DEFAULT_RANDOM_DELAY_MAX_MS = 10 * 60 * 1000;
 const DEFAULT_IDAHO_HARVEST_PARCEL_LAYER = 23;
+const DEFAULT_IDAHO_HARVEST_CPNF_LAYER = 18;
+
+function parseLayerList(value) {
+  return String(value || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isInteger(entry) && entry >= 0);
+}
+
+function parseMapServerLayerCatalog(payload = {}) {
+  const layers = Array.isArray(payload?.layers) ? payload.layers : [];
+  return layers
+    .map((layer) => ({
+      layerId: Number(layer?.id),
+      name: String(layer?.name || '').trim(),
+    }))
+    .filter((layer) => Number.isInteger(layer.layerId) && layer.layerId >= 0);
+}
+
+function findLayerIdsByName(catalog = [], matcher = () => false) {
+  return catalog
+    .filter((layer) => matcher(layer.name))
+    .map((layer) => layer.layerId);
+}
+
+export async function resolveHarvestDatasets({
+  fetchImpl,
+  adaMapServerBaseUrl,
+  env = process.env,
+}) {
+  const explicitParcelLayers = parseLayerList(env.IDAHO_HARVEST_PARCEL_LAYERS);
+  const explicitCpnfLayers = parseLayerList(env.IDAHO_HARVEST_CPNF_LAYERS);
+  const fallbackParcelLayers = explicitParcelLayers.length
+    ? explicitParcelLayers
+    : [Number(env.IDAHO_HARVEST_PARCEL_LAYER || DEFAULT_IDAHO_HARVEST_PARCEL_LAYER)];
+  const fallbackCpnfLayers = explicitCpnfLayers.length
+    ? explicitCpnfLayers
+    : [Number(env.IDAHO_HARVEST_CPNF_LAYER || DEFAULT_IDAHO_HARVEST_CPNF_LAYER)];
+
+  if (explicitParcelLayers.length && explicitCpnfLayers.length) {
+    return [
+      ...explicitParcelLayers.map((layerId) => ({ name: `parcels-layer-${layerId}`, layerId })),
+      ...explicitCpnfLayers.map((layerId) => ({ name: `cpnf-layer-${layerId}`, layerId })),
+    ];
+  }
+
+  const metadataUrl = `${String(adaMapServerBaseUrl || '').replace(/\/+$/, '')}?f=json`;
+  let catalog = [];
+  try {
+    const response = await fetchImpl(metadataUrl);
+    if (response.ok) {
+      catalog = parseMapServerLayerCatalog(await response.json());
+    }
+  } catch {
+    catalog = [];
+  }
+
+  const discoveredParcelLayers = explicitParcelLayers.length
+    ? explicitParcelLayers
+    : findLayerIdsByName(catalog, (name) => /parcel/i.test(name));
+  const discoveredCpnfLayers = explicitCpnfLayers.length
+    ? explicitCpnfLayers
+    : findLayerIdsByName(catalog, (name) => /(cp\s*&\s*f|cpnf|corner)/i.test(name));
+
+  const parcelLayers = discoveredParcelLayers.length ? discoveredParcelLayers : fallbackParcelLayers;
+  const cpnfLayers = discoveredCpnfLayers.length ? discoveredCpnfLayers : fallbackCpnfLayers;
+
+  return [
+    ...parcelLayers.map((layerId) => ({ name: `parcels-layer-${layerId}`, layerId })),
+    ...cpnfLayers.map((layerId) => ({ name: `cpnf-layer-${layerId}`, layerId })),
+  ];
+}
 
 function randomIntBetween(minInclusive, maxInclusive, randomFn = Math.random) {
   const min = Math.ceil(Number(minInclusive));
@@ -93,6 +167,12 @@ export async function runIdahoHarvestWorker({
   process.on('SIGTERM', sigtermHandler);
 
   try {
+    const datasets = await resolveHarvestDatasets({
+      fetchImpl: client.fetchImpl,
+      adaMapServerBaseUrl: client.config.adaMapServer,
+      env,
+    });
+
     while (!shuttingDown) {
       const result = await runIdahoHarvestCycle({
         fetchImpl: client.fetchImpl,
@@ -100,10 +180,7 @@ export async function runIdahoHarvestWorker({
         adaMapServerBaseUrl: client.config.adaMapServer,
         batchSize: Number(env.IDAHO_HARVEST_BATCH_SIZE || 100),
         cpnfPdfBaseUrl: String(env.IDAHO_HARVEST_CPNF_PDF_BASE_URL || ''),
-        datasets: [
-          { name: 'parcels', layerId: Number(env.IDAHO_HARVEST_PARCEL_LAYER || DEFAULT_IDAHO_HARVEST_PARCEL_LAYER) },
-          { name: 'cpnf', layerId: Number(env.IDAHO_HARVEST_CPNF_LAYER || 18) },
-        ],
+        datasets,
         buckets: {
           default: String(env.IDAHO_HARVEST_MINIO_DEFAULT_BUCKET || 'tile-server'),
           parcels: String(env.IDAHO_HARVEST_MINIO_PARCELS_BUCKET || 'tile-server'),

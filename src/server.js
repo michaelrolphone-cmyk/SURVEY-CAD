@@ -1150,13 +1150,15 @@ export function createSurveyServer({
     : null;
   let mapTileStorePromise = mapTileObjectStore ? Promise.resolve(mapTileObjectStore) : null;
 
+  const rawMapTileDatasets = String(process.env.MAPTILE_DATASETS || 'auto').trim().toLowerCase();
   const mapTileSettings = {
     bucket: String(process.env.IDAHO_HARVEST_MINIO_TILE_BUCKET || process.env.IDAHO_HARVEST_MINIO_DEFAULT_BUCKET || 'tile-server'),
+    indexBucket: String(process.env.IDAHO_HARVEST_MINIO_INDEX_BUCKET || process.env.IDAHO_HARVEST_MINIO_DEFAULT_BUCKET || 'tile-server'),
     prefix: String(process.env.MAPTILE_MINIO_PREFIX || 'surveycad/idaho-harvest/tiles/id').replace(/\/+$/, ''),
-    datasets: String(process.env.MAPTILE_DATASETS || 'parcels,cpnf')
-      .split(',')
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean),
+    indexKey: String(process.env.MAPTILE_INDEX_KEY || 'surveycad/idaho-harvest/indexes/id-master-index.geojson'),
+    datasets: rawMapTileDatasets && rawMapTileDatasets !== 'auto'
+      ? rawMapTileDatasets.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean)
+      : [],
   };
 
   async function resolveEvidenceDeskStore() {
@@ -1171,6 +1173,31 @@ export function createSurveyServer({
       mapTileStorePromise = Promise.resolve().then(() => createIdahoHarvestObjectStoreFromEnv(process.env));
     }
     return mapTileStorePromise;
+  }
+
+
+  async function resolveMapTileDatasets() {
+    if (mapTileSettings.datasets.length) return mapTileSettings.datasets;
+
+    let mapTileStore;
+    try {
+      mapTileStore = await resolveMapTileStore();
+    } catch {
+      return [];
+    }
+
+    try {
+      const payload = await mapTileStore.getObject(mapTileSettings.indexKey, { bucket: mapTileSettings.indexBucket });
+      if (!payload) return [];
+      const parsed = JSON.parse(Buffer.from(payload).toString('utf8'));
+      const features = Array.isArray(parsed?.features) ? parsed.features : [];
+      return [...new Set(features
+        .map((feature) => String(feature?.properties?.dataset || '').trim().toLowerCase())
+        .filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+    } catch {
+      return [];
+    }
   }
 
   Promise.resolve()
@@ -2679,7 +2706,8 @@ export function createSurveyServer({
 
       if (urlObj.pathname === '/api/maptiles') {
         const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host || 'localhost'}`;
-        const datasets = mapTileSettings.datasets.map((dataset) => ({
+        const datasetNames = await resolveMapTileDatasets();
+        const datasets = datasetNames.map((dataset) => ({
           dataset,
           tilejson: `${origin}/api/maptiles/${encodeURIComponent(dataset)}/tilejson.json`,
           tiles: `${origin}/api/maptiles/${encodeURIComponent(dataset)}/{z}/{x}/{y}.geojson`,
@@ -2691,7 +2719,8 @@ export function createSurveyServer({
       const mapTileRoute = parseMapTileRoute(urlObj.pathname);
       if (mapTileRoute) {
         const dataset = String(mapTileRoute.dataset || '').trim().toLowerCase();
-        if (!mapTileSettings.datasets.includes(dataset)) {
+        const knownDatasets = await resolveMapTileDatasets();
+        if (!knownDatasets.includes(dataset)) {
           sendJson(res, 404, { error: `Unknown tile dataset: ${dataset}` });
           return;
         }

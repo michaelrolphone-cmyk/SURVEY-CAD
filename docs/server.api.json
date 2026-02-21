@@ -2880,7 +2880,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Tile dataset key (for example parcels or cpnf)"
+            "description": "Tile dataset key (for example parcels-layer-24 or cpnf-layer-18)"
           }
         ],
         "responses": {

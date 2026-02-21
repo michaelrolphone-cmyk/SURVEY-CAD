@@ -287,8 +287,11 @@ export async function runIdahoHarvestCycle({
     subdivision: 'cpnfs',
   };
   const bucketFor = (kind, datasetName = '') => {
+    const normalizedDatasetName = String(datasetName || '').toLowerCase();
     if (datasetName && buckets?.[datasetName]) return buckets[datasetName];
-    const fallbackBucket = DATASET_BUCKET_FALLBACKS[String(datasetName || '').toLowerCase()];
+    if (normalizedDatasetName.startsWith('parcels')) return buckets?.parcels || DATASET_BUCKET_FALLBACKS.parcels;
+    if (normalizedDatasetName.startsWith('cpnf')) return buckets?.cpnf || DATASET_BUCKET_FALLBACKS.cpnf;
+    const fallbackBucket = DATASET_BUCKET_FALLBACKS[normalizedDatasetName];
     if (fallbackBucket) return fallbackBucket;
     if (kind && buckets?.[kind]) return buckets[kind];
     return buckets?.default || null;
@@ -397,7 +400,7 @@ export async function runIdahoHarvestCycle({
       const featureBucket = bucketFor('features', dataset.name);
 
       const pdfKeys = [];
-      if (String(dataset.name).toLowerCase() === 'cpnf') {
+      if (String(dataset.name).toLowerCase().startsWith('cpnf')) {
         const pdfUrls = extractPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
         for (const [pdfIndex, pdfUrl] of pdfUrls.entries()) {
           const pdfResponse = await fetchImpl(pdfUrl);
