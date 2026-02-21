@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const DEFAULT_PREFIX = 'surveycad/idaho-harvest';
+const DEFAULT_CPNF_PDF_DOWNLOAD_BASE = 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/';
 
 function toObjectId(feature = {}, objectIdField = 'OBJECTID') {
   const attrs = feature?.attributes || {};
@@ -253,6 +254,33 @@ function extractPdfUrls(attributes = {}, { baseUrl = '' } = {}) {
   return [...new Set(urls)];
 }
 
+function extractInstrumentNumbers(attributes = {}) {
+  const values = [];
+  for (const [rawKey, rawValue] of Object.entries(attributes || {})) {
+    const key = String(rawKey || '');
+    if (!/(instrument|inst(?:rument)?\b|doc(?:ument)?\s*(?:no|num|number))/i.test(key)) continue;
+    if (rawValue === null || rawValue === undefined || rawValue === '') continue;
+    values.push(rawValue);
+  }
+
+  return [...new Set(values
+    .flatMap((value) => String(value)
+      .split(/[,;|]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)))];
+}
+
+function resolveCpnfPdfUrls(attributes = {}, { baseUrl = '' } = {}) {
+  const pdfUrls = extractPdfUrls(attributes, { baseUrl });
+  const instrumentUrls = extractInstrumentNumbers(attributes).map((instrumentNumber) => {
+    const normalizedInstrument = String(instrumentNumber || '').trim();
+    if (!normalizedInstrument) return null;
+    return `${DEFAULT_CPNF_PDF_DOWNLOAD_BASE}${encodeURIComponent(normalizedInstrument)}.pdf`;
+  }).filter(Boolean);
+
+  return [...new Set([...pdfUrls, ...instrumentUrls])];
+}
+
 function buildPdfObjectKey({ prefix, stateAbbr, dataset, objectId, pdfUrl, index }) {
   const parsed = new URL(pdfUrl);
   const fileName = path.basename(parsed.pathname || '') || `document-${index + 1}.pdf`;
@@ -443,7 +471,7 @@ export async function runIdahoHarvestCycle({
         const objectId = toObjectId(feature);
         if (objectId === '') continue;
         const attributes = feature?.attributes || {};
-        const pdfUrls = extractPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
+        const pdfUrls = resolveCpnfPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
         if (!pdfUrls.length) continue;
 
         const featureKey = `${prefix}/features/${stateAbbr.toLowerCase()}/${cpnfDataset.name}/${encodeURIComponent(String(objectId))}.geojson`;
@@ -463,8 +491,6 @@ export async function runIdahoHarvestCycle({
             index: pdfIndex,
           });
 
-          if (!nextKeys.includes(pdfKey)) nextKeys.push(pdfKey);
-
           const pdfResponse = await fetchImpl(pdfUrl);
           if (!pdfResponse.ok) continue;
           const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
@@ -473,6 +499,7 @@ export async function runIdahoHarvestCycle({
             contentType: pdfResponse.headers?.get?.('content-type') || 'application/pdf',
             bucket: cpnfBucket,
           });
+          if (!nextKeys.includes(pdfKey)) nextKeys.push(pdfKey);
         }
 
         if (existingFeature && nextKeys.length) {
@@ -536,7 +563,7 @@ export async function runIdahoHarvestCycle({
 
       const pdfKeys = [];
       if (String(dataset.name).toLowerCase().startsWith('cpnf')) {
-        const pdfUrls = extractPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
+        const pdfUrls = resolveCpnfPdfUrls(attributes, { baseUrl: cpnfPdfBaseUrl });
         for (const [pdfIndex, pdfUrl] of pdfUrls.entries()) {
           const pdfResponse = await fetchImpl(pdfUrl);
           if (!pdfResponse.ok) continue;
