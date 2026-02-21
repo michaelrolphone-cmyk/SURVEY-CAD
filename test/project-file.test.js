@@ -161,3 +161,40 @@ test('DEFAULT_PROJECT_FILE_FOLDERS exports the same built-in folder list as PROJ
     assert.ok(folder.defaultFormat, 'each default folder should have a defaultFormat');
   }
 });
+
+test('buildProjectArchivePlan generates nested folder paths for subfolders', async () => {
+  const projectFile = {
+    archive: { rootFolderName: 'test-project' },
+    project: { name: 'Test Project' },
+    folders: [
+      {
+        key: 'drawings',
+        label: 'Drawings',
+        index: [],
+      },
+      {
+        key: 'archive',
+        label: 'Archive',
+        parentKey: 'drawings',
+        index: [
+          {
+            id: 'old-1',
+            reference: { type: 'instrument-number', value: 'OLD-001' },
+          },
+        ],
+      },
+    ],
+  };
+
+  const plan = await buildProjectArchivePlan(projectFile, {
+    resolvers: {
+      'instrument-number': async (item) => ({
+        files: [{ name: `${item.reference.value}.pdf`, contentType: 'application/pdf' }],
+      }),
+    },
+  });
+
+  assert.ok(plan.entries.some((e) => e.path === 'test-project/Drawings/index.json'), 'top-level folder should have simple path');
+  assert.ok(plan.entries.some((e) => e.path === 'test-project/Drawings/Archive/index.json'), 'subfolder index should include parent label in path');
+  assert.ok(plan.entries.some((e) => e.path === 'test-project/Drawings/Archive/OLD-001.pdf'), 'subfolder file should include full nested path');
+});

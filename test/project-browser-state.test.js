@@ -17,6 +17,9 @@ import {
   findCpfPointLinksAsync,
   addCustomFolder,
   removeCustomFolder,
+  getFolderDepth,
+  getFolderChildren,
+  MAX_FOLDER_DEPTH,
 } from '../src/project-browser-state.js';
 
 function makeStorage(entries = {}) {
@@ -457,4 +460,162 @@ test('Project Browser includes custom folder management UI', async () => {
   assert.match(projectBrowserHtml, /add-folder-panel/, 'Project Browser should render the add-folder UI panel');
   assert.match(projectBrowserHtml, /remove-folder-btn/, 'Project Browser should render remove buttons for custom folders');
   assert.match(projectBrowserHtml, /folder\.custom/, 'Project Browser should check folder.custom to show remove controls');
+});
+
+test('MAX_FOLDER_DEPTH is 5', () => {
+  assert.equal(MAX_FOLDER_DEPTH, 5);
+});
+
+test('getFolderDepth returns 1 for top-level folders', () => {
+  const projectFile = {
+    folders: [{ key: 'drawings', index: [] }],
+  };
+  assert.equal(getFolderDepth(projectFile, 'drawings'), 1);
+});
+
+test('getFolderDepth returns correct depth for nested folders', () => {
+  const projectFile = {
+    folders: [
+      { key: 'drawings', index: [] },
+      { key: 'sub-a', index: [], custom: true, parentKey: 'drawings' },
+      { key: 'sub-b', index: [], custom: true, parentKey: 'sub-a' },
+      { key: 'sub-c', index: [], custom: true, parentKey: 'sub-b' },
+    ],
+  };
+  assert.equal(getFolderDepth(projectFile, 'drawings'), 1);
+  assert.equal(getFolderDepth(projectFile, 'sub-a'), 2);
+  assert.equal(getFolderDepth(projectFile, 'sub-b'), 3);
+  assert.equal(getFolderDepth(projectFile, 'sub-c'), 4);
+});
+
+test('getFolderDepth returns 0 for invalid inputs', () => {
+  assert.equal(getFolderDepth(null, 'drawings'), 0);
+  assert.equal(getFolderDepth({ folders: [] }, null), 0);
+});
+
+test('getFolderChildren returns direct children of a folder', () => {
+  const projectFile = {
+    folders: [
+      { key: 'drawings', index: [] },
+      { key: 'sub-a', index: [], custom: true, parentKey: 'drawings' },
+      { key: 'sub-b', index: [], custom: true, parentKey: 'drawings' },
+      { key: 'sub-c', index: [], custom: true, parentKey: 'sub-a' },
+    ],
+  };
+
+  const drawingsChildren = getFolderChildren(projectFile, 'drawings');
+  assert.equal(drawingsChildren.length, 2);
+  assert.ok(drawingsChildren.some((f) => f.key === 'sub-a'));
+  assert.ok(drawingsChildren.some((f) => f.key === 'sub-b'));
+
+  const subAChildren = getFolderChildren(projectFile, 'sub-a');
+  assert.equal(subAChildren.length, 1);
+  assert.equal(subAChildren[0].key, 'sub-c');
+
+  assert.equal(getFolderChildren(projectFile, 'sub-b').length, 0);
+});
+
+test('getFolderChildren returns empty array for invalid inputs', () => {
+  assert.deepEqual(getFolderChildren(null, 'drawings'), []);
+  assert.deepEqual(getFolderChildren({ folders: [] }, null), []);
+});
+
+test('addCustomFolder creates a subfolder with parentKey when parentKey is provided', () => {
+  const projectFile = {
+    folders: [{ key: 'drawings', index: [] }],
+  };
+
+  const subfolder = addCustomFolder(projectFile, { label: 'Archive', parentKey: 'drawings' });
+
+  assert.ok(subfolder, 'should return the new subfolder');
+  assert.equal(subfolder.key, 'archive');
+  assert.equal(subfolder.label, 'Archive');
+  assert.equal(subfolder.parentKey, 'drawings');
+  assert.equal(subfolder.custom, true);
+  assert.equal(projectFile.folders.length, 2);
+});
+
+test('addCustomFolder enforces MAX_FOLDER_DEPTH limit', () => {
+  const projectFile = {
+    folders: [
+      { key: 'l1', index: [] },
+      { key: 'l2', index: [], custom: true, parentKey: 'l1' },
+      { key: 'l3', index: [], custom: true, parentKey: 'l2' },
+      { key: 'l4', index: [], custom: true, parentKey: 'l3' },
+      { key: 'l5', index: [], custom: true, parentKey: 'l4' },
+    ],
+  };
+
+  assert.equal(getFolderDepth(projectFile, 'l5'), 5);
+
+  const subfolder = addCustomFolder(projectFile, { label: 'Too Deep', parentKey: 'l5' });
+  assert.equal(subfolder, null, 'should refuse to create a folder beyond MAX_FOLDER_DEPTH');
+  assert.equal(projectFile.folders.length, 5, 'folder count should not change');
+});
+
+test('addCustomFolder allows nesting at exactly MAX_FOLDER_DEPTH - 1', () => {
+  const projectFile = {
+    folders: [
+      { key: 'l1', index: [] },
+      { key: 'l2', index: [], custom: true, parentKey: 'l1' },
+      { key: 'l3', index: [], custom: true, parentKey: 'l2' },
+      { key: 'l4', index: [], custom: true, parentKey: 'l3' },
+    ],
+  };
+
+  assert.equal(getFolderDepth(projectFile, 'l4'), 4);
+
+  const subfolder = addCustomFolder(projectFile, { label: 'Level 5', parentKey: 'l4' });
+  assert.ok(subfolder, 'should allow creating a folder at depth 5');
+  assert.equal(getFolderDepth(projectFile, subfolder.key), 5);
+});
+
+test('addCustomFolder returns null when parentKey does not exist', () => {
+  const projectFile = { folders: [{ key: 'drawings', index: [] }] };
+
+  const result = addCustomFolder(projectFile, { label: 'Sub', parentKey: 'nonexistent' });
+  assert.equal(result, null);
+});
+
+test('removeCustomFolder refuses to remove a folder that has child folders', () => {
+  const projectFile = {
+    folders: [
+      { key: 'parent', index: [], custom: true },
+      { key: 'child', index: [], custom: true, parentKey: 'parent' },
+    ],
+  };
+
+  const result = removeCustomFolder(projectFile, 'parent');
+
+  assert.equal(result, false);
+  assert.equal(projectFile.folders.length, 2);
+});
+
+test('removeCustomFolder removes a leaf subfolder with no children and no files', () => {
+  const projectFile = {
+    folders: [
+      { key: 'parent', index: [], custom: true },
+      { key: 'child', index: [], custom: true, parentKey: 'parent' },
+    ],
+  };
+
+  const result = removeCustomFolder(projectFile, 'child');
+
+  assert.equal(result, true);
+  assert.equal(projectFile.folders.length, 1);
+  assert.equal(projectFile.folders[0].key, 'parent');
+});
+
+test('Project Browser includes subfolder management UI', async () => {
+  const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+
+  assert.match(projectBrowserHtml, /getFolderDepth/, 'Project Browser should import getFolderDepth for depth enforcement');
+  assert.match(projectBrowserHtml, /getFolderChildren/, 'Project Browser should import getFolderChildren for child detection');
+  assert.match(projectBrowserHtml, /MAX_FOLDER_DEPTH/, 'Project Browser should import MAX_FOLDER_DEPTH constant');
+  assert.match(projectBrowserHtml, /add-subfolder-panel/, 'Project Browser should render add-subfolder panels');
+  assert.match(projectBrowserHtml, /Add subfolder/, 'Project Browser should render Add subfolder buttons');
+  assert.match(projectBrowserHtml, /folder-children/, 'Project Browser should render folder-children containers for nesting');
+  assert.match(projectBrowserHtml, /parentKey: folder\.key/, 'Project Browser should pass parentKey when creating subfolders');
+  assert.match(projectBrowserHtml, /folderChildrenContainerMap/, 'Project Browser should track folder containers for hierarchical rendering');
+  assert.match(projectBrowserHtml, /remove its subfolders first/, 'Project Browser should block removal of folders with subfolders');
 });

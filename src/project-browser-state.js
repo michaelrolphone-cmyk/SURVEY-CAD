@@ -91,10 +91,40 @@ function slugifyFolderKey(value) {
     .replace(/^-+|-+$/g, '');
 }
 
-export function addCustomFolder(projectFile, { label, description = '', defaultFormat = 'bin' } = {}) {
+export const MAX_FOLDER_DEPTH = 5;
+
+export function getFolderDepth(projectFile, folderKey) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey) return 0;
+  let depth = 1;
+  let currentKey = folderKey;
+  const visited = new Set();
+  while (true) {
+    if (visited.has(currentKey)) break;
+    visited.add(currentKey);
+    const folder = projectFile.folders.find((f) => f.key === currentKey);
+    if (!folder || !folder.parentKey) break;
+    depth += 1;
+    currentKey = folder.parentKey;
+  }
+  return depth;
+}
+
+export function getFolderChildren(projectFile, folderKey) {
+  if (!projectFile || !Array.isArray(projectFile.folders) || !folderKey) return [];
+  return projectFile.folders.filter((f) => f.parentKey === folderKey);
+}
+
+export function addCustomFolder(projectFile, { label, description = '', defaultFormat = 'bin', parentKey = null } = {}) {
   if (!projectFile || !Array.isArray(projectFile.folders)) return null;
   const trimmedLabel = String(label || '').trim();
   if (!trimmedLabel) return null;
+
+  if (parentKey) {
+    const parentFolder = projectFile.folders.find((f) => f.key === parentKey);
+    if (!parentFolder) return null;
+    const parentDepth = getFolderDepth(projectFile, parentKey);
+    if (parentDepth >= MAX_FOLDER_DEPTH) return null;
+  }
 
   const baseKey = slugifyFolderKey(trimmedLabel) || 'custom';
   let key = baseKey;
@@ -112,6 +142,7 @@ export function addCustomFolder(projectFile, { label, description = '', defaultF
     index: [],
     custom: true,
   };
+  if (parentKey) folder.parentKey = parentKey;
   projectFile.folders.push(folder);
   return folder;
 }
@@ -123,6 +154,7 @@ export function removeCustomFolder(projectFile, folderKey) {
   const folder = projectFile.folders[folderIndex];
   if (!folder.custom) return false;
   if (Array.isArray(folder.index) && folder.index.length > 0) return false;
+  if (projectFile.folders.some((f) => f.parentKey === folderKey)) return false;
   projectFile.folders.splice(folderIndex, 1);
   return true;
 }
