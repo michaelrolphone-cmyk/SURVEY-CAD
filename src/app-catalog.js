@@ -8,6 +8,7 @@
     - VectorPoint
     - TileScribe
     - WayPoint
+    - SiteScribe
 */
 export const APP_CATALOG = [
   {
