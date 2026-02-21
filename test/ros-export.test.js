@@ -291,6 +291,57 @@ test('buildRosBoundaryCsvRowsPNEZD can omit PLSS-only points without CP&F notes'
   assert.ok(lines.every((line) => !/,16COR,$/.test(line)), 'should exclude unbacked PLSS points');
 });
 
+test('buildRosBoundaryCsvRowsPNEZD keeps parcel points while excluding subdivision geometry for CP&F-backed aliquot export', () => {
+  const parcel = {
+    geometry: { rings: [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]] },
+  };
+  const section = {
+    geometry: { rings: [[[0, 0], [400, 0], [400, 400], [0, 400], [0, 0]]] },
+  };
+  const subdivision = {
+    geometry: { rings: [[[120, 0], [200, 0], [200, 100], [120, 100], [120, 0]]] },
+  };
+  const aliquots = [
+    {
+      geometry: {
+        rings: [[
+          [100, 100], [200, 100], [200, 200], [100, 200], [100, 100],
+        ]],
+      },
+    },
+  ];
+
+  const notesByCoordinate = new Map([
+    ['200.000000000,200.000000000', 'CPNFS: 7654321'],
+  ]);
+
+  const { csv, count } = buildRosBoundaryCsvRowsPNEZD({
+    parcelFeature2243: parcel,
+    subdivisionFeature2243: null,
+    sectionFeature2243: section,
+    aliquotFeatures2243: aliquots,
+    notesByCoordinate,
+    includePlssWithoutNotes: false,
+  });
+
+  const lines = csv.trim().split('\n');
+  assert.equal(count, 5);
+  assert.equal(lines.length, 5);
+  assert.ok(lines.some((line) => /,COR,$/.test(line)), 'parcel points should remain in export');
+  assert.ok(lines.some((line) => /,CSECOR,CPNFS: 7654321$/.test(line)), 'CP&F-backed aliquot corner should remain in export');
+  assert.ok(lines.every((line) => !/,SUB,/.test(line)), 'subdivision polygon points should not be emitted');
+
+  const withSubdivision = buildRosBoundaryCsvRowsPNEZD({
+    parcelFeature2243: parcel,
+    subdivisionFeature2243: subdivision,
+    sectionFeature2243: section,
+    aliquotFeatures2243: aliquots,
+    notesByCoordinate,
+    includePlssWithoutNotes: false,
+  });
+  assert.ok(withSubdivision.count > count, 'subdivision geometry should add extra points when included');
+});
+
 
 test('buildAliquotSelectionKey prefers object identifiers and falls back to labels/index', () => {
   assert.equal(buildAliquotSelectionKey({ attributes: { OBJECTID: 42 } }, 3), 'oid:42');
