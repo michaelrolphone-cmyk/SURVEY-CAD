@@ -48,7 +48,7 @@ export const APP_CATALOG = [
     name: 'GLO Records',
     description: 'Looks up BLM GLO records for the active project township/range/section and lists available documents.',
     entryHtml: 'GLO_RECORDS.html',
-    iconPath: '/assets/icons/ros-lookup.svg',
+    iconPath: '/assets/icons/GLO.png',
     color: '#854D0E',
     accent: '#FEF9C3',
     glyph: 'GLO',
