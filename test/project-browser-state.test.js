@@ -253,7 +253,7 @@ test('Project Browser can open point files directly in PointForge via async text
 
   assert.match(projectBrowserHtml, /const\s+POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY\s*=\s*'pointforgeProjectBrowserImport'/, 'Project Browser should use a stable localStorage key for PointForge launches');
   assert.match(projectBrowserHtml, /async\s+function\s+launchPointForgeFromResource\s*\(/, 'Project Browser should define async PointForge launch helper for point-file resources');
-  assert.match(projectBrowserHtml, /async\s+function\s+resolvePointFileText\s*\(resource\)/, 'Project Browser should define an async text resolver for point files');
+  assert.match(projectBrowserHtml, /async\s+function\s+resolvePointFileText\s*\(resource,\s*\{\s*versionId\s*=\s*''\s*\}\s*=\s*\{\}\)/, 'Project Browser should define an async text resolver for point files');
   assert.match(projectBrowserHtml, /const\s+text\s*=\s*await\s+resolvePointFileText\(resource\)/, 'PointForge launch should resolve text asynchronously');
   assert.match(projectBrowserHtml, /ref\.type\s*===\s*'server-upload'/, 'Text resolver should handle server-upload references');
   assert.match(projectBrowserHtml, /await\s+response\.text\(\)/, 'Text resolver should fetch server-uploaded file content as text');
@@ -291,6 +291,7 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /openButton\.textContent\s*=\s*'Open PDF'/, 'Project Browser should render an Open PDF button for CP&F entries');
   assert.match(projectBrowserHtml, /deleteButton\.textContent\s*=\s*'Delete'/, 'Project Browser should render a delete button for CP&F entries');
   assert.match(projectBrowserHtml, /function\s+deleteCpfResource\s*\(/, 'Project Browser should define a CP&F delete handler');
+  assert.match(projectBrowserHtml, /async\s+function\s+deleteResourceFromEvidenceDesk\s*\([\s\S]*try\s*\{[\s\S]*if\s*\(folder\?\.key\s*===\s*'cpfs'\)\s*\{[\s\S]*await\s+deleteCpfResource\(/, 'CP&F delete should run inside the shared delete try/catch so runtime errors surface as controlled remove errors');
   assert.match(projectBrowserHtml, /findCpfPointLinksAsync\(projectContext\?\.projectFile, resolvePointFileText, instrument\)/, 'CP&F delete flow should detect linked point references by instrument using async resolver');
   assert.match(projectBrowserHtml, /window\.confirm\(`This CP&F is linked to/, 'CP&F delete flow should ask for confirmation when linked points exist');
   assert.match(projectBrowserHtml, /function\s+openCpfPrintPreview\s*\(/, 'Project Browser should define a bulk CP&F print-preview builder');

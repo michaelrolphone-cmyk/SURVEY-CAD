@@ -940,21 +940,20 @@
 
     async function deleteResourceFromEvidenceDesk(folder, entry, projectContext = {}) {
       const currentTitle = String(entry?.title || entry?.id || '').trim() || 'file';
-
-      if (folder?.key === 'cpfs') {
-        await deleteCpfResource(folder, entry, projectContext);
-        return;
-      }
-
-      if (!window.confirm(`Remove "${currentTitle}" from the project?`)) return;
-
-      const projectId = projectContext?.activeProjectId;
-      if (!projectId) {
-        renderError('Cannot delete resources without an active project.');
-        return;
-      }
-
       try {
+        if (folder?.key === 'cpfs') {
+          await deleteCpfResource(folder, entry, projectContext);
+          return;
+        }
+
+        if (!window.confirm(`Remove "${currentTitle}" from the project?`)) return;
+
+        const projectId = projectContext?.activeProjectId;
+        if (!projectId) {
+          renderError('Cannot delete resources without an active project.');
+          return;
+        }
+
         if (entry?.reference?.type === 'project-point-file') {
           const pointFileId = entry?.reference?.metadata?.pointFileId || entry?.reference?.value || entry?.id;
           if (!pointFileId) throw new Error('Point file id was missing.');
