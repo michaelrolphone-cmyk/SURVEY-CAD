@@ -234,7 +234,8 @@ test('Project Browser prefers stored project file snapshots before loading API t
   const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
 
   assert.match(projectBrowserHtml, /<script type="module">/, 'Project Browser should use module scripts to import shared state helpers');
-  assert.match(projectBrowserHtml, /import\s*\{[\s\S]*loadStoredProjectFile[\s\S]*\}\s*from\s*'\.\/src\/project-browser-state\.js'/, 'Project Browser should import persisted snapshot loader');
+  assert.match(projectBrowserHtml, /import\s*\*\s*as\s*projectBrowserState\s*from\s*'\.\/src\/project-browser-state\.js'/, 'Project Browser should import project-browser helpers through a namespace for compatibility-safe destructuring');
+  assert.match(projectBrowserHtml, /const\s*\{[\s\S]*loadStoredProjectFile[\s\S]*\}\s*=\s*projectBrowserState;/, 'Project Browser should destructure persisted snapshot loader from project-browser-state namespace');
   assert.match(projectBrowserHtml, /const storedProjectFile = loadStoredProjectFile\(window\.localStorage, activeProjectId\);/, 'Project Browser should attempt to load local project-file snapshots');
   assert.match(projectBrowserHtml, /if \(storedProjectFile\) \{[\s\S]*renderTree\(storedProjectFile,\s*projectContext\);[\s\S]*return;/, 'Project Browser should render persisted files and skip template requests when available');
 });
@@ -611,7 +612,8 @@ test('Project Browser includes subfolder management UI', async () => {
 
   assert.match(projectBrowserHtml, /getFolderDepth/, 'Project Browser should import getFolderDepth for depth enforcement');
   assert.match(projectBrowserHtml, /getFolderChildren/, 'Project Browser should import getFolderChildren for child detection');
-  assert.match(projectBrowserHtml, /MAX_FOLDER_DEPTH/, 'Project Browser should import MAX_FOLDER_DEPTH constant');
+  assert.match(projectBrowserHtml, /projectBrowserState\.MAX_FOLDER_DEPTH/, 'Project Browser should read MAX_FOLDER_DEPTH from project-browser-state namespace');
+  assert.match(projectBrowserHtml, /const\s+MAX_FOLDER_DEPTH\s*=\s*Number\.isFinite\(projectBrowserState\.MAX_FOLDER_DEPTH\)[\s\S]*:\s*5;/, 'Project Browser should fallback to depth 5 when MAX_FOLDER_DEPTH export is unavailable');
   assert.match(projectBrowserHtml, /add-subfolder-panel/, 'Project Browser should render add-subfolder panels');
   assert.match(projectBrowserHtml, /Add subfolder/, 'Project Browser should render Add subfolder buttons');
   assert.match(projectBrowserHtml, /folder-children/, 'Project Browser should render folder-children containers for nesting');

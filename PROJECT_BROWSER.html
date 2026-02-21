@@ -522,8 +522,25 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, moveResourceById, renameResourceTitle, findCpfPointLinksAsync, addCustomFolder, removeCustomFolder, getFolderDepth, getFolderChildren, MAX_FOLDER_DEPTH } from './src/project-browser-state.js';
+    import * as projectBrowserState from './src/project-browser-state.js';
     import { renderLineworkThumbnailDataUrl, renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
+
+    const {
+      loadStoredProjectFile,
+      saveStoredProjectFile,
+      appendResourceToFolder,
+      removeResourceById,
+      moveResourceById,
+      renameResourceTitle,
+      findCpfPointLinksAsync,
+      addCustomFolder,
+      removeCustomFolder,
+      getFolderDepth,
+      getFolderChildren,
+    } = projectBrowserState;
+    const MAX_FOLDER_DEPTH = Number.isFinite(projectBrowserState.MAX_FOLDER_DEPTH)
+      ? projectBrowserState.MAX_FOLDER_DEPTH
+      : 5;
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
