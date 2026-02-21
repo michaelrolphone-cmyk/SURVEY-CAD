@@ -607,9 +607,13 @@ class LocalStorageSocketSync {
       const keyString = String(key);
       const valueString = String(value);
       const previous = this.getItem(keyString);
-      const baseChecksum = checksumSnapshot(buildSnapshot());
+      const willEnqueue = !sync.suppress && shouldSyncLocalStorageKey(keyString) && previous !== valueString;
+      // Compute the pre-write checksum only when starting a new batch. Subsequent writes
+      // within an open batch coalesce into it and don't need their own baseChecksum, which
+      // avoids an O(N) snapshot read + full hash on every localStorage.setItem call.
+      const baseChecksum = (willEnqueue && !sync.pendingBatch) ? checksumSnapshot(buildSnapshot()) : '';
       originalSetItem.call(this, keyString, valueString);
-      if (!sync.suppress && shouldSyncLocalStorageKey(keyString) && previous !== valueString) {
+      if (willEnqueue) {
         sync.enqueue([{ type: 'set', key: keyString, value: valueString }], { baseChecksum });
       }
     };
@@ -617,9 +621,10 @@ class LocalStorageSocketSync {
     storageProto.removeItem = function patchedRemoveItem(key) {
       const keyString = String(key);
       const had = this.getItem(keyString) !== null;
-      const baseChecksum = checksumSnapshot(buildSnapshot());
+      const willEnqueue = !sync.suppress && shouldSyncLocalStorageKey(keyString) && had;
+      const baseChecksum = (willEnqueue && !sync.pendingBatch) ? checksumSnapshot(buildSnapshot()) : '';
       originalRemoveItem.call(this, keyString);
-      if (!sync.suppress && shouldSyncLocalStorageKey(keyString) && had) {
+      if (willEnqueue) {
         sync.enqueue([{ type: 'remove', key: keyString }], { baseChecksum });
       }
     };
@@ -630,9 +635,10 @@ class LocalStorageSocketSync {
         const key = this.key(i);
         if (shouldSyncLocalStorageKey(key)) keys.push(key);
       }
-      const baseChecksum = checksumSnapshot(buildSnapshot());
+      const willEnqueue = !sync.suppress && keys.length > 0;
+      const baseChecksum = (willEnqueue && !sync.pendingBatch) ? checksumSnapshot(buildSnapshot()) : '';
       originalClear.call(this);
-      if (!sync.suppress && keys.length) {
+      if (willEnqueue) {
         sync.enqueue([{ type: 'clear' }], { baseChecksum });
       }
     };
