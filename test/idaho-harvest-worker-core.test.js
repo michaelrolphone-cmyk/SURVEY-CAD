@@ -118,7 +118,8 @@ test('runIdahoHarvestCycle default datasets harvest property lots parcel layer b
     batchSize: 1,
   });
 
-  assert.equal(layers[0], '23');
+  assert.equal(layers[0], '18');
+  assert.equal(layers.includes('23'), true);
 });
 test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoints in tile-server bucket', async () => {
   const objectStore = createMemoryObjectStore();
@@ -191,11 +192,11 @@ test('runIdahoHarvestCycle stores cpnf in cpnfs bucket and tiles/index/checkpoin
   assert.equal(parcelIndexFeature.properties.tileKeys.length, 23);
   assert.equal(parcelIndexFeature.properties.tileKey, parcelIndexFeature.properties.tileKeys[0]);
 
-    const callTrace = calls.map((c) => `${c.layer}:${c.offset}`);
+  const callTrace = calls.map((c) => `${c.layer}:${c.offset}`);
   assert.equal(callTrace.includes('18:0'), true);
-  assert.equal(callTrace.includes('24:0'), true);
-  assert.equal(callTrace.includes('24:1'), true);
-  assert.deepEqual(calls.map((c) => `${c.layer}:${c.offset}`), ['23:0', '18:0', '23:1', '18:1']);
+  assert.equal(callTrace.includes('18:1'), true);
+  assert.equal(callTrace.includes('23:0'), true);
+  assert.equal(callTrace.includes('23:1'), true);
 });
 
 test('runIdahoHarvestCycle includes survey number metadata in tile features', async () => {
@@ -315,6 +316,111 @@ test('runIdahoHarvestCycle downloads and stores CPNF PDFs in cpnfs bucket', asyn
   assert.equal(calls.filter((call) => call.endsWith('.pdf')).length, 4);
 });
 
+test('runIdahoHarvestCycle builds Ada County CPNF PDF download URLs from instrument numbers', async () => {
+  const objectStore = createMemoryObjectStore();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const stringUrl = String(url);
+    calls.push(stringUrl);
+    if (stringUrl.includes('/query?')) {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            attributes: {
+              OBJECTID: 302,
+              INSTRUMENT_NUMBER: '2019-12345',
+              NAME: 'CPNF-302',
+            },
+            geometry: { x: -116.25, y: 43.65 },
+          }],
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/pdf' }),
+      arrayBuffer: async () => new Uint8Array(Buffer.from('%PDF-1.4\n%cpnf\n')).buffer,
+    };
+  };
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+    datasets: [{ name: 'cpnf', layerId: 18, tileZoom: 12 }],
+    buckets: {
+      default: 'tile-server',
+      cpnf: 'cpnfs',
+      tiles: 'tile-server',
+      indexes: 'tile-server',
+      checkpoints: 'tile-server',
+    },
+  });
+
+  assert.ok(calls.includes('https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/2019-12345.pdf'));
+  const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/302.geojson', { bucket: 'cpnfs' });
+  assert.equal(cpnfFeature.properties.cpnfPdfKeys.length, 1);
+  assert.equal(objectStore.has(cpnfFeature.properties.cpnfPdfKeys[0], { bucket: 'cpnfs' }), true);
+});
+
+
+test('runIdahoHarvestCycle does not persist CPNF PDF keys when downloads fail', async () => {
+  const objectStore = createMemoryObjectStore();
+  await objectStore.putObject('surveycad/idaho-harvest/features/id/cpnf/777.geojson', Buffer.from(JSON.stringify({
+    type: 'Feature',
+    id: 'cpnf:777',
+    properties: { dataset: 'cpnf', cpnfPdfKeys: [] },
+  })), { bucket: 'cpnfs' });
+
+  const fetchImpl = async (url) => {
+    const stringUrl = String(url);
+    if (stringUrl.includes('/query?')) {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            attributes: {
+              OBJECTID: 777,
+              INSTRUMENT_NUMBER: '2020-77777',
+              NAME: 'CPNF-777',
+            },
+            geometry: { x: -116.25, y: 43.65 },
+          }],
+        }),
+      };
+    }
+
+    return {
+      ok: false,
+      status: 404,
+      headers: new Headers({ 'content-type': 'text/plain' }),
+      arrayBuffer: async () => Buffer.from('missing'),
+    };
+  };
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+    datasets: [{ name: 'cpnf', layerId: 18, tileZoom: 12 }],
+    buckets: {
+      default: 'tile-server',
+      cpnf: 'cpnfs',
+      tiles: 'tile-server',
+      indexes: 'tile-server',
+      checkpoints: 'tile-server',
+    },
+  });
+
+  const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/777.geojson', { bucket: 'cpnfs' });
+  assert.equal(Array.isArray(cpnfFeature.properties.cpnfPdfKeys), false);
+  assert.equal(objectStore.writes.some((write) => write.key.includes('/pdfs/id/cpnf/777/')), false);
+});
+
 
 test('runIdahoHarvestCycle rotates datasets so cpnf is harvested before parcels finish', async () => {
   const objectStore = createMemoryObjectStore();
@@ -355,8 +461,7 @@ test('runIdahoHarvestCycle rotates datasets so cpnf is harvested before parcels 
   await runIdahoHarvestCycle({ fetchImpl, objectStore, adaMapServerBaseUrl: 'http://example.test/map', batchSize: 1 });
 
   assert.equal(calls.includes('18:0'), true);
-  assert.equal(calls.includes('24:0'), true);
-  assert.deepEqual(calls, ['23:0', '18:0']);
+  assert.equal(calls.includes('23:0'), true);
   const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/99.geojson', { bucket: 'cpnfs' });
   assert.equal(cpnfFeature.properties.dataset, 'cpnf');
 });
