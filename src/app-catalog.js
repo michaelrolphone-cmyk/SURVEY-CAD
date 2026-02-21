@@ -71,7 +71,7 @@ export const APP_CATALOG = [
     name: 'MapTile Browser',
     description: 'Leaflet map for browsing harvested MinIO GeoJSON map tiles through the maptile API.',
     entryHtml: 'MapTileBrowser.html',
-    iconPath: '/assets/icons/cpnf-corners.svg',
+    iconPath: '/assets/icons/TileBrowser.png',
     color: '#1E3A8A',
     accent: '#DBEAFE',
     glyph: 'MT',
