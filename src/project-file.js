@@ -123,6 +123,21 @@ export function createProjectFile({
   };
 }
 
+function buildFolderPathSegment(projectFile, folderKey) {
+  const segments = [];
+  const visited = new Set();
+  let currentKey = folderKey;
+  while (currentKey) {
+    if (visited.has(currentKey)) break;
+    visited.add(currentKey);
+    const folder = (projectFile?.folders || []).find((f) => f.key === currentKey);
+    if (!folder) break;
+    segments.unshift(folder.label);
+    currentKey = folder.parentKey || null;
+  }
+  return segments.join('/');
+}
+
 export async function buildProjectArchivePlan(projectFile, { resolvers = {} } = {}) {
   const entries = [];
   const unresolved = [];
@@ -137,8 +152,9 @@ export async function buildProjectArchivePlan(projectFile, { resolvers = {} } = 
   });
 
   for (const folder of projectFile?.folders || []) {
+    const folderPath = buildFolderPathSegment(projectFile, folder.key);
     entries.push({
-      path: `${root}/${folder.label}/index.json`,
+      path: `${root}/${folderPath}/index.json`,
       source: {
         type: 'folder-index',
         folder: folder.key,
@@ -172,7 +188,7 @@ export async function buildProjectArchivePlan(projectFile, { resolvers = {} } = 
 
       for (const file of files) {
         entries.push({
-          path: `${root}/${folder.label}/${file.name}`,
+          path: `${root}/${folderPath}/${file.name}`,
           source: {
             type: 'resolved-resource',
             folder: folder.key,

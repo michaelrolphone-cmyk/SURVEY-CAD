@@ -498,6 +498,17 @@
       border-color: rgba(239, 68, 68, 0.75);
       background: rgba(127, 29, 29, 0.35);
     }
+
+    .folder-children {
+      margin-left: 1.25rem;
+      padding-left: 0.75rem;
+      border-left: 2px solid rgba(148, 163, 184, 0.12);
+    }
+
+    .add-subfolder-panel {
+      margin-top: 0.35rem;
+      padding: 0.45rem 0.65rem;
+    }
   </style>
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
@@ -511,7 +522,7 @@
   </div>
 
   <script type="module">
-    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, moveResourceById, renameResourceTitle, findCpfPointLinksAsync, addCustomFolder, removeCustomFolder } from './src/project-browser-state.js';
+    import { loadStoredProjectFile, saveStoredProjectFile, appendResourceToFolder, removeResourceById, moveResourceById, renameResourceTitle, findCpfPointLinksAsync, addCustomFolder, removeCustomFolder, getFolderDepth, getFolderChildren, MAX_FOLDER_DEPTH } from './src/project-browser-state.js';
     import { renderLineworkThumbnailDataUrl, renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
@@ -1956,7 +1967,12 @@
 
       const associationIndex = buildDrawingAssociationIndex(projectFile);
 
+      const folderChildrenContainerMap = new Map();
       for (const folder of projectFile.folders || []) {
+        const parentChildrenContainer = folder.parentKey ? folderChildrenContainerMap.get(folder.parentKey) : null;
+        const folderGroupWrapper = document.createElement('div');
+        folderGroupWrapper.className = 'folder-group';
+        (parentChildrenContainer || treeContainer).appendChild(folderGroupWrapper);
         const folderUploadStatusText = document.createElement('div');
         folderUploadStatusText.className = 'upload-status';
         folderUploadStatusText.hidden = true;
@@ -2038,11 +2054,15 @@
           removeBtn.type = 'button';
           removeBtn.className = 'remove-folder-btn';
           removeBtn.textContent = 'Remove';
-          removeBtn.title = 'Remove this custom folder (only allowed when empty)';
+          removeBtn.title = 'Remove this custom folder (only allowed when empty and has no subfolders)';
           removeBtn.addEventListener('click', (event) => {
             event.stopPropagation();
             if (Array.isArray(folder.index) && folder.index.length > 0) {
               projectContext.setUploadStatus(`Cannot remove "${folder.label}" — move or delete its files first.`);
+              return;
+            }
+            if (getFolderChildren(projectContext.projectFile, folder.key).length > 0) {
+              projectContext.setUploadStatus(`Cannot remove "${folder.label}" — remove its subfolders first.`);
               return;
             }
             if (!confirm(`Remove the custom folder "${folder.label}"?`)) return;
@@ -2057,16 +2077,16 @@
           folderRow.appendChild(removeBtn);
         }
 
-        treeContainer.appendChild(folderRow);
+        folderGroupWrapper.appendChild(folderRow);
 
         const folderUploadFeedback = document.createElement('div');
         folderUploadFeedback.className = 'folder-upload-feedback';
         folderUploadFeedback.appendChild(folderUploadStatusText);
         folderUploadFeedback.appendChild(folderUploadProgressBar);
-        treeContainer.appendChild(folderUploadFeedback);
+        folderGroupWrapper.appendChild(folderUploadFeedback);
 
         if (folder.key === 'point-files') {
-          treeContainer.appendChild(createPointFileUploadPanel(projectContext));
+          folderGroupWrapper.appendChild(createPointFileUploadPanel(projectContext));
         }
 
         const fileListContainer = document.createElement('div');
@@ -2111,16 +2131,14 @@
             await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus);
           }
         });
-        treeContainer.appendChild(fileListContainer);
+        folderGroupWrapper.appendChild(fileListContainer);
 
         if (!folder.index.length) {
           const empty = document.createElement('div');
           empty.className = 'empty';
           empty.textContent = 'No linked resources yet.';
           fileListContainer.appendChild(empty);
-          continue;
-        }
-
+        } else {
         for (const entry of folder.index) {
           const resource = document.createElement('div');
           resource.className = 'file-row';
@@ -2502,6 +2520,52 @@
           }
 
           fileListContainer.appendChild(resource);
+        }
+        } // end else
+
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'folder-children';
+        folderGroupWrapper.appendChild(childrenContainer);
+        folderChildrenContainerMap.set(folder.key, childrenContainer);
+
+        const currentFolderDepth = getFolderDepth(projectFile, folder.key);
+        if (currentFolderDepth < MAX_FOLDER_DEPTH) {
+          const addSubfolderPanel = document.createElement('div');
+          addSubfolderPanel.className = 'add-folder-panel add-subfolder-panel';
+
+          const addSubfolderLabel = document.createElement('span');
+          addSubfolderLabel.className = 'muted';
+          addSubfolderLabel.textContent = 'Add subfolder:';
+          addSubfolderPanel.appendChild(addSubfolderLabel);
+
+          const addSubfolderInput = document.createElement('input');
+          addSubfolderInput.type = 'text';
+          addSubfolderInput.className = 'add-folder-input';
+          addSubfolderInput.placeholder = 'Subfolder name…';
+          addSubfolderInput.maxLength = 60;
+          addSubfolderInput.addEventListener('keydown', (event) => event.stopPropagation());
+          addSubfolderPanel.appendChild(addSubfolderInput);
+
+          const addSubfolderBtn = document.createElement('button');
+          addSubfolderBtn.type = 'button';
+          addSubfolderBtn.className = 'launch-btn';
+          addSubfolderBtn.textContent = 'Add subfolder';
+          addSubfolderBtn.addEventListener('click', () => {
+            const label = addSubfolderInput.value.trim();
+            if (!label) {
+              projectContext.setUploadStatus('Enter a subfolder name first.');
+              return;
+            }
+            const subfolder = addCustomFolder(projectContext.projectFile, { label, parentKey: folder.key });
+            if (!subfolder) {
+              projectContext.setUploadStatus(`Could not create subfolder "${label}" — maximum folder depth (${MAX_FOLDER_DEPTH}) reached.`);
+              return;
+            }
+            saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+            renderTree(projectContext.projectFile, projectContext);
+          });
+          addSubfolderPanel.appendChild(addSubfolderBtn);
+          childrenContainer.appendChild(addSubfolderPanel);
         }
       }
 
