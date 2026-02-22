@@ -388,6 +388,11 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /\.pdf-frame \{ width: min\(100%, 8\.5in\);[\s\S]*background: #fff; \}/, 'Print preview iframe styling should avoid dark backgrounds and constrain width for centered preview');
   assert.doesNotMatch(projectBrowserHtml, /<h2>\$\{index \+ 1\}\./, 'Print preview should not inject heading-only pages between PDFs');
   assert.match(projectBrowserHtml, /onclick="window\.print\(\)"/, 'Print preview should include a direct print button');
+  assert.match(projectBrowserHtml, /\.cpf-hover-preview-tooltip\s*\{[\s\S]*position:\s*fixed;/, 'Project Browser should style a fixed CP&F hover preview tooltip container');
+  assert.match(projectBrowserHtml, /\.cpf-hover-preview-image\s*\{[\s\S]*object-fit:\s*contain;/, 'CP&F hover preview image should use object-fit contain so full pages are visible');
+  assert.match(projectBrowserHtml, /const\s+maxHeight\s*=\s*Math\.max\(220,\s*Math\.floor\(viewportHeight\s*\*\s*0\.9\)\)/, 'CP&F hover preview height should be capped at 90% of the viewport');
+  assert.match(projectBrowserHtml, /const\s+preferredLeft\s*=\s*Math\.round\(anchorRect\.right\s*\+\s*CPH_GAP\)/, 'CP&F hover preview should anchor to the right side of the hovered thumbnail');
+  assert.match(projectBrowserHtml, /thumb\.tabIndex\s*=\s*0;[\s\S]*bindCpfHoverPreview\(thumb, entry\);/, 'CP&F thumbnails should be keyboard-focusable and wired to the hover preview behavior');
 });
 
 
