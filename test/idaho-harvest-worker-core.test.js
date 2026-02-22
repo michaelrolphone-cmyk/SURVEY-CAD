@@ -367,6 +367,59 @@ test('runIdahoHarvestCycle builds Ada County CPNF PDF download URLs from instrum
 });
 
 
+test('runIdahoHarvestCycle deduplicates CPNF PDF URLs that differ only by extension case', async () => {
+  const objectStore = createMemoryObjectStore();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const stringUrl = String(url);
+    calls.push(stringUrl);
+    if (stringUrl.includes('/query?')) {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            attributes: {
+              OBJECTID: 350,
+              // DOC_URL has uppercase .PDF — same Ada County server path the instrument number generates
+              DOC_URL: 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/2022-00350.PDF',
+              INSTRUMENT_NUMBER: '2022-00350',
+            },
+            geometry: { x: -116.25, y: 43.65 },
+          }],
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/pdf' }),
+      arrayBuffer: async () => new Uint8Array(Buffer.from('%PDF-1.4\n%cpnf\n')).buffer,
+    };
+  };
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+    datasets: [{ name: 'cpnf', layerId: 18, tileZoom: 12 }],
+    buckets: {
+      default: 'tile-server',
+      cpnf: 'cpnfs',
+      tiles: 'tile-server',
+      indexes: 'tile-server',
+      checkpoints: 'tile-server',
+    },
+  });
+
+  const cpnfFeature = objectStore.readJson('surveycad/idaho-harvest/features/id/cpnf/350.geojson', { bucket: 'cpnfs' });
+  // The .PDF attribute URL and the instrument-constructed .pdf URL differ only by extension case — should deduplicate to 1
+  assert.equal(cpnfFeature.properties.cpnfPdfKeys.length, 1);
+  // The stored key must use a lowercase .pdf extension
+  assert.ok(cpnfFeature.properties.cpnfPdfKeys[0].endsWith('.pdf'), 'stored key should have lowercase .pdf extension');
+  assert.ok(!cpnfFeature.properties.cpnfPdfKeys[0].endsWith('.PDF'), 'stored key must not have uppercase .PDF extension');
+});
+
 test('runIdahoHarvestCycle does not persist CPNF PDF keys when downloads fail', async () => {
   const objectStore = createMemoryObjectStore();
   await objectStore.putObject('surveycad/idaho-harvest/features/id/cpnf/777.geojson', Buffer.from(JSON.stringify({
