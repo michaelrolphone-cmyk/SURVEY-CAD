@@ -35,6 +35,13 @@ import {
   deleteProjectPointFile,
 } from './project-point-file-store.js';
 import {
+  listProjectCpfs,
+  getProjectCpf,
+  createOrUpdateProjectCpf,
+  batchUpsertProjectCpfs,
+  deleteProjectCpf,
+} from './project-cpf-store.js';
+import {
   getProjectWorkbenchLink,
   setProjectWorkbenchLink,
   clearProjectWorkbenchLink,
@@ -186,6 +193,15 @@ function parseProjectPointFileRoute(pathname = '') {
   return {
     projectId: decodeURIComponent(match[1]),
     pointFileId: match[2] ? decodeURIComponent(match[2]) : '',
+  };
+}
+
+function parseProjectCpfRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/cpfs(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
+  return {
+    projectId: decodeURIComponent(match[1]),
+    cpfId: match[2] ? decodeURIComponent(match[2]) : '',
   };
 }
 
@@ -2153,6 +2169,124 @@ export function createSurveyServer({
             return;
           }
           await deletePointFoundryPointFileObject(projectId, pointFileId);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: deletedResult?.sync?.allOperations || [],
+            state: {
+              version: deletedResult?.sync?.state?.version,
+              checksum: deletedResult?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
+        return;
+      }
+
+      const cpfRoute = parseProjectCpfRoute(urlObj.pathname);
+      if (cpfRoute) {
+        const { projectId, cpfId } = cpfRoute;
+
+        if (req.method === 'GET' && !cpfId) {
+          const cpfs = await listProjectCpfs(localStorageSyncStore, projectId);
+          sendJson(res, 200, { projectId, cpfs });
+          return;
+        }
+
+        if (req.method === 'GET' && cpfId) {
+          const cpf = await getProjectCpf(localStorageSyncStore, projectId, cpfId);
+          if (!cpf) {
+            sendJson(res, 404, { error: 'CP&F record not found.' });
+            return;
+          }
+          sendJson(res, 200, { cpf });
+          return;
+        }
+
+        if (req.method === 'POST' && !cpfId) {
+          const body = await readJsonBody(req);
+          // Support batch upsert when body.cpfs is an array
+          if (Array.isArray(body?.cpfs)) {
+            const result = await batchUpsertProjectCpfs(localStorageSyncStore, projectId, body.cpfs);
+            if (result.sync) {
+              localStorageSyncWsService.broadcast({
+                type: 'sync-differential-applied',
+                operations: result.sync?.allOperations || [],
+                state: {
+                  version: result.sync?.state?.version,
+                  checksum: result.sync?.state?.checksum,
+                },
+                originClientId: null,
+                requestId: null,
+              });
+            }
+            sendJson(res, 200, { cpfs: result.cpfs });
+            return;
+          }
+          // Single create
+          if (!body?.instrument) {
+            sendJson(res, 400, { error: 'instrument is required.' });
+            return;
+          }
+          const result = await createOrUpdateProjectCpf(localStorageSyncStore, {
+            projectId,
+            instrument: body.instrument,
+            title: body.title,
+            source: body.source,
+            aliquots: body.aliquots,
+          });
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { cpf: result.cpf });
+          return;
+        }
+
+        if ((req.method === 'PUT' || req.method === 'PATCH') && cpfId) {
+          const body = await readJsonBody(req);
+          if (!body?.instrument) {
+            sendJson(res, 400, { error: 'instrument is required.' });
+            return;
+          }
+          const result = await createOrUpdateProjectCpf(localStorageSyncStore, {
+            projectId,
+            cpfId,
+            instrument: body.instrument,
+            title: body.title,
+            source: body.source,
+            aliquots: body.aliquots,
+          });
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { cpf: result.cpf });
+          return;
+        }
+
+        if (req.method === 'DELETE' && cpfId) {
+          const deletedResult = await deleteProjectCpf(localStorageSyncStore, projectId, cpfId);
+          if (!deletedResult) {
+            sendJson(res, 404, { error: 'CP&F record not found.' });
+            return;
+          }
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
             operations: deletedResult?.sync?.allOperations || [],
