@@ -447,6 +447,24 @@
       font-style: italic;
       font-size: 0.86rem;
     }
+    .empty.err {
+      color: #fecaca;
+    }
+
+    .corner-group {
+      margin-top: 0.6rem;
+    }
+    .corner-group:first-child {
+      margin-top: 0;
+    }
+    .corner-group-label {
+      margin-left: 1.65rem;
+      margin-bottom: 0.25rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
 
     .error {
       border: 1px solid rgba(239, 68, 68, 0.4);
@@ -533,6 +551,8 @@
       moveResourceById,
       renameResourceTitle,
       findCpfPointLinksAsync,
+      groupCpfsByCorner,
+      CPF_CORNER_GROUP_RADIUS_FEET,
       addCustomFolder,
       removeCustomFolder,
       getFolderDepth,
@@ -2207,7 +2227,7 @@
           empty.textContent = 'No linked resources yet.';
           fileListContainer.appendChild(empty);
         } else {
-        for (const entry of folder.index) {
+        function buildOneFileRow(entry) {
           const resource = document.createElement('div');
           resource.className = 'file-row';
 
@@ -2587,7 +2607,47 @@
             attachProjectPointFileVersionTimeline(resource, entry, projectContext).catch(() => {});
           }
 
-          fileListContainer.appendChild(resource);
+          return resource;
+        }
+        if (folder.key === 'cpfs' && folder.index.length) {
+          const loadingDiv = document.createElement('div');
+          loadingDiv.className = 'empty';
+          loadingDiv.textContent = 'Grouping CP&Fs by corner…';
+          fileListContainer.appendChild(loadingDiv);
+          (async () => {
+            try {
+              const entriesWithCoords = await Promise.all(folder.index.map(async (entry) => {
+                const instrument = String(entry?.reference?.value || entry?.reference?.metadata?.instrument || '').trim();
+                const links = instrument ? await findCpfPointLinksAsync(projectContext?.projectFile, resolvePointFileText, instrument) : [];
+                const first = links.find((l) => l.north != null && l.east != null);
+                return { entry, north: first?.north, east: first?.east };
+              }));
+              const groups = groupCpfsByCorner(entriesWithCoords, CPF_CORNER_GROUP_RADIUS_FEET);
+              loadingDiv.remove();
+              for (const group of groups) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'corner-group';
+                const labelEl = document.createElement('div');
+                labelEl.className = 'corner-group-label';
+                labelEl.textContent = group.label;
+                groupDiv.appendChild(labelEl);
+                for (const entry of group.entries) {
+                  groupDiv.appendChild(buildOneFileRow(entry));
+                }
+                fileListContainer.appendChild(groupDiv);
+              }
+            } catch (e) {
+              loadingDiv.textContent = 'Could not group by corner. Showing flat list.';
+              loadingDiv.classList.add('err');
+              for (const entry of folder.index) {
+                fileListContainer.appendChild(buildOneFileRow(entry));
+              }
+            }
+          })();
+        } else {
+          for (const entry of folder.index) {
+            fileListContainer.appendChild(buildOneFileRow(entry));
+          }
         }
         } // end else
 

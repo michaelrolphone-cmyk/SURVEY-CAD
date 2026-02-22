@@ -15,6 +15,9 @@ import {
   extractCpfInstrumentsFromPointNote,
   findCpfPointLinks,
   findCpfPointLinksAsync,
+  groupCpfsByCorner,
+  aliquotCornerLabelFromNormXY,
+  CPF_CORNER_GROUP_RADIUS_FEET,
   addCustomFolder,
   removeCustomFolder,
   getFolderDepth,
@@ -222,6 +225,62 @@ test('findCpfPointLinksAsync resolves point file text via async resolver functio
   assert.equal(links[0].pointFileTitle, 'Boundary Export.csv');
   assert.equal(links[0].pointNumber, '10');
   assert.equal(links[0].pointCode, 'COR');
+});
+
+test('findCpfPointLinksAsync returns north and east from point file when present', async () => {
+  const csvText = [
+    'number,northing,easting,z,code,notes',
+    '10,1200500.5,2300100.25,0,COR,"CPNFS: 2019-12345"',
+  ].join('\n');
+  const projectFile = {
+    folders: [{
+      key: 'point-files',
+      index: [{ id: 'pf-1', title: 'Points.csv', reference: { value: 'key1' } }],
+    }],
+  };
+  const links = await findCpfPointLinksAsync(projectFile, async () => csvText, '2019-12345');
+  assert.equal(links.length, 1);
+  assert.equal(links[0].north, 1200500.5);
+  assert.equal(links[0].east, 2300100.25);
+});
+
+test('groupCpfsByCorner clusters entries within 33 feet and labels by coordinates', () => {
+  const e1 = { id: 'a', title: 'CP&F 1' };
+  const e2 = { id: 'b', title: 'CP&F 2' };
+  const e3 = { id: 'c', title: 'CP&F 3' };
+  const entries = [
+    { entry: e1, north: 1000, east: 2000 },
+    { entry: e2, north: 1005, east: 2005 },
+    { entry: e3, north: 5000, east: 6000 },
+  ];
+  const groups = groupCpfsByCorner(entries, 33);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].entries.length, 2);
+  assert.ok(groups[0].entries.includes(e1) && groups[0].entries.includes(e2));
+  assert.equal(groups[1].entries.length, 1);
+  assert.equal(groups[1].entries[0], e3);
+  assert.match(groups[0].label, /Corner at N \d+, E \d+/);
+});
+
+test('groupCpfsByCorner puts entries without coordinates in No linked location', () => {
+  const e1 = { id: 'a' };
+  const groups = groupCpfsByCorner([{ entry: e1, north: undefined, east: undefined }], 33);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].label, 'No linked location');
+  assert.equal(groups[0].entries[0], e1);
+});
+
+test('aliquotCornerLabelFromNormXY returns section and quarter labels', () => {
+  assert.equal(aliquotCornerLabelFromNormXY(0, 0), 'Section corner');
+  assert.equal(aliquotCornerLabelFromNormXY(0.5, 0.5), 'Center of section');
+  assert.equal(aliquotCornerLabelFromNormXY(0.5, 1), 'North quarter corner');
+  assert.equal(aliquotCornerLabelFromNormXY(0.5, 0), 'South quarter corner');
+  assert.equal(aliquotCornerLabelFromNormXY(1, 0.5), 'East quarter corner');
+  assert.equal(aliquotCornerLabelFromNormXY(0.25, 0.25), 'Sixteenth corner');
+});
+
+test('CPF_CORNER_GROUP_RADIUS_FEET is 33', () => {
+  assert.equal(CPF_CORNER_GROUP_RADIUS_FEET, 33);
 });
 
 test('findCpfPointLinksAsync returns empty array for invalid inputs', async () => {
