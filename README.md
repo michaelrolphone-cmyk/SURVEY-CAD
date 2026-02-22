@@ -1319,5 +1319,28 @@ EvidenceDesk photo uploads now support point-number metadata so LineSmith can sh
 
 When EvidenceDesk is configured for S3/MinIO object storage, server startup now schedules a background cleanup pass that scans Redis for legacy EvidenceDesk binary payload keys and deletes them (`surveycad:evidence-desk:bin:*` and `surveycad:evidence-desk:thumb:*`). This removes pre-migration binary blobs that are now persisted in MinIO.
 
+## RecordQuarry → PointForge export: how CP&Fs are saved for EvidenceDesk
+
+When you click **Export to PointForge** in `RecordQuarry.html`, CP&F visibility in EvidenceDesk depends on one localStorage-backed project-file flow:
+
+1. RecordQuarry resolves the active project context (must include `projectId`).
+2. It loads the project file from `surveyfoundryProjectFile:<projectId>`.
+3. It parses CP&F instrument notes from exported corners (`CPNFS:` note text), normalizes instrument numbers, and deduplicates them.
+4. It writes one entry per instrument into the project file `cpfs` folder index with `reference.type = instrument-number` and `resolverHint = lookup-cpf-pdf`.
+5. It also writes a PointForge CSV handoff entry into `point-files` with `resolverHint = local-pointforge-export`.
+6. It saves the updated project file back to `surveyfoundryProjectFile:<projectId>`.
+
+### What should happen when it works
+
+- RecordQuarry log should report: `Saved PointForge export to project file (N CP&F references).`
+- Opening EvidenceDesk for the same `projectId` should show those CP&F rows in the **CP&Fs** folder.
+
+### Fast troubleshooting checklist
+
+- **No active project id:** If RecordQuarry was opened without a resolvable project context, CP&Fs are not persisted to a project file.
+- **No CP&F notes found:** If no instrument numbers are resolved from exported points, CP&F count can be zero.
+- **Mismatched project:** If EvidenceDesk is opened on a different `projectId`, it reads a different `surveyfoundryProjectFile:<projectId>` key.
+- **Manual verification:** In browser devtools localStorage, inspect `surveyfoundryProjectFile:<projectId>` and confirm `folders[].key === "cpfs"` contains index entries with `reference.type: "instrument-number"`.
+
 - API endpoints: `GET /health`, `GET /api/project-files`, `GET /api/project-files/download`, `GET /api/project-files/image-thumbnail`.
 - CLI/server commands: `npm start`, `npm test`.
