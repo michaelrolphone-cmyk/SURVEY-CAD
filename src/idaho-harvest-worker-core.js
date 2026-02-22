@@ -177,6 +177,21 @@ function buildLayerQueryUrl(baseUrl, layerId, params = {}) {
   return url.toString();
 }
 
+// Like buildLayerQueryUrl but supports a pre-resolved serviceUrl (full layer endpoint).
+// When serviceUrl is provided it is used directly; otherwise falls back to baseUrl/layerId.
+function buildDatasetQueryUrl(baseUrl, layerId, serviceUrl, params = {}) {
+  const base = serviceUrl
+    ? `${String(serviceUrl).replace(/\/+$/, '')}/query`
+    : `${String(baseUrl).replace(/\/+$/, '')}/${layerId}/query`;
+  const url = new URL(base);
+  url.searchParams.set('f', 'json');
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    url.searchParams.set(key, String(value));
+  }
+  return url.toString();
+}
+
 function lonLatToTile(lon, lat, zoom = 14) {
   const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, Number(lat)));
   const normalizedLon = ((Number(lon) + 180) / 360);
@@ -444,7 +459,7 @@ export async function runIdahoHarvestCycle({
   const cpnfPdfState = checkpoint.cpnfPdfScrape || { offset: 0, done: false };
 
   if (cpnfDataset && !cpnfPdfState.done) {
-    const pdfQueryUrl = buildLayerQueryUrl(adaMapServerBaseUrl, cpnfDataset.layerId, {
+    const pdfQueryUrl = buildDatasetQueryUrl(adaMapServerBaseUrl, cpnfDataset.layerId, cpnfDataset.serviceUrl, {
       where: '1=1',
       outFields: '*',
       returnGeometry: 'false',
@@ -525,7 +540,7 @@ export async function runIdahoHarvestCycle({
     const state = checkpoint.datasets[dataset.name] || { offset: 0, done: false };
     if (state.done) continue;
 
-    const queryUrl = buildLayerQueryUrl(adaMapServerBaseUrl, dataset.layerId, {
+    const queryUrl = buildDatasetQueryUrl(adaMapServerBaseUrl, dataset.layerId, dataset.serviceUrl, {
       where: '1=1',
       outFields: '*',
       returnGeometry: 'true',

@@ -8,6 +8,74 @@ const DEFAULT_RANDOM_DELAY_MAX_MS = 10 * 60 * 1000;
 const DEFAULT_IDAHO_HARVEST_PARCEL_LAYER = 23;
 const DEFAULT_IDAHO_HARVEST_CPNF_LAYER = 18;
 
+// Ada County gisprod portal — same source RecordQuarry uses to discover the CP&F layer.
+const DEFAULT_ADA_CPF_PORTAL_BASE = 'https://gisprod.adacounty.id.gov/arcgis';
+const DEFAULT_ADA_CPF_WEBMAP_ITEM_ID = '019521c7932442f0b4b581f641cbf236';
+
+// Discovers the Ada County CP&F point layer URL from the gisprod ArcGIS portal, mirroring
+// the same discovery logic used by RecordQuarry in the browser.  Returns the full layer
+// service URL (suitable for appending "/query") or null when discovery fails.
+async function discoverCpnfLayerUrl({ fetchImpl, portalBaseUrl, webmapItemId }) {
+  const itemDataUrl = `${String(portalBaseUrl).replace(/\/+$/, '')}/sharing/rest/content/items/${webmapItemId}/data?f=json`;
+  let webmap;
+  try {
+    const response = await fetchImpl(itemDataUrl);
+    if (!response.ok) return null;
+    webmap = await response.json();
+  } catch {
+    return null;
+  }
+
+  const candidates = [];
+  function walk(entries) {
+    for (const entry of (entries || [])) {
+      if (entry?.url) candidates.push(String(entry.url).trim());
+      if (entry?.layers) walk(entry.layers);
+    }
+  }
+  walk(webmap?.operationalLayers);
+
+  function hasInstrumentField(fields = []) {
+    return (fields || []).some(
+      (f) => /instr|instrument/i.test(f.name || '') || /instr|instrument/i.test(f.alias || ''),
+    );
+  }
+
+  for (const candidateUrl of candidates) {
+    const baseUrl = String(candidateUrl).replace(/[?#].*$/, '').replace(/\/+$/, '');
+    let meta;
+    try {
+      const metaResp = await fetchImpl(`${baseUrl}?f=json`);
+      if (!metaResp.ok) continue;
+      meta = await metaResp.json();
+    } catch {
+      continue;
+    }
+
+    // Direct point layer with instrument field — use it as-is.
+    if (/esriGeometryPoint/i.test(meta?.geometryType || '') && hasInstrumentField(meta?.fields || [])) {
+      return baseUrl;
+    }
+
+    // Map service — check each sublayer.
+    for (const layer of (meta?.layers || [])) {
+      const layerUrl = `${baseUrl}/${layer.id}`;
+      try {
+        const layerMetaResp = await fetchImpl(`${layerUrl}?f=json`);
+        if (!layerMetaResp.ok) continue;
+        const layerMeta = await layerMetaResp.json();
+        if (/esriGeometryPoint/i.test(layerMeta?.geometryType || '') && hasInstrumentField(layerMeta?.fields || [])) {
+          return layerUrl;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
+}
+
 function parseLayerList(value) {
   return String(value || '')
     .split(',')
@@ -38,6 +106,10 @@ export async function resolveHarvestDatasets({
   adaMapServerBaseUrl,
   env = process.env,
 }) {
+  // Guard against callers that pass undefined (e.g. client.fetchImpl when the client
+  // does not expose a fetchImpl property).
+  const resolvedFetch = typeof fetchImpl === 'function' ? fetchImpl : fetch;
+
   const explicitParcelLayers = parseLayerList(env.IDAHO_HARVEST_PARCEL_LAYERS);
   const explicitCpnfLayers = parseLayerList(env.IDAHO_HARVEST_CPNF_LAYERS);
   const fallbackParcelLayers = explicitParcelLayers.length
@@ -47,17 +119,10 @@ export async function resolveHarvestDatasets({
     ? explicitCpnfLayers
     : [Number(env.IDAHO_HARVEST_CPNF_LAYER || DEFAULT_IDAHO_HARVEST_CPNF_LAYER)];
 
-  if (explicitParcelLayers.length && explicitCpnfLayers.length) {
-    return [
-      ...explicitParcelLayers.map((layerId) => ({ name: `parcels-layer-${layerId}`, layerId })),
-      ...explicitCpnfLayers.map((layerId) => ({ name: `cpnf-layer-${layerId}`, layerId })),
-    ];
-  }
-
   const metadataUrl = `${String(adaMapServerBaseUrl || '').replace(/\/+$/, '')}?f=json`;
   let catalog = [];
   try {
-    const response = await fetchImpl(metadataUrl);
+    const response = await resolvedFetch(metadataUrl);
     if (response.ok) {
       catalog = parseMapServerLayerCatalog(await response.json());
     }
@@ -75,9 +140,26 @@ export async function resolveHarvestDatasets({
   const parcelLayers = discoveredParcelLayers.length ? discoveredParcelLayers : fallbackParcelLayers;
   const cpnfLayers = discoveredCpnfLayers.length ? discoveredCpnfLayers : fallbackCpnfLayers;
 
+  // Discover the real CP&F feature layer URL from the Ada County gisprod portal —
+  // the same way RecordQuarry does it in the browser.  The assessor's map server
+  // (adaMapServerBaseUrl) has subdivisions at layer 18, not CP&F records, so we
+  // cannot rely on it for CPNF queries.
+  const portalBaseUrl = String(env.ADA_CPF_PORTAL_BASE || DEFAULT_ADA_CPF_PORTAL_BASE);
+  const webmapItemId = String(env.ADA_CPF_WEBMAP_ITEM_ID || DEFAULT_ADA_CPF_WEBMAP_ITEM_ID);
+  let cpnfServiceUrl = null;
+  try {
+    cpnfServiceUrl = await discoverCpnfLayerUrl({ fetchImpl: resolvedFetch, portalBaseUrl, webmapItemId });
+  } catch {
+    cpnfServiceUrl = null;
+  }
+
   return [
     ...parcelLayers.map((layerId) => ({ name: `parcels-layer-${layerId}`, layerId })),
-    ...cpnfLayers.map((layerId) => ({ name: `cpnf-layer-${layerId}`, layerId })),
+    ...cpnfLayers.map((layerId) => ({
+      name: `cpnf-layer-${layerId}`,
+      layerId,
+      ...(cpnfServiceUrl ? { serviceUrl: cpnfServiceUrl } : {}),
+    })),
   ];
 }
 
