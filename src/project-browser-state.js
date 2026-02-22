@@ -378,6 +378,38 @@ export function aliquotCornerLabelFromNormXY(normX, normY, nodeTol = 0.08) {
 }
 
 /**
+ * Attempts to derive a corner designation from CP&F aliquot text (e.g. NWNW, C, N2).
+ * The parser is intentionally conservative and only emits labels when every aliquot agrees.
+ * @param {string[]|undefined} aliquots
+ * @returns {string|null}
+ */
+export function cornerDesignationFromAliquots(aliquots) {
+  if (!Array.isArray(aliquots) || !aliquots.length) return null;
+
+  const normalized = aliquots
+    .map((value) => String(value || '').trim().toUpperCase().replace(/[^NSEWC]/g, ''))
+    .filter(Boolean);
+  if (!normalized.length) return null;
+
+  const unique = new Set(normalized);
+  if (unique.size !== 1) return null;
+  const token = normalized[0];
+
+  if (token === 'C') return 'Center of section';
+  if (token.length === 1) {
+    const map = { N: 'North quarter corner', S: 'South quarter corner', E: 'East quarter corner', W: 'West quarter corner' };
+    return map[token] || null;
+  }
+
+  if (token.length === 2 && ((token.includes('N') || token.includes('S')) && (token.includes('E') || token.includes('W')))) {
+    return 'Section corner';
+  }
+
+  if (token.length >= 3 && token.length <= 4) return 'Sixteenth corner';
+  return null;
+}
+
+/**
  * Group CP&F entries by representative coordinates within radiusFeet.
  * Each entry gets a representative (north, east) from its first linked point with coordinates.
  * @param {Array<{ entry: object, north: number|undefined, east: number|undefined }>} entriesWithCoords
@@ -419,11 +451,18 @@ export function groupCpfsByCorner(entriesWithCoords, radiusFeet = CPF_CORNER_GRO
     }
     const avgN = cluster.reduce((s, x) => s + x.north, 0) / cluster.length;
     const avgE = cluster.reduce((s, x) => s + x.east, 0) / cluster.length;
+    const designationVotes = cluster
+      .map((item) => cornerDesignationFromAliquots(item?.entry?.reference?.metadata?.aliquots))
+      .filter(Boolean);
+    const uniqueDesignations = new Set(designationVotes);
+    const designation = uniqueDesignations.size === 1 ? designationVotes[0] : null;
     groups.push({
       north: avgN,
       east: avgE,
       entries: cluster.map((c) => c.entry),
-      label: `Corner at N ${avgN.toFixed(0)}, E ${avgE.toFixed(0)}`,
+      label: designation
+        ? `${designation} (N ${avgN.toFixed(0)}, E ${avgE.toFixed(0)})`
+        : `Corner at N ${avgN.toFixed(0)}, E ${avgE.toFixed(0)}`,
     });
   }
 
