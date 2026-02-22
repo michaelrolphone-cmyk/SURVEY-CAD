@@ -466,6 +466,54 @@ test('runIdahoHarvestCycle rotates datasets so cpnf is harvested before parcels 
   assert.equal(cpnfFeature.properties.dataset, 'cpnf');
 });
 
+test('runIdahoHarvestCycle scrapes CPNF PDFs from instrument number when dataset is named cpnf-layer-N', async () => {
+  const objectStore = createMemoryObjectStore();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const stringUrl = String(url);
+    calls.push(stringUrl);
+    if (stringUrl.includes('/query?')) {
+      return {
+        ok: true,
+        json: async () => ({
+          features: [{
+            attributes: {
+              OBJECTID: 401,
+              INSTRUMENT_NUMBER: '2021-00401',
+              NAME: 'CPNF-401',
+            },
+            geometry: { x: -116.25, y: 43.65 },
+          }],
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/pdf' }),
+      arrayBuffer: async () => new Uint8Array(Buffer.from('%PDF-1.4\n%cpnf\n')).buffer,
+    };
+  };
+
+  await runIdahoHarvestCycle({
+    fetchImpl,
+    objectStore,
+    adaMapServerBaseUrl: 'http://example.test/map',
+    batchSize: 1,
+    datasets: [{ name: 'cpnf-layer-18', layerId: 18, tileZoom: 12 }],
+    buckets: {
+      default: 'tile-server',
+      cpnf: 'cpnfs',
+      tiles: 'tile-server',
+      indexes: 'tile-server',
+      checkpoints: 'tile-server',
+    },
+  });
+
+  assert.ok(calls.includes('https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/2021-00401.pdf'));
+  assert.ok(objectStore.writes.some((write) => write.key.includes('/pdfs/id/cpnf-layer-18/401/') && write.bucket === 'cpnfs'));
+});
+
 test('runIdahoHarvestCycle scrapes cpnf PDFs even when map dataset checkpoint is already complete', async () => {
   const objectStore = createMemoryObjectStore();
   const checkpointKey = 'surveycad/idaho-harvest/checkpoints/id.json';

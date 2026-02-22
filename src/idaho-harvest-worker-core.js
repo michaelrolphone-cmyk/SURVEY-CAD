@@ -440,7 +440,7 @@ export async function runIdahoHarvestCycle({
 
   let changed = false;
 
-  const cpnfDataset = datasets.find((dataset) => String(dataset?.name || '').toLowerCase() === 'cpnf');
+  const cpnfDataset = datasets.find((dataset) => String(dataset?.name || '').toLowerCase().startsWith('cpnf'));
   const cpnfPdfState = checkpoint.cpnfPdfScrape || { offset: 0, done: false };
 
   if (cpnfDataset && !cpnfPdfState.done) {
