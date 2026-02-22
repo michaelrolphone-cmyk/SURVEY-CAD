@@ -1403,7 +1403,7 @@
       cpfHoverPreviewTooltip.style.top = '';
     }
 
-    function showCpfHoverPreviewTooltip(anchor, imageSrc, altText = 'CP&F preview') {
+    function showCpfHoverPreviewTooltip(anchor, imageSrc, altText = 'CP&F preview', sourceDimensions = null) {
       if (!anchor || !imageSrc) return;
 
       const tooltip = ensureCpfHoverPreviewTooltip();
@@ -1416,17 +1416,33 @@
       const viewportHeight = window.innerHeight;
       const maxHeight = Math.max(220, Math.floor(viewportHeight * 0.9));
       const anchorRect = anchor.getBoundingClientRect();
-      const preferredLeft = Math.round(anchorRect.right + CPH_GAP);
+      const imageNaturalWidth = Number(sourceDimensions?.width || previewImage.naturalWidth || anchor.naturalWidth || 0);
+      const imageNaturalHeight = Number(sourceDimensions?.height || previewImage.naturalHeight || anchor.naturalHeight || 0);
+      const safeImageHeight = imageNaturalHeight > 0 ? imageNaturalHeight : 1;
+      const imageAspectRatio = imageNaturalWidth > 0 ? (imageNaturalWidth / safeImageHeight) : (8.5 / 11);
       const maxWidth = Math.max(180, viewportWidth - (CPH_TOOLTIP_MARGIN * 2));
-      const clampedLeft = Math.min(preferredLeft, viewportWidth - maxWidth - CPH_TOOLTIP_MARGIN);
+      const maxPreviewWidth = Math.min(maxWidth, Math.floor(viewportWidth * 0.6));
+      const previewHeight = Math.max(160, Math.min(maxHeight, Math.floor(maxPreviewWidth / imageAspectRatio)));
+      const previewWidth = Math.max(160, Math.min(maxPreviewWidth, Math.floor(previewHeight * imageAspectRatio)));
 
-      tooltip.style.width = `${Math.round(maxWidth)}px`;
-      tooltip.style.height = `${maxHeight}px`;
+      const availableRight = viewportWidth - anchorRect.right - CPH_GAP - CPH_TOOLTIP_MARGIN;
+      const availableLeft = anchorRect.left - CPH_GAP - CPH_TOOLTIP_MARGIN;
+      const shouldPlaceRight = availableRight >= previewWidth || availableRight >= availableLeft;
+      const preferredLeft = shouldPlaceRight
+        ? Math.round(anchorRect.right + CPH_GAP)
+        : Math.round(anchorRect.left - CPH_GAP - previewWidth);
+      const clampedLeft = Math.min(
+        Math.max(CPH_TOOLTIP_MARGIN, preferredLeft),
+        viewportWidth - previewWidth - CPH_TOOLTIP_MARGIN,
+      );
 
-      const centeredTop = anchorRect.top + (anchorRect.height / 2) - (maxHeight / 2);
-      const maxTop = Math.max(CPH_TOOLTIP_MARGIN, viewportHeight - maxHeight - CPH_TOOLTIP_MARGIN);
+      tooltip.style.width = `${Math.round(previewWidth)}px`;
+      tooltip.style.height = `${Math.round(previewHeight)}px`;
+
+      const centeredTop = anchorRect.top + (anchorRect.height / 2) - (previewHeight / 2);
+      const maxTop = Math.max(CPH_TOOLTIP_MARGIN, viewportHeight - previewHeight - CPH_TOOLTIP_MARGIN);
       const clampedTop = Math.min(Math.max(CPH_TOOLTIP_MARGIN, centeredTop), maxTop);
-      tooltip.style.left = `${Math.round(Math.max(CPH_TOOLTIP_MARGIN, clampedLeft))}px`;
+      tooltip.style.left = `${Math.round(clampedLeft)}px`;
       tooltip.style.top = `${Math.round(clampedTop)}px`;
       tooltip.classList.add('visible');
     }
@@ -1438,6 +1454,10 @@
           thumb,
           thumb.src,
           `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+          {
+            width: thumb.naturalWidth,
+            height: thumb.naturalHeight,
+          },
         );
       });
       thumb.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
@@ -1446,6 +1466,10 @@
           thumb,
           thumb.src,
           `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+          {
+            width: thumb.naturalWidth,
+            height: thumb.naturalHeight,
+          },
         );
       });
       thumb.addEventListener('blur', () => hideCpfHoverPreviewTooltip());
