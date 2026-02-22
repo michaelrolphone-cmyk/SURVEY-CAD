@@ -89,6 +89,10 @@
       "description": "Project-scoped point file CRUD for PointForge/EvidenceDesk"
     },
     {
+      "name": "CP&F Records",
+      "description": "Project-scoped Corner Perpetuation & Filing record CRUD"
+    },
+    {
       "name": "Map Tiles",
       "description": "TileJSON and XYZ GeoJSON tile access from harvested MinIO buckets"
     }
@@ -1860,6 +1864,245 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/cpfs": {
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Project ID"
+        }
+      ],
+      "get": {
+        "tags": ["CP&F Records"],
+        "summary": "List project CP&F records",
+        "description": "Returns all CP&F records for the project sorted by updatedAt descending.",
+        "operationId": "listProjectCpfs",
+        "responses": {
+          "200": {
+            "description": "CP&F record list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCpfListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "post": {
+        "tags": ["CP&F Records"],
+        "summary": "Create or batch-upsert CP&F record(s)",
+        "description": "Accepts either a single record body (`{ instrument, ... }`) or a batch body (`{ cpfs: [...] }`).\n\n- **Single**: creates a new record or upserts an existing one by derived `cpfId`. Returns `201` for new, `200` for updated.\n- **Batch**: all entries are upserted atomically. Always returns `200`. Entries missing `instrument` are silently skipped.",
+        "operationId": "createOrBatchUpsertProjectCpfs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ProjectCpfMutationRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ProjectCpfBatchUpsertRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch upsert result or single upsert of existing record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProjectCpfResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ProjectCpfBatchUpsertResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Single CP&F record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCpfResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/cpfs/{cpfId}": {
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Project ID"
+        },
+        {
+          "name": "cpfId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Slugified instrument number (e.g. `2024-123456`)"
+        }
+      ],
+      "get": {
+        "tags": ["CP&F Records"],
+        "summary": "Get a single CP&F record",
+        "operationId": "getProjectCpf",
+        "responses": {
+          "200": {
+            "description": "CP&F record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCpfResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "put": {
+        "tags": ["CP&F Records"],
+        "summary": "Update (upsert) a CP&F record",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "operationId": "updateProjectCpf",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCpfMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CP&F record updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCpfResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "CP&F record created via upsert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCpfResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["CP&F Records"],
+        "summary": "Patch (upsert) a CP&F record",
+        "description": "Identical behaviour to `PUT`. Updates the record identified by `cpfId`, or creates it if absent.",
+        "operationId": "patchProjectCpf",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCpfMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CP&F record updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCpfResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "CP&F record created via upsert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCpfResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["CP&F Records"],
+        "summary": "Delete a CP&F record",
+        "operationId": "deleteProjectCpf",
+        "responses": {
+          "200": {
+            "description": "Record deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       }
@@ -5461,6 +5704,170 @@
         "required": [
           "pointFile"
         ]
+      },
+      "ProjectCpfSummary": {
+        "type": "object",
+        "description": "Lightweight CP&F summary stored in the project index (returned by list).",
+        "properties": {
+          "cpfId": {
+            "type": "string",
+            "description": "Slugified instrument number (e.g. \"2024-123456\")"
+          },
+          "instrument": {
+            "type": "string",
+            "description": "Normalized instrument number (uppercase)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating app (e.g. \"RecordQuarry\") or null"
+          },
+          "aliquots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "PLSS aliquot labels"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["cpfId", "instrument", "title", "aliquots", "createdAt", "updatedAt"]
+      },
+      "ProjectCpf": {
+        "type": "object",
+        "description": "Full CP&F record persisted in the sync snapshot.",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "example": "1.0.0"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "cpfId": {
+            "type": "string",
+            "description": "Slugified instrument number derived at write time"
+          },
+          "instrument": {
+            "type": "string",
+            "description": "Normalized instrument number (uppercase)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title (defaults to \"CP&F {instrument}\")"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating app (e.g. \"RecordQuarry\") or null"
+          },
+          "aliquots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "PLSS aliquot labels"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["schemaVersion", "projectId", "cpfId", "instrument", "title", "aliquots", "createdAt", "updatedAt"]
+      },
+      "ProjectCpfMutationRequest": {
+        "type": "object",
+        "description": "Request body for single CP&F create/update (POST without batch, PUT, or PATCH).",
+        "properties": {
+          "instrument": {
+            "type": "string",
+            "description": "Instrument number. Normalized to uppercase; `cpfId` is derived by slugifying this value."
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title. Defaults to \"CP&F {instrument}\" when omitted."
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating app label (e.g. \"RecordQuarry\")"
+          },
+          "aliquots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "PLSS aliquot labels to associate with this record"
+          }
+        },
+        "required": ["instrument"]
+      },
+      "ProjectCpfBatchUpsertRequest": {
+        "type": "object",
+        "description": "Request body for atomic batch upsert of multiple CP&F records.",
+        "properties": {
+          "cpfs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectCpfMutationRequest"
+            },
+            "description": "Array of CP&F entries to upsert. Entries missing `instrument` are silently skipped."
+          }
+        },
+        "required": ["cpfs"]
+      },
+      "ProjectCpfListResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "cpfs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectCpfSummary"
+            },
+            "description": "CP&F summaries sorted by updatedAt descending"
+          }
+        },
+        "required": ["projectId", "cpfs"]
+      },
+      "ProjectCpfResponse": {
+        "type": "object",
+        "properties": {
+          "cpf": {
+            "$ref": "#/components/schemas/ProjectCpf"
+          }
+        },
+        "required": ["cpf"]
+      },
+      "ProjectCpfBatchUpsertResponse": {
+        "type": "object",
+        "properties": {
+          "cpfs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectCpf"
+            },
+            "description": "Full records for all successfully upserted entries"
+          }
+        },
+        "required": ["cpfs"]
       },
       "ProjectWorkbenchLink": {
         "type": "object",
