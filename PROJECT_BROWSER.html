@@ -1126,11 +1126,36 @@
       return proxyUrl.toString();
     }
 
-    function buildPrintPreviewPdfUrl(pdfUrl) {
+    async function fetchPdfThumbnailDataUrl(pdfUrl, {
+      maxAttempts = 60,
+      initialDelayMs = 350,
+      maxDelayMs = 4000,
+    } = {}) {
       if (!pdfUrl) return '';
-      // PDF Open Parameters hide most built-in viewer chrome and ask for fit-to-page scaling.
-      // Browsers may ignore unsupported flags, but this prevents sidebar/tool UI in engines that support them.
-      return `${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit&zoom=page-fit`;
+      const thumbnailApiUrl = new URL('/api/project-files/pdf-thumbnail', window.location.origin);
+      thumbnailApiUrl.searchParams.set('source', pdfUrl);
+      const thumbnailKey = thumbnailApiUrl.toString();
+
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const response = await fetch(thumbnailKey, { method: 'GET' });
+        if (response.status === 202) {
+          await new Promise((resolve) => setTimeout(resolve, Math.min(maxDelayMs, initialDelayMs + (attempt * 200))));
+          continue;
+        }
+        if (!response.ok) {
+          throw new Error(`thumbnail request failed (${response.status})`);
+        }
+        const blob = await response.blob();
+        if (typeof blob.arrayBuffer !== 'function') return '';
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let index = 0; index < bytes.length; index += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+        }
+        return `data:${blob.type || 'image/png'};base64,${btoa(binary)}`;
+      }
+      throw new Error('thumbnail generation timed out');
     }
 
     function openCpfPdfFromResource(resource) {
@@ -1511,19 +1536,12 @@
       placeholder.title = 'Generating thumbnail…';
       slot.replaceChildren(placeholder);
 
-      const thumbnailApiUrl = new URL('/api/project-files/pdf-thumbnail', window.location.origin);
-      thumbnailApiUrl.searchParams.set('source', previewBaseUrl);
-      const thumbnailKey = thumbnailApiUrl.toString();
-
       const applyThumbnail = async () => {
-        const response = await fetch(thumbnailKey, { method: 'GET' });
-        if (response.status === 202) return false;
-        if (!response.ok) throw new Error(`thumbnail request failed (${response.status})`);
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
+        const thumbnailDataUrl = await fetchPdfThumbnailDataUrl(previewBaseUrl);
+        if (!thumbnailDataUrl) return false;
         const thumb = document.createElement('img');
         thumb.className = 'pdf-preview-thumb';
-        thumb.src = objectUrl;
+        thumb.src = thumbnailDataUrl;
         thumb.alt = `${entry?.title || entry?.id || 'PDF'} preview`;
         thumb.title = `${entry?.title || entry?.id || 'PDF'} preview`;
         thumb.decoding = 'async';
@@ -1536,12 +1554,8 @@
         return true;
       };
       try {
-        const maxAttempts = 60;
-        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-          const done = await applyThumbnail();
-          if (done) return;
-          await new Promise((resolve) => setTimeout(resolve, Math.min(4000, 350 + (attempt * 200))));
-        }
+        const done = await applyThumbnail();
+        if (done) return;
         placeholder.classList.add('pdf-preview-failed');
         placeholder.textContent = 'Unavailable';
         placeholder.title = 'Thumbnail preview is unavailable right now. Open the PDF to view it.';
@@ -1644,7 +1658,7 @@
       return nextValue;
     }
 
-    function openCpfPrintPreview(resources = []) {
+    async function openCpfPrintPreview(resources = []) {
       const printableResources = resources
         .filter((entry) => isCpfStarredForFieldBook(entry))
         .map((entry) => ({
@@ -1667,11 +1681,25 @@
         return;
       }
 
-      const pagesMarkup = printableResources.map(({ url }, index) => `
+      const thumbnailPages = await Promise.all(printableResources.map(async ({ url, entry }, index) => {
+        try {
+          const thumbnailDataUrl = await fetchPdfThumbnailDataUrl(url);
+          if (!thumbnailDataUrl) return '';
+          return `
         <section class="page-block">
-          <iframe src="${escapeHtml(buildPrintPreviewPdfUrl(url))}" title="CP&amp;F PDF ${index + 1}" class="pdf-frame"></iframe>
+          <img src="${escapeHtml(thumbnailDataUrl)}" alt="CP&amp;F thumbnail ${index + 1}" title="${escapeHtml(entry?.title || `CP&F ${index + 1}`)}" class="cpf-print-thumbnail" />
         </section>
-      `).join('');
+      `;
+        } catch {
+          return '';
+        }
+      }));
+      const pagesMarkup = thumbnailPages.filter(Boolean).join('');
+      if (!pagesMarkup) {
+        renderError('No starred CP&F thumbnails could be generated right now. Try again in a moment.');
+        printWindow.close();
+        return;
+      }
 
       printWindow.document.write(`<!doctype html>
 <html lang="en">
@@ -1684,19 +1712,20 @@
     .toolbar { position: sticky; top: 0; background: #fff; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; }
     .print-button { font: inherit; padding: 0.45rem 0.8rem; border-radius: 6px; border: 1px solid #334155; background: #fff; cursor: pointer; }
     .page-block { margin: 0 0 1rem; display: flex; justify-content: center; background: #fff; }
-    .pdf-frame { width: min(100%, 8.5in); height: 98vh; border: 1px solid #94a3b8; border-radius: 8px; display: block; margin: 0 auto; background: #fff; }
+    .cpf-print-thumbnail { width: min(100%, 8.5in); max-height: calc(100vh - 5rem); object-fit: contain; border: 1px solid #94a3b8; border-radius: 8px; display: block; margin: 0 auto; background: #fff; }
     @media print {
       @page { margin: 0; }
       .toolbar { display: none; }
       body { margin: 0; background: #fff; }
-      .page-block { margin: 0; break-inside: avoid; page-break-inside: avoid; display: flex; justify-content: center; background: #fff; }
-      .pdf-frame { width: 100%; border: none; border-radius: 0; height: 100vh; background: #fff; }
+      .page-block { margin: 0; break-after: page; break-inside: avoid; page-break-after: always; page-break-inside: avoid; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #fff; }
+      .page-block:last-of-type { break-after: auto; page-break-after: auto; }
+      .cpf-print-thumbnail { width: 100%; max-height: 100vh; border: none; border-radius: 0; background: #fff; }
     }
   </style>
 </head>
 <body>
   <div class="toolbar">
-    <button type="button" class="print-button" onclick="window.print()">Print all CP&amp;F PDFs</button>
+    <button type="button" class="print-button" onclick="window.print()">Print all CP&amp;F thumbnails</button>
   </div>
   ${pagesMarkup}
 </body>
