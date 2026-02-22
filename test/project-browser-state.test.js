@@ -17,6 +17,7 @@ import {
   findCpfPointLinksAsync,
   groupCpfsByCorner,
   aliquotCornerLabelFromNormXY,
+  cornerDesignationFromAliquots,
   CPF_CORNER_GROUP_RADIUS_FEET,
   addCustomFolder,
   removeCustomFolder,
@@ -262,6 +263,17 @@ test('groupCpfsByCorner clusters entries within 33 feet and labels by coordinate
   assert.match(groups[0].label, /Corner at N \d+, E \d+/);
 });
 
+test('groupCpfsByCorner labels grouped CP&Fs by aliquot-derived corner designation when consistent', () => {
+  const entries = [
+    { entry: { id: 'a', reference: { metadata: { aliquots: ['NENW'] } } }, north: 1010, east: 2020 },
+    { entry: { id: 'b', reference: { metadata: { aliquots: ['nenw'] } } }, north: 1014, east: 2024 },
+  ];
+
+  const groups = groupCpfsByCorner(entries, 33);
+  assert.equal(groups.length, 1);
+  assert.match(groups[0].label, /^Sixteenth corner \(N \d+, E \d+\)$/);
+});
+
 test('groupCpfsByCorner puts entries without coordinates in No linked location', () => {
   const e1 = { id: 'a' };
   const groups = groupCpfsByCorner([{ entry: e1, north: undefined, east: undefined }], 33);
@@ -277,6 +289,14 @@ test('aliquotCornerLabelFromNormXY returns section and quarter labels', () => {
   assert.equal(aliquotCornerLabelFromNormXY(0.5, 0), 'South quarter corner');
   assert.equal(aliquotCornerLabelFromNormXY(1, 0.5), 'East quarter corner');
   assert.equal(aliquotCornerLabelFromNormXY(0.25, 0.25), 'Sixteenth corner');
+});
+
+test('cornerDesignationFromAliquots infers section, quarter, center, and sixteenth corners', () => {
+  assert.equal(cornerDesignationFromAliquots(['NW']), 'Section corner');
+  assert.equal(cornerDesignationFromAliquots(['N']), 'North quarter corner');
+  assert.equal(cornerDesignationFromAliquots(['C']), 'Center of section');
+  assert.equal(cornerDesignationFromAliquots(['NENW']), 'Sixteenth corner');
+  assert.equal(cornerDesignationFromAliquots(['NE', 'SW']), null);
 });
 
 test('CPF_CORNER_GROUP_RADIUS_FEET is 33', () => {
