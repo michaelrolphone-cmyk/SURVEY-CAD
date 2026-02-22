@@ -2768,8 +2768,30 @@
                 labelEl.className = 'corner-group-label';
                 labelEl.textContent = group.label;
                 groupDiv.appendChild(labelEl);
-                for (const entry of group.entries) {
-                  groupDiv.appendChild(buildOneFileRow(entry));
+
+                const entries = Array.isArray(group.entries) ? group.entries : [];
+                if (!entries.length) {
+                  fileListContainer.appendChild(groupDiv);
+                  continue;
+                }
+
+                groupDiv.appendChild(buildOneFileRow(entries[0]));
+
+                if (entries.length > 1) {
+                  const moreDetails = document.createElement('details');
+                  moreDetails.className = 'corner-group-more';
+
+                  const moreSummary = document.createElement('summary');
+                  moreSummary.className = 'launch-btn';
+                  const extraCount = entries.length - 1;
+                  moreSummary.textContent = `Show ${extraCount} more CP&F${extraCount === 1 ? '' : 's'}`;
+                  moreDetails.appendChild(moreSummary);
+
+                  for (const entry of entries.slice(1)) {
+                    moreDetails.appendChild(buildOneFileRow(entry));
+                  }
+
+                  groupDiv.appendChild(moreDetails);
                 }
                 fileListContainer.appendChild(groupDiv);
               }
