@@ -61,6 +61,7 @@ function buildCpfSummary(record) {
     title: record.title,
     source: record.source || null,
     aliquots: Array.isArray(record.aliquots) ? record.aliquots : [],
+    starredInFieldBook: Boolean(record.starredInFieldBook),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
@@ -105,6 +106,7 @@ export async function createOrUpdateProjectCpf(store, {
   title,
   source,
   aliquots,
+  starredInFieldBook,
 } = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
   const instrument = normalizeInstrumentNumber(instrumentRaw);
@@ -129,6 +131,7 @@ export async function createOrUpdateProjectCpf(store, {
     source: source || existing?.source || null,
     aliquots: Array.isArray(aliquots) ? aliquots.map((v) => String(v || '').trim()).filter(Boolean)
       : (existing?.aliquots || []),
+    starredInFieldBook: typeof starredInFieldBook === 'boolean' ? starredInFieldBook : Boolean(existing?.starredInFieldBook),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
   };
@@ -178,6 +181,9 @@ export async function batchUpsertProjectCpfs(store, projectIdRaw, entries = []) 
       aliquots: Array.isArray(entry?.aliquots)
         ? entry.aliquots.map((v) => String(v || '').trim()).filter(Boolean)
         : (existing?.aliquots || []),
+      starredInFieldBook: typeof entry?.starredInFieldBook === 'boolean'
+        ? entry.starredInFieldBook
+        : Boolean(existing?.starredInFieldBook),
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     };

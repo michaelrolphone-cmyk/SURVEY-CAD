@@ -674,7 +674,7 @@
           type: 'instrument-number',
           value: instrument,
           resolverHint: 'lookup-cpf-pdf',
-          metadata: { instrument, cpfId, source: cpf.source || '', aliquots: cpf.aliquots || [] },
+          metadata: { instrument, cpfId, source: cpf.source || '', aliquots: cpf.aliquots || [], starredInFieldBook: Boolean(cpf.starredInFieldBook) },
         },
       };
     }
@@ -1609,8 +1609,44 @@
         .replaceAll("'", '&#39;');
     }
 
+    function isCpfStarredForFieldBook(resource = {}) {
+      return Boolean(resource?.reference?.metadata?.starredInFieldBook);
+    }
+
+    async function setCpfFieldBookStar(resource = {}, starred = false, projectContext = {}) {
+      const projectId = String(projectContext?.activeProjectId || '').trim();
+      const cpfId = String(resource?.reference?.metadata?.cpfId || resource?.id || '').trim();
+      const instrument = String(resource?.reference?.metadata?.instrument || resource?.reference?.value || '').trim();
+      if (!projectId || !cpfId || !instrument) {
+        throw new Error('Missing project, CP&F, or instrument metadata.');
+      }
+
+      const response = await fetch(buildProjectCpfApiUrl(projectId, cpfId), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          instrument,
+          title: resource?.title,
+          source: resource?.reference?.metadata?.source || '',
+          aliquots: resource?.reference?.metadata?.aliquots || [],
+          starredInFieldBook: Boolean(starred),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const nextValue = Boolean(payload?.cpf?.starredInFieldBook);
+      if (!resource.reference) resource.reference = {};
+      if (!resource.reference.metadata || typeof resource.reference.metadata !== 'object') resource.reference.metadata = {};
+      resource.reference.metadata.starredInFieldBook = nextValue;
+      return nextValue;
+    }
+
     function openCpfPrintPreview(resources = []) {
       const printableResources = resources
+        .filter((entry) => isCpfStarredForFieldBook(entry))
         .map((entry) => ({
           entry,
           url: getCpfPdfUrl(entry),
@@ -1618,7 +1654,7 @@
         .filter((item) => item.url);
 
       if (!printableResources.length) {
-        renderError('No printable CP&F PDF records were found for this project.');
+        renderError('No starred CP&F PDF records were found for this project. Star CP&Fs for your field book and try again.');
         return;
       }
 
@@ -2267,10 +2303,10 @@
           const printAllButton = document.createElement('button');
           printAllButton.type = 'button';
           printAllButton.className = 'launch-btn';
-          printAllButton.textContent = 'Print all';
-          printAllButton.title = 'Builds a single print preview containing each CP&F PDF in order';
+          printAllButton.textContent = 'Print starred';
+          printAllButton.title = 'Builds a single print preview containing starred CP&F PDFs for your field book';
           printAllButton.addEventListener('click', () => openCpfPrintPreview(folder.index));
-          printAllButton.disabled = !folder.index.some((entry) => entry?.exportFormat === 'pdf');
+          printAllButton.disabled = !folder.index.some((entry) => entry?.exportFormat === 'pdf' && isCpfStarredForFieldBook(entry));
           folderRow.appendChild(printAllButton);
         }
 
@@ -2573,6 +2609,34 @@
             });
             actionButtons.appendChild(openButton);
 
+            const starButton = document.createElement('button');
+            const syncStarButton = (isBusy = false) => {
+              const starred = isCpfStarredForFieldBook(entry);
+              starButton.textContent = starred ? '★ Starred' : '☆ Star';
+              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
+              starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
+              starButton.disabled = Boolean(isBusy);
+            };
+            starButton.type = 'button';
+            starButton.className = 'launch-btn';
+            syncStarButton(false);
+            starButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              syncStarButton(true);
+              try {
+                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
+                syncStarButton(false);
+                const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
+                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
+                saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+                renderTree(projectContext.projectFile, projectContext);
+              } catch (error) {
+                syncStarButton(false);
+                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
+              }
+            });
+            actionButtons.appendChild(starButton);
+
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
             deleteButton.className = 'launch-btn';
@@ -2637,6 +2701,34 @@
               window.open(downloadUrl, '_blank', 'noopener,noreferrer');
             });
             actionButtons.appendChild(openButton);
+
+            const starButton = document.createElement('button');
+            const syncStarButton = (isBusy = false) => {
+              const starred = isCpfStarredForFieldBook(entry);
+              starButton.textContent = starred ? '★ Starred' : '☆ Star';
+              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
+              starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
+              starButton.disabled = Boolean(isBusy);
+            };
+            starButton.type = 'button';
+            starButton.className = 'launch-btn';
+            syncStarButton(false);
+            starButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              syncStarButton(true);
+              try {
+                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
+                syncStarButton(false);
+                const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
+                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
+                saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+                renderTree(projectContext.projectFile, projectContext);
+              } catch (error) {
+                syncStarButton(false);
+                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
+              }
+            });
+            actionButtons.appendChild(starButton);
 
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
@@ -2717,6 +2809,34 @@
           }
 
           if (!canLaunchPointForge && !canOpenLineSmithDrawing && !canOpenCpfPdf && !isServerUpload) {
+            const starButton = document.createElement('button');
+            const syncStarButton = (isBusy = false) => {
+              const starred = isCpfStarredForFieldBook(entry);
+              starButton.textContent = starred ? '★ Starred' : '☆ Star';
+              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
+              starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
+              starButton.disabled = Boolean(isBusy);
+            };
+            starButton.type = 'button';
+            starButton.className = 'launch-btn';
+            syncStarButton(false);
+            starButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              syncStarButton(true);
+              try {
+                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
+                syncStarButton(false);
+                const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
+                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
+                saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
+                renderTree(projectContext.projectFile, projectContext);
+              } catch (error) {
+                syncStarButton(false);
+                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
+              }
+            });
+            actionButtons.appendChild(starButton);
+
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
             deleteButton.className = 'launch-btn';

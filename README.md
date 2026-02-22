@@ -1321,3 +1321,16 @@ When EvidenceDesk is configured for S3/MinIO object storage, server startup now 
 
 - API endpoints: `GET /health`, `GET /api/project-files`, `GET /api/project-files/download`, `GET /api/project-files/image-thumbnail`.
 - CLI/server commands: `npm start`, `npm test`.
+
+## API and CLI endpoints for EvidenceDesk CP&F field-book stars
+
+EvidenceDesk CP&F rows now support a persisted `starredInFieldBook` flag so crews can mark the exact CP&Fs needed in the field, and the CP&F bulk print action only includes starred records.
+
+### API endpoints
+- `GET /api/projects/{projectId}/cpfs` — returns CP&F summaries including `starredInFieldBook`.
+- `POST /api/projects/{projectId}/cpfs` — accepts single and batch upserts with optional `starredInFieldBook`.
+- `PATCH /api/projects/{projectId}/cpfs/{cpfId}` — updates a CP&F record (including `starredInFieldBook`).
+
+### CLI and server commands
+- `npm start`
+- `npm test`

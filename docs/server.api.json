@@ -1881,7 +1881,9 @@
         }
       ],
       "get": {
-        "tags": ["CP&F Records"],
+        "tags": [
+          "CP&F Records"
+        ],
         "summary": "List project CP&F records",
         "description": "Returns all CP&F records for the project sorted by updatedAt descending.",
         "operationId": "listProjectCpfs",
@@ -1902,7 +1904,9 @@
         }
       },
       "post": {
-        "tags": ["CP&F Records"],
+        "tags": [
+          "CP&F Records"
+        ],
         "summary": "Create or batch-upsert CP&F record(s)",
         "description": "Accepts either a single record body (`{ instrument, ... }`) or a batch body (`{ cpfs: [...] }`).\n\n- **Single**: creates a new record or upserts an existing one by derived `cpfId`. Returns `201` for new, `200` for updated.\n- **Batch**: all entries are upserted atomically. Always returns `200`. Entries missing `instrument` are silently skipped.",
         "operationId": "createOrBatchUpsertProjectCpfs",
@@ -1979,7 +1983,9 @@
         }
       ],
       "get": {
-        "tags": ["CP&F Records"],
+        "tags": [
+          "CP&F Records"
+        ],
         "summary": "Get a single CP&F record",
         "operationId": "getProjectCpf",
         "responses": {
@@ -1999,9 +2005,11 @@
         }
       },
       "put": {
-        "tags": ["CP&F Records"],
+        "tags": [
+          "CP&F Records"
+        ],
         "summary": "Update (upsert) a CP&F record",
-        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectCpf",
         "requestBody": {
           "required": true,
@@ -2040,7 +2048,9 @@
         }
       },
       "patch": {
-        "tags": ["CP&F Records"],
+        "tags": [
+          "CP&F Records"
+        ],
         "summary": "Patch (upsert) a CP&F record",
         "description": "Identical behaviour to `PUT`. Updates the record identified by `cpfId`, or creates it if absent.",
         "operationId": "patchProjectCpf",
@@ -2081,7 +2091,9 @@
         }
       },
       "delete": {
-        "tags": ["CP&F Records"],
+        "tags": [
+          "CP&F Records"
+        ],
         "summary": "Delete a CP&F record",
         "operationId": "deleteProjectCpf",
         "responses": {
@@ -2096,7 +2108,9 @@
                       "type": "boolean"
                     }
                   },
-                  "required": ["deleted"]
+                  "required": [
+                    "deleted"
+                  ]
                 }
               }
             }
@@ -5740,9 +5754,21 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "starredInFieldBook": {
+            "type": "boolean",
+            "description": "Whether this CP&F is starred for field-book print jobs."
           }
         },
-        "required": ["cpfId", "instrument", "title", "aliquots", "createdAt", "updatedAt"]
+        "required": [
+          "cpfId",
+          "instrument",
+          "title",
+          "aliquots",
+          "createdAt",
+          "updatedAt",
+          "starredInFieldBook"
+        ]
       },
       "ProjectCpf": {
         "type": "object",
@@ -5786,9 +5812,23 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "starredInFieldBook": {
+            "type": "boolean",
+            "description": "Whether this CP&F is starred for field-book print jobs."
           }
         },
-        "required": ["schemaVersion", "projectId", "cpfId", "instrument", "title", "aliquots", "createdAt", "updatedAt"]
+        "required": [
+          "schemaVersion",
+          "projectId",
+          "cpfId",
+          "instrument",
+          "title",
+          "aliquots",
+          "createdAt",
+          "updatedAt",
+          "starredInFieldBook"
+        ]
       },
       "ProjectCpfMutationRequest": {
         "type": "object",
@@ -5813,9 +5853,15 @@
               "type": "string"
             },
             "description": "PLSS aliquot labels to associate with this record"
+          },
+          "starredInFieldBook": {
+            "type": "boolean",
+            "description": "Whether this CP&F is starred for field-book print jobs."
           }
         },
-        "required": ["instrument"]
+        "required": [
+          "instrument"
+        ]
       },
       "ProjectCpfBatchUpsertRequest": {
         "type": "object",
@@ -5829,7 +5875,9 @@
             "description": "Array of CP&F entries to upsert. Entries missing `instrument` are silently skipped."
           }
         },
-        "required": ["cpfs"]
+        "required": [
+          "cpfs"
+        ]
       },
       "ProjectCpfListResponse": {
         "type": "object",
@@ -5845,7 +5893,10 @@
             "description": "CP&F summaries sorted by updatedAt descending"
           }
         },
-        "required": ["projectId", "cpfs"]
+        "required": [
+          "projectId",
+          "cpfs"
+        ]
       },
       "ProjectCpfResponse": {
         "type": "object",
@@ -5854,7 +5905,9 @@
             "$ref": "#/components/schemas/ProjectCpf"
           }
         },
-        "required": ["cpf"]
+        "required": [
+          "cpf"
+        ]
       },
       "ProjectCpfBatchUpsertResponse": {
         "type": "object",
@@ -5867,7 +5920,9 @@
             "description": "Full records for all successfully upserted entries"
           }
         },
-        "required": ["cpfs"]
+        "required": [
+          "cpfs"
+        ]
       },
       "ProjectWorkbenchLink": {
         "type": "object",
