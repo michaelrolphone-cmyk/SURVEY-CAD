@@ -285,6 +285,16 @@ function extractInstrumentNumbers(attributes = {}) {
       .filter(Boolean)))];
 }
 
+function normalizePdfUrl(url) {
+  try {
+    const parsed = new URL(url);
+    parsed.pathname = parsed.pathname.replace(/\.pdf$/i, '.pdf');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function resolveCpnfPdfUrls(attributes = {}, { baseUrl = '' } = {}) {
   const pdfUrls = extractPdfUrls(attributes, { baseUrl });
   const instrumentUrls = extractInstrumentNumbers(attributes).map((instrumentNumber) => {
@@ -293,12 +303,13 @@ function resolveCpnfPdfUrls(attributes = {}, { baseUrl = '' } = {}) {
     return `${DEFAULT_CPNF_PDF_DOWNLOAD_BASE}${encodeURIComponent(normalizedInstrument)}.pdf`;
   }).filter(Boolean);
 
-  return [...new Set([...pdfUrls, ...instrumentUrls])];
+  return [...new Set([...pdfUrls, ...instrumentUrls].map(normalizePdfUrl))];
 }
 
 function buildPdfObjectKey({ prefix, stateAbbr, dataset, objectId, pdfUrl, index }) {
   const parsed = new URL(pdfUrl);
-  const fileName = path.basename(parsed.pathname || '') || `document-${index + 1}.pdf`;
+  const rawFileName = path.basename(parsed.pathname || '') || `document-${index + 1}.pdf`;
+  const fileName = rawFileName.replace(/\.pdf$/i, '.pdf');
   return `${prefix}/pdfs/${stateAbbr.toLowerCase()}/${dataset}/${encodeURIComponent(String(objectId))}/${index + 1}-${encodeURIComponent(fileName)}`;
 }
 
