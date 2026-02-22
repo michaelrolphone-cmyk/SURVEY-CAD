@@ -282,6 +282,19 @@ test('groupCpfsByCorner puts entries without coordinates in No linked location',
   assert.equal(groups[0].entries[0], e1);
 });
 
+test('groupCpfsByCorner sorts grouped entries by highest instrument number first', () => {
+  const entries = [
+    { entry: { id: 'a', title: 'CP&F 2019-12345', reference: { value: '2019-12345' } }, north: 1000, east: 2000 },
+    { entry: { id: 'b', title: 'CP&F 2021-00002', reference: { value: '2021-00002' } }, north: 1001, east: 2001 },
+    { entry: { id: 'c', title: 'CP&F 2020-90000', reference: { value: '2020-90000' } }, north: 1002, east: 2002 },
+  ];
+
+  const groups = groupCpfsByCorner(entries, 33);
+
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].entries.map((entry) => entry.id), ['b', 'c', 'a']);
+});
+
 test('aliquotCornerLabelFromNormXY returns section and quarter labels', () => {
   assert.equal(aliquotCornerLabelFromNormXY(0, 0), 'Section corner');
   assert.equal(aliquotCornerLabelFromNormXY(0.5, 0.5), 'Center of section');
@@ -378,6 +391,10 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /findCpfPointLinksAsync\(projectContext\?\.projectFile, resolvePointFileText, instrument\)/, 'CP&F delete flow should detect linked point references by instrument using async resolver');
   assert.match(projectBrowserHtml, /window\.confirm\(`This CP&F is linked to/, 'CP&F delete flow should ask for confirmation when linked points exist');
   assert.match(projectBrowserHtml, /function\s+openCpfPrintPreview\s*\(/, 'Project Browser should define a bulk CP&F print-preview builder');
+  assert.match(projectBrowserHtml, /const\s+entries\s*=\s*Array\.isArray\(group\.entries\)\s*\?\s*group\.entries\s*:\s*\[\]/, 'Project Browser should normalize grouped CP&F entry arrays before rendering rows');
+  assert.match(projectBrowserHtml, /groupDiv\.appendChild\(buildOneFileRow\(entries\[0\]\)\)/, 'Project Browser should keep CP&F groups collapsed to the first entry by default');
+  assert.match(projectBrowserHtml, /const\s+moreDetails\s*=\s*document\.createElement\('details'\)/, 'Project Browser should render expandable details wrappers for additional grouped CP&Fs');
+  assert.match(projectBrowserHtml, /for\s*\(const\s+entry\s+of\s+entries\.slice\(1\)\)/, 'Project Browser should place additional grouped CP&Fs inside the expandable section');
   assert.match(projectBrowserHtml, /window\.open\('', '_blank'\)/, 'Print preview should open a writable popup window for inline HTML content');
   assert.match(projectBrowserHtml, /printAllButton\.textContent\s*=\s*'Print all'/, 'CP&F folder should render a Print all action');
   assert.match(projectBrowserHtml, /printAllButton\.addEventListener\('click',\s*\(\)\s*=>\s*openCpfPrintPreview\(folder\.index\)\)/, 'Print all action should open a combined CP&F print preview');

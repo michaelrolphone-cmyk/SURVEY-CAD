@@ -416,6 +416,29 @@ export function cornerDesignationFromAliquots(aliquots) {
  * @param {number} radiusFeet
  * @returns {Array<{ north: number, east: number, entries: object[], label: string }>}
  */
+  function getCpfInstrument(entry = {}) {
+    return String(entry?.reference?.value || entry?.reference?.metadata?.instrument || '').trim();
+  }
+
+  function cpfInstrumentSortValue(entry = {}) {
+    const instrument = getCpfInstrument(entry);
+    if (!instrument) return Number.NEGATIVE_INFINITY;
+    const digitParts = instrument.match(/\d+/g);
+    if (!digitParts?.length) return Number.NEGATIVE_INFINITY;
+    return Number(digitParts.join(''));
+  }
+
+  function compareCpfsByInstrumentDesc(a = {}, b = {}) {
+    const valueA = cpfInstrumentSortValue(a);
+    const valueB = cpfInstrumentSortValue(b);
+    if (valueA !== valueB) return valueB - valueA;
+
+    const instrumentA = getCpfInstrument(a);
+    const instrumentB = getCpfInstrument(b);
+    if (instrumentA !== instrumentB) return instrumentB.localeCompare(instrumentA, undefined, { numeric: true, sensitivity: 'base' });
+    return String(b?.title || '').localeCompare(String(a?.title || ''), undefined, { numeric: true, sensitivity: 'base' });
+  }
+
 export function groupCpfsByCorner(entriesWithCoords, radiusFeet = CPF_CORNER_GROUP_RADIUS_FEET) {
   const radiusSq = radiusFeet * radiusFeet;
   function distSq(n1, e1, n2, e2) {
@@ -459,7 +482,7 @@ export function groupCpfsByCorner(entriesWithCoords, radiusFeet = CPF_CORNER_GRO
     groups.push({
       north: avgN,
       east: avgE,
-      entries: cluster.map((c) => c.entry),
+      entries: cluster.map((c) => c.entry).sort(compareCpfsByInstrumentDesc),
       label: designation
         ? `${designation} (N ${avgN.toFixed(0)}, E ${avgE.toFixed(0)})`
         : `Corner at N ${avgN.toFixed(0)}, E ${avgE.toFixed(0)}`,
@@ -470,7 +493,7 @@ export function groupCpfsByCorner(entriesWithCoords, radiusFeet = CPF_CORNER_GRO
     groups.push({
       north: NaN,
       east: NaN,
-      entries: withoutCoords.map((c) => c.entry),
+      entries: withoutCoords.map((c) => c.entry).sort(compareCpfsByInstrumentDesc),
       label: 'No linked location',
     });
   }
