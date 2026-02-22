@@ -14,6 +14,7 @@
 - [Crew Management](#crew-management)
 - [Equipment Management](#equipment-management)
 - [Equipment Logs](#equipment-logs)
+- [CP&F Records (Project-scoped CRUD)](#cpf-records-project-scoped-crud)
 - [LocalStorage Sync (REST)](#localstorage-sync-rest)
 - [PointForge Exports](#pointforge-exports)
 - [FLD Configuration](#fld-configuration)
@@ -1085,6 +1086,160 @@ Delete a point-file record from a project.
 
 ---
 
+## CP&F Records (Project-scoped CRUD)
+
+Project-scoped Corner Perpetuation & Filing (CP&F) records are persisted in the shared sync snapshot (Redis-backed when configured). Each record represents a single CP&F instrument reference tied to a project. All mutations broadcast a `sync-differential-applied` event to all connected LocalStorage Sync WebSocket clients.
+
+### `GET /api/projects/:projectId/cpfs`
+
+List all CP&F records for a project, sorted by `updatedAt` descending.
+
+**Response `200`:**
+```json
+{
+  "projectId": "proj-1",
+  "cpfs": [
+    {
+      "cpfId": "2024-123456",
+      "instrument": "2024-123456",
+      "title": "CP&F 2024-123456",
+      "source": "RecordQuarry",
+      "aliquots": ["NE 1/4 SE 1/4"],
+      "createdAt": "2026-02-18T00:00:00.000Z",
+      "updatedAt": "2026-02-18T00:10:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/projects/:projectId/cpfs`
+
+Create or upsert one or more CP&F records for a project. Accepts either a **single record** or a **batch array**.
+
+#### Single record
+
+**Request Body:**
+```json
+{
+  "instrument": "2024-123456",
+  "title": "CP&F 2024-123456",
+  "source": "RecordQuarry",
+  "aliquots": ["NE 1/4 SE 1/4"]
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `instrument` | `string` | Yes | - | Instrument number (normalized to uppercase). Derives `cpfId` via slugification. |
+| `title` | `string` | No | `"CP&F {instrument}"` | Human-readable display title |
+| `source` | `string \| null` | No | `null` | Originating app (e.g. `"RecordQuarry"`) |
+| `aliquots` | `string[]` | No | `[]` | PLSS aliquot labels associated with this record |
+
+**Response `201`** (new record) or **`200`** (updated existing):
+```json
+{
+  "cpf": { ... }
+}
+```
+
+#### Batch upsert
+
+When `body.cpfs` is an array, all entries are upserted atomically in a single differential patch.
+
+**Request Body:**
+```json
+{
+  "cpfs": [
+    { "instrument": "2024-123456", "title": "CP&F 2024-123456", "source": "RecordQuarry" },
+    { "instrument": "2019-987654" }
+  ]
+}
+```
+
+Each array entry accepts the same fields as a single record. Entries missing `instrument` are silently skipped.
+
+**Response `200`:**
+```json
+{
+  "cpfs": [ { ... }, { ... } ]
+}
+```
+
+---
+
+### `GET /api/projects/:projectId/cpfs/:cpfId`
+
+Fetch the full CP&F record for a single instrument.
+
+**Path Param:** `cpfId` — the slugified instrument number (e.g. `2024-123456`).
+
+**Response `200`:**
+```json
+{
+  "cpf": {
+    "schemaVersion": "1.0.0",
+    "projectId": "proj-1",
+    "cpfId": "2024-123456",
+    "instrument": "2024-123456",
+    "title": "CP&F 2024-123456",
+    "source": "RecordQuarry",
+    "aliquots": ["NE 1/4 SE 1/4"],
+    "createdAt": "2026-02-18T00:00:00.000Z",
+    "updatedAt": "2026-02-18T00:10:00.000Z"
+  }
+}
+```
+
+**Response `404`:** `{ "error": "CP&F record not found." }`
+
+---
+
+### `PUT /api/projects/:projectId/cpfs/:cpfId`
+### `PATCH /api/projects/:projectId/cpfs/:cpfId`
+
+Update an existing CP&F record. Acts as upsert — if the record does not yet exist for `cpfId`, it is created.
+
+**Request Body:**
+```json
+{
+  "instrument": "2024-123456",
+  "title": "Updated Title",
+  "source": "RecordQuarry",
+  "aliquots": ["NE 1/4 SE 1/4", "SW 1/4 SE 1/4"]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `instrument` | `string` | Yes | Instrument number (must be provided; used to re-normalize the stored value) |
+| `title` | `string` | No | Updated display title |
+| `source` | `string \| null` | No | Updated source label |
+| `aliquots` | `string[]` | No | Replacement aliquot list |
+
+**Response `200`** (updated) or **`201`** (newly created via upsert):
+```json
+{
+  "cpf": { ... }
+}
+```
+
+---
+
+### `DELETE /api/projects/:projectId/cpfs/:cpfId`
+
+Delete a CP&F record from a project.
+
+**Response `200`:**
+```json
+{
+  "deleted": true
+}
+```
+
+**Response `404`:** `{ "error": "CP&F record not found." }`
+
 ---
 
 ## PointForge Exports
@@ -1655,6 +1810,26 @@ PointForgeExport {
   createdAt:    string                 // ISO 8601
 }
 ```
+
+### ProjectCpf
+
+```
+ProjectCpf {
+  schemaVersion: string               // "1.0.0"
+  projectId:     string               // Parent project ID
+  cpfId:         string               // Slugified instrument number (e.g. "2024-123456")
+  instrument:    string               // Normalized instrument number (uppercase)
+  title:         string               // Display title (defaults to "CP&F {instrument}")
+  source:        string | null        // Originating app (e.g. "RecordQuarry") or null
+  aliquots:      string[]             // PLSS aliquot labels
+  createdAt:     string               // ISO 8601
+  updatedAt:     string               // ISO 8601
+}
+```
+
+The `cpfId` is derived by slugifying `instrument` (lowercased, non-alphanumeric runs replaced with `-`). Posting the same instrument number to `POST /api/projects/:projectId/cpfs` will always resolve to the same `cpfId`, making the endpoint naturally idempotent.
+
+---
 
 ### SyncState
 
