@@ -2238,6 +2238,7 @@ export function createSurveyServer({
             title: body.title,
             source: body.source,
             aliquots: body.aliquots,
+            starredInFieldBook: body.starredInFieldBook,
           });
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
@@ -2266,6 +2267,7 @@ export function createSurveyServer({
             title: body.title,
             source: body.source,
             aliquots: body.aliquots,
+            starredInFieldBook: body.starredInFieldBook,
           });
           localStorageSyncWsService.broadcast({
             type: 'sync-differential-applied',
