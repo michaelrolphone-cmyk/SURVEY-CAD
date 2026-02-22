@@ -731,7 +731,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return projectContext;
   }
 
-  function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount }) {
+  async function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount }) {
     const resolvedProjectContext = resolveProjectContextForProjectFile(projectContext);
     if (!resolvedProjectContext.projectId) return null;
 
@@ -774,6 +774,25 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
 
     projectFile.generatedAt = exportTimestamp;
     saveProjectFileSnapshot(resolvedProjectContext, projectFile);
+
+    // Persist CP&F records server-side so EvidenceDesk can display them.
+    if (cpfInstruments.length && resolvedProjectContext.projectId) {
+      try {
+        const cpfsPayload = cpfInstruments.map((instrument) => ({
+          instrument,
+          title: `CP&F ${instrument}`,
+          source: 'RecordQuarry',
+        }));
+        await fetch(`/api/projects/${encodeURIComponent(resolvedProjectContext.projectId)}/cpfs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cpfs: cpfsPayload }),
+        });
+      } catch {
+        // Non-fatal: server sync is best-effort; local snapshot was already saved.
+      }
+    }
+
     return { projectFile, cpfCount: cpfInstruments.length };
   }
 
@@ -2525,7 +2544,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         exportedAt: new Date().toISOString(),
         csv: pointForgeCsv,
       }));
-      const projectFileUpdate = persistPointForgeExportProjectFile({
+      const projectFileUpdate = await persistPointForgeExportProjectFile({
         projectContext: state.projectContext,
         notesByCoordinate,
         csv: pointForgeCsv,
