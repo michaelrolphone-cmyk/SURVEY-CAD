@@ -535,6 +535,7 @@ export class SurveyCadClient {
     u.searchParams.set("format", "json");
     u.searchParams.set("limit", "1");
     u.searchParams.set("addressdetails", "1");
+    u.searchParams.set("countrycodes", "us");
     if (this.config.nominatimEmail) {
       u.searchParams.set("email", this.config.nominatimEmail);
     }
@@ -1025,10 +1026,13 @@ export class SurveyCadClient {
       addressFeature = null;
     }
     let geocode = null;
-    try {
-      geocode = await this.geocodeAddress(address);
-    } catch {
-      geocode = null;
+    const hasAddressGeometry = Number.isFinite(addressFeature?.geometry?.x) && Number.isFinite(addressFeature?.geometry?.y);
+    if (!hasAddressGeometry) {
+      try {
+        geocode = await this.geocodeAddress(address);
+      } catch {
+        geocode = null;
+      }
     }
 
     const lon = addressFeature?.geometry?.x ?? geocode?.lon;

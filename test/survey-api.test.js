@@ -16,7 +16,7 @@ function createMockServer(options = {}) {
     omitTransformers = false,
   } = options;
   const requests = [];
-  const headers = { geocodeUserAgent: null, geocodeEmail: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [], nearPointPath: null, nearPointPaths: [] };
+  const headers = { geocodeUserAgent: null, geocodeEmail: null, geocodeCountryCodes: null, arcgisGeocodeUserAgent: null, estimateCalculateBodies: [], nearPointPath: null, nearPointPaths: [] };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     requests.push(url.pathname + url.search);
@@ -24,6 +24,7 @@ function createMockServer(options = {}) {
     if (url.pathname === '/geocode') {
       headers.geocodeUserAgent = req.headers['user-agent'] || null;
       headers.geocodeEmail = url.searchParams.get('email');
+      headers.geocodeCountryCodes = url.searchParams.get('countrycodes');
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify([{ lat: '43.61', lon: '-116.20', display_name: 'Boise' }]));
       return;
@@ -393,6 +394,7 @@ test('geocodeAddress sends configured nominatim user agent', async () => {
     await client.geocodeAddress('100 Main St, Boise');
     assert.equal(headers.geocodeUserAgent, 'survey-cad-test/2.0');
     assert.equal(headers.geocodeEmail, 'owner@example.com');
+    assert.equal(headers.geocodeCountryCodes, 'us');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -484,6 +486,34 @@ test('lookupByAddress throws clear error when address and geocode both fail', as
   }
 });
 
+
+
+test('lookupByAddress skips geocodeAddress when address layer returns valid geometry', async () => {
+  const { server, port, requests } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode`,
+    blmFirstDivisionLayer: `${base}/blm1`,
+    blmSecondDivisionLayer: `${base}/blm2`,
+  });
+
+  try {
+    const lookup = await client.lookupByAddress('100 Main St, Boise');
+    assert.equal(lookup.location.lon, -116.2);
+    assert.equal(lookup.location.lat, 43.61);
+    assert.equal(lookup.geocode, null);
+
+    // The address layer returned a feature with valid geometry, so the main
+    // geocodeAddress call must be skipped — no /geocode requests at all until
+    // the utility sub-lookup (which runs later and may hit /geocode itself).
+    // What matters is that the address-layer coordinates are used directly.
+    const addressLayerQueries = requests.filter((r) => r.includes('/16/query'));
+    assert.ok(addressLayerQueries.length >= 1, 'address layer should have been queried');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
 
 
 test('findContainingPolygonWithOutSr chooses nearest polygon when point is not contained', async () => {
