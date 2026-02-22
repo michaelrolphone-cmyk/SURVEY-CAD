@@ -239,9 +239,37 @@
       border-radius: 6px;
       border: 1px solid var(--border);
       box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
-      pointer-events: none;
       flex: none;
       object-fit: cover;
+      background: #ffffff;
+      cursor: zoom-in;
+    }
+
+    .cpf-hover-preview-tooltip {
+      position: fixed;
+      z-index: 1400;
+      padding: 0.5rem;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(2, 6, 23, 0.95);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.6);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 120ms ease;
+    }
+
+    .cpf-hover-preview-tooltip.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .cpf-hover-preview-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 6px;
       background: #ffffff;
     }
 
@@ -1345,6 +1373,87 @@
       return mimeMap[String(format).toLowerCase()] || 'application/octet-stream';
     }
 
+    const CPH_TOOLTIP_MARGIN = 16;
+    const CPH_GAP = 14;
+    let cpfHoverPreviewTooltip = null;
+
+    function ensureCpfHoverPreviewTooltip() {
+      if (cpfHoverPreviewTooltip && document.body.contains(cpfHoverPreviewTooltip)) {
+        return cpfHoverPreviewTooltip;
+      }
+      const tooltip = document.createElement('div');
+      tooltip.className = 'cpf-hover-preview-tooltip';
+      tooltip.setAttribute('aria-hidden', 'true');
+
+      const image = document.createElement('img');
+      image.className = 'cpf-hover-preview-image';
+      image.alt = '';
+      tooltip.appendChild(image);
+      document.body.appendChild(tooltip);
+      cpfHoverPreviewTooltip = tooltip;
+      return tooltip;
+    }
+
+    function hideCpfHoverPreviewTooltip() {
+      if (!cpfHoverPreviewTooltip) return;
+      cpfHoverPreviewTooltip.classList.remove('visible');
+      cpfHoverPreviewTooltip.style.width = '';
+      cpfHoverPreviewTooltip.style.height = '';
+      cpfHoverPreviewTooltip.style.left = '';
+      cpfHoverPreviewTooltip.style.top = '';
+    }
+
+    function showCpfHoverPreviewTooltip(anchor, imageSrc, altText = 'CP&F preview') {
+      if (!anchor || !imageSrc) return;
+
+      const tooltip = ensureCpfHoverPreviewTooltip();
+      const previewImage = tooltip.querySelector('.cpf-hover-preview-image');
+      if (!previewImage) return;
+      previewImage.src = imageSrc;
+      previewImage.alt = altText;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const maxHeight = Math.max(220, Math.floor(viewportHeight * 0.9));
+      const anchorRect = anchor.getBoundingClientRect();
+      const preferredLeft = Math.round(anchorRect.right + CPH_GAP);
+      const maxWidth = Math.max(180, viewportWidth - (CPH_TOOLTIP_MARGIN * 2));
+      const clampedLeft = Math.min(preferredLeft, viewportWidth - maxWidth - CPH_TOOLTIP_MARGIN);
+
+      tooltip.style.width = `${Math.round(maxWidth)}px`;
+      tooltip.style.height = `${maxHeight}px`;
+
+      const centeredTop = anchorRect.top + (anchorRect.height / 2) - (maxHeight / 2);
+      const maxTop = Math.max(CPH_TOOLTIP_MARGIN, viewportHeight - maxHeight - CPH_TOOLTIP_MARGIN);
+      const clampedTop = Math.min(Math.max(CPH_TOOLTIP_MARGIN, centeredTop), maxTop);
+      tooltip.style.left = `${Math.round(Math.max(CPH_TOOLTIP_MARGIN, clampedLeft))}px`;
+      tooltip.style.top = `${Math.round(clampedTop)}px`;
+      tooltip.classList.add('visible');
+    }
+
+    function bindCpfHoverPreview(thumb, entry) {
+      if (!thumb) return;
+      thumb.addEventListener('mouseenter', () => {
+        showCpfHoverPreviewTooltip(
+          thumb,
+          thumb.src,
+          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+        );
+      });
+      thumb.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
+      thumb.addEventListener('focus', () => {
+        showCpfHoverPreviewTooltip(
+          thumb,
+          thumb.src,
+          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+        );
+      });
+      thumb.addEventListener('blur', () => hideCpfHoverPreviewTooltip());
+    }
+
+    window.addEventListener('scroll', () => hideCpfHoverPreviewTooltip(), { passive: true });
+    window.addEventListener('resize', () => hideCpfHoverPreviewTooltip());
+
     function attachImagePreview(resource, entry) {
       if (entry?.reference?.type !== 'server-upload') return;
       if (!isImageResource(entry)) return;
@@ -1395,6 +1504,10 @@
         thumb.title = `${entry?.title || entry?.id || 'PDF'} preview`;
         thumb.decoding = 'async';
         thumb.loading = 'lazy';
+        if (folder?.key === 'cpfs') {
+          thumb.tabIndex = 0;
+          bindCpfHoverPreview(thumb, entry);
+        }
         slot.replaceChildren(thumb);
         return true;
       };
