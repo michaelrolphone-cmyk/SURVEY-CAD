@@ -2430,9 +2430,19 @@
     }
 
     
-    function isFolderCollapsed(folderKey) {
-      // Default: collapsed (true). Only expanded if explicitly set to false.
-      return folderCollapseState.get(folderKey) !== false;
+    function isFolderCollapsed(folder) {
+      const folderKey = String(folder?.key || '').trim();
+      if (!folderKey) return true;
+
+      // If the user has toggled this folder, honor that persisted state.
+      if (folderCollapseState.has(folderKey)) {
+        return folderCollapseState.get(folderKey) !== false;
+      }
+
+      // Default rule: collapsed unless there is exactly one direct file in the folder.
+      const fileCount = Array.isArray(folder?.index) ? folder.index.length : 0;
+      if (fileCount === 1) return false; // expanded by default
+      return true;
     }
         function safeFileExt(value) {
       const raw = String(value || '').trim().toLowerCase();
@@ -2815,7 +2825,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
         const parentChildrenContainer = folder.parentKey ? folderChildrenContainerMap.get(folder.parentKey) : null;
                 let thumbnailStrip = null;
         let pointFileUploadPanel = null;
-        const isCollapsed = isFolderCollapsed(folder.key);
+        const isCollapsed = isFolderCollapsed(folder);
         const folderGroupWrapper = document.createElement('div');
         folderGroupWrapper.className = 'folder-group';
         (parentChildrenContainer || treeContainer).appendChild(folderGroupWrapper);
@@ -2847,7 +2857,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
         folderRow.innerHTML = `<span class="folder-title"><span class="folder-collapse-chevron" aria-hidden="true">▶</span><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span><span class="folder-actions"></span>`;
         folderRow.addEventListener('click', (event) => {
           if (event.target.closest('button, input, select, a')) return;
-          const nowCollapsed = !isFolderCollapsed(folder.key);
+          const nowCollapsed = !isFolderCollapsed(folder);
           folderCollapseState.set(folder.key, nowCollapsed);
           folderRow.dataset.collapsed = nowCollapsed ? 'true' : 'false';
           if (thumbnailStrip) {
