@@ -389,7 +389,7 @@
 import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, loadUtilitiesByAddress, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
 import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtilityMarkersForPointForge, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport } from "./src/ros-export.js";
 
-(() => {
+(async () => {
   // -----------------------------
   // Configuration (Ada County)
   // -----------------------------
@@ -501,8 +501,15 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return `${ADDRESS_LOOKUP_STORAGE_PREFIX}:${normalizeAddressStorageKey(address)}`;
   }
 
-  function loadProjectLookupSnapshot(projectId) {
+  async function loadProjectLookupSnapshot(projectId) {
     if (!projectId) return null;
+    try {
+      const resp = await fetch(`/api/projects/${encodeURIComponent(projectId)}/record-quarry-cache`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data?.cache?.lookup) return data.cache;
+      }
+    } catch {}
     try {
       const raw = localStorage.getItem(projectLookupStorageKey(projectId));
       if (!raw) return null;
@@ -514,14 +521,30 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     }
   }
 
-  function saveProjectLookupSnapshot(projectId, snapshot) {
+  async function saveProjectLookupSnapshot(projectId, snapshot) {
     if (!projectId || !snapshot) return;
-    localStorage.setItem(projectLookupStorageKey(projectId), JSON.stringify(snapshot));
+    try {
+      await fetch(`/api/projects/${encodeURIComponent(projectId)}/record-quarry-cache`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snapshot),
+      });
+    } catch {}
+    try {
+      localStorage.setItem(projectLookupStorageKey(projectId), JSON.stringify(snapshot));
+    } catch {}
   }
 
-  function loadAddressLookupSnapshot(address) {
+  async function loadAddressLookupSnapshot(address) {
     const normalized = normalizeAddressStorageKey(address);
     if (!normalized) return null;
+    try {
+      const resp = await fetch(`/api/record-quarry-cache?address=${encodeURIComponent(normalized)}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data?.cache?.lookup) return data.cache;
+      }
+    } catch {}
     try {
       const raw = localStorage.getItem(addressLookupStorageKey(normalized));
       if (!raw) return null;
@@ -533,14 +556,23 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     }
   }
 
-  function saveAddressLookupSnapshot(address, snapshot) {
+  async function saveAddressLookupSnapshot(address, snapshot) {
     const normalized = normalizeAddressStorageKey(address);
     if (!normalized || !snapshot) return;
-    localStorage.setItem(addressLookupStorageKey(normalized), JSON.stringify(snapshot));
-    localStorage.setItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY, normalized);
+    try {
+      await fetch(`/api/record-quarry-cache?address=${encodeURIComponent(normalized)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...snapshot, address: normalized }),
+      });
+    } catch {}
+    try {
+      localStorage.setItem(addressLookupStorageKey(normalized), JSON.stringify(snapshot));
+      localStorage.setItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY, normalized);
+    } catch {}
   }
 
-  function loadMostRecentAddressLookupSnapshot() {
+  async function loadMostRecentAddressLookupSnapshot() {
     const recentAddress = normalizeAddressStorageKey(localStorage.getItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY));
     if (!recentAddress) return null;
     return loadAddressLookupSnapshot(recentAddress);
@@ -580,7 +612,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     }
   }
 
-  function saveLookupSnapshotsForCurrentState(address) {
+  async function saveLookupSnapshotsForCurrentState(address) {
     const normalizedAddress = normalizeAddressStorageKey(address);
     if (!normalizedAddress || !state.lastLookupPayload) return;
     const snapshot = {
@@ -589,9 +621,9 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       lookup: state.lastLookupPayload,
       selection: readSelectionSnapshot(),
     };
-    saveAddressLookupSnapshot(normalizedAddress, snapshot);
+    await saveAddressLookupSnapshot(normalizedAddress, snapshot);
     if (state.projectContext.projectId) {
-      saveProjectLookupSnapshot(state.projectContext.projectId, snapshot);
+      await saveProjectLookupSnapshot(state.projectContext.projectId, snapshot);
     }
   }
 
@@ -2149,7 +2181,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       invalidateMapSoon("lookup start");
 
       const cachedAddressSnapshot = (!options.lookupPayload && !options.disableAddressCache)
-        ? loadAddressLookupSnapshot(rawAddr)
+        ? await loadAddressLookupSnapshot(rawAddr)
         : null;
       const lookup = options.lookupPayload || cachedAddressSnapshot?.lookup || await lookupByAddress(rawAddr);
       state.lastLookupPayload = lookup;
@@ -2619,8 +2651,8 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     log(`Project loaded: ${state.projectContext.projectName || state.projectContext.projectId} (${state.projectContext.client || "no client"}).`);
 
     const hasProjectAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
-    const projectSnapshot = loadProjectLookupSnapshot(state.projectContext.projectId);
-    const projectAddressSnapshot = hasProjectAddress ? loadAddressLookupSnapshot(state.projectContext.address) : null;
+    const projectSnapshot = await loadProjectLookupSnapshot(state.projectContext.projectId);
+    const projectAddressSnapshot = hasProjectAddress ? await loadAddressLookupSnapshot(state.projectContext.address) : null;
 
     let launchLookupPayload = null;
     let launchSelectionSnapshot = null;
@@ -2660,9 +2692,9 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   } else {
     const hasLaunchAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
     const launchAddressSnapshot = hasLaunchAddress
-      ? loadAddressLookupSnapshot(state.projectContext.address)
+      ? await loadAddressLookupSnapshot(state.projectContext.address)
       : null;
-    const snapshot = loadMostRecentAddressLookupSnapshot();
+    const snapshot = await loadMostRecentAddressLookupSnapshot();
 
     if (hasLaunchAddress) {
       if (launchAddressSnapshot?.lookup) {
