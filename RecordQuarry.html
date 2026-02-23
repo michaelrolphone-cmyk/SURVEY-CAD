@@ -275,6 +275,11 @@
       }
     }
 
+    .cpf-collapsed{display:flex;gap:8px;align-items:flex-start}
+    .cpf-thumb{width:60px;height:76px;object-fit:cover;border-radius:4px;border:1px solid var(--line);flex-shrink:0;background:rgba(0,0,0,.3);cursor:pointer}
+    .cpf-collapsed-info{flex:1;min-width:0}
+    .cpf-expand-btn{font-size:11px;padding:3px 8px;margin-top:5px}
+
     .busyModal{
       position:fixed;
       inset:0;
@@ -2029,20 +2034,97 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return out;
   }
 
+  function buildCpfPdfThumbnailUrl(pdfProxyUrl) {
+    // pdfProxyUrl is a relative URL like /api/ros-pdf?url=... from buildRosPdfProxyUrl
+    return `/api/project-files/pdf-thumbnail?${new URLSearchParams({ source: pdfProxyUrl })}`;
+  }
+
+  async function loadCpfThumbnailWithRetry(imgEl, thumbnailUrl, maxAttempts = 9) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, Math.min(600 * Math.pow(2, attempt - 1), 10000)));
+      }
+      try {
+        const resp = await fetch(thumbnailUrl);
+        if (resp.ok && resp.headers.get('content-type')?.startsWith('image/')) {
+          const blob = await resp.blob();
+          imgEl.src = URL.createObjectURL(blob);
+          imgEl.style.display = '';
+          return;
+        }
+        if (resp.status === 202) continue; // still generating — retry
+        break; // permanent error
+      } catch {
+        break;
+      }
+    }
+  }
+
   async function lazyLoadAliquotSummaryCpfLinks(targets = []) {
     for (const target of targets) {
       const node = document.querySelector(`[data-aliquot-cpf-links="${target.token}"]`);
       if (!node) continue;
       try {
         const records = await queryCpfRecordsForAliquot(target.feature);
-        const html = cpfLinksHtml(records);
-        node.innerHTML = html;
-        if (flattenCpfRecordLinks(records).length) {
-          log(`Loaded CP&F PDF links for summary ${target.label}.`);
-        } else {
+        if (!flattenCpfRecordLinks(records).length) {
           node.innerHTML = '<span class="small">No CP&amp;F PDF links found.</span>';
           log(`No CP&F PDF links found for summary ${target.label}.`, 'warn');
+          continue;
         }
+
+        // Collapsed view: show only the most recent (first) record with a thumbnail
+        const first = records[0];
+        const resolvedInstrument = resolveCpfRecordInstrument(first);
+        const instrumentHtml = resolvedInstrument ? escapeHtml(resolvedInstrument) : 'CP&amp;F Record';
+        const monsetHtml = first.monset != null && String(first.monset).trim()
+          ? `<div style="margin-top:2px;color:var(--muted)">Monument Set: <span style="color:var(--text)">${escapeHtml(String(first.monset).trim())}</span></div>`
+          : '';
+        const surveyorHtml = first.surveyor != null && String(first.surveyor).trim()
+          ? `<div style="color:var(--muted)">Surveyor: <span style="color:var(--text)">${escapeHtml(String(first.surveyor).trim())}</span></div>`
+          : '';
+        const linkHtml = first.links.map((url, i) => (
+          `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(url))}">CP&amp;F PDF${first.links.length > 1 ? ` ${i + 1}` : ''}</a>`
+        )).join(' ');
+        const expandHtml = records.length > 1
+          ? `<div><button class="secondary cpf-expand-btn" data-cpf-expand>Show all ${records.length} records</button></div>`
+          : '';
+        const allRecordsHtml = records.length > 1
+          ? `<div data-cpf-all style="display:none;margin-top:6px">${cpfLinksHtml(records)}</div>`
+          : '';
+
+        node.innerHTML = `<div class="cpf-collapsed">
+          <img class="cpf-thumb" style="display:none" alt="CP&amp;F PDF thumbnail"/>
+          <div class="cpf-collapsed-info">
+            <b>${instrumentHtml}</b>${monsetHtml}${surveyorHtml}
+            <div style="margin-top:4px">${linkHtml}</div>
+            ${expandHtml}${allRecordsHtml}
+          </div>
+        </div>`;
+
+        // Wire expand button
+        const expandBtn = node.querySelector('[data-cpf-expand]');
+        const allDiv = node.querySelector('[data-cpf-all]');
+        if (expandBtn && allDiv) {
+          expandBtn.addEventListener('click', (evt) => {
+            evt.stopPropagation();
+            allDiv.style.display = '';
+            expandBtn.parentElement.remove();
+          });
+        }
+
+        // Load thumbnail for the first record's PDF
+        const firstProxyUrl = first.links[0] ? buildRosPdfProxyUrl(first.links[0]) : null;
+        if (firstProxyUrl) {
+          const thumbEl = node.querySelector('.cpf-thumb');
+          if (thumbEl) {
+            // Clicking thumbnail opens the PDF
+            const pdfHref = escapeHtml(firstProxyUrl);
+            thumbEl.addEventListener('click', () => window.open(pdfHref, '_blank', 'noopener'));
+            loadCpfThumbnailWithRetry(thumbEl, buildCpfPdfThumbnailUrl(firstProxyUrl));
+          }
+        }
+
+        log(`Loaded CP&F PDF links for summary ${target.label}.`);
       } catch (e) {
         node.innerHTML = `<span class="small" style="color:#ffb3b3">CP&amp;F lookup failed: ${escapeHtml(e.message || e)}</span>`;
         log(`CP&F summary lookup failed for ${target.label}: ${e.message || e}`, 'warn');
