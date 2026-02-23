@@ -1178,8 +1178,9 @@ export function createSurveyServer({
       : [],
   };
 
-  function getProjectFolderKeys(projectId) {
-    const { snapshot } = localStorageSyncStore.getState();
+  async function getProjectFolderKeys(projectId) {
+    const state = await Promise.resolve(localStorageSyncStore?.getState?.());
+    const snapshot = state?.snapshot && typeof state.snapshot === 'object' ? state.snapshot : {};
     const raw = snapshot[`${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`];
     if (!raw) return VALID_FOLDER_KEYS;
     try {
@@ -1923,7 +1924,7 @@ export function createSurveyServer({
 
           const sources = await collectProjectWorkbenchSources(localStorageSyncStore, projectId, {
             uploadsDir: UPLOADS_DIR,
-            validFolderKeys: getProjectFolderKeys(projectId),
+            validFolderKeys: await getProjectFolderKeys(projectId),
           });
           const sync = await syncProjectSourcesToCasefile(bew.store, link.casefileId, projectId, sources);
           casefile = await bew.store.getCasefile(link.casefileId);
@@ -1959,7 +1960,7 @@ export function createSurveyServer({
         if (req.method === 'GET' && action === 'sources') {
           const sources = await collectProjectWorkbenchSources(localStorageSyncStore, projectId, {
             uploadsDir: UPLOADS_DIR,
-            validFolderKeys: getProjectFolderKeys(projectId),
+            validFolderKeys: await getProjectFolderKeys(projectId),
           });
           sendJson(res, 200, { projectId, sources });
           return;
@@ -2509,7 +2510,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId and folderKey are required fields.' });
           return;
         }
-        if (!getProjectFolderKeys(projectId).has(folderKey)) {
+        if (!(await getProjectFolderKeys(projectId)).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2586,7 +2587,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!getProjectFolderKeys(projectId).has(folderKey)) {
+        if (!(await getProjectFolderKeys(projectId)).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2619,7 +2620,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!getProjectFolderKeys(projectId).has(folderKey)) {
+        if (!(await getProjectFolderKeys(projectId)).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2709,7 +2710,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!getProjectFolderKeys(projectId).has(folderKey)) {
+        if (!(await getProjectFolderKeys(projectId)).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2731,7 +2732,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'targetFolderKey is required.' });
           return;
         }
-        if (!getProjectFolderKeys(projectId).has(targetFolderKey)) {
+        if (!(await getProjectFolderKeys(projectId)).has(targetFolderKey)) {
           sendJson(res, 400, { error: 'Invalid targetFolderKey.' });
           return;
         }
@@ -2757,7 +2758,7 @@ export function createSurveyServer({
           sendJson(res, 400, { error: 'projectId, folderKey, and fileName are required.' });
           return;
         }
-        if (!getProjectFolderKeys(projectId).has(folderKey)) {
+        if (!(await getProjectFolderKeys(projectId)).has(folderKey)) {
           sendJson(res, 400, { error: 'Invalid folderKey.' });
           return;
         }
@@ -2798,7 +2799,7 @@ export function createSurveyServer({
           return;
         }
         const { store } = await resolveEvidenceDeskStore();
-        const listing = await store.listFiles(projectId, [...getProjectFolderKeys(projectId)]);
+        const listing = await store.listFiles(projectId, [...await getProjectFolderKeys(projectId)]);
         sendJson(res, 200, listing);
         return;
       }

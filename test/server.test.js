@@ -869,6 +869,88 @@ test('server localstorage sync endpoint supports async-backed stores', async () 
   }
 });
 
+test('server file upload endpoints support async localstorage sync stores when validating folder keys', async () => {
+  const testProjectId = `async-upload-${Date.now()}`;
+  const testProjectDir = path.join(UPLOADS_DIR, testProjectId);
+  const projectFileKey = `surveyfoundryProjectFile:${testProjectId}`;
+  const localStorageSyncStore = {
+    async getState() {
+      return {
+        version: 1,
+        snapshot: {
+          [projectFileKey]: JSON.stringify({
+            folders: [{ key: 'drawings' }],
+          }),
+        },
+      };
+    },
+  };
+
+  const app = await startApiServer(new SurveyCadClient(), { localStorageSyncStore });
+
+  try {
+    const boundary = '----AsyncFolderBoundary';
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="projectId"',
+      '',
+      testProjectId,
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="folderKey"',
+      '',
+      'drawings',
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="async-folder-test.txt"',
+      'Content-Type: text/plain',
+      '',
+      'hello async folder',
+      `--${boundary}--`,
+    ].join('\r\n');
+
+    const uploadRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    });
+
+    assert.equal(uploadRes.status, 201);
+    const uploadPayload = await uploadRes.json();
+    assert.equal(uploadPayload?.resource?.folder, 'drawings');
+
+    const badFolderBoundary = '----AsyncInvalidFolderBoundary';
+    const badFolderBody = [
+      `--${badFolderBoundary}`,
+      'Content-Disposition: form-data; name="projectId"',
+      '',
+      testProjectId,
+      `--${badFolderBoundary}`,
+      'Content-Disposition: form-data; name="folderKey"',
+      '',
+      'deeds',
+      `--${badFolderBoundary}`,
+      'Content-Disposition: form-data; name="file"; filename="invalid-folder-test.txt"',
+      'Content-Type: text/plain',
+      '',
+      'this should fail folder validation',
+      `--${badFolderBoundary}--`,
+    ].join('\r\n');
+
+    const invalidFolderRes = await fetch(`http://127.0.0.1:${app.port}/api/project-files/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${badFolderBoundary}` },
+      body: badFolderBody,
+    });
+
+    assert.equal(invalidFolderRes.status, 400);
+    const invalidFolderPayload = await invalidFolderRes.json();
+    assert.match(invalidFolderPayload.error || '', /invalid folderkey/i);
+  } finally {
+    await new Promise((resolve) => app.server.close(resolve));
+    await fs.rm(testProjectDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+
 test('server file upload CRUD and list endpoints', async () => {
   const app = await startApiServer(new SurveyCadClient());
   const testProjectId = `test-upload-${Date.now()}`;
