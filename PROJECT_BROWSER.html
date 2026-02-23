@@ -683,6 +683,10 @@
       padding: 0.35rem 0.5rem 0.45rem 1.65rem;
       align-items: flex-start;
     }
+    /* Safety: thumbnail strip MUST only be visible while folder is collapsed */
+    .folder-row[data-collapsed="false"] + .folder-thumbnail-strip { display: none !important; }
+    .folder-row[data-collapsed="true"] + .folder-thumbnail-strip { display: flex; }
+
     .folder-thumb-item {
       flex: none;
       display: flex;
@@ -2827,7 +2831,10 @@ function openEntryFromFolder(folder, entry, projectContext) {
           const nowCollapsed = !isFolderCollapsed(folder.key);
           folderCollapseState.set(folder.key, nowCollapsed);
           folderRow.dataset.collapsed = nowCollapsed ? 'true' : 'false';
-          if (thumbnailStrip) thumbnailStrip.hidden = !nowCollapsed;
+          if (thumbnailStrip) {
+            thumbnailStrip.hidden = false;
+            thumbnailStrip.style.display = nowCollapsed ? 'flex' : 'none';
+          }
           folderUploadFeedback.hidden = nowCollapsed;
           fileListContainer.hidden = nowCollapsed;
           if (pointFileUploadPanel) pointFileUploadPanel.hidden = nowCollapsed;
@@ -2917,7 +2924,8 @@ function openEntryFromFolder(folder, entry, projectContext) {
 
         // Collapsed mode: show a horizontal thumbnail strip (expanded mode hides it).
         thumbnailStrip = buildFolderThumbnailStrip(folder, projectContext);
-        thumbnailStrip.hidden = !isCollapsed;
+        thumbnailStrip.hidden = false;
+        thumbnailStrip.style.display = isCollapsed ? 'flex' : 'none';
         folderGroupWrapper.appendChild(thumbnailStrip);
 
         const folderUploadFeedback = document.createElement('div');
