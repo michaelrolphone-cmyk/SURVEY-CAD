@@ -2864,10 +2864,17 @@ function openEntryFromFolder(folder, entry, projectContext) {
             thumbnailStrip.hidden = false;
             thumbnailStrip.style.display = nowCollapsed ? 'flex' : 'none';
           }
+          const isExpanded = !nowCollapsed;
           folderUploadFeedback.hidden = nowCollapsed;
+          folderUploadFeedback.style.display = isExpanded ? 'grid' : 'none';
           fileListContainer.hidden = nowCollapsed;
-          if (pointFileUploadPanel) pointFileUploadPanel.hidden = nowCollapsed;
+          fileListContainer.style.display = isExpanded ? 'grid' : 'none';
+          if (pointFileUploadPanel) {
+            pointFileUploadPanel.hidden = nowCollapsed;
+            pointFileUploadPanel.style.display = isExpanded ? 'grid' : 'none';
+          }
           childrenContainer.hidden = nowCollapsed;
+          childrenContainer.style.display = isExpanded ? 'block' : 'none';
         });
         folderRow.addEventListener('dragover', (event) => {
           const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
@@ -2960,6 +2967,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
         const folderUploadFeedback = document.createElement('div');
         folderUploadFeedback.className = 'folder-upload-feedback';
         folderUploadFeedback.hidden = isCollapsed;
+        folderUploadFeedback.style.display = isCollapsed ? 'none' : 'grid';
         folderUploadFeedback.appendChild(folderUploadStatusText);
         folderUploadFeedback.appendChild(folderUploadProgressBar);
         folderGroupWrapper.appendChild(folderUploadFeedback);
@@ -2967,6 +2975,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
         const fileListContainer = document.createElement('div');
         fileListContainer.className = 'file-list-container';
         fileListContainer.hidden = isCollapsed;
+        fileListContainer.style.display = isCollapsed ? 'none' : 'grid';
         fileListContainer.addEventListener('dragover', (event) => {
           const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
           if (dragTypes.includes('application/x-surveycad-resource-move')) {
@@ -3560,6 +3569,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
         const childrenContainer = document.createElement('div');
         childrenContainer.className = 'folder-children';
         childrenContainer.hidden = isCollapsed;
+        childrenContainer.style.display = isCollapsed ? 'none' : 'block';
         folderGroupWrapper.appendChild(childrenContainer);
         folderChildrenContainerMap.set(folder.key, childrenContainer);
 
