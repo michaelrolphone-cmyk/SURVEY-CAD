@@ -42,6 +42,14 @@ import {
   deleteProjectCpf,
 } from './project-cpf-store.js';
 import {
+  getProjectRecordQuarryCache,
+  saveProjectRecordQuarryCache,
+  deleteProjectRecordQuarryCache,
+  getAddressRecordQuarryCache,
+  saveAddressRecordQuarryCache,
+  deleteAddressRecordQuarryCache,
+} from './record-quarry-cache-store.js';
+import {
   getProjectWorkbenchLink,
   setProjectWorkbenchLink,
   clearProjectWorkbenchLink,
@@ -203,6 +211,12 @@ function parseProjectCpfRoute(pathname = '') {
     projectId: decodeURIComponent(match[1]),
     cpfId: match[2] ? decodeURIComponent(match[2]) : '',
   };
+}
+
+function parseProjectRecordQuarryCacheRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/record-quarry-cache\/?$/);
+  if (!match) return null;
+  return { projectId: decodeURIComponent(match[1]) };
 }
 
 function buildLineSmithDrawingObjectName(drawingId = '') {
@@ -2185,6 +2199,128 @@ export function createSurveyServer({
         }
 
         sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
+        return;
+      }
+
+      const recordQuarryCacheProjectRoute = parseProjectRecordQuarryCacheRoute(urlObj.pathname);
+      if (recordQuarryCacheProjectRoute) {
+        const { projectId } = recordQuarryCacheProjectRoute;
+
+        if (req.method === 'GET') {
+          const cache = await getProjectRecordQuarryCache(localStorageSyncStore, projectId);
+          if (!cache) {
+            sendJson(res, 404, { error: 'No cached results found for project.' });
+            return;
+          }
+          sendJson(res, 200, { cache });
+          return;
+        }
+
+        if (req.method === 'PUT' || req.method === 'POST') {
+          const body = await readJsonBody(req);
+          const result = await saveProjectRecordQuarryCache(localStorageSyncStore, projectId, body);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { cache: result.cache });
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          const deletedResult = await deleteProjectRecordQuarryCache(localStorageSyncStore, projectId);
+          if (!deletedResult) {
+            sendJson(res, 404, { error: 'No cached results found for project.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: deletedResult?.sync?.allOperations || [],
+            state: {
+              version: deletedResult?.sync?.state?.version,
+              checksum: deletedResult?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, PUT, POST, DELETE.' });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/record-quarry-cache' || urlObj.pathname === '/api/record-quarry-cache/') {
+        const address = String(urlObj.searchParams.get('address') || '').trim();
+
+        if (req.method === 'GET') {
+          if (!address) {
+            sendJson(res, 400, { error: 'address query parameter is required.' });
+            return;
+          }
+          const cache = await getAddressRecordQuarryCache(localStorageSyncStore, address);
+          if (!cache) {
+            sendJson(res, 404, { error: 'No cached results found for address.' });
+            return;
+          }
+          sendJson(res, 200, { cache });
+          return;
+        }
+
+        if (req.method === 'PUT' || req.method === 'POST') {
+          const body = await readJsonBody(req);
+          const addressForSave = address || String(body?.address || '').trim();
+          if (!addressForSave) {
+            sendJson(res, 400, { error: 'address is required (query param or body field).' });
+            return;
+          }
+          const result = await saveAddressRecordQuarryCache(localStorageSyncStore, addressForSave, body);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { cache: result.cache });
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          if (!address) {
+            sendJson(res, 400, { error: 'address query parameter is required.' });
+            return;
+          }
+          const deletedResult = await deleteAddressRecordQuarryCache(localStorageSyncStore, address);
+          if (!deletedResult) {
+            sendJson(res, 404, { error: 'No cached results found for address.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: deletedResult?.sync?.allOperations || [],
+            state: {
+              version: deletedResult?.sync?.state?.version,
+              checksum: deletedResult?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, PUT, POST, DELETE.' });
         return;
       }
 
