@@ -511,18 +511,33 @@
     }
 
     .corner-group {
-      margin-top: 0.6rem;
+      margin-top: 1rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid rgba(148, 163, 184, 0.12);
     }
     .corner-group:first-child {
       margin-top: 0;
+      padding-top: 0;
+      border-top: none;
     }
     .corner-group-label {
       margin-left: 1.65rem;
-      margin-bottom: 0.25rem;
-      font-size: 0.8rem;
-      font-weight: 600;
+      margin-bottom: 0.4rem;
+      padding-bottom: 0.3rem;
+      font-size: 0.96rem;
+      font-weight: 700;
       color: var(--accent);
       letter-spacing: 0.02em;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.22);
+    }
+    .corner-group > .file-row,
+    .corner-group-more > .file-row {
+      margin-left: 2.75rem;
+    }
+    .corner-group > .corner-group-more > summary {
+      display: block;
+      margin-left: 1.1rem;
+      margin-top: 0.3rem;
     }
 
     .error {
