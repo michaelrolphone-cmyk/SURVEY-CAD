@@ -126,7 +126,7 @@
     .folder-row {
       margin-top: 0.45rem;
       background: var(--panel-alt);
-      justify-content: space-between;
+      justify-content: flex-start;
     }
 
     .folder-title {
@@ -134,6 +134,16 @@
       align-items: center;
       gap: 0.55rem;
       min-width: 0;
+      margin-left: auto;
+      justify-content: flex-end;
+      text-align: right;
+    }
+
+    .folder-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex: none;
     }
 
     .file-row {
@@ -705,6 +715,21 @@
       border: 1px solid var(--border);
       flex: none;
     }
+    .folder-thumb-img.folder-thumb-icon {
+      object-fit: contain;
+      background: rgba(2, 6, 23, 0.35);
+    }
+
+    .file-icon-thumb {
+      width: 86px;
+      height: 86px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      object-fit: contain;
+      background: rgba(2, 6, 23, 0.35);
+      flex: none;
+    }
+
     .folder-thumb-img.pdf-thumb-bg {
       background: #ffffff;
     }
@@ -1768,11 +1793,13 @@
       const slot = resource.querySelector('.file-preview-slot');
       if (!slot) return;
 
-      const placeholder = document.createElement('span');
-      placeholder.className = 'pdf-preview-placeholder';
-      placeholder.textContent = 'PDF';
-      placeholder.title = 'Generating thumbnail…';
-      slot.replaceChildren(placeholder);
+      const placeholderIcon = document.createElement('img');
+      placeholderIcon.className = 'file-icon-thumb';
+      placeholderIcon.alt = `${entry?.title || entry?.id || 'PDF'}`;
+      placeholderIcon.decoding = 'async';
+      placeholderIcon.title = 'Generating thumbnail…';
+      setImgToDownloadIcon(placeholderIcon, 'pdf');
+      slot.replaceChildren(placeholderIcon);
 
       const applyThumbnail = async () => {
         const thumbnailDataUrl = await fetchPdfThumbnailDataUrl(previewBaseUrl);
@@ -1794,13 +1821,9 @@
       try {
         const done = await applyThumbnail();
         if (done) return;
-        placeholder.classList.add('pdf-preview-failed');
-        placeholder.textContent = 'Unavailable';
-        placeholder.title = 'Thumbnail preview is unavailable right now. Open the PDF to view it.';
+        placeholderIcon.title = 'Thumbnail preview is unavailable right now. Open the PDF to view it.';
       } catch {
-        placeholder.classList.add('pdf-preview-failed');
-        placeholder.textContent = 'Unavailable';
-        placeholder.title = 'Thumbnail preview failed to load. Open the PDF to view it.';
+        placeholderIcon.title = 'Thumbnail preview failed to load. Open the PDF to view it.';
       }
     }
 
@@ -2394,7 +2417,29 @@
       // Default: collapsed (true). Only expanded if explicitly set to false.
       return folderCollapseState.get(folderKey) !== false;
     }
-    function openEntryFromFolder(folder, entry, projectContext) {
+        function safeFileExt(value) {
+      const raw = String(value || '').trim().toLowerCase();
+      const cleaned = raw.replace(/[^a-z0-9]+/g, '');
+      return cleaned || 'file';
+    }
+
+    function getDownloadIconUrl(ext) {
+      const safeExt = safeFileExt(ext);
+      return `assets/icons/download/Download-${safeExt}.png`;
+    }
+
+    function setImgToDownloadIcon(imgEl, ext) {
+      if (!imgEl) return;
+      imgEl.src = getDownloadIconUrl(ext);
+      imgEl.dataset.iconTriedPrimary = '1';
+      imgEl.onerror = () => {
+        if (imgEl.dataset.iconTriedFallback === '1') return;
+        imgEl.dataset.iconTriedFallback = '1';
+        imgEl.src = 'assets/icons/download/Download-file.png';
+      };
+    }
+
+function openEntryFromFolder(folder, entry, projectContext) {
       const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
       const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
       const canLaunchPointForge = folder.key === 'point-files'
@@ -2430,12 +2475,12 @@
         const text = await resolvePointFileText(entry);
         if (!text?.trim()) return;
         const url = renderPointFileThumbnailDataUrl(text, { width: 58, height: 58 });
-        if (url) { thumbImg.src = url; thumbImg.dataset.thumbLoaded = 'true'; }
+        if (url) { thumbImg.src = url; thumbImg.classList.remove('folder-thumb-icon'); thumbImg.dataset.thumbLoaded = 'true'; }
       } else if (canOpenLineSmithDrawing) {
         const points = await resolveDrawingPoints(entry);
         if (!Array.isArray(points) || !points.length) return;
         const url = renderLineworkThumbnailDataUrl(points, { width: 58, height: 58 });
-        if (url) { thumbImg.src = url; thumbImg.dataset.thumbLoaded = 'true'; }
+        if (url) { thumbImg.src = url; thumbImg.classList.remove('folder-thumb-icon'); thumbImg.dataset.thumbLoaded = 'true'; }
       } else if (isPdfResource) {
         const pdfUrl = getPdfPreviewUrl(folder, entry);
         if (!pdfUrl) return;
@@ -2443,6 +2488,7 @@
           const dataUrl = await fetchPdfThumbnailDataUrl(pdfUrl);
           if (dataUrl) {
             thumbImg.src = dataUrl;
+            thumbImg.classList.remove('folder-thumb-icon');
             thumbImg.classList.add('pdf-thumb-bg');
             thumbImg.dataset.thumbLoaded = 'true';
           }
@@ -2451,6 +2497,7 @@
         const previewUrl = String(entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
         if (previewUrl) {
           thumbImg.src = previewUrl;
+          thumbImg.classList.remove('folder-thumb-icon');
           thumbImg.dataset.thumbLoaded = 'true';
         }
       }
@@ -2478,29 +2525,25 @@
         const item = document.createElement('div');
         item.className = 'folder-thumb-item';
         item.title = entry?.title || entry?.id || 'File';
-        if (hasThumbnail) {
-          const thumbImg = document.createElement('img');
-          thumbImg.className = 'folder-thumb-img';
-          thumbImg.alt = entry?.title || entry?.id || 'File';
-          thumbImg.decoding = 'async';
-          attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
-          thumbImg.addEventListener('mouseenter', () => {
-            if (thumbImg.dataset.thumbLoaded !== 'true') return;
-            showCpfHoverPreviewTooltip(
-              thumbImg,
-              thumbImg.src,
-              entry?.title || entry?.id || 'File preview',
-              { width: thumbImg.naturalWidth, height: thumbImg.naturalHeight },
-            );
-          });
-          thumbImg.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
-          item.appendChild(thumbImg);
-        } else {
-          const placeholder = document.createElement('div');
-          placeholder.className = 'folder-thumb-placeholder';
-          placeholder.textContent = '📄';
-          item.appendChild(placeholder);
-        }
+                // Always show an icon immediately; if a real thumbnail is generated, it will replace this.
+        const thumbImg = document.createElement('img');
+        thumbImg.className = 'folder-thumb-img folder-thumb-icon';
+        thumbImg.alt = entry?.title || entry?.id || 'File';
+        thumbImg.decoding = 'async';
+        setImgToDownloadIcon(thumbImg, entry?.exportFormat);
+
+        attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
+        thumbImg.addEventListener('mouseenter', () => {
+          if (thumbImg.dataset.thumbLoaded !== 'true') return;
+          showCpfHoverPreviewTooltip(
+            thumbImg,
+            thumbImg.src,
+            entry?.title || entry?.id || 'File preview',
+            { width: thumbImg.naturalWidth, height: thumbImg.naturalHeight },
+          );
+        });
+        thumbImg.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
+        item.appendChild(thumbImg);
         const label = document.createElement('div');
         label.className = 'folder-thumb-label';
         label.textContent = entry?.title || entry?.id || 'File';
@@ -2717,7 +2760,7 @@
         folderRow.className = 'folder-row';
         folderRow.dataset.folderKey = folder.key;
         folderRow.dataset.collapsed = isCollapsed ? 'true' : 'false';
-        folderRow.innerHTML = `<span class="folder-collapse-chevron" aria-hidden="true">▶</span><span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
+        folderRow.innerHTML = `<span class="folder-left"><span class="folder-collapse-chevron" aria-hidden="true">▶</span></span><span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
         folderRow.addEventListener('click', (event) => {
           if (event.target.closest('button, input, select, a')) return;
           const nowCollapsed = !isFolderCollapsed(folder.key);
@@ -2806,7 +2849,7 @@
             saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
             renderTree(projectContext.projectFile, projectContext);
           });
-          folderRow.appendChild(removeBtn);
+          folderRow.querySelector('.folder-left')?.appendChild(removeBtn);
         }
 
         folderGroupWrapper.appendChild(folderRow);
@@ -2954,6 +2997,18 @@
             ? `<ul class="association-list" title="Point file associated with this drawing"><li class="association-list-item">↳ Point file: ${drawingAssociationName}</li></ul>`
             : '';
           resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-primary"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}${pointPillMarkup}${equipmentAuditPillMarkup}</span>${pointFileAssociationMarkup}${drawingAssociationMarkup}</span></span>`;
+
+            if (showThumbnailSlot) {
+              const slot = resource.querySelector('.file-preview-slot');
+              if (slot) {
+                const iconImg = document.createElement('img');
+                iconImg.className = 'file-icon-thumb';
+                iconImg.alt = entry?.title || entry?.id || 'File';
+                iconImg.decoding = 'async';
+                setImgToDownloadIcon(iconImg, entry?.exportFormat);
+                slot.replaceChildren(iconImg);
+              }
+            }
           const actionButtons = document.createElement('div');
           actionButtons.className = 'file-actions';
           resource.appendChild(actionButtons);
@@ -3478,7 +3533,7 @@
             childrenContainer.prepend(inlineForm);
             inlineInput.focus();
           });
-          folderRow.appendChild(addSubfolderIconBtn);
+          folderRow.querySelector('.folder-left')?.appendChild(addSubfolderIconBtn);
         }
       }
 
