@@ -95,6 +95,10 @@
     {
       "name": "Map Tiles",
       "description": "TileJSON and XYZ GeoJSON tile access from harvested MinIO buckets"
+    },
+    {
+      "name": "RecordQuarry Cache",
+      "description": "Server-side caching of RecordQuarry lookup results, keyed by project ID or normalized address. Avoids re-running the full GIS search on every open."
     }
   ],
   "paths": {
@@ -2114,6 +2118,341 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/record-quarry-cache": {
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Project ID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Get cached RecordQuarry results for a project",
+        "description": "Returns the most recently saved lookup snapshot for this project. Returns 404 if no cache exists yet.",
+        "operationId": "getProjectRecordQuarryCache",
+        "responses": {
+          "200": {
+            "description": "Cached lookup snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cache": {
+                      "$ref": "#/components/schemas/RecordQuarryCacheRecord"
+                    }
+                  },
+                  "required": ["cache"]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Save (upsert) RecordQuarry results for a project",
+        "description": "Stores the lookup snapshot for this project. Overwrites any previously cached results.",
+        "operationId": "saveProjectRecordQuarryCache",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordQuarryCacheInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cache saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cache": {
+                      "$ref": "#/components/schemas/RecordQuarryCacheRecord"
+                    }
+                  },
+                  "required": ["cache"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Save (upsert) RecordQuarry results for a project (POST alias)",
+        "description": "Identical behaviour to `PUT`. Provided for clients that prefer POST for creates.",
+        "operationId": "saveProjectRecordQuarryCachePost",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordQuarryCacheInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cache saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cache": {
+                      "$ref": "#/components/schemas/RecordQuarryCacheRecord"
+                    }
+                  },
+                  "required": ["cache"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Delete cached RecordQuarry results for a project",
+        "operationId": "deleteProjectRecordQuarryCache",
+        "responses": {
+          "200": {
+            "description": "Cache deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/api/record-quarry-cache": {
+      "get": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Get cached RecordQuarry results for an address",
+        "description": "Returns the cached lookup snapshot for the given normalized address. The `address` parameter is lowercased and whitespace-collapsed before lookup.",
+        "operationId": "getAddressRecordQuarryCache",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Normalized address string (e.g. \"123 main st\")"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cached lookup snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cache": {
+                      "$ref": "#/components/schemas/RecordQuarryCacheRecord"
+                    }
+                  },
+                  "required": ["cache"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Save (upsert) RecordQuarry results for an address",
+        "description": "Stores the lookup snapshot keyed by normalized address. The `address` query parameter takes precedence; if omitted the `address` field in the request body is used instead.",
+        "operationId": "saveAddressRecordQuarryCache",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Normalized address string. If omitted, the `address` field in the request body is used."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordQuarryCacheInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cache saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cache": {
+                      "$ref": "#/components/schemas/RecordQuarryCacheRecord"
+                    }
+                  },
+                  "required": ["cache"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Save (upsert) RecordQuarry results for an address (POST alias)",
+        "description": "Identical behaviour to `PUT`.",
+        "operationId": "saveAddressRecordQuarryCachePost",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Normalized address string. If omitted, the `address` field in the request body is used."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordQuarryCacheInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cache saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cache": {
+                      "$ref": "#/components/schemas/RecordQuarryCacheRecord"
+                    }
+                  },
+                  "required": ["cache"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "RecordQuarry Cache"
+        ],
+        "summary": "Delete cached RecordQuarry results for an address",
+        "operationId": "deleteAddressRecordQuarryCache",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Normalized address string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cache deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
@@ -6568,6 +6907,93 @@
         "required": [
           "worker"
         ]
+      },
+      "RecordQuarryCacheInput": {
+        "type": "object",
+        "description": "Request body for saving a RecordQuarry lookup snapshot.",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Normalized address string (lowercased, whitespace-collapsed). Used as the cache key when saving by address."
+          },
+          "lookup": {
+            "type": "object",
+            "description": "Full RecordQuarry lookup payload returned by lookupByAddress(). Contains geocode, parcel, ROS, sections, township, utilities, etc.",
+            "additionalProperties": true
+          },
+          "selection": {
+            "type": "object",
+            "nullable": true,
+            "description": "Optional aliquot/parcel selection state snapshot.",
+            "properties": {
+              "selectedParcel": {
+                "type": "boolean"
+              },
+              "selectedAliquotKeys": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "deselectedAliquotKeys": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "savedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp set by the client when the snapshot was captured. Overwritten by the server on save."
+          }
+        },
+        "required": ["lookup"]
+      },
+      "RecordQuarryCacheRecord": {
+        "type": "object",
+        "description": "A persisted RecordQuarry lookup snapshot as returned by the server.",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "example": "1.0.0"
+          },
+          "projectId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Present when the record is keyed by project. Omitted for address-keyed records."
+          },
+          "address": {
+            "type": "string",
+            "description": "Normalized address string (lowercased, whitespace-collapsed)."
+          },
+          "lookup": {
+            "type": "object",
+            "description": "Full RecordQuarry lookup payload.",
+            "additionalProperties": true
+          },
+          "selection": {
+            "type": "object",
+            "nullable": true,
+            "description": "Aliquot/parcel selection state snapshot, or null if not saved.",
+            "properties": {
+              "selectedParcel": {
+                "type": "boolean"
+              },
+              "selectedAliquotKeys": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "deselectedAliquotKeys": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "savedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp of when this snapshot was last saved on the server."
+          }
+        },
+        "required": ["schemaVersion", "address", "lookup", "savedAt"]
       }
     }
   }
