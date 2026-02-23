@@ -126,7 +126,7 @@
     .folder-row {
       margin-top: 0.45rem;
       background: var(--panel-alt);
-      justify-content: flex-start;
+      justify-content: space-between;
     }
 
     .folder-title {
@@ -134,12 +134,12 @@
       align-items: center;
       gap: 0.55rem;
       min-width: 0;
-      margin-left: auto;
-      justify-content: flex-end;
-      text-align: right;
+      flex: 1 1 auto;
+      justify-content: flex-start;
+      text-align: left;
     }
 
-    .folder-left {
+    .folder-actions {
       display: inline-flex;
       align-items: center;
       gap: 0.55rem;
@@ -674,20 +674,14 @@
     /* Thumbnail strip shown when folder is collapsed */
     .folder-thumbnail-strip {
       display: flex;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
       flex-direction: row;
       gap: 0.5rem;
-      overflow-x: auto;
+      overflow: hidden;
       padding: 0.35rem 0.5rem 0.45rem 1.65rem;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
       align-items: flex-start;
-    }
-    .folder-thumbnail-strip::-webkit-scrollbar {
-      height: 4px;
-    }
-    .folder-thumbnail-strip::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.25);
-      border-radius: 2px;
     }
     .folder-thumb-item {
       flex: none;
@@ -2505,52 +2499,119 @@ function openEntryFromFolder(folder, entry, projectContext) {
     function buildFolderThumbnailStrip(folder, projectContext) {
       const strip = document.createElement('div');
       strip.className = 'folder-thumbnail-strip';
-      const entries = Array.isArray(folder.index) ? folder.index : [];
-      if (!entries.length) {
+      const allEntries = Array.isArray(folder.index) ? folder.index : [];
+
+      if (!allEntries.length) {
         const emptyMsg = document.createElement('span');
         emptyMsg.className = 'folder-thumb-empty';
         emptyMsg.textContent = 'No files';
         strip.appendChild(emptyMsg);
         return strip;
       }
-      for (const entry of entries) {
-        const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
-        const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
-        const canLaunchPointForge = folder.key === 'point-files' && isPointFileFormat
-          && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
-        const canOpenLineSmithDrawing = folder.key === 'drawings'
-          && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
-        const hasThumbnail = canLaunchPointForge || canOpenLineSmithDrawing
-          || entry?.exportFormat === 'pdf' || isImageResource(entry);
-        const item = document.createElement('div');
-        item.className = 'folder-thumb-item';
-        item.title = entry?.title || entry?.id || 'File';
-                // Always show an icon immediately; if a real thumbnail is generated, it will replace this.
-        const thumbImg = document.createElement('img');
-        thumbImg.className = 'folder-thumb-img folder-thumb-icon';
-        thumbImg.alt = entry?.title || entry?.id || 'File';
-        thumbImg.decoding = 'async';
-        setImgToDownloadIcon(thumbImg, entry?.exportFormat);
 
-        attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
-        thumbImg.addEventListener('mouseenter', () => {
-          if (thumbImg.dataset.thumbLoaded !== 'true') return;
-          showCpfHoverPreviewTooltip(
-            thumbImg,
-            thumbImg.src,
-            entry?.title || entry?.id || 'File preview',
-            { width: thumbImg.naturalWidth, height: thumbImg.naturalHeight },
-          );
-        });
-        thumbImg.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
-        item.appendChild(thumbImg);
-        const label = document.createElement('div');
-        label.className = 'folder-thumb-label';
-        label.textContent = entry?.title || entry?.id || 'File';
-        item.appendChild(label);
-        item.addEventListener('click', () => openEntryFromFolder(folder, entry, projectContext));
-        strip.appendChild(item);
+      const renderEntries = (entries) => {
+        strip.replaceChildren();
+        const toRender = Array.isArray(entries) ? entries : [];
+        if (!toRender.length) {
+          const emptyMsg = document.createElement('span');
+          emptyMsg.className = 'folder-thumb-empty';
+          emptyMsg.textContent = 'No files';
+          strip.appendChild(emptyMsg);
+          return;
+        }
+
+        for (const entry of toRender) {
+          const item = document.createElement('div');
+          item.className = 'folder-thumb-item';
+          item.title = entry?.title || entry?.id || 'File';
+
+          // Always show an icon immediately; if a real thumbnail is generated, it will replace this.
+          const thumbImg = document.createElement('img');
+          thumbImg.className = 'folder-thumb-img folder-thumb-icon';
+          thumbImg.alt = entry?.title || entry?.id || 'File';
+          thumbImg.decoding = 'async';
+          setImgToDownloadIcon(thumbImg, entry?.exportFormat);
+
+          attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
+          thumbImg.addEventListener('mouseenter', () => {
+            if (thumbImg.dataset.thumbLoaded !== 'true') return;
+            showCpfHoverPreviewTooltip(
+              thumbImg,
+              thumbImg.src,
+              entry?.title || entry?.id || 'File preview',
+              { width: thumbImg.naturalWidth, height: thumbImg.naturalHeight },
+            );
+          });
+          thumbImg.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
+
+          item.appendChild(thumbImg);
+
+          const label = document.createElement('div');
+          label.className = 'folder-thumb-label';
+          label.textContent = entry?.title || entry?.id || 'File';
+          item.appendChild(label);
+
+          item.addEventListener('click', () => openEntryFromFolder(folder, entry, projectContext));
+          strip.appendChild(item);
+        }
+      };
+
+      // CP&F special rule: show only one CP&F per corner in the collapsed horizontal strip.
+      if (folder?.key === 'cpfs') {
+        const loadingMsg = document.createElement('span');
+        loadingMsg.className = 'folder-thumb-empty';
+        loadingMsg.textContent = 'Loading CP&F corners…';
+        strip.appendChild(loadingMsg);
+
+        (async () => {
+          try {
+            const entriesWithCoords = await Promise.all(allEntries.map(async (entry) => {
+              const instrument = String(entry?.reference?.value || entry?.reference?.metadata?.instrument || '').trim();
+              const links = instrument
+                ? await findCpfPointLinksAsync(projectContext?.projectFile, resolvePointFileText, instrument)
+                : [];
+              const first = links.find((l) => l && l.north != null && l.east != null);
+              return { entry, north: first?.north, east: first?.east };
+            }));
+            const groups = groupCpfsByCorner(entriesWithCoords, CPF_CORNER_GROUP_RADIUS_FEET);
+            const reps = (Array.isArray(groups) ? groups : [])
+              .map((g) => Array.isArray(g?.entries) ? g.entries[0] : null)
+              .filter(Boolean);
+
+            // If grouping yielded nothing (e.g., no links), fall back to de-duping by instrument.
+            if (!reps.length) {
+              const seen = new Set();
+              const dedup = [];
+              for (const e of allEntries) {
+                const key = String(e?.reference?.value || e?.reference?.metadata?.instrument || e?.id || '').trim().toLowerCase();
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+                dedup.push(e);
+              }
+              renderEntries(dedup.length ? dedup : allEntries);
+              return;
+            }
+
+            renderEntries(reps);
+          } catch (err) {
+            // Conservative fallback: de-dupe by instrument (still avoids obvious duplicates).
+            const seen = new Set();
+            const dedup = [];
+            for (const e of allEntries) {
+              const key = String(e?.reference?.value || e?.reference?.metadata?.instrument || e?.id || '').trim().toLowerCase();
+              if (!key || seen.has(key)) continue;
+              seen.add(key);
+              dedup.push(e);
+            }
+            renderEntries(dedup.length ? dedup : allEntries);
+          }
+        })();
+
+        return strip;
       }
+
+      // Default: show all files for other folders.
+      renderEntries(allEntries);
       return strip;
     }
 
@@ -2760,7 +2821,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
         folderRow.className = 'folder-row';
         folderRow.dataset.folderKey = folder.key;
         folderRow.dataset.collapsed = isCollapsed ? 'true' : 'false';
-        folderRow.innerHTML = `<span class="folder-left"><span class="folder-collapse-chevron" aria-hidden="true">▶</span></span><span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
+        folderRow.innerHTML = `<span class="folder-title"><span class="folder-collapse-chevron" aria-hidden="true">▶</span><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span><span class="folder-actions"></span>`;
         folderRow.addEventListener('click', (event) => {
           if (event.target.closest('button, input, select, a')) return;
           const nowCollapsed = !isFolderCollapsed(folder.key);
@@ -2849,7 +2910,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
             saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
             renderTree(projectContext.projectFile, projectContext);
           });
-          folderRow.querySelector('.folder-left')?.appendChild(removeBtn);
+          folderRow.querySelector('.folder-actions')?.appendChild(removeBtn);
         }
 
         folderGroupWrapper.appendChild(folderRow);
@@ -3533,7 +3594,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
             childrenContainer.prepend(inlineForm);
             inlineInput.focus();
           });
-          folderRow.querySelector('.folder-left')?.appendChild(addSubfolderIconBtn);
+          folderRow.querySelector('.folder-actions')?.appendChild(addSubfolderIconBtn);
         }
       }
 
