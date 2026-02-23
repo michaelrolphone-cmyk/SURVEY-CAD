@@ -1027,6 +1027,12 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       const instrumentKey = pickField(features[0]?.attributes || {}, layerMeta, [/^instrument$/i, /instr/i, /instrument_?no/i, /inst_?no/i]);
       const pdfUrlKey = pickField(features[0]?.attributes || {}, layerMeta, [/pdf/i, /doc/i, /document/i, /hyperlink/i, /url/i, /link/i]);
       const pdfNameKey = pickField(features[0]?.attributes || {}, layerMeta, [/file/i, /filename/i, /pdfname/i]);
+      const monsetKey = pickField(features[0]?.attributes || {}, layerMeta, [/^monset$/i, /monument.*set/i]);
+      const surveyorKey = pickField(features[0]?.attributes || {}, layerMeta, [/^surveyor$/i]);
+      const townshipKey = pickField(features[0]?.attributes || {}, layerMeta, [/^township$/i]);
+      const rangeKey = pickField(features[0]?.attributes || {}, layerMeta, [/^range$/i]);
+      const sectionKey = pickField(features[0]?.attributes || {}, layerMeta, [/^section$/i]);
+      const indexNumberKey = pickField(features[0]?.attributes || {}, layerMeta, [/^index_?number$/i, /^index$/i]);
 
       const records = features.map((feature) => {
         const x = Number(feature?.geometry?.x);
@@ -1038,11 +1044,23 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         const instrument = instrumentKey ? attrs[instrumentKey] : null;
         const pdfUrl = pdfUrlKey ? attrs[pdfUrlKey] : null;
         const pdfName = pdfNameKey ? attrs[pdfNameKey] : null;
+        const monset = monsetKey ? attrs[monsetKey] : null;
+        const surveyor = surveyorKey ? attrs[surveyorKey] : null;
+        const township = townshipKey ? attrs[townshipKey] : null;
+        const range = rangeKey ? attrs[rangeKey] : null;
+        const section = sectionKey ? attrs[sectionKey] : null;
+        const indexNumber = indexNumberKey ? attrs[indexNumberKey] : null;
         return {
           distanceMeters,
           instrument,
           pdfUrl,
           pdfName,
+          monset,
+          surveyor,
+          township,
+          range,
+          section,
+          indexNumber,
           links: buildCpfPdfLinks(instrument, pdfUrl, pdfName),
         };
       }).filter((record) => record.links.length && (record.distanceMeters == null || record.distanceMeters <= (radius + 0.5)));
@@ -1096,7 +1114,13 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       const links = record.links.map((url, i) => (
         `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(url))}">CP&amp;F PDF${record.links.length > 1 ? ` ${i + 1}` : ''}</a>`
       )).join('<br/>');
-      return `<div style="margin:6px 0"><b>${instrument}</b><br/>${links}</div>`;
+      const monsetHtml = record.monset != null && String(record.monset).trim()
+        ? `<div style="margin-top:2px;color:var(--muted)">Monument Set: <span style="color:var(--text)">${escapeHtml(String(record.monset).trim())}</span></div>`
+        : '';
+      const surveyorHtml = record.surveyor != null && String(record.surveyor).trim()
+        ? `<div style="color:var(--muted)">Surveyor: <span style="color:var(--text)">${escapeHtml(String(record.surveyor).trim())}</span></div>`
+        : '';
+      return `<div style="margin:6px 0"><b>${instrument}</b>${monsetHtml}${surveyorHtml}<div style="margin-top:2px">${links}</div></div>`;
     }).join('');
   }
 
@@ -1282,6 +1306,37 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
 
   function buildAllSelectedAliquotKeys(aliquotFeatures) {
     return new Set((aliquotFeatures || []).map((feature, index) => buildAliquotSelectionKey(feature, index)));
+  }
+
+  // Parse Township, Range, Section, and Index from BLM aliquot attributes.
+  // PLSSID format: {ST(2)}{PM(2)}{TWP(3)}{zone(1)}{TWPDIR(1)}{RNG(3)}{zone(1)}{RNGDIR(1)}{extra}
+  // e.g. "ID080030N0020E0" → T3N R2E
+  // FRSTDIVID appends "SN{sec*10}" e.g. "SN150" → Section 15
+  // SECDIVNO / SECDIVLAB is the Index e.g. "SWNE"
+  function parsePlssFromAliquot(feature) {
+    const attrs = feature?.attributes || {};
+    const plssid = String(attrs.PLSSID || '');
+    const frstdivid = String(attrs.FRSTDIVID || '');
+    const index = String(attrs.SECDIVNO || attrs.SECDIVLAB || '').trim();
+
+    let township = '', range = '';
+    const plssMatch = plssid.match(/^[A-Z]{2}\d{2}(\d{3})\d([NS])(\d{3})\d([EW])/);
+    if (plssMatch) {
+      const twpNum = parseInt(plssMatch[1], 10);
+      if (twpNum) township = `T${twpNum}${plssMatch[2]}`;
+      const rngNum = parseInt(plssMatch[3], 10);
+      if (rngNum) range = `R${rngNum}${plssMatch[4]}`;
+    }
+
+    let section = '';
+    const suffix = plssid ? frstdivid.slice(plssid.length) : '';
+    const secMatch = suffix.match(/^SN(\d+)/);
+    if (secMatch) {
+      const secNum = Math.round(parseInt(secMatch[1], 10) / 10);
+      if (secNum >= 1 && secNum <= 36) section = String(secNum);
+    }
+
+    return { township, range, section, index };
   }
 
   function isAliquotSelected(feature, index) {
@@ -1962,6 +2017,8 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         if (!links.length) continue;
         out.push({
           instrument: record.instrument,
+          monset: record.monset,
+          surveyor: record.surveyor,
           distanceMeters: record.distanceMeters,
           links,
         });
@@ -2352,47 +2409,58 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         }
       ));
 
-      cards.push(card(
-        "Aliquots",
-        "CPNF-style aliquot lookup",
-        [["Count", String(state.aliquotFeatures.length)]],
-        []
-      ));
-
       const aliquotSummaryCpfTargets = [];
       if (state.aliquotFeatures.length) {
-        const aliquotCards = state.aliquotFeatures.map((f, idx) => {
-          const a = f.attributes || {};
-          const title = a.ALIQUOT || a.ALIQUOT_LABEL || `Aliquot #${idx + 1}`;
-          const token = `aliquot-${idx + 1}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          const selectionKey = buildAliquotSelectionKey(f, idx);
-          aliquotSummaryCpfTargets.push({ token, feature: f, label: `Aliquot #${idx + 1}` });
-          return card(
-            `Aliquot #${idx + 1}`,
-            title,
-            summarizeAttrs(a),
-            [
-              `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-aliquot-select-key="${selectionKey}" ${isAliquotSelected(f, idx) ? 'checked' : ''}/> Include in export</label>`,
-              ...buildPdfProxyLinks(a, "Open CP&F PDF (API)"),
-              `<div class="small"><b>Corner CP&amp;F records</b><br/><span data-aliquot-cpf-links="${token}">Loading CP&amp;F records…</span></div>`
-            ],
-            {
-              onSelect: () => centerMapOnFeature(f, layers.aliquots, `Aliquot #${idx + 1}`),
-              onRender: (cardEl) => {
-                const checkbox = cardEl.querySelector(`[data-aliquot-select-key="${selectionKey}"]`);
-                if (!checkbox) return;
-                checkbox.addEventListener('click', (evt) => evt.stopPropagation());
-                checkbox.addEventListener('change', () => {
-                  setAliquotSelected(f, idx, checkbox.checked);
-                  drawAliquots(state.aliquotFeatures, section);
-                  drawCornerMarkers(buildCornerMarkerEntries());
-                  log(`${checkbox.checked ? 'Included' : 'Excluded'} aliquot in export: ${title}`);
-                });
-              },
-            }
-          );
-        });
-        cards.push(...aliquotCards);
+        // Group aliquots by Township + Range + Section (parsed from BLM PLSSID/FRSTDIVID).
+        // The Index (SECDIVNO/SECDIVLAB) identifies each aliquot within the group.
+        const groups = new Map();
+        for (const [idx, f] of state.aliquotFeatures.entries()) {
+          const loc = parsePlssFromAliquot(f);
+          const sectionLabel = loc.section ? `Sec ${loc.section}` : '';
+          const groupKey = [loc.township, loc.range, sectionLabel].filter(Boolean).join(' ') || 'Aliquots';
+          if (!groups.has(groupKey)) groups.set(groupKey, { label: groupKey, items: [] });
+          groups.get(groupKey).items.push({ f, idx, loc });
+        }
+
+        for (const [, group] of groups) {
+          // Group header — shown for every group so the Township/Range/Section is always visible.
+          const headerEl = document.createElement('div');
+          headerEl.style.cssText = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 2px 2px;margin-top:4px;';
+          headerEl.textContent = group.label;
+          cards.push(headerEl);
+
+          for (const { f, idx, loc } of group.items) {
+            const a = f.attributes || {};
+            const indexLabel = loc.index || a.ALIQUOT || a.ALIQUOT_LABEL || `Aliquot #${idx + 1}`;
+            const token = `aliquot-${idx + 1}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const selectionKey = buildAliquotSelectionKey(f, idx);
+            aliquotSummaryCpfTargets.push({ token, feature: f, label: indexLabel });
+            cards.push(card(
+              indexLabel,
+              group.label,
+              summarizeAttrs(a),
+              [
+                `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-aliquot-select-key="${selectionKey}" ${isAliquotSelected(f, idx) ? 'checked' : ''}/> Include in export</label>`,
+                ...buildPdfProxyLinks(a, "Open CP&F PDF (API)"),
+                `<div class="small"><b>Corner CP&amp;F records</b><br/><span data-aliquot-cpf-links="${token}">Loading CP&amp;F records…</span></div>`
+              ],
+              {
+                onSelect: () => centerMapOnFeature(f, layers.aliquots, indexLabel),
+                onRender: (cardEl) => {
+                  const checkbox = cardEl.querySelector(`[data-aliquot-select-key="${selectionKey}"]`);
+                  if (!checkbox) return;
+                  checkbox.addEventListener('click', (evt) => evt.stopPropagation());
+                  checkbox.addEventListener('change', () => {
+                    setAliquotSelected(f, idx, checkbox.checked);
+                    drawAliquots(state.aliquotFeatures, section);
+                    drawCornerMarkers(buildCornerMarkerEntries());
+                    log(`${checkbox.checked ? 'Included' : 'Excluded'} aliquot in export: ${indexLabel}`);
+                  });
+                },
+              }
+            ));
+          }
+        }
       }
 
       if (state.utilityLocations.length) {
