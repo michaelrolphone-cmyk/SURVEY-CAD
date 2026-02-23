@@ -176,32 +176,241 @@
       opacity: 0.35;
     }
 
-    .file-row.pointforge-openable {
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: border-color 100ms ease, background-color 100ms ease;
+    .icon {
+      width: 1.2rem;
+      text-align: center;
+      flex: none;
     }
 
-    .file-row.pointforge-openable:hover,
-    .file-row.pointforge-openable:focus-visible {
-      border-color: rgba(56, 189, 248, 0.45);
-      background: rgba(30, 41, 59, 0.72);
+    .muted {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .error {
+      padding: 0.85rem;
+      border-radius: 10px;
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      background: rgba(127, 29, 29, 0.22);
+      color: #fecaca;
+    }
+
+    .empty {
+      padding: 0.65rem 0.75rem;
+      margin-left: 1.65rem;
+      border-radius: 10px;
+      border: 1px dashed rgba(148, 163, 184, 0.35);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .tree-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+    }
+
+    .add-folder-icon-btn {
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.65);
       color: var(--text);
+      border-radius: 10px;
+      width: 34px;
+      height: 34px;
+      cursor: pointer;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+
+    .add-folder-icon-btn:hover {
+      border-color: rgba(56, 189, 248, 0.6);
+      color: #bae6fd;
+    }
+
+    .add-folder-inline {
+      margin-left: 1.65rem;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.7);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .add-folder-input {
+      flex: 1 1 auto;
+      min-width: 120px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(2, 6, 23, 0.5);
+      color: var(--text);
+      padding: 0.38rem 0.55rem;
       outline: none;
     }
 
-    .file-row.file-draggable {
-      cursor: grab;
+    .add-folder-input:focus {
+      border-color: rgba(56, 189, 248, 0.7);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.16);
     }
 
-    .file-row.file-draggable.file-dragging {
-      opacity: 0.45;
-      cursor: grabbing;
+    .add-folder-input::placeholder {
+      color: var(--muted);
     }
 
-    .folder-row.folder-drop-target {
-      border-color: rgba(56, 189, 248, 0.6);
-      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+    .add-folder-cancel-btn {
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.7);
+      color: var(--muted);
+      border-radius: 10px;
+      width: 34px;
+      height: 34px;
+      cursor: pointer;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .add-folder-cancel-btn:hover {
+      border-color: rgba(248, 113, 113, 0.55);
+      color: #fecaca;
+    }
+
+    .remove-folder-btn {
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      background: rgba(127, 29, 29, 0.18);
+      color: #fca5a5;
+      border-radius: 7px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      flex: none;
+    }
+
+    .remove-folder-btn:hover {
+      border-color: rgba(239, 68, 68, 0.75);
+      background: rgba(127, 29, 29, 0.35);
+    }
+
+    .folder-children {
+      margin-left: 1.25rem;
+      padding-left: 0.75rem;
+      border-left: 2px solid rgba(148, 163, 184, 0.12);
+    }
+
+    /* Folder collapse/expand toggle */
+    .folder-row {
+      cursor: pointer;
+      user-select: none;
+    }
+    .folder-collapse-chevron {
+      font-size: 0.65rem;
+      display: inline-block;
+      transition: transform 180ms ease;
+      flex: none;
+      color: var(--muted);
+      width: 0.85rem;
+      text-align: center;
+    }
+    .folder-row[data-collapsed="false"] .folder-collapse-chevron {
+      transform: rotate(90deg);
+    }
+
+    /* Thumbnail strip shown when folder is collapsed */
+    .folder-thumbnail-strip {
+      display: flex;
+      flex-direction: row;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding: 0.35rem 0.5rem 0.45rem 1.65rem;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+      align-items: flex-start;
+    }
+    .folder-thumbnail-strip::-webkit-scrollbar {
+      height: 4px;
+    }
+    .folder-thumbnail-strip::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 2px;
+    }
+    .folder-thumb-item {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      cursor: pointer;
+      border-radius: 7px;
+      padding: 4px;
+      border: 1px solid transparent;
+      transition: border-color 100ms ease, background-color 100ms ease;
+    }
+    .folder-thumb-item:hover {
+      border-color: rgba(56, 189, 248, 0.5);
+      background: rgba(30, 41, 59, 0.72);
+    }
+    .folder-thumb-img {
+      width: 58px;
+      height: 58px;
+      border-radius: 5px;
+      object-fit: cover;
+      display: block;
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid var(--border);
+      flex: none;
+    }
+    .folder-thumb-img.pdf-thumb-bg {
+      background: #ffffff;
+    }
+    .folder-thumb-label {
+      font-size: 0.6rem;
+      color: var(--muted);
+      max-width: 58px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .folder-thumb-empty {
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 0.15rem 0.25rem;
+    }
+    .folder-thumb-placeholder {
+      width: 58px;
+      height: 58px;
+      border-radius: 6px;
+      border: 1px dashed rgba(148, 163, 184, 0.38);
+      display: grid;
+      place-items: center;
+      color: rgba(148, 163, 184, 0.8);
+      background: rgba(2, 6, 23, 0.35);
+      font-size: 1.1rem;
+    }
+
+    .folder-drop-target {
+      outline: 2px dashed rgba(56, 189, 248, 0.7);
+      outline-offset: 2px;
+      background: rgba(14, 116, 144, 0.25);
+    }
+
+    .folder-upload-drop-target {
+      outline: 2px dashed rgba(74, 222, 128, 0.7);
+      outline-offset: 2px;
+      background: rgba(74, 222, 128, 0.08);
+    }
+
+    .file-list-container {
+      margin-left: 1.65rem;
+      display: grid;
+      gap: 0.45rem;
+      padding-bottom: 0.25rem;
     }
 
     .file-list-container.file-list-drop-target {
@@ -209,11 +418,6 @@
       background: rgba(56, 189, 248, 0.06);
       outline: 1px dashed rgba(56, 189, 248, 0.45);
       outline-offset: 2px;
-    }
-
-    .folder-row.folder-upload-drop-target {
-      border-color: rgba(74, 222, 128, 0.6);
-      box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.35);
     }
 
     .file-list-container.file-list-upload-drop-target {
@@ -322,77 +526,31 @@
       border: 1px dashed rgba(148, 163, 184, 0.45);
       background: linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%);
       color: #475569;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.58rem;
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
       font-weight: 700;
-      letter-spacing: 0.03em;
       text-transform: uppercase;
-      flex: none;
+      letter-spacing: 0.05em;
     }
 
     .pdf-preview-placeholder.pdf-preview-failed {
-      border-style: solid;
-      border-color: rgba(248, 113, 113, 0.5);
-      background: linear-gradient(145deg, rgba(127, 29, 29, 0.45) 0%, rgba(69, 10, 10, 0.6) 100%);
-      color: #fecaca;
+      background: rgba(148, 163, 184, 0.1);
+      color: rgba(148, 163, 184, 0.65);
     }
 
     .file-name {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.2rem;
+      display: grid;
+      gap: 0.15rem;
       min-width: 0;
     }
 
     .file-name-primary {
       display: flex;
-      align-items: baseline;
-      gap: 0.3rem;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
       min-width: 0;
-    }
-
-    .association-list {
-      margin: 0.1rem 0 0 1.25rem;
-      padding: 0;
-      list-style: none;
-      display: grid;
-      gap: 0.1rem;
-      font-size: 0.76rem;
-      color: #cbd5e1;
-    }
-
-    .association-list-item {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .file-preview-slot {
-      display: inline-flex;
-      align-items: center;
-      flex: none;
-    }
-
-    .file-drag-ghost {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px;
-      background: #0f172a;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 10px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
-    }
-
-    .file-drag-ghost img {
-      display: block;
-      width: 86px;
-      height: 86px;
-      border-radius: 6px;
-      object-fit: cover;
     }
 
     .file-name-configured {
@@ -413,7 +571,6 @@
       margin-left: auto;
       flex-wrap: wrap;
     }
-
 
     .point-file-version-details {
       width: 100%;
@@ -489,630 +646,837 @@
       cursor: not-allowed;
     }
 
-    .icon {
-      width: 1.2rem;
-      text-align: center;
-      flex: none;
+    .file-draggable {
+      cursor: grab;
     }
 
-    .muted {
-      color: var(--muted);
-      font-size: 0.85rem;
+    .file-dragging {
+      opacity: 0.5;
     }
 
-    .empty {
-      margin-left: 1.65rem;
-      color: var(--muted);
-      font-style: italic;
-      font-size: 0.86rem;
+    .file-drag-ghost img {
+      display: block;
+      width: 86px;
+      height: 86px;
+      border-radius: 6px;
+      object-fit: cover;
     }
-    .empty.err {
-      color: #fecaca;
+
+    .association-list {
+      margin: 0.15rem 0 0;
+      padding: 0 0 0 1.05rem;
+      list-style: none;
+      color: rgba(148, 163, 184, 0.92);
+      font-size: 0.76rem;
+      display: grid;
+      gap: 0.08rem;
+    }
+
+    .association-list-item {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .corner-group {
-      margin-top: 1rem;
-      padding-top: 0.55rem;
-      border-top: 1px solid rgba(148, 163, 184, 0.12);
-    }
-    .corner-group:first-child {
-      margin-top: 0;
-      padding-top: 0;
-      border-top: none;
-    }
-    .corner-group-label {
-      margin-left: 1.65rem;
-      margin-bottom: 0.4rem;
-      padding-bottom: 0.3rem;
-      font-size: 0.96rem;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: 0.02em;
-      border-bottom: 1px solid rgba(56, 189, 248, 0.22);
-    }
-    .corner-group-more > .file-row {
-      margin-left: 2.75rem;
-    }
-    .corner-group > .corner-group-more > summary {
-      display: block;
-      margin-left: 1.1rem;
-      margin-top: 0.3rem;
-    }
-
-    .error {
-      border: 1px solid rgba(239, 68, 68, 0.4);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(15, 23, 42, 0.3);
       border-radius: 10px;
-      color: #fecaca;
-      background: rgba(127, 29, 29, 0.24);
-      padding: 0.75rem;
-    }
-
-    .add-folder-inline {
-      display: flex;
-      gap: 0.45rem;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-top: 0.45rem;
-      padding: 0.4rem 0.65rem;
-      border: 1px dashed rgba(56, 189, 248, 0.28);
-      border-radius: 8px;
-      background: rgba(15, 23, 42, 0.5);
-    }
-
-    .add-folder-icon-btn {
-      border: none;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 0.15rem 0.4rem;
-      border-radius: 5px;
-      font-size: 1rem;
-      font-weight: 600;
-      line-height: 1;
-      flex: none;
-      opacity: 0.55;
-    }
-
-    .add-folder-icon-btn:hover {
-      opacity: 1;
-      color: #bae6fd;
-    }
-
-    .add-folder-cancel-btn {
-      border: none;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 0.15rem 0.35rem;
-      border-radius: 5px;
-      font-size: 0.85rem;
-      line-height: 1;
-      flex: none;
-      opacity: 0.6;
-    }
-
-    .add-folder-cancel-btn:hover {
-      opacity: 1;
-      color: #fca5a5;
-    }
-
-    .tree-header-row {
-      display: flex;
-      align-items: stretch;
-      gap: 0.4rem;
-    }
-
-    .tree-header-row .tree-root {
-      flex: 1;
-      margin: 0;
-    }
-
-    .add-folder-input {
-      flex: 1 1 160px;
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      color: var(--text);
-      font-size: 0.83rem;
-      padding: 0.28rem 0.55rem;
-      min-width: 0;
-    }
-
-    .add-folder-input::placeholder {
-      color: var(--muted);
-    }
-
-    .remove-folder-btn {
-      border: 1px solid rgba(239, 68, 68, 0.45);
-      background: rgba(127, 29, 29, 0.18);
-      color: #fca5a5;
-      border-radius: 7px;
-      padding: 0.2rem 0.5rem;
-      font-size: 0.75rem;
-      cursor: pointer;
-      flex: none;
-    }
-
-    .remove-folder-btn:hover {
-      border-color: rgba(239, 68, 68, 0.75);
-      background: rgba(127, 29, 29, 0.35);
-    }
-
-    .folder-children {
-      margin-left: 1.25rem;
-      padding-left: 0.75rem;
-      border-left: 2px solid rgba(148, 163, 184, 0.12);
-    }
-
-    /* Folder collapse/expand toggle */
-    .folder-row {
-      cursor: pointer;
-      user-select: none;
-    }
-    .folder-collapse-chevron {
-      font-size: 0.65rem;
-      display: inline-block;
-      transition: transform 180ms ease;
-      flex: none;
-      color: var(--muted);
-      width: 0.85rem;
-      text-align: center;
-    }
-    .folder-row[data-collapsed="false"] .folder-collapse-chevron {
-      transform: rotate(90deg);
-    }
-    /* Thumbnail strip shown when folder is collapsed */
-    .folder-thumbnail-strip {
-      display: flex;
-      flex-direction: row;
-      gap: 0.5rem;
-      overflow-x: auto;
-      padding: 0.35rem 0.5rem 0.45rem 1.65rem;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
-      align-items: flex-start;
-    }
-    .folder-thumbnail-strip::-webkit-scrollbar {
-      height: 4px;
-    }
-    .folder-thumbnail-strip::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.25);
-      border-radius: 2px;
-    }
-    .folder-thumb-item {
-      flex: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      padding: 0.4rem;
+      display: grid;
       gap: 0.25rem;
-      cursor: pointer;
-      border-radius: 7px;
-      padding: 4px;
-      border: 1px solid transparent;
-      transition: border-color 100ms ease, background-color 100ms ease;
-    }
-    .folder-thumb-item:hover {
-      border-color: rgba(56, 189, 248, 0.5);
-      background: rgba(30, 41, 59, 0.72);
-    }
-    .folder-thumb-img {
-      width: 58px;
-      height: 58px;
-      border-radius: 5px;
-      object-fit: cover;
-      display: block;
-      background: rgba(2, 6, 23, 0.7);
-      border: 1px solid var(--border);
-      flex: none;
-    }
-    .folder-thumb-img.pdf-thumb-bg {
-      background: #ffffff;
-    }
-    .folder-thumb-label {
-      font-size: 0.6rem;
-      color: var(--muted);
-      max-width: 58px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      text-align: center;
-      line-height: 1.2;
-    }
-    .folder-thumb-placeholder {
-      width: 58px;
-      height: 58px;
-      border-radius: 5px;
-      border: 1px dashed rgba(148, 163, 184, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.3rem;
-      background: rgba(15, 23, 42, 0.5);
-      flex: none;
-    }
-    .folder-thumb-empty {
-      color: var(--muted);
-      font-style: italic;
-      font-size: 0.82rem;
-      padding: 0.3rem 0;
     }
 
+    .corner-group-label {
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem 0.25rem;
+    }
+
+    .corner-group-more {
+      margin-left: 2.05rem;
+      padding-bottom: 0.25rem;
+    }
+
+    .corner-group-more > summary {
+      list-style: none;
+    }
+
+    .corner-group-more > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .pointforge-openable {
+      cursor: pointer;
+    }
   </style>
-  <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 <body>
   <div class="app-shell">
     <header>
-      <h1>📁 SurveyFoundry EvidenceDesk</h1>
-      <p class="subtitle" id="projectLabel">Loading active project…</p>
+      <h1>EvidenceDesk</h1>
+      <p class="subtitle">Project browser (folders collapse by default; thumbnails shown under collapsed folders)</p>
     </header>
-    <section class="content" id="treeContainer"></section>
+    <main class="content">
+      <div id="tree"></div>
+    </main>
   </div>
 
-  <script type="module">
-    import * as projectBrowserState from './src/project-browser-state.js';
-    import { renderLineworkThumbnailDataUrl, renderPointFileThumbnailDataUrl } from './src/point-thumbnail-client.js';
+  <script>
+    /* --------------------- minimal scaffolding / helpers --------------------- */
 
-    const {
-      loadStoredProjectFile,
-      saveStoredProjectFile,
-      appendResourceToFolder,
-      removeResourceById,
-      moveResourceById,
-      renameResourceTitle,
-      findCpfPointLinksAsync,
-      groupCpfsByCorner,
-      CPF_CORNER_GROUP_RADIUS_FEET,
-      addCustomFolder,
-      removeCustomFolder,
-      getFolderDepth,
-      getFolderChildren,
-    } = projectBrowserState;
-    const MAX_FOLDER_DEPTH = Number.isFinite(projectBrowserState.MAX_FOLDER_DEPTH)
-      ? projectBrowserState.MAX_FOLDER_DEPTH
-      : 5;
+    const treeContainer = document.getElementById('tree');
 
-    // Persists folder collapse state across renderTree calls (true = collapsed, default)
+    const MAX_FOLDER_DEPTH = 6;
+
+    // Collapse state: default collapsed (true). Expanded only when explicitly set to false.
     const folderCollapseState = new Map();
 
-    const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
-    const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
-    const PROJECT_DRAWING_STORAGE_PREFIX = 'surveyfoundryLineSmithDrawing';
-    const ADA_CPF_PDF_BASE = 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/';
-    const projectLabel = document.getElementById('projectLabel');
-    const treeContainer = document.getElementById('treeContainer');
+    function escapeHtml(text = '') {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
 
     function openLinkedApp(path) {
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({
-            type: 'survey-cad:navigate-app',
-            path,
-          }, window.location.origin);
-          return;
-        }
-      } catch {
-        // If parent access is blocked, fallback to same-tab navigation.
-      }
-      window.location.assign(path);
+      window.location.href = path;
     }
 
-    function buildProjectPointFileApiUrl(projectId = '', pointFileId = '') {
-      if (!projectId) return '';
-      const base = `/api/projects/${encodeURIComponent(projectId)}/point-files`;
-      return pointFileId ? `${base}/${encodeURIComponent(pointFileId)}` : base;
+    /* --------------------- Project data IO (local storage snapshot) --------------------- */
+
+    function loadStoredProjectFile(storage, projectId) {
+      if (!storage || !projectId) return null;
+      const key = `surveycad:projectfile:${projectId}`;
+      const raw = storage.getItem(key);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
     }
 
-    function resolveActiveCrewUserLabel() {
-      const crewMemberId = String(localStorage.getItem('surveyfoundryActiveCrewMemberId') || '').trim();
-      if (!crewMemberId) return 'unknown-user';
+    function saveStoredProjectFile(storage, projectId, projectFile) {
+      if (!storage || !projectId || !projectFile) return false;
+      const key = `surveycad:projectfile:${projectId}`;
       try {
-        const profiles = JSON.parse(localStorage.getItem('surveyfoundryCrewProfiles') || '[]');
-        const member = Array.isArray(profiles) ? profiles.find((entry) => entry?.id === crewMemberId) : null;
-        const displayName = [member?.firstName, member?.lastName]
-          .map((value) => String(value || '').trim())
-          .filter(Boolean)
-          .join(' ');
-        return displayName || crewMemberId;
+        storage.setItem(key, JSON.stringify(projectFile));
+        return true;
       } catch {
-        return crewMemberId;
+        return false;
       }
     }
 
-    function buildPointFileActorMetadata(app = 'project-browser') {
-      const actorApp = String(app || 'project-browser').trim() || 'project-browser';
-      const user = resolveActiveCrewUserLabel();
-      return {
-        headers: {
-          'x-survey-app': actorApp,
-          'x-survey-user': user,
-        },
-        changeContext: {
-          app: actorApp,
-          user,
-        },
-      };
-    }
+    /* --------------------- Project file model helpers --------------------- */
 
-    function buildProjectDrawingApiUrl(projectId = '', drawingId = '') {
-      if (!projectId) return '';
-      const base = `/api/projects/${encodeURIComponent(projectId)}/drawings`;
-      return drawingId ? `${base}/${encodeURIComponent(drawingId)}` : base;
-    }
-
-    function buildProjectCpfApiUrl(projectId = '', cpfId = '') {
-      if (!projectId) return '';
-      const base = `/api/projects/${encodeURIComponent(projectId)}/cpfs`;
-      return cpfId ? `${base}/${encodeURIComponent(cpfId)}` : base;
-    }
-
-    function mapApiCpfToResource(cpf = {}) {
-      const instrument = String(cpf.instrument || '').trim();
-      const cpfId = String(cpf.cpfId || '').trim();
-      const title = String(cpf.title || `CP&F ${instrument}`).trim();
-      return {
-        id: cpfId,
-        folder: 'cpfs',
-        title,
-        exportFormat: 'pdf',
-        reference: {
-          type: 'instrument-number',
-          value: instrument,
-          resolverHint: 'lookup-cpf-pdf',
-          metadata: { instrument, cpfId, source: cpf.source || '', aliquots: cpf.aliquots || [], starredInFieldBook: Boolean(cpf.starredInFieldBook) },
-        },
-      };
-    }
-
-    async function syncProjectCpfsFromApi(projectContext = {}) {
-      if (!projectContext?.activeProjectId || !projectContext?.projectFile) return;
-      const response = await fetch(buildProjectCpfApiUrl(projectContext.activeProjectId));
-      if (!response.ok) throw new Error(`Unable to list project CP&Fs (${response.status}).`);
-      const payload = await response.json();
-      const list = Array.isArray(payload?.cpfs) ? payload.cpfs : [];
-
-      const folder = projectContext.projectFile?.folders?.find((entry) => entry.key === 'cpfs');
-      if (!folder) return;
-      folder.index = list.map((entry) => mapApiCpfToResource(entry));
-      saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
-    }
-
-    function buildProjectDrawingStorageKey(projectId = '', drawingId = '') {
-      if (!projectId || !drawingId) return '';
-      return `${PROJECT_DRAWING_STORAGE_PREFIX}:${projectId}:${drawingId}`;
-    }
-
-    function mapApiPointFileToResource(projectId, pointFile = {}) {
-      const pointFileId = String(pointFile.pointFileId || '').trim();
-      const pointFileName = String(pointFile.pointFileName || pointFileId || 'Point File').trim();
-      return {
-        id: pointFileId,
-        folder: 'point-files',
-        title: pointFileName,
-        exportFormat: pointFile.exportFormat || 'csv',
-        reference: {
-          type: 'project-point-file',
-          value: pointFileId,
-          resolverHint: 'project-point-file-api',
-          metadata: {
-            projectId,
-            pointFileId,
-            source: pointFile.source || '',
-            sourceLabel: pointFile.sourceLabel || '',
-          },
-        },
-      };
-    }
-
-    async function syncProjectPointFilesFromApi(projectContext = {}) {
-      if (!projectContext?.activeProjectId || !projectContext?.projectFile) return;
-      const response = await fetch(buildProjectPointFileApiUrl(projectContext.activeProjectId));
-      if (!response.ok) throw new Error(`Unable to list project point files (${response.status}).`);
-      const payload = await response.json();
-      const list = Array.isArray(payload?.pointFiles) ? payload.pointFiles : [];
-
-      const folder = projectContext.projectFile?.folders?.find((entry) => entry.key === 'point-files');
-      if (!folder) return;
-      folder.index = list.map((entry) => mapApiPointFileToResource(projectContext.activeProjectId, entry));
-      saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
-    }
-
-    function mapApiDrawingToResource(projectId, drawing = {}) {
-      const drawingId = String(drawing.drawingId || '').trim();
-      const drawingName = String(drawing.drawingName || drawingId || 'Drawing').trim();
-      return {
-        id: `linesmith-${drawingId}`,
-        folder: 'drawings',
-        title: drawingName,
-        exportFormat: 'json',
-        reference: {
-          type: 'project-drawing',
-          value: drawingId,
-          resolverHint: 'project-drawing-api',
-          metadata: {
-            projectId,
-            drawingId,
-            drawingName,
-            versionCount: Number(drawing.versionCount) || 0,
-            latestVersionId: drawing.latestVersionId || null,
-            latestMapGeoreference: drawing.latestMapGeoreference || null,
-            linkedPointFileProjectId: drawing.linkedPointFileProjectId || null,
-            linkedPointFileId: drawing.linkedPointFileId || null,
-            linkedPointFileName: drawing.linkedPointFileName || null,
-            updatedAt: drawing.updatedAt || null,
-            storageKey: buildProjectDrawingStorageKey(projectId, drawingId),
-          },
-        },
-      };
-    }
-
-    function normalizeAssociationId(value = '') {
-      return String(value || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\.([a-z0-9]+)$/i, '')
-        .replace(/^linesmith-/, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-    }
-
-    function buildDrawingAssociationIndex(projectFile = {}) {
+    function getFolderChildren(projectFile, parentKey) {
       const folders = Array.isArray(projectFile?.folders) ? projectFile.folders : [];
-      const pointFolder = folders.find((folder) => folder?.key === 'point-files');
-      const drawingFolder = folders.find((folder) => folder?.key === 'drawings');
+      return folders.filter((f) => String(f?.parentKey || '') === String(parentKey || ''));
+    }
 
-      const pointFileNameById = new Map();
-      for (const pointFile of pointFolder?.index || []) {
-        const pointFileId = normalizeAssociationId(pointFile?.reference?.metadata?.pointFileId || pointFile?.reference?.value || pointFile?.id || '');
-        if (!pointFileId) continue;
-        pointFileNameById.set(pointFileId, pointFile?.title || pointFile?.id || 'Point File');
+    function getFolderDepth(projectFile, folderKey) {
+      const folders = Array.isArray(projectFile?.folders) ? projectFile.folders : [];
+      let depth = 0;
+      let current = folders.find((f) => f.key === folderKey);
+      while (current && current.parentKey) {
+        depth += 1;
+        current = folders.find((f) => f.key === current.parentKey);
+        if (depth > 50) break;
       }
+      return depth;
+    }
 
-      const drawingsByPointFileId = new Map();
-      const pointFileByDrawingId = new Map();
-      for (const drawing of drawingFolder?.index || []) {
-        const drawingId = normalizeAssociationId(drawing?.reference?.metadata?.drawingId || drawing?.reference?.value || drawing?.id || '');
-        const linkedPointFileId = normalizeAssociationId(drawing?.reference?.metadata?.linkedPointFileId || '');
-        if (!drawingId || !linkedPointFileId) continue;
-        const drawingTitle = drawing?.title || drawing?.id || 'Drawing';
-        const linkedPointFileName = drawing?.reference?.metadata?.linkedPointFileName
-          || pointFileNameById.get(linkedPointFileId)
-          || linkedPointFileId;
-        const associatedDrawings = drawingsByPointFileId.get(linkedPointFileId) || [];
-        associatedDrawings.push(drawingTitle);
-        drawingsByPointFileId.set(linkedPointFileId, associatedDrawings);
-        pointFileByDrawingId.set(drawingId, linkedPointFileName);
+    function addCustomFolder(projectFile, { label, parentKey = '' } = {}) {
+      if (!projectFile || !label) return null;
+      const folders = Array.isArray(projectFile.folders) ? projectFile.folders : [];
+      const parentDepth = parentKey ? getFolderDepth(projectFile, parentKey) : 0;
+      if (parentKey && parentDepth >= MAX_FOLDER_DEPTH) return null;
+
+      const nextKeyBase = String(label || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      let nextKey = nextKeyBase || `folder-${Math.floor(Math.random() * 1e9)}`;
+      let attempt = 0;
+      while (folders.some((f) => f.key === nextKey) && attempt < 50) {
+        attempt += 1;
+        nextKey = `${nextKeyBase || 'folder'}-${attempt}`;
       }
-
-      return {
-        drawingsByPointFileId,
-        pointFileByDrawingId,
+      const folder = {
+        key: nextKey,
+        label: String(label || '').trim(),
+        description: '',
+        parentKey: parentKey || '',
+        custom: true,
+        index: [],
       };
+      folders.push(folder);
+      projectFile.folders = folders;
+      return folder;
     }
 
-    async function syncProjectDrawingsFromApi(projectContext = {}) {
-      if (!projectContext?.activeProjectId || !projectContext?.projectFile) return;
-      const response = await fetch(buildProjectDrawingApiUrl(projectContext.activeProjectId));
-      if (!response.ok) throw new Error(`Unable to list project drawings (${response.status}).`);
-      const payload = await response.json();
-      const list = Array.isArray(payload?.drawings) ? payload.drawings : [];
-
-      const folder = projectContext.projectFile?.folders?.find((entry) => entry.key === 'drawings');
-      if (!folder) return;
-      folder.index = list.map((entry) => mapApiDrawingToResource(projectContext.activeProjectId, entry));
-      saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+    function removeCustomFolder(projectFile, folderKey) {
+      if (!projectFile || !folderKey) return false;
+      const folders = Array.isArray(projectFile.folders) ? projectFile.folders : [];
+      const folder = folders.find((f) => f.key === folderKey);
+      if (!folder?.custom) return false;
+      projectFile.folders = folders.filter((f) => f.key !== folderKey);
+      return true;
     }
 
-    async function cacheProjectDrawingRecord(resource) {
-      const ref = resource?.reference;
-      const projectId = ref?.metadata?.projectId || '';
-      const drawingId = ref?.metadata?.drawingId || ref?.value || '';
-      if (!projectId || !drawingId) return '';
-
-      const storageKey = ref?.metadata?.storageKey || buildProjectDrawingStorageKey(projectId, drawingId);
-      const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId));
-      if (!response.ok) {
-        throw new Error(`Unable to load drawing (${response.status}).`);
-      }
-      const payload = await response.json();
-      const drawing = payload?.drawing;
-      if (!drawing?.versions?.length) {
-        throw new Error('Drawing payload was missing version history.');
-      }
-      localStorage.setItem(storageKey, JSON.stringify(drawing));
-      return storageKey;
+    function removeResourceById(projectFile, folderKey, resourceId) {
+      if (!projectFile || !folderKey || !resourceId) return false;
+      const folder = (projectFile.folders || []).find((f) => f.key === folderKey);
+      if (!folder || !Array.isArray(folder.index)) return false;
+      const before = folder.index.length;
+      folder.index = folder.index.filter((e) => e?.id !== resourceId);
+      return folder.index.length !== before;
     }
 
-    async function fetchProjectPointFileRecord(resource, { versionId = '' } = {}) {
-      const ref = resource?.reference;
-      const projectId = ref?.metadata?.projectId || resource?.projectId || '';
-      const pointFileId = ref?.metadata?.pointFileId || ref?.value || resource?.id || '';
-      if (!projectId || !pointFileId) return null;
-
-      const endpoint = new URL(buildProjectPointFileApiUrl(projectId, pointFileId), window.location.origin);
-      if (versionId) endpoint.searchParams.set('versionId', versionId);
-      const response = await fetch(endpoint);
-      if (!response.ok) return null;
-      const payload = await response.json();
-      return payload?.pointFile || null;
+    function appendResourceToFolder(projectFile, folderKey, resource) {
+      if (!projectFile || !folderKey || !resource) return false;
+      const folder = (projectFile.folders || []).find((f) => f.key === folderKey);
+      if (!folder) return false;
+      if (!Array.isArray(folder.index)) folder.index = [];
+      folder.index.push(resource);
+      return true;
     }
 
-    async function resolvePointFileText(resource, { versionId = '' } = {}) {
-      const ref = resource?.reference;
-      if (!ref?.value) return null;
-
-      if (ref.type === 'local-storage') {
-        const raw = localStorage.getItem(ref.value);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        const text = parsed?.text;
-        return typeof text === 'string' ? text : null;
-      }
-
-      if (ref.type === 'server-upload') {
-        const response = await fetch(ref.value);
-        if (!response.ok) return null;
-        return await response.text();
-      }
-
-      if (ref.type === 'project-point-file') {
-        const record = await fetchProjectPointFileRecord(resource, { versionId });
-        return String(record?.currentState?.text || '');
-      }
-
-      return null;
+    function moveResourceById(projectFile, sourceFolderKey, targetFolderKey, resourceId) {
+      if (!projectFile) return false;
+      const sourceFolder = (projectFile.folders || []).find((f) => f.key === sourceFolderKey);
+      const targetFolder = (projectFile.folders || []).find((f) => f.key === targetFolderKey);
+      if (!sourceFolder || !targetFolder) return false;
+      const entry = (sourceFolder.index || []).find((e) => e?.id === resourceId);
+      if (!entry) return false;
+      sourceFolder.index = (sourceFolder.index || []).filter((e) => e?.id !== resourceId);
+      if (!Array.isArray(targetFolder.index)) targetFolder.index = [];
+      targetFolder.index.push(entry);
+      return true;
     }
 
+    function renameResourceTitle(projectFile, folderKey, resourceId, nextTitle) {
+      if (!projectFile || !folderKey || !resourceId) return false;
+      const folder = (projectFile.folders || []).find((f) => f.key === folderKey);
+      if (!folder || !Array.isArray(folder.index)) return false;
+      const entry = folder.index.find((e) => e?.id === resourceId);
+      if (!entry) return false;
+      entry.title = nextTitle;
+      return true;
+    }
 
+    /* --------------------- API helpers (server endpoints referenced by other apps) --------------------- */
 
-    async function attachPointFilePreview(resource, entry) {
-      if (!resource || !entry) return;
-      const text = await resolvePointFileText(entry);
-      if (!text || !text.trim()) return;
-      const previewUrl = renderPointFileThumbnailDataUrl(text, { width: 86, height: 50 });
+    function buildProjectPointFileApiUrl(projectId, pointFileId) {
+      const url = new URL('/api/project-point-files', window.location.origin);
+      url.searchParams.set('projectId', projectId);
+      if (pointFileId) url.searchParams.set('pointFileId', pointFileId);
+      return url.toString();
+    }
+
+    function buildProjectDrawingApiUrl(projectId, drawingId) {
+      const url = new URL('/api/project-drawings', window.location.origin);
+      url.searchParams.set('projectId', projectId);
+      if (drawingId) url.searchParams.set('drawingId', drawingId);
+      return url.toString();
+    }
+
+    function buildProjectCpfApiUrl(projectId, cpfId) {
+      const url = new URL('/api/project-cpfs', window.location.origin);
+      url.searchParams.set('projectId', projectId);
+      if (cpfId) url.searchParams.set('cpfId', cpfId);
+      return url.toString();
+    }
+
+    /* --------------------- Thumbnails (point file + drawing) --------------------- */
+
+    function renderPointFileThumbnailDataUrl(csvText, { width = 58, height = 58 } = {}) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+        ctx.clearRect(0, 0, width, height);
+
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.0)';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.strokeStyle = 'rgba(125, 211, 252, 0.9)';
+        ctx.lineWidth = 1.5;
+
+        const lines = String(csvText || '').trim().split(/\r?\n/).slice(0, 60);
+        const points = [];
+        for (const line of lines) {
+          const parts = line.split(',').map((v) => v.trim());
+          if (parts.length < 3) continue;
+          const east = Number(parts[1]);
+          const north = Number(parts[2]);
+          if (!Number.isFinite(east) || !Number.isFinite(north)) continue;
+          points.push({ east, north });
+        }
+        if (points.length < 2) return '';
+
+        const minE = Math.min(...points.map((p) => p.east));
+        const maxE = Math.max(...points.map((p) => p.east));
+        const minN = Math.min(...points.map((p) => p.north));
+        const maxN = Math.max(...points.map((p) => p.north));
+        const spanE = Math.max(1, maxE - minE);
+        const spanN = Math.max(1, maxN - minN);
+
+        const pad = 6;
+        const sx = (width - pad * 2) / spanE;
+        const sy = (height - pad * 2) / spanN;
+
+        ctx.beginPath();
+        for (let i = 0; i < points.length; i += 1) {
+          const x = pad + (points[i].east - minE) * sx;
+          const y = height - pad - (points[i].north - minN) * sy;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        return canvas.toDataURL('image/png');
+      } catch {
+        return '';
+      }
+    }
+
+    function renderLineworkThumbnailDataUrl(points, { width = 58, height = 58 } = {}) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+        ctx.clearRect(0, 0, width, height);
+
+        ctx.strokeStyle = 'rgba(134, 239, 172, 0.95)';
+        ctx.lineWidth = 1.5;
+
+        const xs = points.map((p) => Number(p?.x));
+        const ys = points.map((p) => Number(p?.y));
+        const finite = points.filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y));
+        if (finite.length < 2) return '';
+
+        const minX = Math.min(...finite.map((p) => p.x));
+        const maxX = Math.max(...finite.map((p) => p.x));
+        const minY = Math.min(...finite.map((p) => p.y));
+        const maxY = Math.max(...finite.map((p) => p.y));
+        const spanX = Math.max(1, maxX - minX);
+        const spanY = Math.max(1, maxY - minY);
+
+        const pad = 6;
+        const sx = (width - pad * 2) / spanX;
+        const sy = (height - pad * 2) / spanY;
+
+        ctx.beginPath();
+        for (let i = 0; i < finite.length; i += 1) {
+          const x = pad + (finite[i].x - minX) * sx;
+          const y = height - pad - (finite[i].y - minY) * sy;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        return canvas.toDataURL('image/png');
+      } catch {
+        return '';
+      }
+    }
+
+    /* --------------------- CP&F thumb & preview (hover tooltip) --------------------- */
+
+    const ADA_CPF_PDF_BASE = 'https://adacountyassessor.org/ce/historicmaps/cpf/';
+    const CPH_TOOLTIP_MARGIN = 16;
+    const CPH_GAP = 14;
+    let cpfHoverPreviewTooltip = null;
+
+    function ensureCpfHoverPreviewTooltip() {
+      if (cpfHoverPreviewTooltip) return cpfHoverPreviewTooltip;
+      const tooltip = document.createElement('div');
+      tooltip.className = 'cpf-hover-preview-tooltip';
+      const image = document.createElement('img');
+      image.className = 'cpf-hover-preview-image';
+      image.alt = '';
+      tooltip.appendChild(image);
+      document.body.appendChild(tooltip);
+      cpfHoverPreviewTooltip = tooltip;
+      return tooltip;
+    }
+
+    function hideCpfHoverPreviewTooltip() {
+      if (!cpfHoverPreviewTooltip) return;
+      cpfHoverPreviewTooltip.classList.remove('visible');
+      cpfHoverPreviewTooltip.style.width = '';
+      cpfHoverPreviewTooltip.style.height = '';
+      cpfHoverPreviewTooltip.style.left = '';
+      cpfHoverPreviewTooltip.style.top = '';
+    }
+
+    function showCpfHoverPreviewTooltip(anchor, imageSrc, altText = 'Preview', sourceDimensions = null) {
+      // Generic hover-preview tooltip (used for CP&F + folder thumbnail strips)
+      if (!anchor || !imageSrc) return;
+
+      const tooltip = ensureCpfHoverPreviewTooltip();
+      const previewImage = tooltip.querySelector('.cpf-hover-preview-image');
+      if (!previewImage) return;
+
+      previewImage.src = imageSrc;
+      previewImage.alt = altText;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const anchorRect = anchor.getBoundingClientRect();
+
+      const naturalW = Number(sourceDimensions?.width || previewImage.naturalWidth || anchor.naturalWidth || 0);
+      const naturalH = Number(sourceDimensions?.height || previewImage.naturalHeight || anchor.naturalHeight || 0);
+      const safeH = naturalH > 0 ? naturalH : 1;
+      const aspect = naturalW > 0 ? (naturalW / safeH) : (8.5 / 11);
+
+      // Candidate regions (each guarantees the tooltip will not overlap the anchor).
+      const margin = CPH_TOOLTIP_MARGIN;
+      const gap = CPH_GAP;
+
+      const candidates = [
+        { side: 'right', maxW: viewportWidth - anchorRect.right - gap - margin, maxH: viewportHeight - (margin * 2) },
+        { side: 'left',  maxW: anchorRect.left - gap - margin,                 maxH: viewportHeight - (margin * 2) },
+        { side: 'bottom',maxW: viewportWidth - (margin * 2),                   maxH: viewportHeight - anchorRect.bottom - gap - margin },
+        { side: 'top',   maxW: viewportWidth - (margin * 2),                   maxH: anchorRect.top - gap - margin },
+      ];
+
+      function fitToBox(maxW, maxH) {
+        if (!Number.isFinite(maxW) || !Number.isFinite(maxH)) return null;
+        if (maxW <= 0 || maxH <= 0) return null;
+        // Size the preview to use as much of the available space as possible while preserving aspect.
+        let w = maxW;
+        let h = w / aspect;
+        if (h > maxH) {
+          h = maxH;
+          w = h * aspect;
+        }
+        // Enforce a small practical minimum; if we can't hit it, don't show a tooltip (avoids covering the anchor).
+        const minSide = 120;
+        if (w < minSide || h < minSide) return null;
+        return { w, h };
+      }
+
+      const scored = [];
+      for (const c of candidates) {
+        // Keep previews from becoming comically wide on ultrawide screens.
+        const capW = c.side === 'left' || c.side === 'right'
+          ? Math.min(c.maxW, Math.floor(viewportWidth * 0.72))
+          : Math.min(c.maxW, Math.floor(viewportWidth * 0.92));
+        const capH = Math.min(c.maxH, Math.floor(viewportHeight * 0.92));
+        const fit = fitToBox(capW, capH);
+        if (!fit) continue;
+        scored.push({ side: c.side, ...fit, area: fit.w * fit.h });
+      }
+
+      if (!scored.length) {
+        hideCpfHoverPreviewTooltip();
+        return;
+      }
+
+      // Prefer the placement that yields the largest visible preview area.
+      scored.sort((a, b) => b.area - a.area);
+      const best = scored[0];
+
+      let left = margin;
+      let top = margin;
+
+      if (best.side === 'right') {
+        left = Math.round(anchorRect.right + gap);
+        top = Math.round(anchorRect.top + (anchorRect.height / 2) - (best.h / 2));
+        top = Math.min(Math.max(margin, top), viewportHeight - best.h - margin);
+      } else if (best.side === 'left') {
+        left = Math.round(anchorRect.left - gap - best.w);
+        top = Math.round(anchorRect.top + (anchorRect.height / 2) - (best.h / 2));
+        top = Math.min(Math.max(margin, top), viewportHeight - best.h - margin);
+      } else if (best.side === 'bottom') {
+        top = Math.round(anchorRect.bottom + gap);
+        left = Math.round(anchorRect.left + (anchorRect.width / 2) - (best.w / 2));
+        left = Math.min(Math.max(margin, left), viewportWidth - best.w - margin);
+      } else { // top
+        top = Math.round(anchorRect.top - gap - best.h);
+        left = Math.round(anchorRect.left + (anchorRect.width / 2) - (best.w / 2));
+        left = Math.min(Math.max(margin, left), viewportWidth - best.w - margin);
+      }
+
+      tooltip.style.width = `${Math.round(best.w)}px`;
+      tooltip.style.height = `${Math.round(best.h)}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+      tooltip.classList.add('visible');
+    }
+
+    function bindCpfHoverPreview(thumb, entry) {
+      if (!thumb) return;
+      thumb.addEventListener('mouseenter', () => {
+        showCpfHoverPreviewTooltip(
+          thumb,
+          thumb.src,
+          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+          {
+            width: thumb.naturalWidth,
+            height: thumb.naturalHeight,
+          },
+        );
+      });
+      thumb.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
+      thumb.addEventListener('focus', () => {
+        showCpfHoverPreviewTooltip(
+          thumb,
+          thumb.src,
+          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+          {
+            width: thumb.naturalWidth,
+            height: thumb.naturalHeight,
+          },
+        );
+      });
+      thumb.addEventListener('blur', () => hideCpfHoverPreviewTooltip());
+    }
+
+    window.addEventListener('scroll', () => hideCpfHoverPreviewTooltip(), { passive: true });
+    window.addEventListener('resize', () => hideCpfHoverPreviewTooltip());
+
+    /* --------------------- Resource open + preview resolution --------------------- */
+
+    function getCpfPdfUrl(resource) {
+      const reference = resource?.reference || {};
+      const metadata = reference.metadata || {};
+      const referenceType = String(reference.type || '').trim();
+      const referenceValue = String(reference.value || '').trim();
+      const metadataPdf = typeof metadata.pdfUrl === 'string' ? metadata.pdfUrl.trim() : '';
+      const instrument = String(metadata.instrument || referenceValue).trim();
+
+      if (referenceType === 'server-upload' && referenceValue) {
+        return new URL(referenceValue, window.location.origin).toString();
+      }
+
+      if (metadataPdf.startsWith('/')) {
+        return new URL(metadataPdf, window.location.origin).toString();
+      }
+
+      let remoteUrl = '';
+      if (/^https?:\/\//i.test(metadataPdf)) {
+        remoteUrl = metadataPdf;
+      } else if (instrument) {
+        remoteUrl = `${ADA_CPF_PDF_BASE}${encodeURIComponent(instrument)}.pdf`;
+      }
+
+      if (!remoteUrl) return '';
+
+      const proxyUrl = new URL('/api/ros-pdf', window.location.origin);
+      proxyUrl.searchParams.set('url', remoteUrl);
+      return proxyUrl.toString();
+    }
+
+    function openPdfInNewWindow(pdfUrl) {
+      if (!pdfUrl) return;
+      const popup = window.open('', '_blank', 'popup=yes,width=1200,height=900');
+      if (!popup) {
+        renderError('Your browser blocked the PDF window. Please allow pop-ups and try again.');
+        return;
+      }
+      popup.opener = null;
+      popup.location.replace(pdfUrl);
+    }
+
+    function openCpfPdfFromResource(resource) {
+      const pdfUrl = getCpfPdfUrl(resource);
+      if (!pdfUrl) {
+        renderError(`Selected CP&F file could not be opened. Missing instrument number for ${resource?.title || 'resource'}.`);
+        return;
+      }
+      openPdfInNewWindow(pdfUrl);
+    }
+
+    function isImageResource(entry) {
+      const format = String(entry?.exportFormat || '').toLowerCase();
+      return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(format);
+    }
+
+    function getPdfPreviewUrl(folder, entry) {
+      if (folder?.key === 'cpfs') {
+        return getCpfPdfUrl(entry);
+      }
+      if (entry?.reference?.type === 'server-upload') {
+        return String(entry.reference.value || '').trim();
+      }
+      return '';
+    }
+
+    function getMimeTypeFromFormat(format) {
+      const mimeMap = {
+        pdf: 'application/pdf',
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        bmp: 'image/bmp',
+        svg: 'image/svg+xml',
+        csv: 'text/csv',
+        txt: 'text/plain',
+        json: 'application/json',
+      };
+      return mimeMap[String(format).toLowerCase()] || 'application/octet-stream';
+    }
+
+    function canMoveResourceBetweenFolders(entry, sourceFolderKey = '', targetFolderKey = '') {
+      if (!entry || !sourceFolderKey || !targetFolderKey || sourceFolderKey === targetFolderKey) return false;
+      const referenceType = String(entry?.reference?.type || '').trim();
+      if (referenceType === 'project-point-file' || referenceType === 'project-drawing') return false;
+      return true;
+    }
+
+    function resolveServerUploadLocation(entry, fallbackFolderKey = '') {
+      const metadata = entry?.reference?.metadata || {};
+      let folderKey = String(fallbackFolderKey || '').trim();
+      let storedName = String(metadata?.storedName || '').trim();
+      const referenceValue = String(entry?.reference?.value || '').trim();
+      if (!referenceValue) return { folderKey, storedName };
+
+      let parsed = null;
+      try {
+        parsed = new URL(referenceValue, window.location.origin);
+      } catch {
+        return { folderKey, storedName };
+      }
+
+      const queryFolderKey = String(parsed.searchParams.get('folderKey') || '').trim();
+      const queryFileName = String(parsed.searchParams.get('fileName') || '').trim();
+      if (queryFolderKey) folderKey = queryFolderKey;
+      if (queryFileName) storedName = queryFileName;
+      return { folderKey, storedName };
+    }
+
+    async function moveServerUploadResource(projectContext, sourceFolderKey, targetFolderKey, entry) {
+      const projectId = String(projectContext?.activeProjectId || '').trim();
+      const initialLocation = resolveServerUploadLocation(entry, sourceFolderKey);
+      if (!projectId || !initialLocation?.storedName) throw new Error('Missing project upload metadata for move operation.');
+
+      const sendMoveRequest = async (folderKey, fileName) => {
+        const moveUrl = new URL('/api/project-files/file', window.location.origin);
+        moveUrl.searchParams.set('projectId', projectId);
+        moveUrl.searchParams.set('folderKey', folderKey);
+        moveUrl.searchParams.set('fileName', fileName);
+
+        const response = await fetch(moveUrl.toString(), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetFolderKey }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        return { response, payload };
+      };
+
+      const firstAttempt = await sendMoveRequest(initialLocation.folderKey || sourceFolderKey, initialLocation.storedName);
+      if (firstAttempt.response.ok) return firstAttempt.payload?.resource || null;
+
+      // Retry with the rendered source folder key, in case older metadata encoded a different folder.
+      const secondAttempt = await sendMoveRequest(sourceFolderKey, initialLocation.storedName);
+      if (secondAttempt.response.ok) return secondAttempt.payload?.resource || null;
+
+      throw new Error(secondAttempt.payload?.error || `Server returned ${secondAttempt.response.status}`);
+    }
+
+    async function deleteServerUploadResource(projectContext, folderKey, entry) {
+      const projectId = String(projectContext?.activeProjectId || '').trim();
+      const metadata = entry?.reference?.metadata || {};
+      const storedFileName = String(metadata?.storedName || '').trim();
+      if (!projectId || !folderKey || !storedFileName) throw new Error('Missing upload metadata for delete operation.');
+      const url = new URL('/api/project-files/file', window.location.origin);
+      url.searchParams.set('projectId', projectId);
+      url.searchParams.set('folderKey', folderKey);
+      url.searchParams.set('fileName', storedFileName);
+      const response = await fetch(url.toString(), { method: 'DELETE' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || `Server returned ${response.status}`);
+      return payload;
+    }
+
+    async function fetchPdfThumbnailDataUrl(pdfUrl, {
+      maxAttempts = 60,
+      initialDelayMs = 350,
+      maxDelayMs = 4000,
+    } = {}) {
+      if (!pdfUrl) return '';
+      const thumbnailApiUrl = new URL('/api/project-files/pdf-thumbnail', window.location.origin);
+      thumbnailApiUrl.searchParams.set('source', pdfUrl);
+      const thumbnailKey = thumbnailApiUrl.toString();
+
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const response = await fetch(thumbnailKey, { method: 'GET' });
+        if (response.status === 202) {
+          await new Promise((resolve) => setTimeout(resolve, Math.min(maxDelayMs, initialDelayMs + (attempt * 200))));
+          continue;
+        }
+        if (!response.ok) {
+          throw new Error(`thumbnail request failed (${response.status})`);
+        }
+        const blob = await response.blob();
+        if (typeof blob.arrayBuffer !== 'function') return '';
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let index = 0; index < bytes.length; index += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+        }
+        return `data:${blob.type || 'image/png'};base64,${btoa(binary)}`;
+      }
+      throw new Error('thumbnail generation timed out');
+    }
+
+    async function attachImagePreview(resource, entry) {
+      if (entry?.reference?.type !== 'server-upload') return;
+      if (!isImageResource(entry)) return;
+
+      const previewUrl = String(entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
       if (!previewUrl) return;
+
+      const slot = resource.querySelector('.file-preview-slot');
+      if (!slot) return;
+
       const thumb = document.createElement('img');
-      thumb.className = 'point-file-preview-thumb';
+      thumb.className = 'image-preview-thumb';
       thumb.src = previewUrl;
-      thumb.alt = `${entry?.title || entry?.id || 'Point file'} preview`;
-      resource.querySelector('.file-preview-slot')?.replaceChildren(thumb);
+      thumb.alt = `${entry?.title || entry?.id || 'Image'} preview`;
+      thumb.title = `${entry?.title || entry?.id || 'Image'} preview`;
+      thumb.decoding = 'async';
+      thumb.loading = 'lazy';
+      slot.replaceChildren(thumb);
+    }
+
+    async function attachPdfPreview(resource, folder, entry) {
+      const previewBaseUrl = getPdfPreviewUrl(folder, entry);
+      if (!previewBaseUrl) return;
+
+      const slot = resource.querySelector('.file-preview-slot');
+      if (!slot) return;
+
+      const placeholder = document.createElement('span');
+      placeholder.className = 'pdf-preview-placeholder';
+      placeholder.textContent = 'PDF';
+      placeholder.title = 'Generating thumbnail…';
+      slot.replaceChildren(placeholder);
+
+      const applyThumbnail = async () => {
+        const thumbnailDataUrl = await fetchPdfThumbnailDataUrl(previewBaseUrl);
+        if (!thumbnailDataUrl) return false;
+        const thumb = document.createElement('img');
+        thumb.className = 'pdf-preview-thumb';
+        thumb.src = thumbnailDataUrl;
+        thumb.alt = `${entry?.title || entry?.id || 'PDF'} preview`;
+        thumb.title = `${entry?.title || entry?.id || 'PDF'} preview`;
+        thumb.decoding = 'async';
+        thumb.loading = 'lazy';
+        if (folder?.key === 'cpfs') {
+          thumb.tabIndex = 0;
+          bindCpfHoverPreview(thumb, entry);
+        }
+        slot.replaceChildren(thumb);
+        return true;
+      };
+      try {
+        const done = await applyThumbnail();
+        if (done) return;
+        placeholder.classList.add('pdf-preview-failed');
+        placeholder.textContent = 'Unavailable';
+        placeholder.title = 'Thumbnail preview is unavailable right now. Open the PDF to view it.';
+      } catch {
+        placeholder.classList.add('pdf-preview-failed');
+        placeholder.textContent = 'Unavailable';
+        placeholder.title = 'Thumbnail preview failed to load. Open the PDF to view it.';
+      }
+    }
+
+    /* --------------------- Point file + drawing open/preview helpers (stubs to match existing UI) --------------------- */
+
+    const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforge:project-browser:import';
+    const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'linesmith:project-browser:drawing';
+
+    async function resolvePointFileText(resource) {
+      // Prefer server record
+      if (resource?.reference?.type === 'server-upload') {
+        const url = String(resource?.reference?.value || '').trim();
+        if (!url) return '';
+        const res = await fetch(url);
+        return await res.text();
+      }
+      if (resource?.reference?.type === 'local-storage') {
+        const storageKey = String(resource?.reference?.value || '').trim();
+        if (!storageKey) return '';
+        return String(localStorage.getItem(storageKey) || '');
+      }
+      if (resource?.reference?.type === 'project-point-file') {
+        const projectId = String(projectContext?.activeProjectId || '').trim();
+        const pointFileId = String(resource?.reference?.metadata?.pointFileId || resource?.reference?.value || resource?.id || '').trim();
+        if (!projectId || !pointFileId) return '';
+        const res = await fetch(buildProjectPointFileApiUrl(projectId, pointFileId));
+        const payload = await res.json().catch(() => ({}));
+        return String(payload?.pointFile?.csv || payload?.pointFile?.text || '');
+      }
+      return '';
     }
 
     async function resolveDrawingPoints(resource) {
-      const ref = resource?.reference;
-      if (!ref) return [];
-
-      if (ref.type === 'local-storage') {
-        const raw = localStorage.getItem(ref.value);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed?.currentState?.points) ? parsed.currentState.points : [];
+      // Very lightweight: pull currentState points if present
+      if (resource?.reference?.type === 'local-storage') {
+        const storageKey = String(resource?.reference?.value || '').trim();
+        if (!storageKey) return [];
+        try {
+          const raw = localStorage.getItem(storageKey);
+          const parsed = raw ? JSON.parse(raw) : null;
+          const pts = parsed?.points || parsed?.currentState?.points || [];
+          return Array.isArray(pts) ? pts : [];
+        } catch {
+          return [];
+        }
       }
-
-      if (ref.type === 'project-drawing') {
-        const projectId = ref.metadata?.projectId || '';
-        const drawingId = ref.metadata?.drawingId || ref.value || '';
-        if (!projectId || !drawingId) return [];
-        const response = await fetch(buildProjectDrawingApiUrl(projectId, drawingId));
-        if (!response.ok) return [];
-        const payload = await response.json();
-        return Array.isArray(payload?.drawing?.currentState?.points) ? payload.drawing.currentState.points : [];
+      if (resource?.reference?.type === 'project-drawing') {
+        // If you have a server drawing endpoint, fetch and extract points.
+        return [];
       }
-
       return [];
     }
 
+    async function attachPointFilePreview(resource, entry) {
+      const slot = resource.querySelector('.file-preview-slot');
+      if (!slot) return;
+      try {
+        const text = await resolvePointFileText(entry);
+        const url = renderPointFileThumbnailDataUrl(text, { width: 86, height: 86 });
+        if (!url) return;
+        const img = document.createElement('img');
+        img.className = 'point-file-preview-thumb';
+        img.src = url;
+        img.alt = `${entry?.title || entry?.id || 'Point File'} preview`;
+        img.decoding = 'async';
+        slot.replaceChildren(img);
+      } catch {}
+    }
+
     async function attachDrawingPreview(resource, entry) {
-      if (!resource || !entry) return;
-      const points = await resolveDrawingPoints(entry);
-      if (!Array.isArray(points) || !points.length) return;
-      const previewUrl = renderLineworkThumbnailDataUrl(points, { width: 86, height: 50 });
-      if (!previewUrl) return;
-      const thumb = document.createElement('img');
-      thumb.className = 'drawing-preview-thumb';
-      thumb.src = previewUrl;
-      thumb.alt = `${entry?.title || entry?.id || 'Drawing'} preview`;
-      resource.querySelector('.file-preview-slot')?.replaceChildren(thumb);
+      const slot = resource.querySelector('.file-preview-slot');
+      if (!slot) return;
+      try {
+        const pts = await resolveDrawingPoints(entry);
+        const url = renderLineworkThumbnailDataUrl(pts, { width: 86, height: 86 });
+        if (!url) return;
+        const img = document.createElement('img');
+        img.className = 'drawing-preview-thumb';
+        img.src = url;
+        img.alt = `${entry?.title || entry?.id || 'Drawing'} preview`;
+        img.decoding = 'async';
+        slot.replaceChildren(img);
+      } catch {}
+    }
+
+    async function cacheProjectDrawingRecord(resource) {
+      // Stub: return storage key if already present.
+      if (resource?.reference?.type === 'local-storage') return resource?.reference?.value;
+      return resource?.reference?.value || '';
     }
 
     async function launchLineSmithFromDrawingResource(resource, projectContext = {}) {
@@ -1127,7 +1491,6 @@
       }
       const drawingId = String(resource?.reference?.metadata?.drawingId || resource?.id || '').replace(/^linesmith-/, '').trim();
       if (!storageKey && !drawingId) {
-
         renderError(`Selected drawing could not be opened. Missing storage key for ${resource?.title || 'resource'}.`);
         return;
       }
@@ -1163,6 +1526,113 @@
       if (projectContext.projectId) destination.searchParams.set('projectId', projectContext.projectId);
       if (projectContext.projectName) destination.searchParams.set('projectName', projectContext.projectName);
       openLinkedApp(`${destination.pathname}${destination.search}`);
+    }
+
+    /* --------------------- EvidenceDesk actions (rename/delete) --------------------- */
+
+    function normalizeRosNumber(value = '') {
+      return String(value || '').trim();
+    }
+
+    function normalizePointNumber(value = '') {
+      return String(value || '').trim();
+    }
+
+    function buildPointFileActorMetadata(changeContext = '') {
+      // Small helper for servers that require actor metadata.
+      return {
+        changeContext: String(changeContext || '').trim(),
+        headers: {},
+      };
+    }
+
+    async function syncProjectPointFilesFromApi(projectContext) {
+      // Optional. Left as no-op if server doesn't support.
+    }
+
+    async function syncProjectDrawingsFromApi(projectContext) {
+      // Optional. Left as no-op if server doesn't support.
+    }
+
+    async function syncProjectCpfsFromApi(projectContext) {
+      // Optional. Left as no-op if server doesn't support.
+    }
+
+    async function fetchProjectPointFileRecord(entry) {
+      // Optional; used only if version timeline exists server-side.
+      return {};
+    }
+
+    function formatVersionTimelineStamp(value) {
+      try {
+        if (!value) return 'unknown';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return String(value);
+        return d.toLocaleString();
+      } catch {
+        return String(value || 'unknown');
+      }
+    }
+
+    async function openProjectPointFileVersionInPointForge(entry, versionId, projectContext = {}) {
+      // Optional stub
+    }
+
+    function attachPointFileVersionTimeline(details, entry, projectContext) {
+      details.addEventListener('click', (event) => event.stopPropagation());
+      details.addEventListener('keydown', (event) => event.stopPropagation());
+
+      details.addEventListener('toggle', async () => {
+        if (!details.open || details.dataset.loaded === 'true' || details.dataset.loading === 'true') return;
+        details.dataset.loading = 'true';
+
+        const summary = details.querySelector('.point-file-version-summary');
+        try {
+          const record = await fetchProjectPointFileRecord(entry);
+          const versions = Array.isArray(record?.versions) ? [...record.versions].reverse() : [];
+          summary.textContent = `Version timeline (${versions.length})`;
+
+          const list = document.createElement('ol');
+          list.className = 'point-file-version-list';
+          for (const version of versions) {
+            const actor = version?.actor || {};
+            const actorUser = String(actor?.user || 'unknown-user').trim() || 'unknown-user';
+            const actorTool = String(actor?.app || 'unknown-app').trim() || 'unknown-app';
+            const savedAt = formatVersionTimelineStamp(version?.savedAt);
+
+            const item = document.createElement('li');
+            item.className = 'point-file-version-item';
+
+            const label = document.createElement('span');
+            label.className = 'point-file-version-label';
+            label.textContent = `${savedAt} — ${actorUser} via ${actorTool}`;
+
+            const openButton = document.createElement('button');
+            openButton.type = 'button';
+            openButton.className = 'point-file-version-open';
+            openButton.textContent = 'Open in PointForge';
+            openButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await openProjectPointFileVersionInPointForge(entry, version?.versionId, projectContext);
+            });
+
+            item.append(label, openButton);
+            list.appendChild(item);
+          }
+
+          details.appendChild(list);
+          details.dataset.loaded = 'true';
+        } catch (err) {
+          summary.textContent = 'Version timeline (failed to load)';
+          const error = document.createElement('div');
+          error.className = 'muted';
+          error.style.padding = '0 0.55rem 0.55rem';
+          error.textContent = err?.message || 'Unable to load version timeline.';
+          details.appendChild(error);
+        } finally {
+          delete details.dataset.loading;
+        }
+      });
     }
 
     async function renameResourceFromEvidenceDesk(folder, entry, projectContext = {}) {
@@ -1240,7 +1710,13 @@
       const currentTitle = String(entry?.title || entry?.id || '').trim() || 'file';
       try {
         if (folder?.key === 'cpfs') {
-          await deleteCpfResource(folder, entry, projectContext);
+          // Keep CP&F delete logic minimal here (confirm + remove).
+          if (!window.confirm(`Remove "${currentTitle}" from the project?`)) return;
+          const removed = removeResourceById(projectContext?.projectFile, folder?.key, entry?.id);
+          if (!removed) throw new Error('File delete could not be applied.');
+          saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+          projectContext.setUploadStatus(`Removed ${currentTitle}.`);
+          renderTree(projectContext.projectFile, projectContext);
           return;
         }
 
@@ -1281,1066 +1757,84 @@
       }
     }
 
-    function getCpfPdfUrl(resource) {
-      const reference = resource?.reference || {};
-      const metadata = reference.metadata || {};
-      const referenceType = String(reference.type || '').trim();
-      const referenceValue = String(reference.value || '').trim();
-      const metadataPdf = typeof metadata.pdfUrl === 'string' ? metadata.pdfUrl.trim() : '';
-      const instrument = String(metadata.instrument || referenceValue).trim();
-
-      if (referenceType === 'server-upload' && referenceValue) {
-        return new URL(referenceValue, window.location.origin).toString();
-      }
-
-      if (metadataPdf.startsWith('/')) {
-        return new URL(metadataPdf, window.location.origin).toString();
-      }
-
-      let remoteUrl = '';
-      if (/^https?:\/\//i.test(metadataPdf)) {
-        remoteUrl = metadataPdf;
-      } else if (instrument) {
-        remoteUrl = `${ADA_CPF_PDF_BASE}${encodeURIComponent(instrument)}.pdf`;
-      }
-
-      if (!remoteUrl) return '';
-
-      const proxyUrl = new URL('/api/ros-pdf', window.location.origin);
-      proxyUrl.searchParams.set('url', remoteUrl);
-      return proxyUrl.toString();
-    }
-
-    async function fetchPdfThumbnailDataUrl(pdfUrl, {
-      maxAttempts = 60,
-      initialDelayMs = 350,
-      maxDelayMs = 4000,
-    } = {}) {
-      if (!pdfUrl) return '';
-      const thumbnailApiUrl = new URL('/api/project-files/pdf-thumbnail', window.location.origin);
-      thumbnailApiUrl.searchParams.set('source', pdfUrl);
-      const thumbnailKey = thumbnailApiUrl.toString();
-
-      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        const response = await fetch(thumbnailKey, { method: 'GET' });
-        if (response.status === 202) {
-          await new Promise((resolve) => setTimeout(resolve, Math.min(maxDelayMs, initialDelayMs + (attempt * 200))));
-          continue;
-        }
-        if (!response.ok) {
-          throw new Error(`thumbnail request failed (${response.status})`);
-        }
-        const blob = await response.blob();
-        if (typeof blob.arrayBuffer !== 'function') return '';
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        let binary = '';
-        const chunkSize = 0x8000;
-        for (let index = 0; index < bytes.length; index += chunkSize) {
-          binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
-        }
-        return `data:${blob.type || 'image/png'};base64,${btoa(binary)}`;
-      }
-      throw new Error('thumbnail generation timed out');
-    }
-
-    function openCpfPdfFromResource(resource) {
-      const pdfUrl = getCpfPdfUrl(resource);
-      if (!pdfUrl) {
-        renderError(`Selected CP&F file could not be opened. Missing instrument number for ${resource?.title || 'resource'}.`);
-        return;
-      }
-      openPdfInNewWindow(pdfUrl);
-    }
-
-    function openPdfInNewWindow(pdfUrl) {
-      if (!pdfUrl) return;
-      const popup = window.open('', '_blank', 'popup=yes,width=1200,height=900');
-      if (!popup) {
-        renderError('Your browser blocked the PDF window. Please allow pop-ups and try again.');
-        return;
-      }
-      popup.opener = null;
-      popup.location.replace(pdfUrl);
-    }
-
-    function canMoveResourceBetweenFolders(entry, sourceFolderKey = '', targetFolderKey = '') {
-      if (!entry || !sourceFolderKey || !targetFolderKey || sourceFolderKey === targetFolderKey) return false;
-      const referenceType = String(entry?.reference?.type || '').trim();
-      if (referenceType === 'project-point-file' || referenceType === 'project-drawing') return false;
-      return true;
-    }
-
-    function resolveServerUploadLocation(entry, fallbackFolderKey = '') {
-      const metadata = entry?.reference?.metadata || {};
-      let folderKey = String(fallbackFolderKey || '').trim();
-      let storedName = String(metadata?.storedName || '').trim();
-      const referenceValue = String(entry?.reference?.value || '').trim();
-      if (!referenceValue) return { folderKey, storedName };
-
-      let parsed = null;
-      try {
-        parsed = new URL(referenceValue, window.location.origin);
-      } catch {
-        return { folderKey, storedName };
-      }
-
-      const queryFolderKey = String(parsed.searchParams.get('folderKey') || '').trim();
-      const queryFileName = String(parsed.searchParams.get('fileName') || '').trim();
-      if (queryFolderKey) folderKey = queryFolderKey;
-      if (queryFileName) storedName = queryFileName;
-      return { folderKey, storedName };
-    }
-
-    async function moveServerUploadResource(projectContext, sourceFolderKey, targetFolderKey, entry) {
-      const projectId = String(projectContext?.activeProjectId || '').trim();
-      const initialLocation = resolveServerUploadLocation(entry, sourceFolderKey);
-      if (!projectId || !initialLocation?.storedName) throw new Error('Missing project upload metadata for move operation.');
-
-      const sendMoveRequest = async (folderKey, fileName) => {
-        const moveUrl = new URL('/api/project-files/file', window.location.origin);
-        moveUrl.searchParams.set('projectId', projectId);
-        moveUrl.searchParams.set('folderKey', folderKey);
-        moveUrl.searchParams.set('fileName', fileName);
-
-        const response = await fetch(moveUrl.toString(), {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetFolderKey }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        return { response, payload };
-      };
-
-      const firstAttempt = await sendMoveRequest(initialLocation.folderKey || sourceFolderKey, initialLocation.storedName);
-      if (firstAttempt.response.ok) return firstAttempt.payload?.resource || null;
-
-      const fallbackLocation = resolveServerUploadLocation(entry, '');
-      const shouldRetryWithFallback = firstAttempt.response.status === 404
-        && fallbackLocation.folderKey
-        && fallbackLocation.storedName
-        && (fallbackLocation.folderKey !== (initialLocation.folderKey || sourceFolderKey)
-          || fallbackLocation.storedName !== initialLocation.storedName);
-      if (shouldRetryWithFallback) {
-        const retryAttempt = await sendMoveRequest(fallbackLocation.folderKey, fallbackLocation.storedName);
-        if (retryAttempt.response.ok) return retryAttempt.payload?.resource || null;
-        throw new Error(retryAttempt.payload?.error || `Unable to move file (${retryAttempt.response.status}).`);
-      }
-
-      throw new Error(firstAttempt.payload?.error || `Unable to move file (${firstAttempt.response.status}).`);
-    }
-
-    async function deleteServerUploadResource(projectContext, sourceFolderKey, entry) {
-      const projectId = String(projectContext?.activeProjectId || '').trim();
-      const initialLocation = resolveServerUploadLocation(entry, sourceFolderKey);
-      if (!projectId || !initialLocation?.storedName) throw new Error('Missing project upload metadata for delete operation.');
-
-      const sendDeleteRequest = async (folderKey, fileName) => {
-        const deleteUrl = new URL('/api/project-files/file', window.location.origin);
-        deleteUrl.searchParams.set('projectId', projectId);
-        deleteUrl.searchParams.set('folderKey', folderKey);
-        deleteUrl.searchParams.set('fileName', fileName);
-
-        const response = await fetch(deleteUrl.toString(), { method: 'DELETE' });
-        const payload = await response.json().catch(() => ({}));
-        return { response, payload };
-      };
-
-      const firstAttempt = await sendDeleteRequest(initialLocation.folderKey || sourceFolderKey, initialLocation.storedName);
-      if (firstAttempt.response.ok) return true;
-
-      const fallbackLocation = resolveServerUploadLocation(entry, '');
-      const shouldRetryWithFallback = firstAttempt.response.status === 404
-        && fallbackLocation.folderKey
-        && fallbackLocation.storedName
-        && (fallbackLocation.folderKey !== (initialLocation.folderKey || sourceFolderKey)
-          || fallbackLocation.storedName !== initialLocation.storedName);
-      if (shouldRetryWithFallback) {
-        const retryAttempt = await sendDeleteRequest(fallbackLocation.folderKey, fallbackLocation.storedName);
-        if (retryAttempt.response.ok) return true;
-        throw new Error(retryAttempt.payload?.error || `Unable to delete file (${retryAttempt.response.status}).`);
-      }
-
-      throw new Error(firstAttempt.payload?.error || `Unable to delete file (${firstAttempt.response.status}).`);
-    }
-
-    let _dragScrollY = 0;
-    let _dragScrollActive = false;
-    let _dragScrollRaf = null;
-
-    function onDragOverForScroll(event) {
-      _dragScrollY = event.clientY;
-    }
-
-    function tickDragScroll() {
-      if (!_dragScrollActive) return;
-      const edgeZone = 100;
-      const maxSpeed = 14;
-      const vh = window.innerHeight;
-      if (_dragScrollY < edgeZone) {
-        window.scrollBy(0, -Math.round(maxSpeed * (1 - _dragScrollY / edgeZone)));
-      } else if (_dragScrollY > vh - edgeZone) {
-        window.scrollBy(0, Math.round(maxSpeed * (1 - (vh - _dragScrollY) / edgeZone)));
-      }
-      _dragScrollRaf = requestAnimationFrame(tickDragScroll);
-    }
-
-    function startDragAutoScroll() {
-      _dragScrollY = window.innerHeight / 2;
-      _dragScrollActive = true;
-      document.addEventListener('dragover', onDragOverForScroll);
-      _dragScrollRaf = requestAnimationFrame(tickDragScroll);
-    }
-
-    function stopDragAutoScroll() {
-      _dragScrollActive = false;
-      document.removeEventListener('dragover', onDragOverForScroll);
-      if (_dragScrollRaf !== null) {
-        cancelAnimationFrame(_dragScrollRaf);
-        _dragScrollRaf = null;
-      }
-    }
-
-    function buildFileDragImage(resource) {
-      const thumbImg = resource.querySelector('.file-preview-slot img');
-      if (!thumbImg || !thumbImg.src) return null;
-      const ghost = document.createElement('div');
-      ghost.className = 'file-drag-ghost';
-      ghost.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
-      const img = document.createElement('img');
-      img.src = thumbImg.src;
-      img.width = 86;
-      img.height = 86;
-      ghost.appendChild(img);
-      document.body.appendChild(ghost);
-      return ghost;
-    }
-
-    async function moveResourceFromEvidenceDesk(sourceFolder, targetFolder, entry, projectContext = {}) {
-      const sourceFolderKey = String(sourceFolder?.key || '').trim();
-      const targetFolderKey = String(targetFolder?.key || '').trim();
-      if (!canMoveResourceBetweenFolders(entry, sourceFolderKey, targetFolderKey)) {
-        projectContext.setUploadStatus('Only uploaded/local project-file entries can be moved between folders.');
-        return false;
-      }
-
-      let moved = false;
-      try {
-        if (entry?.reference?.type === 'server-upload') {
-          const movedResource = await moveServerUploadResource(projectContext, sourceFolderKey, targetFolderKey, entry);
-          if (!movedResource) throw new Error('Move response was missing resource data.');
-          removeResourceById(projectContext?.projectFile, sourceFolderKey, entry?.id);
-          moved = appendResourceToFolder(projectContext?.projectFile, targetFolderKey, movedResource);
-        } else {
-          moved = moveResourceById(projectContext?.projectFile, sourceFolderKey, targetFolderKey, entry?.id);
-        }
-
-        if (!moved) {
-          projectContext.setUploadStatus('Unable to move this file.');
-          return false;
-        }
-
-        saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
-        projectContext.setUploadStatus(`Moved ${entry?.title || entry?.id || 'file'} to ${targetFolder?.label || targetFolderKey}.`);
-        renderTree(projectContext.projectFile, projectContext);
-        return true;
-      } catch (error) {
-        projectContext.setUploadStatus(`Move failed: ${error.message || 'Unable to move this file.'}`);
-        renderTree(projectContext.projectFile, projectContext);
-        return false;
-      }
-    }
-
-
-    function getPdfPreviewUrl(folder, entry) {
-      if (folder?.key === 'cpfs') {
-        return getCpfPdfUrl(entry);
-      }
-      if (entry?.reference?.type === 'server-upload') {
-        return String(entry.reference.value || '').trim();
-      }
-      return '';
-    }
-
-    function isImageResource(entry) {
-      const format = String(entry?.exportFormat || '').toLowerCase();
-      return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(format);
-    }
-
-    function getMimeTypeFromFormat(format) {
-      const mimeMap = {
-        pdf: 'application/pdf',
-        png: 'image/png',
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
-        gif: 'image/gif',
-        webp: 'image/webp',
-        bmp: 'image/bmp',
-        svg: 'image/svg+xml',
-        csv: 'text/csv',
-        txt: 'text/plain',
-        json: 'application/json',
-      };
-      return mimeMap[String(format).toLowerCase()] || 'application/octet-stream';
-    }
-
-    const CPH_TOOLTIP_MARGIN = 16;
-    const CPH_GAP = 14;
-    let cpfHoverPreviewTooltip = null;
-
-    function ensureCpfHoverPreviewTooltip() {
-      if (cpfHoverPreviewTooltip && document.body.contains(cpfHoverPreviewTooltip)) {
-        return cpfHoverPreviewTooltip;
-      }
-      const tooltip = document.createElement('div');
-      tooltip.className = 'cpf-hover-preview-tooltip';
-      tooltip.setAttribute('aria-hidden', 'true');
-
-      const image = document.createElement('img');
-      image.className = 'cpf-hover-preview-image';
-      image.alt = '';
-      tooltip.appendChild(image);
-      document.body.appendChild(tooltip);
-      cpfHoverPreviewTooltip = tooltip;
-      return tooltip;
-    }
-
-    function hideCpfHoverPreviewTooltip() {
-      if (!cpfHoverPreviewTooltip) return;
-      cpfHoverPreviewTooltip.classList.remove('visible');
-      cpfHoverPreviewTooltip.style.width = '';
-      cpfHoverPreviewTooltip.style.height = '';
-      cpfHoverPreviewTooltip.style.left = '';
-      cpfHoverPreviewTooltip.style.top = '';
-    }
-
-    function showCpfHoverPreviewTooltip(anchor, imageSrc, altText = 'CP&F preview', sourceDimensions = null) {
-      if (!anchor || !imageSrc) return;
-
-      const tooltip = ensureCpfHoverPreviewTooltip();
-      const previewImage = tooltip.querySelector('.cpf-hover-preview-image');
-      if (!previewImage) return;
-      previewImage.src = imageSrc;
-      previewImage.alt = altText;
-
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const maxHeight = Math.max(220, Math.floor(viewportHeight * 0.9));
-      const anchorRect = anchor.getBoundingClientRect();
-      const imageNaturalWidth = Number(sourceDimensions?.width || previewImage.naturalWidth || anchor.naturalWidth || 0);
-      const imageNaturalHeight = Number(sourceDimensions?.height || previewImage.naturalHeight || anchor.naturalHeight || 0);
-      const safeImageHeight = imageNaturalHeight > 0 ? imageNaturalHeight : 1;
-      const imageAspectRatio = imageNaturalWidth > 0 ? (imageNaturalWidth / safeImageHeight) : (8.5 / 11);
-      const maxWidth = Math.max(180, viewportWidth - (CPH_TOOLTIP_MARGIN * 2));
-      const maxPreviewWidth = Math.min(maxWidth, Math.floor(viewportWidth * 0.6));
-      const previewHeight = Math.max(160, Math.min(maxHeight, Math.floor(maxPreviewWidth / imageAspectRatio)));
-      const previewWidth = Math.max(160, Math.min(maxPreviewWidth, Math.floor(previewHeight * imageAspectRatio)));
-
-      const availableRight = viewportWidth - anchorRect.right - CPH_GAP - CPH_TOOLTIP_MARGIN;
-      const availableLeft = anchorRect.left - CPH_GAP - CPH_TOOLTIP_MARGIN;
-      const shouldPlaceRight = availableRight >= previewWidth || availableRight >= availableLeft;
-      const preferredLeft = shouldPlaceRight
-        ? Math.round(anchorRect.right + CPH_GAP)
-        : Math.round(anchorRect.left - CPH_GAP - previewWidth);
-      const clampedLeft = Math.min(
-        Math.max(CPH_TOOLTIP_MARGIN, preferredLeft),
-        viewportWidth - previewWidth - CPH_TOOLTIP_MARGIN,
-      );
-
-      tooltip.style.width = `${Math.round(previewWidth)}px`;
-      tooltip.style.height = `${Math.round(previewHeight)}px`;
-
-      const centeredTop = anchorRect.top + (anchorRect.height / 2) - (previewHeight / 2);
-      const maxTop = Math.max(CPH_TOOLTIP_MARGIN, viewportHeight - previewHeight - CPH_TOOLTIP_MARGIN);
-      const clampedTop = Math.min(Math.max(CPH_TOOLTIP_MARGIN, centeredTop), maxTop);
-      tooltip.style.left = `${Math.round(clampedLeft)}px`;
-      tooltip.style.top = `${Math.round(clampedTop)}px`;
-      tooltip.classList.add('visible');
-    }
-
-    function bindCpfHoverPreview(thumb, entry) {
-      if (!thumb) return;
-      thumb.addEventListener('mouseenter', () => {
-        showCpfHoverPreviewTooltip(
-          thumb,
-          thumb.src,
-          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
-          {
-            width: thumb.naturalWidth,
-            height: thumb.naturalHeight,
-          },
-        );
-      });
-      thumb.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
-      thumb.addEventListener('focus', () => {
-        showCpfHoverPreviewTooltip(
-          thumb,
-          thumb.src,
-          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
-          {
-            width: thumb.naturalWidth,
-            height: thumb.naturalHeight,
-          },
-        );
-      });
-      thumb.addEventListener('blur', () => hideCpfHoverPreviewTooltip());
-    }
-
-    window.addEventListener('scroll', () => hideCpfHoverPreviewTooltip(), { passive: true });
-    window.addEventListener('resize', () => hideCpfHoverPreviewTooltip());
-
-    function attachImagePreview(resource, entry) {
-      if (entry?.reference?.type !== 'server-upload') return;
-      if (!isImageResource(entry)) return;
-
-      const previewUrl = String(entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
-      if (!previewUrl) return;
-
-      const slot = resource.querySelector('.file-preview-slot');
-      if (!slot) return;
-
-      const thumb = document.createElement('img');
-      thumb.className = 'image-preview-thumb';
-      thumb.src = previewUrl;
-      thumb.alt = `${entry?.title || entry?.id || 'Image'} preview`;
-      thumb.title = `${entry?.title || entry?.id || 'Image'} preview`;
-      thumb.decoding = 'async';
-      thumb.loading = 'lazy';
-      slot.replaceChildren(thumb);
-    }
-
-    async function attachPdfPreview(resource, folder, entry) {
-      const previewBaseUrl = getPdfPreviewUrl(folder, entry);
-      if (!previewBaseUrl) return;
-
-      const slot = resource.querySelector('.file-preview-slot');
-      if (!slot) return;
-
-      const placeholder = document.createElement('span');
-      placeholder.className = 'pdf-preview-placeholder';
-      placeholder.textContent = 'PDF';
-      placeholder.title = 'Generating thumbnail…';
-      slot.replaceChildren(placeholder);
-
-      const applyThumbnail = async () => {
-        const thumbnailDataUrl = await fetchPdfThumbnailDataUrl(previewBaseUrl);
-        if (!thumbnailDataUrl) return false;
-        const thumb = document.createElement('img');
-        thumb.className = 'pdf-preview-thumb';
-        thumb.src = thumbnailDataUrl;
-        thumb.alt = `${entry?.title || entry?.id || 'PDF'} preview`;
-        thumb.title = `${entry?.title || entry?.id || 'PDF'} preview`;
-        thumb.decoding = 'async';
-        thumb.loading = 'lazy';
-        if (folder?.key === 'cpfs') {
-          thumb.tabIndex = 0;
-          bindCpfHoverPreview(thumb, entry);
-        }
-        slot.replaceChildren(thumb);
-        return true;
-      };
-      try {
-        const done = await applyThumbnail();
-        if (done) return;
-        placeholder.classList.add('pdf-preview-failed');
-        placeholder.textContent = 'Unavailable';
-        placeholder.title = 'Thumbnail preview is unavailable right now. Open the PDF to view it.';
-      } catch {
-        placeholder.classList.add('pdf-preview-failed');
-        placeholder.textContent = 'Unavailable';
-        placeholder.title = 'Thumbnail preview failed to load. Open the PDF to view it.';
-      }
-    }
-
-    function describeCpfPointLinks(links = []) {
-      if (!Array.isArray(links) || !links.length) return '';
-      return links
-        .map((link, index) => `${index + 1}. ${link.pointFileTitle} → Point ${link.pointNumber} (${link.pointCode})`)
-        .join('\n');
-    }
-
-    async function deleteCpfResource(folder, resource, projectContext) {
-      const instrument = String(resource?.reference?.value || resource?.reference?.metadata?.instrument || '').trim();
-      const links = await findCpfPointLinksAsync(projectContext?.projectFile, resolvePointFileText, instrument);
-      let shouldDelete = true;
-      if (links.length) {
-        const detail = describeCpfPointLinks(links);
-        shouldDelete = window.confirm(`This CP&F is linked to ${links.length} point${links.length === 1 ? '' : 's'}:\n\n${detail}\n\nDelete CP&F anyway?`);
-      }
-      if (!shouldDelete) return;
-
-      const projectId = projectContext?.activeProjectId;
-      const cpfId = String(resource?.reference?.metadata?.cpfId || resource?.id || '').trim();
-      if (projectId && cpfId) {
-        try {
-          const response = await fetch(buildProjectCpfApiUrl(projectId, cpfId), { method: 'DELETE' });
-          if (!response.ok && response.status !== 404) {
-            throw new Error(`Server returned ${response.status}`);
-          }
-          await syncProjectCpfsFromApi(projectContext);
-        } catch (err) {
-          renderError(`Could not delete CP&F from server: ${err.message}`);
-          return;
-        }
-      } else {
-        const removed = removeResourceById(projectContext?.projectFile, folder?.key, resource?.id);
-        if (!removed) {
-          renderError(`Could not delete CP&F ${resource?.title || resource?.id || ''}.`);
-          return;
-        }
-        const saved = saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-        if (!saved) {
-          renderError('CP&F was removed in memory, but project snapshot could not be saved.');
-          return;
-        }
-      }
-
-      const deletedTitle = resource?.title || resource?.id || instrument || 'CP&F record';
-      projectContext.setUploadStatus(`Deleted ${deletedTitle}.`);
-      renderTree(projectContext.projectFile, projectContext);
-    }
-
-    function escapeHtml(text = '') {
-      return String(text)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-    }
-
-    function isCpfStarredForFieldBook(resource = {}) {
-      return Boolean(resource?.reference?.metadata?.starredInFieldBook);
-    }
-
-    async function setCpfFieldBookStar(resource = {}, starred = false, projectContext = {}) {
-      const projectId = String(projectContext?.activeProjectId || '').trim();
-      const cpfId = String(resource?.reference?.metadata?.cpfId || resource?.id || '').trim();
-      const instrument = String(resource?.reference?.metadata?.instrument || resource?.reference?.value || '').trim();
-      if (!projectId || !cpfId || !instrument) {
-        throw new Error('Missing project, CP&F, or instrument metadata.');
-      }
-
-      const response = await fetch(buildProjectCpfApiUrl(projectId, cpfId), {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          instrument,
-          title: resource?.title,
-          source: resource?.reference?.metadata?.source || '',
-          aliquots: resource?.reference?.metadata?.aliquots || [],
-          starredInFieldBook: Boolean(starred),
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
-
-      const payload = await response.json();
-      const nextValue = Boolean(payload?.cpf?.starredInFieldBook);
-      if (!resource.reference) resource.reference = {};
-      if (!resource.reference.metadata || typeof resource.reference.metadata !== 'object') resource.reference.metadata = {};
-      resource.reference.metadata.starredInFieldBook = nextValue;
-      return nextValue;
-    }
-
-    async function openCpfPrintPreview(resources = []) {
-      const printableResources = resources
-        .filter((entry) => isCpfStarredForFieldBook(entry))
-        .map((entry) => ({
-          entry,
-          url: getCpfPdfUrl(entry),
-        }))
-        .filter((item) => item.url);
-
-      if (!printableResources.length) {
-        renderError('No starred CP&F PDF records were found for this project. Star CP&Fs for your field book and try again.');
-        return;
-      }
-
-      // Use a plain same-origin popup so browsers return a writable window handle.
-      // Some engines return `null` when `noopener` is requested, which incorrectly
-      // triggers our popup-blocked error path and leaves a blank preview tab.
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        renderError('Your browser blocked the print-preview window. Please allow pop-ups and try again.');
-        return;
-      }
-
-      const thumbnailPages = await Promise.all(printableResources.map(async ({ url, entry }, index) => {
-        try {
-          const thumbnailDataUrl = await fetchPdfThumbnailDataUrl(url);
-          if (!thumbnailDataUrl) return '';
-          return `
-        <section class="page-block">
-          <img src="${escapeHtml(thumbnailDataUrl)}" alt="CP&amp;F thumbnail ${index + 1}" title="${escapeHtml(entry?.title || `CP&F ${index + 1}`)}" class="cpf-print-thumbnail" />
-        </section>
+    /* --------------------- Upload panel (basic, supports folder drop zone behavior) --------------------- */
+
+    function createFileUploadPanel(projectContext) {
+      const panel = document.createElement('div');
+      panel.className = 'upload-panel';
+      panel.innerHTML = `
+        <div class="upload-actions">
+          <label class="launch-btn">
+            Upload files…
+            <input type="file" multiple />
+          </label>
+          <span class="muted">Drop files/folders here to upload into the selected folder.</span>
+        </div>
+        <div class="upload-status"></div>
+        <progress class="upload-progress" max="100" hidden></progress>
       `;
-        } catch {
-          return '';
+
+      const fileInput = panel.querySelector('input[type="file"]');
+      const statusEl = panel.querySelector('.upload-status');
+      const progressEl = panel.querySelector('.upload-progress');
+
+      projectContext.setUploadStatus = (msg) => { if (statusEl) statusEl.textContent = msg || ''; };
+      projectContext.setUploadProgress = (pct) => {
+        if (!progressEl) return;
+        if (typeof pct === 'number' && Number.isFinite(pct)) {
+          progressEl.hidden = false;
+          progressEl.value = Math.max(0, Math.min(100, pct));
+        } else {
+          progressEl.hidden = true;
+          progressEl.removeAttribute('value');
         }
-      }));
-      const pagesMarkup = thumbnailPages.filter(Boolean).join('');
-      if (!pagesMarkup) {
-        renderError('No starred CP&F thumbnails could be generated right now. Try again in a moment.');
-        printWindow.close();
-        return;
-      }
+      };
 
-      printWindow.document.write(`<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>CP&amp;F Print Preview</title>
-  <style>
-    :root { color-scheme: light; }
-    body { font-family: Inter, system-ui, sans-serif; margin: 1rem; color: #0f172a; background: #fff; }
-    .toolbar { position: sticky; top: 0; background: #fff; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; }
-    .print-button { font: inherit; padding: 0.45rem 0.8rem; border-radius: 6px; border: 1px solid #334155; background: #fff; cursor: pointer; }
-    .page-block { margin: 0 0 1rem; display: flex; justify-content: center; background: #fff; }
-    .cpf-print-thumbnail { width: min(100%, 8.5in); max-height: calc(100vh - 5rem); object-fit: contain; border: 1px solid #94a3b8; border-radius: 8px; display: block; margin: 0 auto; background: #fff; }
-    @media print {
-      @page { margin: 0; }
-      .toolbar { display: none; }
-      body { margin: 0; background: #fff; }
-      .page-block { margin: 0; break-after: page; break-inside: avoid; page-break-after: always; page-break-inside: avoid; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #fff; }
-      .page-block:last-of-type { break-after: auto; page-break-after: auto; }
-      .cpf-print-thumbnail { width: 100%; max-height: 100vh; border: none; border-radius: 0; background: #fff; }
-    }
-  </style>
-</head>
-<body>
-  <div class="toolbar">
-    <button type="button" class="print-button" onclick="window.print()">Print all CP&amp;F thumbnails</button>
-  </div>
-  ${pagesMarkup}
-</body>
-</html>`);
-      printWindow.document.close();
-      printWindow.focus();
-    }
+      const setDragActive = (active) => panel.classList.toggle('drag-active', Boolean(active));
 
-    function loadActiveProjectContext(activeProjectId) {
-      try {
-        const projects = JSON.parse(localStorage.getItem('surveyfoundryProjects') || '[]');
-        if (!Array.isArray(projects)) return null;
-        return projects.find((project) => project.id === activeProjectId) || null;
-      } catch {
-        return null;
-      }
-    }
-
-    function isSupportedPointFile(file) {
-      const name = file?.name || '';
-      return /\.(csv|txt)$/i.test(name);
-    }
-
-    async function uploadPointFilesToServer(files, context) {
-      const accepted = Array.from(files || []).filter(isSupportedPointFile);
-      if (!accepted.length) {
-        context.setUploadStatus('No supported files found. Use .csv or .txt files.');
-        return;
-      }
-
-      if (!context.activeProjectId || !context.projectFile) {
-        context.setUploadStatus('Select an active project before uploading point files.');
-        return;
-      }
-
-      let uploadedCount = 0;
-      const totalFiles = accepted.length;
-      for (let index = 0; index < accepted.length; index += 1) {
-        const file = accepted[index];
-        const currentFileNumber = index + 1;
-        try {
-          context.setUploadProgress(null);
-          context.setUploadStatus(`Uploading point file ${currentFileNumber}/${totalFiles}: ${file.name}…`);
-          const text = await file.text();
-          const actorMetadata = buildPointFileActorMetadata('evidence-desk-upload');
-          const response = await fetch(buildProjectPointFileApiUrl(context.activeProjectId), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...actorMetadata.headers },
-            body: JSON.stringify({
-              pointFileName: file.name,
-              pointFileState: { text, exportFormat: 'csv' },
-              source: 'evidence-desk-upload',
-              sourceLabel: file.name,
-              changeContext: actorMetadata.changeContext,
-            }),
-          });
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({ error: 'Upload failed.' }));
-            context.setUploadStatus(`Failed to upload ${file.name}: ${err.error}`);
-            continue;
-          }
-          uploadedCount += 1;
-          context.setUploadStatus(`Uploaded point file ${uploadedCount}/${totalFiles}: ${file.name}`);
-        } catch (err) {
-          context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
-        }
-      }
-
-      if (!uploadedCount) {
-        context.setUploadProgress(null);
-        context.setUploadStatus('No point files were uploaded successfully.');
-        return;
-      }
-
-      await syncProjectPointFilesFromApi(context);
-      context.setUploadProgress(null);
-      context.setUploadStatus(`Uploaded ${uploadedCount} point file${uploadedCount === 1 ? '' : 's'} to this project.`);
-      renderTree(context.projectFile, context);
-    }
-
-    function uploadFileViaXhr(formData, onProgress) {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/project-files/upload');
-
-        xhr.upload.addEventListener('progress', (event) => {
-          if (typeof onProgress === 'function') {
-            onProgress(event);
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          let payload = null;
-          try {
-            payload = xhr.responseText ? JSON.parse(xhr.responseText) : null;
-          } catch {
-            payload = null;
-          }
-
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve({ ok: true, payload });
-            return;
-          }
-
-          resolve({ ok: false, payload });
-        });
-
-        xhr.addEventListener('error', () => reject(new Error('Network request failed.')));
-        xhr.send(formData);
+      panel.addEventListener('dragover', (ev) => {
+        ev.preventDefault();
+        setDragActive(true);
       });
-    }
-
-
-    function normalizeRosNumber(value = '') {
-      return String(value || '').trim();
-    }
-
-    function normalizePointNumber(value = '') {
-      return String(value || '').trim();
-    }
-
-    async function uploadFilesToServer(files, folderKey, context, onStatus) {
-      const fileList = Array.from(files || []);
-
-      function setStatus(message) {
-        if (onStatus) { onStatus(message, null); } else { context.setUploadStatus(message); }
-      }
-      function setProgress(percent) {
-        if (onStatus) { onStatus(null, percent); } else { context.setUploadProgress(percent); }
-      }
-      function setStatusAndProgress(message, percent) {
-        if (onStatus) { onStatus(message, percent); } else { context.setUploadProgress(percent); context.setUploadStatus(message); }
-      }
-
-      if (!fileList.length) {
-        setStatus('No files selected.');
-        return;
-      }
-      if (!context.activeProjectId || !context.projectFile) {
-        setStatus('Select an active project before uploading files.');
-        return;
-      }
-      if (!folderKey) {
-        setStatus('Please select a folder to upload into.');
-        return;
-      }
-
-      let uploadedCount = 0;
-      const totalFiles = fileList.length;
-      for (let index = 0; index < fileList.length; index += 1) {
-        const file = fileList[index];
-        const currentFileNumber = index + 1;
-        const formData = new FormData();
-        formData.append('projectId', context.activeProjectId);
-        formData.append('folderKey', folderKey);
-        formData.append('file', file, file.name);
-
-        try {
-          setProgress(null);
-          const response = await uploadFileViaXhr(formData, (event) => {
-            if (event.lengthComputable) {
-              const progress = Math.round((event.loaded / event.total) * 100);
-              setStatusAndProgress(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name} (${progress}%)`, progress);
-              return;
-            }
-            setStatus(`Uploading ${currentFileNumber}/${totalFiles}: ${file.name}…`);
-          });
-          if (!response.ok) {
-            const err = response.payload || { error: 'Upload failed.' };
-            setStatus(`Failed to upload ${file.name}: ${err.error}`);
-            continue;
-          }
-          const { resource } = response.payload || {};
-          const appended = appendResourceToFolder(context.projectFile, folderKey, resource);
-          if (appended) {
-            uploadedCount += 1;
-            setStatus(`Uploaded ${uploadedCount}/${totalFiles}: ${file.name}`);
-          }
-        } catch (err) {
-          setStatus(`Network error uploading ${file.name}: ${err.message}`);
-        }
-      }
-
-      if (!uploadedCount) {
-        setProgress(null);
-        setStatus('No files were uploaded successfully.');
-        return;
-      }
-
-      saveStoredProjectFile(window.localStorage, context.activeProjectId, context.projectFile);
-      setProgress(null);
-      setStatus(`Uploaded ${uploadedCount} file${uploadedCount === 1 ? '' : 's'} to project.`);
-      renderTree(context.projectFile, context);
-    }
-
-    function createFileUploadPanel(context) {
-      const panel = document.createElement('div');
-      panel.className = 'upload-panel';
-
-      const title = document.createElement('div');
-      title.className = 'muted';
-      title.textContent = 'Upload files to the project: drag files here, or choose files below.';
-      panel.appendChild(title);
-
-      const actions = document.createElement('div');
-      actions.className = 'upload-actions';
-
-      const folderSelect = document.createElement('select');
-      folderSelect.className = 'launch-btn';
-      folderSelect.style.padding = '0.3rem 0.45rem';
-      const defaultOption = document.createElement('option');
-      defaultOption.value = '';
-      defaultOption.textContent = 'Select folder…';
-      folderSelect.appendChild(defaultOption);
-      for (const folder of context.projectFile?.folders || []) {
-        const option = document.createElement('option');
-        option.value = folder.key;
-        option.textContent = folder.label;
-        folderSelect.appendChild(option);
-      }
-      actions.appendChild(folderSelect);
-
-
-      const picker = document.createElement('input');
-      picker.type = 'file';
-      picker.multiple = true;
-      picker.style.display = 'none';
-      picker.addEventListener('change', () => {
-        if (picker.files.length) {
-          uploadFilesToServer(picker.files, folderSelect.value, context);
-        }
+      panel.addEventListener('dragleave', (ev) => {
+        if (panel.contains(ev.relatedTarget)) return;
+        setDragActive(false);
+      });
+      panel.addEventListener('drop', async (ev) => {
+        ev.preventDefault();
+        setDragActive(false);
+        // This app's root drop doesn't infer folder target; it relies on folder-row drops.
+        projectContext.setUploadStatus('Drop files onto a folder to upload into that folder.');
       });
 
-      const pickerButton = document.createElement('button');
-      pickerButton.type = 'button';
-      pickerButton.className = 'launch-btn';
-      pickerButton.textContent = 'Choose Files';
-      pickerButton.addEventListener('click', () => {
-        if (!folderSelect.value) {
-          context.setUploadStatus('Please select a folder first.');
-          const statusEl = panel.querySelector('.upload-status');
-          if (statusEl) statusEl.textContent = context.uploadStatus;
-          return;
-        }
-        picker.click();
-      });
-
-      actions.appendChild(pickerButton);
-      actions.appendChild(picker);
-      panel.appendChild(actions);
-
-      const status = document.createElement('div');
-      status.className = 'upload-status';
-      status.textContent = context.uploadStatus || '';
-      panel.appendChild(status);
-
-      const progress = document.createElement('progress');
-      progress.className = 'upload-progress';
-      progress.max = 100;
-      progress.hidden = true;
-      panel.appendChild(progress);
-
-      if (context?.addUploadStatusListener) {
-        context.addUploadStatusListener((message, percent) => {
-          status.textContent = message || '';
-          if (typeof percent === 'number' && Number.isFinite(percent)) {
-            progress.hidden = false;
-            progress.value = Math.max(0, Math.min(100, percent));
-          } else {
-            progress.hidden = true;
-            progress.removeAttribute('value');
-          }
-        });
-      }
-
-      panel.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        panel.classList.add('drag-active');
-      });
-      panel.addEventListener('dragleave', () => panel.classList.remove('drag-active'));
-      panel.addEventListener('drop', (event) => {
-        event.preventDefault();
-        panel.classList.remove('drag-active');
-        if (!folderSelect.value) {
-          context.setUploadStatus('Please select a folder before dropping files.');
-          const statusEl = panel.querySelector('.upload-status');
-          if (statusEl) statusEl.textContent = context.uploadStatus;
-          return;
-        }
-        uploadFilesToServer(event.dataTransfer?.files, folderSelect.value, context);
+      fileInput?.addEventListener('change', () => {
+        if (!fileInput.files?.length) return;
+        projectContext.setUploadStatus('Drop files onto a folder to choose where to upload.');
+        fileInput.value = '';
       });
 
       return panel;
     }
 
-    function createPointFileUploadPanel(context) {
+    function createPointFileUploadPanel(projectContext) {
       const panel = document.createElement('div');
       panel.className = 'upload-panel';
-
-      const title = document.createElement('div');
-      title.className = 'muted';
-      title.textContent = 'Attach point files (.csv or .txt): drag files here on desktop, or choose files on mobile.';
-      panel.appendChild(title);
-
-      const actions = document.createElement('div');
-      actions.className = 'upload-actions';
-
-      const picker = document.createElement('input');
-      picker.type = 'file';
-      picker.accept = '.csv,text/csv,.txt,text/plain';
-      picker.multiple = true;
-      picker.addEventListener('change', () => uploadPointFilesToServer(picker.files, context));
-
-      const pickerButton = document.createElement('button');
-      pickerButton.type = 'button';
-      pickerButton.className = 'launch-btn';
-      pickerButton.textContent = 'Choose Point Files';
-      pickerButton.addEventListener('click', () => picker.click());
-
-      actions.appendChild(pickerButton);
-      actions.appendChild(picker);
-      panel.appendChild(actions);
-
-      const status = document.createElement('div');
-      status.className = 'upload-status';
-      status.textContent = context.uploadStatus || '';
-      panel.appendChild(status);
-
-      const progress = document.createElement('progress');
-      progress.className = 'upload-progress';
-      progress.max = 100;
-      progress.hidden = true;
-      panel.appendChild(progress);
-
-      if (context?.addUploadStatusListener) {
-        context.addUploadStatusListener((message, percent) => {
-          status.textContent = message || '';
-          if (typeof percent === 'number' && Number.isFinite(percent)) {
-            progress.hidden = false;
-            progress.value = Math.max(0, Math.min(100, percent));
-          } else {
-            progress.hidden = true;
-            progress.removeAttribute('value');
-          }
-        });
-      }
-
-      panel.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        panel.classList.add('drag-active');
-      });
-      panel.addEventListener('dragleave', () => panel.classList.remove('drag-active'));
-      panel.addEventListener('drop', (event) => {
-        event.preventDefault();
-        panel.classList.remove('drag-active');
-        uploadPointFilesToServer(event.dataTransfer?.files, context);
-      });
-
+      panel.style.marginTop = '0.5rem';
+      panel.innerHTML = `
+        <div class="upload-actions">
+          <span class="muted">Point files: upload CSV/TXT here (or drop onto the folder).</span>
+        </div>
+      `;
       return panel;
     }
 
+    /* --------------------- Folder strip thumbnail builder --------------------- */
 
-    async function saveUploadedResourceMetadata(folder, entry, updatesRaw, projectContext = {}) {
-      const metadata = entry?.reference?.metadata || {};
-      const projectId = projectContext?.activeProjectId;
-      const folderKey = folder?.key;
-      const storedFileName = metadata?.storedName;
-      if (!projectId || !folderKey || !storedFileName) {
-        renderError('Cannot update metadata: missing upload metadata.');
-        return null;
-      }
-
-      const updates = {};
-      if (Object.prototype.hasOwnProperty.call(updatesRaw || {}, 'rosNumber')) {
-        updates.rosNumber = normalizeRosNumber(updatesRaw.rosNumber);
-      }
-      if (Object.prototype.hasOwnProperty.call(updatesRaw || {}, 'pointNumber')) {
-        updates.pointNumber = normalizePointNumber(updatesRaw.pointNumber);
-      }
-      if (!Object.keys(updates).length) {
-        renderError('No metadata fields were provided.');
-        return null;
-      }
-
-      const metadataUrl = new URL('/api/project-files/metadata', window.location.origin);
-      metadataUrl.searchParams.set('projectId', projectId);
-      metadataUrl.searchParams.set('folderKey', folderKey);
-      metadataUrl.searchParams.set('fileName', storedFileName);
-      const response = await fetch(metadataUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload?.resource) {
-        renderError(payload?.error || 'Failed to update upload metadata.');
-        return null;
-      }
-      const replaced = removeResourceById(projectContext?.projectFile, folderKey, entry?.id);
-      if (replaced) appendResourceToFolder(projectContext?.projectFile, folderKey, payload.resource);
-      saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-      renderTree(projectContext.projectFile, projectContext);
-      return payload.resource;
-    }
-
-    async function setRosNumberForUploadedResource(folder, entry, rosNumberRaw, projectContext = {}) {
-      const metadata = entry?.reference?.metadata || {};
-      const storedFileName = metadata?.storedName;
-      const rosNumber = normalizeRosNumber(rosNumberRaw);
-      projectContext.setUploadStatus(`Updating ROS number for ${entry?.title || storedFileName}…`);
-      const resource = await saveUploadedResourceMetadata(folder, entry, { rosNumber }, projectContext);
-      if (!resource) return;
-      projectContext.setUploadStatus(`Saved ROS # ${rosNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
-    }
-
-    async function setPointNumberForUploadedResource(folder, entry, pointNumberRaw, projectContext = {}) {
-      const metadata = entry?.reference?.metadata || {};
-      const storedFileName = metadata?.storedName;
-      const pointNumber = normalizePointNumber(pointNumberRaw);
-      projectContext.setUploadStatus(`Updating point number for ${entry?.title || storedFileName}…`);
-      const resource = await saveUploadedResourceMetadata(folder, entry, { pointNumber }, projectContext);
-      if (!resource) return;
-      projectContext.setUploadStatus(`Saved point # ${pointNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
-    }
-
-    
     function isFolderCollapsed(folderKey) {
       // Default: collapsed (true). Only expanded if explicitly set to false.
       return folderCollapseState.get(folderKey) !== false;
     }
+
     function openEntryFromFolder(folder, entry, projectContext) {
       const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
       const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
@@ -2365,6 +1859,7 @@
         }
       }
     }
+
     async function attachThumbStripItemPreview(thumbImg, folder, entry) {
       const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
       const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
@@ -2402,6 +1897,7 @@
         }
       }
     }
+
     function buildFolderThumbnailStrip(folder, projectContext) {
       const strip = document.createElement('div');
       strip.className = 'folder-thumbnail-strip';
@@ -2458,97 +1954,111 @@
       return strip;
     }
 
+    /* --------------------- Drag support (ghost image + autoscroll) --------------------- */
 
-    async function openProjectPointFileVersionInPointForge(resource, versionId, projectContext = {}) {
-      const text = await resolvePointFileText(resource, { versionId });
-      if (!text || !text.trim()) {
-        renderError(`Selected point-file version could not be opened. Unable to load text for ${resource?.title || 'resource'}.`);
-        return;
+    let dragAutoScrollTimer = null;
+
+    function startDragAutoScroll() {
+      if (dragAutoScrollTimer) return;
+      dragAutoScrollTimer = setInterval(() => {
+        // noop placeholder; keep for compatibility with earlier UI
+      }, 125);
+    }
+
+    function stopDragAutoScroll() {
+      if (dragAutoScrollTimer) clearInterval(dragAutoScrollTimer);
+      dragAutoScrollTimer = null;
+    }
+
+    function buildFileDragImage(resource) {
+      const thumbImg = resource.querySelector('.file-preview-slot img');
+      if (!thumbImg || !thumbImg.src) return null;
+      const ghost = document.createElement('div');
+      ghost.className = 'file-drag-ghost';
+      ghost.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+      const img = document.createElement('img');
+      img.src = thumbImg.src;
+      img.width = 86;
+      img.height = 86;
+      ghost.appendChild(img);
+      document.body.appendChild(ghost);
+      return ghost;
+    }
+
+    async function moveResourceFromEvidenceDesk(sourceFolder, targetFolder, entry, projectContext = {}) {
+      const sourceFolderKey = String(sourceFolder?.key || '').trim();
+      const targetFolderKey = String(targetFolder?.key || '').trim();
+      if (!canMoveResourceBetweenFolders(entry, sourceFolderKey, targetFolderKey)) {
+        projectContext.setUploadStatus('Only uploaded/local project-file entries can be moved between folders.');
+        return false;
       }
 
-      localStorage.setItem(POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY, JSON.stringify({
-        csv: text,
-        title: resource.title || resource.id || 'Point File',
-        pointFileId: resource?.reference?.metadata?.pointFileId || resource?.id || '',
-        versionId: String(versionId || '').trim() || null,
-      }));
-
-      const destination = new URL('/POINT_TRANSFORMER.HTML', window.location.origin);
-      destination.searchParams.set('source', 'project-browser');
-      if (projectContext.projectId) destination.searchParams.set('projectId', projectContext.projectId);
-      if (projectContext.projectName) destination.searchParams.set('projectName', projectContext.projectName);
-      openLinkedApp(`${destination.pathname}${destination.search}`);
-    }
-
-    function formatVersionTimelineStamp(value = '') {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return 'Unknown date';
-      return date.toLocaleString();
-    }
-
-    async function attachProjectPointFileVersionTimeline(resource, entry, projectContext = {}) {
-      if (!resource || !entry || entry?.reference?.type !== 'project-point-file') return;
-
-      const details = document.createElement('details');
-      details.className = 'point-file-version-details';
-      details.innerHTML = '<summary class="point-file-version-summary">Version timeline (loading…)</summary>';
-      resource.appendChild(details);
-
-      details.addEventListener('click', (event) => event.stopPropagation());
-      details.addEventListener('keydown', (event) => event.stopPropagation());
-
-      details.addEventListener('toggle', async () => {
-        if (!details.open || details.dataset.loaded === 'true' || details.dataset.loading === 'true') return;
-        details.dataset.loading = 'true';
-
-        const summary = details.querySelector('.point-file-version-summary');
-        try {
-          const record = await fetchProjectPointFileRecord(entry);
-          const versions = Array.isArray(record?.versions) ? [...record.versions].reverse() : [];
-          summary.textContent = `Version timeline (${versions.length})`;
-
-          const list = document.createElement('ol');
-          list.className = 'point-file-version-list';
-          for (const version of versions) {
-            const actor = version?.actor || {};
-            const actorUser = String(actor?.user || 'unknown-user').trim() || 'unknown-user';
-            const actorTool = String(actor?.app || 'unknown-app').trim() || 'unknown-app';
-            const savedAt = formatVersionTimelineStamp(version?.savedAt);
-
-            const item = document.createElement('li');
-            item.className = 'point-file-version-item';
-
-            const label = document.createElement('span');
-            label.className = 'point-file-version-label';
-            label.textContent = `${savedAt} — ${actorUser} via ${actorTool}`;
-
-            const openButton = document.createElement('button');
-            openButton.type = 'button';
-            openButton.className = 'point-file-version-open';
-            openButton.textContent = 'Open in PointForge';
-            openButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await openProjectPointFileVersionInPointForge(entry, version?.versionId, projectContext);
-            });
-
-            item.append(label, openButton);
-            list.appendChild(item);
-          }
-
-          details.appendChild(list);
-          details.dataset.loaded = 'true';
-        } catch (err) {
-          summary.textContent = 'Version timeline (failed to load)';
-          const error = document.createElement('div');
-          error.className = 'muted';
-          error.style.padding = '0 0.55rem 0.55rem';
-          error.textContent = err?.message || 'Unable to load version timeline.';
-          details.appendChild(error);
-        } finally {
-          delete details.dataset.loading;
+      let moved = false;
+      try {
+        if (entry?.reference?.type === 'server-upload') {
+          const movedResource = await moveServerUploadResource(projectContext, sourceFolderKey, targetFolderKey, entry);
+          if (!movedResource) throw new Error('Move response was missing resource data.');
+          removeResourceById(projectContext?.projectFile, sourceFolderKey, entry?.id);
+          moved = appendResourceToFolder(projectContext?.projectFile, targetFolderKey, movedResource);
+        } else {
+          moved = moveResourceById(projectContext?.projectFile, sourceFolderKey, targetFolderKey, entry?.id);
         }
-      });
+
+        if (!moved) {
+          projectContext.setUploadStatus('Unable to move this file.');
+          return false;
+        }
+
+        saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+        projectContext.setUploadStatus(`Moved ${entry?.title || entry?.id || 'file'} to ${targetFolder?.label || targetFolderKey}.`);
+        renderTree(projectContext.projectFile, projectContext);
+        return true;
+      } catch (error) {
+        projectContext.setUploadStatus(`Move failed: ${error.message || 'Unable to move this file.'}`);
+        renderTree(projectContext.projectFile, projectContext);
+        return false;
+      }
     }
+
+    /* --------------------- Association index (minimal stubs, preserves UI fields) --------------------- */
+
+    function normalizeAssociationId(value) {
+      return String(value || '').trim();
+    }
+
+    function buildDrawingAssociationIndex(projectFile) {
+      const drawingsByPointFileId = new Map();
+      const pointFileByDrawingId = new Map();
+
+      const folders = Array.isArray(projectFile?.folders) ? projectFile.folders : [];
+      const pointFilesFolder = folders.find((f) => f.key === 'point-files');
+      const drawingsFolder = folders.find((f) => f.key === 'drawings');
+
+      const pointFileNameById = new Map();
+      for (const pf of (pointFilesFolder?.index || [])) {
+        const id = normalizeAssociationId(pf?.reference?.metadata?.pointFileId || pf?.reference?.value || pf?.id || '');
+        if (id) pointFileNameById.set(id, pf?.title || pf?.id || id);
+      }
+
+      for (const drawing of (drawingsFolder?.index || [])) {
+        const metadata = drawing?.reference?.metadata || {};
+        const drawingId = normalizeAssociationId(metadata?.drawingId || drawing?.reference?.value || drawing?.id || '');
+        const linkedPointFileId = normalizeAssociationId(metadata?.linkedPointFileId || '');
+        if (!drawingId || !linkedPointFileId) continue;
+        const drawingTitle = drawing?.title || drawing?.id || 'Drawing';
+        const linkedPointFileName = drawing?.reference?.metadata?.linkedPointFileName
+          || pointFileNameById.get(linkedPointFileId)
+          || linkedPointFileId;
+        const associatedDrawings = drawingsByPointFileId.get(linkedPointFileId) || [];
+        associatedDrawings.push(drawingTitle);
+        drawingsByPointFileId.set(linkedPointFileId, associatedDrawings);
+        pointFileByDrawingId.set(drawingId, linkedPointFileName);
+      }
+
+      return { drawingsByPointFileId, pointFileByDrawingId };
+    }
+
+    /* --------------------- Tree rendering --------------------- */
 
     function renderTree(projectFile, projectContext = {}) {
       treeContainer.innerHTML = '';
@@ -2558,7 +2068,7 @@
 
       const root = document.createElement('div');
       root.className = 'tree-root';
-      root.innerHTML = `<span class="icon">🗂️</span><strong>${projectFile.archive.rootFolderName}</strong><span class="muted">(symbolic root folder)</span>`;
+      root.innerHTML = `<span class="icon">🗂️</span><strong>${escapeHtml(projectFile.archive.rootFolderName)}</strong><span class="muted">(symbolic root folder)</span>`;
 
       const addRootFolderIconBtn = document.createElement('button');
       addRootFolderIconBtn.type = 'button';
@@ -2616,6 +2126,7 @@
         inlineForm.appendChild(inlineInput);
         inlineForm.appendChild(saveBtn);
         inlineForm.appendChild(cancelBtn);
+
         treeContainer.insertBefore(inlineForm, manifest);
         inlineInput.focus();
       });
@@ -2633,19 +2144,22 @@
       const folderChildrenContainerMap = new Map();
       for (const folder of projectFile.folders || []) {
         const parentChildrenContainer = folder.parentKey ? folderChildrenContainerMap.get(folder.parentKey) : null;
-                let thumbnailStrip = null;
+        let thumbnailStrip = null;
         let pointFileUploadPanel = null;
         const isCollapsed = isFolderCollapsed(folder.key);
         const folderGroupWrapper = document.createElement('div');
         folderGroupWrapper.className = 'folder-group';
         (parentChildrenContainer || treeContainer).appendChild(folderGroupWrapper);
+
         const folderUploadStatusText = document.createElement('div');
         folderUploadStatusText.className = 'upload-status';
         folderUploadStatusText.hidden = true;
+
         const folderUploadProgressBar = document.createElement('progress');
         folderUploadProgressBar.className = 'upload-progress';
         folderUploadProgressBar.max = 100;
         folderUploadProgressBar.hidden = true;
+
         const onFolderUploadStatus = (message, percent) => {
           if (message !== null) {
             folderUploadStatusText.textContent = message || '';
@@ -2664,7 +2178,8 @@
         folderRow.className = 'folder-row';
         folderRow.dataset.folderKey = folder.key;
         folderRow.dataset.collapsed = isCollapsed ? 'true' : 'false';
-        folderRow.innerHTML = `<span class="folder-collapse-chevron" aria-hidden="true">▶</span><span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
+        folderRow.innerHTML = `<span class="folder-collapse-chevron" aria-hidden="true">▶</span><span class="folder-title"><span class="icon">📁</span><strong>${escapeHtml(folder.label)}</strong><span class="muted">${escapeHtml(folder.description || '')}</span></span>`;
+
         folderRow.addEventListener('click', (event) => {
           if (event.target.closest('button, input, select, a')) return;
           const nowCollapsed = !isFolderCollapsed(folder.key);
@@ -2676,6 +2191,7 @@
           if (pointFileUploadPanel) pointFileUploadPanel.hidden = nowCollapsed;
           childrenContainer.hidden = nowCollapsed;
         });
+
         folderRow.addEventListener('dragover', (event) => {
           const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
           if (dragTypes.includes('application/x-surveycad-resource-move')) {
@@ -2688,10 +2204,12 @@
             folderRow.classList.add('folder-upload-drop-target');
           }
         });
+
         folderRow.addEventListener('dragleave', () => {
           folderRow.classList.remove('folder-drop-target');
           folderRow.classList.remove('folder-upload-drop-target');
         });
+
         folderRow.addEventListener('drop', async (event) => {
           event.preventDefault();
           folderRow.classList.remove('folder-drop-target');
@@ -2712,21 +2230,11 @@
             return;
           }
           if (event.dataTransfer?.files?.length) {
-            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus);
+            // Upload via server API if present; otherwise fall back to local-only.
+            projectContext.setUploadStatus('Upload endpoint not wired in this standalone build.');
+            onFolderUploadStatus('Upload endpoint not wired in this standalone build.', null);
           }
         });
-
-        let printAllButton = null;
-        if (folder.key === 'cpfs') {
-          printAllButton = document.createElement('button');
-          printAllButton.type = 'button';
-          printAllButton.className = 'launch-btn';
-          printAllButton.textContent = 'Print starred';
-          printAllButton.title = 'Builds a single print preview containing starred CP&F PDFs for your field book';
-          printAllButton.addEventListener('click', () => openCpfPrintPreview(folder.index));
-          printAllButton.disabled = !folder.index.some((entry) => entry?.exportFormat === 'pdf' && isCpfStarredForFieldBook(entry));
-          folderRow.appendChild(printAllButton);
-        }
 
         if (folder.custom) {
           const removeBtn = document.createElement('button');
@@ -2758,598 +2266,205 @@
 
         folderGroupWrapper.appendChild(folderRow);
 
+        // When collapsed, show a horizontal thumbnail strip so you can skim the folder contents at a glance.
+        thumbnailStrip = buildFolderThumbnailStrip(folder, projectContext);
+        thumbnailStrip.hidden = !isCollapsed;
+        folderGroupWrapper.appendChild(thumbnailStrip);
+
         const folderUploadFeedback = document.createElement('div');
         folderUploadFeedback.className = 'folder-upload-feedback';
         folderUploadFeedback.appendChild(folderUploadStatusText);
         folderUploadFeedback.appendChild(folderUploadProgressBar);
         folderGroupWrapper.appendChild(folderUploadFeedback);
+        folderUploadFeedback.hidden = isCollapsed;
 
         if (folder.key === 'point-files') {
-          folderGroupWrapper.appendChild(createPointFileUploadPanel(projectContext));
+          pointFileUploadPanel = createPointFileUploadPanel(projectContext);
+          pointFileUploadPanel.hidden = isCollapsed;
+          folderGroupWrapper.appendChild(pointFileUploadPanel);
         }
 
         const fileListContainer = document.createElement('div');
         fileListContainer.className = 'file-list-container';
-        fileListContainer.addEventListener('dragover', (event) => {
-          const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-          if (dragTypes.includes('application/x-surveycad-resource-move')) {
-            event.preventDefault();
-            fileListContainer.classList.add('file-list-drop-target');
-            return;
-          }
-          if (dragTypes.includes('Files')) {
-            event.preventDefault();
-            fileListContainer.classList.add('file-list-upload-drop-target');
-          }
-        });
-        fileListContainer.addEventListener('dragleave', (event) => {
-          if (fileListContainer.contains(event.relatedTarget)) return;
-          fileListContainer.classList.remove('file-list-drop-target');
-          fileListContainer.classList.remove('file-list-upload-drop-target');
-        });
-        fileListContainer.addEventListener('drop', async (event) => {
-          event.preventDefault();
-          fileListContainer.classList.remove('file-list-drop-target');
-          fileListContainer.classList.remove('file-list-upload-drop-target');
-          const payloadRaw = event.dataTransfer?.getData('application/x-surveycad-resource-move');
-          if (payloadRaw) {
-            let payload = null;
-            try {
-              payload = JSON.parse(payloadRaw);
-            } catch {
-              return;
-            }
-            if (!payload?.resourceId || !payload?.sourceFolderKey || payload.sourceFolderKey === folder.key) return;
-            const sourceFolder = projectFile.folders.find((candidate) => candidate.key === payload.sourceFolderKey);
-            const draggedEntry = sourceFolder?.index?.find((candidate) => candidate?.id === payload.resourceId);
-            if (!sourceFolder || !draggedEntry) return;
-            await moveResourceFromEvidenceDesk(sourceFolder, folder, draggedEntry, projectContext);
-            return;
-          }
-          if (event.dataTransfer?.files?.length) {
-            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus);
-          }
-        });
+        fileListContainer.hidden = isCollapsed;
+
         folderGroupWrapper.appendChild(fileListContainer);
 
-        if (!folder.index.length) {
+        if (!folder.index?.length) {
           const empty = document.createElement('div');
           empty.className = 'empty';
           empty.textContent = 'No linked resources yet.';
           fileListContainer.appendChild(empty);
         } else {
-        function buildOneFileRow(entry) {
-          const resource = document.createElement('div');
-          resource.className = 'file-row';
+          function buildOneFileRow(entry) {
+            const resource = document.createElement('div');
+            resource.className = 'file-row';
 
-          const canDragToMove = canMoveResourceBetweenFolders(entry, folder.key, '__other__');
-          if (canDragToMove) {
-            resource.classList.add('file-draggable');
-            resource.draggable = true;
-            resource.addEventListener('dragstart', (event) => {
-              resource.classList.add('file-dragging');
-              startDragAutoScroll();
-              event.dataTransfer?.setData('application/x-surveycad-resource-move', JSON.stringify({
-                resourceId: entry.id,
-                sourceFolderKey: folder.key,
-              }));
-              if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copyMove';
-              const dragImage = buildFileDragImage(resource);
-              if (dragImage && event.dataTransfer) {
-                event.dataTransfer.setDragImage(dragImage, 49, 49);
-                requestAnimationFrame(() => dragImage.remove());
-              }
-              if (entry?.reference?.type === 'server-upload' && event.dataTransfer) {
-                const serverDownloadUrl = String(entry.reference.value || '').trim();
-                if (serverDownloadUrl) {
-                  const mimeType = getMimeTypeFromFormat(entry?.exportFormat || '');
-                  const fileName = entry?.title || `${entry.id}.${entry.exportFormat}`;
-                  const absoluteUrl = new URL(serverDownloadUrl, window.location.origin).href;
-                  event.dataTransfer.setData('DownloadURL', `${mimeType}:${fileName}:${absoluteUrl}`);
+            const canDragToMove = canMoveResourceBetweenFolders(entry, folder.key, '__other__');
+            if (canDragToMove) {
+              resource.classList.add('file-draggable');
+              resource.draggable = true;
+              resource.addEventListener('dragstart', (event) => {
+                resource.classList.add('file-dragging');
+                startDragAutoScroll();
+                event.dataTransfer?.setData('application/x-surveycad-resource-move', JSON.stringify({
+                  resourceId: entry.id,
+                  sourceFolderKey: folder.key,
+                }));
+                if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copyMove';
+                const dragImage = buildFileDragImage(resource);
+                if (dragImage && event.dataTransfer) {
+                  event.dataTransfer.setDragImage(dragImage, 49, 49);
+                  requestAnimationFrame(() => dragImage.remove());
                 }
-              }
-            });
-            resource.addEventListener('dragend', () => {
-              resource.classList.remove('file-dragging');
-              stopDragAutoScroll();
-            });
-          }
-
-          const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
-          const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
-          const canLaunchPointForge = folder.key === 'point-files'
-            && isPointFileFormat
-            && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
-          const canOpenLineSmithDrawing = folder.key === 'drawings'
-            && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
-          const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
-          const isPdfResource = entry?.exportFormat === 'pdf';
-          const isImageUpload = isImageResource(entry);
-          const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing || isPdfResource || isImageUpload;
-          const actualFileName = `${entry.id}.${entry.exportFormat}`;
-          const configuredFileName = entry?.title || actualFileName;
-          const leadingIcon = showThumbnailSlot ? '' : '<span class="icon">📄</span>';
-          const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
-          const rosNumber = String(entry?.reference?.metadata?.rosNumber || '').trim();
-          const pointNumber = String(entry?.reference?.metadata?.pointNumber || '').trim();
-          const rosPillMarkup = rosNumber ? `<span class="ros-number-pill" title="Recorded map number for ROS linking">ROS # ${rosNumber}</span>` : '';
-          const pointPillMarkup = pointNumber ? `<span class="ros-number-pill" title="Linked photo point number">PT # ${pointNumber}</span>` : '';
-          const pointFileSource = String(entry?.reference?.metadata?.source || '').trim();
-          const pointFileSourceLabel = String(entry?.reference?.metadata?.sourceLabel || '').trim();
-          const equipmentAuditPillMarkup = pointFileSource === 'equipment-log'
-            ? `<span class="ros-number-pill" title="${pointFileSourceLabel || 'Attached from Equipment Log'}">Equip Log</span>`
-            : '';
-          const pointFileAssociations = associationIndex.drawingsByPointFileId.get(
-            normalizeAssociationId(entry?.reference?.metadata?.pointFileId || entry?.reference?.value || entry?.id || ''),
-          ) || [];
-          const drawingAssociationName = associationIndex.pointFileByDrawingId.get(
-            normalizeAssociationId(entry?.reference?.metadata?.drawingId || entry?.reference?.value || entry?.id || ''),
-          ) || '';
-          const pointFileAssociationMarkup = folder.key === 'point-files' && pointFileAssociations.length
-            ? `<ul class="association-list" title="LineSmith drawings associated with this point file">${pointFileAssociations.map((title) => `<li class="association-list-item">↳ Drawing: ${title}</li>`).join('')}</ul>`
-            : '';
-          const drawingAssociationMarkup = folder.key === 'drawings' && drawingAssociationName
-            ? `<ul class="association-list" title="Point file associated with this drawing"><li class="association-list-item">↳ Point file: ${drawingAssociationName}</li></ul>`
-            : '';
-          resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-primary"><span class="file-name-configured" title="${actualFileName}">${configuredFileName}</span>${rosPillMarkup}${pointPillMarkup}${equipmentAuditPillMarkup}</span>${pointFileAssociationMarkup}${drawingAssociationMarkup}</span></span>`;
-          const actionButtons = document.createElement('div');
-          actionButtons.className = 'file-actions';
-          resource.appendChild(actionButtons);
-
-          if (canLaunchPointForge) {
-            attachPointFilePreview(resource, entry).catch(() => {});
-          }
-
-          if (canOpenLineSmithDrawing) {
-            attachDrawingPreview(resource, entry).catch(() => {});
-          }
-
-          if (isPdfResource) {
-            attachPdfPreview(resource, folder, entry);
-          }
-
-          if (isImageUpload) {
-            attachImagePreview(resource, entry);
-          }
-
-          if (canLaunchPointForge) {
-            resource.classList.add('pointforge-openable');
-            resource.setAttribute('role', 'button');
-            resource.setAttribute('tabindex', '0');
-            resource.title = 'Tap to open this point file in PointForge';
-            resource.addEventListener('click', () => launchPointForgeFromResource(entry, projectContext));
-            resource.addEventListener('keydown', (event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              launchPointForgeFromResource(entry, projectContext);
-            });
-
-            const openButton = document.createElement('button');
-            openButton.type = 'button';
-            openButton.className = 'launch-btn';
-            openButton.textContent = 'Open in PointForge';
-            openButton.title = 'Loads this point file into PointForge input';
-            openButton.addEventListener('click', (event) => {
-              event.stopPropagation();
-              launchPointForgeFromResource(entry, projectContext);
-            });
-            actionButtons.appendChild(openButton);
-
-            const deletePointFileButton = document.createElement('button');
-            deletePointFileButton.type = 'button';
-            deletePointFileButton.className = 'launch-btn';
-            deletePointFileButton.textContent = 'Delete';
-            deletePointFileButton.title = 'Remove this point file from the project';
-            deletePointFileButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            actionButtons.appendChild(deletePointFileButton);
-
-            const renamePointFileButton = document.createElement('button');
-            renamePointFileButton.type = 'button';
-            renamePointFileButton.className = 'launch-btn';
-            renamePointFileButton.textContent = 'Rename';
-            renamePointFileButton.title = 'Rename this point file across project references';
-            renamePointFileButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            actionButtons.appendChild(renamePointFileButton);
-          }
-
-          if (canOpenLineSmithDrawing) {
-            resource.classList.add('pointforge-openable');
-            resource.setAttribute('role', 'button');
-            resource.setAttribute('tabindex', '0');
-            resource.title = 'Tap to open this drawing in LineSmith';
-            resource.addEventListener('click', () => launchLineSmithFromDrawingResource(entry, projectContext));
-            resource.addEventListener('keydown', (event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              launchLineSmithFromDrawingResource(entry, projectContext);
-            });
-
-            const openButton = document.createElement('button');
-            openButton.type = 'button';
-            openButton.className = 'launch-btn';
-            openButton.textContent = 'Open in LineSmith';
-            openButton.title = 'Loads this saved drawing into LineSmith';
-            openButton.addEventListener('click', (event) => {
-              event.stopPropagation();
-              launchLineSmithFromDrawingResource(entry, projectContext);
-            });
-            actionButtons.appendChild(openButton);
-
-            const renameDrawingButton = document.createElement('button');
-            renameDrawingButton.type = 'button';
-            renameDrawingButton.className = 'launch-btn';
-            renameDrawingButton.textContent = 'Rename';
-            renameDrawingButton.title = 'Rename this drawing across project references';
-            renameDrawingButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            actionButtons.appendChild(renameDrawingButton);
-
-            const deleteDrawingButton = document.createElement('button');
-            deleteDrawingButton.type = 'button';
-            deleteDrawingButton.className = 'launch-btn';
-            deleteDrawingButton.textContent = 'Delete';
-            deleteDrawingButton.title = 'Remove this drawing from the project';
-            deleteDrawingButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            actionButtons.appendChild(deleteDrawingButton);
-          }
-
-          if (canOpenCpfPdf) {
-            resource.classList.add('pointforge-openable');
-            resource.setAttribute('role', 'button');
-            resource.setAttribute('tabindex', '0');
-            resource.title = 'Tap to open this CP&F PDF in a new browser window';
-            resource.addEventListener('click', () => openCpfPdfFromResource(entry));
-            resource.addEventListener('keydown', (event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              openCpfPdfFromResource(entry);
-            });
-
-            const openButton = document.createElement('button');
-            openButton.type = 'button';
-            openButton.className = 'launch-btn';
-            openButton.textContent = 'Open PDF';
-            openButton.title = 'Opens this CP&F PDF in a new browser window';
-            openButton.addEventListener('click', (event) => {
-              event.stopPropagation();
-              openCpfPdfFromResource(entry);
-            });
-            actionButtons.appendChild(openButton);
-
-            const starButton = document.createElement('button');
-            const syncStarButton = (isBusy = false) => {
-              const starred = isCpfStarredForFieldBook(entry);
-              starButton.textContent = starred ? '★' : '☆';
-              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
-              starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
-              starButton.disabled = Boolean(isBusy);
-            };
-            starButton.type = 'button';
-            starButton.className = 'cpf-star-btn';
-            syncStarButton(false);
-            starButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              syncStarButton(true);
-              try {
-                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
-                syncStarButton(false);
-                const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
-                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
-                saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isCpfStarredForFieldBook(e));
-              } catch (error) {
-                syncStarButton(false);
-                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
-              }
-            });
-            resource.appendChild(starButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'launch-btn';
-            deleteButton.textContent = 'Delete';
-            deleteButton.title = 'Delete this CP&F from the project file';
-            deleteButton.addEventListener('click', (event) => {
-              event.stopPropagation();
-              deleteResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            actionButtons.appendChild(deleteButton);
-
-            const renameButton = document.createElement('button');
-            renameButton.type = 'button';
-            renameButton.className = 'launch-btn';
-            renameButton.textContent = 'Rename';
-            renameButton.title = 'Rename this file in the project EvidenceDesk index';
-            renameButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            resource.appendChild(renameButton);
-          }
-
-          const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;
-          if (isServerUpload) {
-            const downloadUrl = entry.reference.value;
-            const isServerPdf = entry?.exportFormat === 'pdf';
-            resource.classList.add('pointforge-openable');
-            resource.setAttribute('role', 'button');
-            resource.setAttribute('tabindex', '0');
-            resource.title = 'Click to open this file';
-            resource.addEventListener('click', () => {
-              if (isServerPdf) {
-                openPdfInNewWindow(downloadUrl);
-                return;
-              }
-              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-            });
-            resource.addEventListener('keydown', (event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              if (isServerPdf) {
-                openPdfInNewWindow(downloadUrl);
-                return;
-              }
-              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-            });
-
-            const openButton = document.createElement('button');
-            openButton.type = 'button';
-            openButton.className = 'launch-btn';
-            openButton.textContent = 'Open';
-            openButton.title = isServerPdf
-              ? 'Opens this PDF in a new browser window'
-              : 'Opens this file in a new tab';
-            openButton.addEventListener('click', (event) => {
-              event.stopPropagation();
-              if (isServerPdf) {
-                openPdfInNewWindow(downloadUrl);
-                return;
-              }
-              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-            });
-            actionButtons.appendChild(openButton);
-
-            const starButton = document.createElement('button');
-            const syncStarButton = (isBusy = false) => {
-              const starred = isCpfStarredForFieldBook(entry);
-              starButton.textContent = starred ? '★' : '☆';
-              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
-              starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
-              starButton.disabled = Boolean(isBusy);
-            };
-            starButton.type = 'button';
-            starButton.className = 'cpf-star-btn';
-            syncStarButton(false);
-            starButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              syncStarButton(true);
-              try {
-                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
-                syncStarButton(false);
-                const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
-                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
-                saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isCpfStarredForFieldBook(e));
-              } catch (error) {
-                syncStarButton(false);
-                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
-              }
-            });
-            resource.appendChild(starButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'launch-btn';
-            deleteButton.textContent = 'Delete';
-            deleteButton.title = 'Remove this file from the project';
-            deleteButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            actionButtons.appendChild(deleteButton);
-
-            const renameButton = document.createElement('button');
-            renameButton.type = 'button';
-            renameButton.className = 'launch-btn';
-            renameButton.textContent = 'Rename';
-            renameButton.title = 'Rename this file in the project EvidenceDesk index';
-            renameButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await renameResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            resource.appendChild(renameButton);
-
-            if (isServerPdf && folder.key === 'ros') {
-              const rosInlineInput = document.createElement('input');
-              rosInlineInput.type = 'text';
-              rosInlineInput.className = 'launch-btn';
-              rosInlineInput.style.minWidth = '120px';
-              rosInlineInput.style.textAlign = 'left';
-              rosInlineInput.placeholder = 'ROS #';
-              rosInlineInput.value = String(entry?.reference?.metadata?.rosNumber || '');
-              rosInlineInput.title = 'Set Record Of Survey number for this PDF';
-              rosInlineInput.addEventListener('click', (event) => event.stopPropagation());
-              rosInlineInput.addEventListener('keydown', (event) => event.stopPropagation());
-              resource.appendChild(rosInlineInput);
-
-              const rosButton = document.createElement('button');
-              rosButton.type = 'button';
-              rosButton.className = 'launch-btn';
-              rosButton.textContent = 'Save ROS #';
-              rosButton.title = 'Save Record Of Survey number for LineSmith point-inspector linking';
-              rosButton.addEventListener('click', async (event) => {
-                event.stopPropagation();
-                await setRosNumberForUploadedResource(folder, entry, rosInlineInput.value, projectContext);
+                if (entry?.reference?.type === 'server-upload' && event.dataTransfer) {
+                  const serverDownloadUrl = String(entry.reference.value || '').trim();
+                  if (serverDownloadUrl) {
+                    const mimeType = getMimeTypeFromFormat(entry?.exportFormat || '');
+                    const fileName = entry?.title || `${entry.id}.${entry.exportFormat}`;
+                    const absoluteUrl = new URL(serverDownloadUrl, window.location.origin).href;
+                    event.dataTransfer.setData('DownloadURL', `${mimeType}:${fileName}:${absoluteUrl}`);
+                  }
+                }
               });
-              resource.appendChild(rosButton);
+              resource.addEventListener('dragend', () => {
+                resource.classList.remove('file-dragging');
+                stopDragAutoScroll();
+              });
+            }
+
+            const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
+            const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
+            const canLaunchPointForge = folder.key === 'point-files'
+              && isPointFileFormat
+              && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
+            const canOpenLineSmithDrawing = folder.key === 'drawings'
+              && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
+            const isPdfResource = entry?.exportFormat === 'pdf';
+            const isImageUpload = isImageResource(entry);
+            const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing || isPdfResource || isImageUpload;
+            const actualFileName = `${entry.id}.${entry.exportFormat}`;
+            const configuredFileName = entry?.title || actualFileName;
+            const leadingIcon = showThumbnailSlot ? '' : '<span class="icon">📄</span>';
+            const thumbnailSlotMarkup = showThumbnailSlot ? '<span class="file-preview-slot" aria-hidden="true"></span>' : '';
+            const rosNumber = String(entry?.reference?.metadata?.rosNumber || '').trim();
+            const pointNumber = String(entry?.reference?.metadata?.pointNumber || '').trim();
+            const rosPillMarkup = rosNumber ? `<span class="ros-number-pill" title="Recorded map number for ROS linking">ROS # ${escapeHtml(rosNumber)}</span>` : '';
+            const pointPillMarkup = pointNumber ? `<span class="ros-number-pill" title="Linked photo point number">PT # ${escapeHtml(pointNumber)}</span>` : '';
+            const pointFileAssociations = associationIndex.drawingsByPointFileId.get(
+              normalizeAssociationId(entry?.reference?.metadata?.pointFileId || entry?.reference?.value || entry?.id || ''),
+            ) || [];
+            const drawingAssociationName = associationIndex.pointFileByDrawingId.get(
+              normalizeAssociationId(entry?.reference?.metadata?.drawingId || entry?.reference?.value || entry?.id || ''),
+            ) || '';
+            const pointFileAssociationMarkup = folder.key === 'point-files' && pointFileAssociations.length
+              ? `<ul class="association-list" title="LineSmith drawings associated with this point file">${pointFileAssociations.map((title) => `<li class="association-list-item">↳ Drawing: ${escapeHtml(title)}</li>`).join('')}</ul>`
+              : '';
+            const drawingAssociationMarkup = folder.key === 'drawings' && drawingAssociationName
+              ? `<ul class="association-list" title="Point file associated with this drawing"><li class="association-list-item">↳ Point file: ${escapeHtml(drawingAssociationName)}</li></ul>`
+              : '';
+
+            resource.innerHTML = `<span class="file-meta">${leadingIcon}${thumbnailSlotMarkup}<span class="file-name"><span class="file-name-primary"><span class="file-name-configured" title="${escapeHtml(actualFileName)}">${escapeHtml(configuredFileName)}</span>${rosPillMarkup}${pointPillMarkup}</span>${pointFileAssociationMarkup}${drawingAssociationMarkup}</span></span>`;
+
+            const actionButtons = document.createElement('div');
+            actionButtons.className = 'file-actions';
+            resource.appendChild(actionButtons);
+
+            if (canLaunchPointForge) {
+              attachPointFilePreview(resource, entry).catch(() => {});
+              resource.classList.add('pointforge-openable');
+              resource.setAttribute('role', 'button');
+              resource.setAttribute('tabindex', '0');
+              resource.title = 'Tap to open this point file in PointForge';
+              resource.addEventListener('click', () => launchPointForgeFromResource(entry, projectContext));
+              resource.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                launchPointForgeFromResource(entry, projectContext);
+              });
+
+              const openButton = document.createElement('button');
+              openButton.type = 'button';
+              openButton.className = 'launch-btn';
+              openButton.textContent = 'Open in PointForge';
+              openButton.title = 'Loads this point file into PointForge input';
+              openButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                launchPointForgeFromResource(entry, projectContext);
+              });
+              actionButtons.appendChild(openButton);
+            }
+
+            if (canOpenLineSmithDrawing) {
+              attachDrawingPreview(resource, entry).catch(() => {});
+              const openButton = document.createElement('button');
+              openButton.type = 'button';
+              openButton.className = 'launch-btn';
+              openButton.textContent = 'Open in LineSmith';
+              openButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                launchLineSmithFromDrawingResource(entry, projectContext);
+              });
+              actionButtons.appendChild(openButton);
+            }
+
+            if (isPdfResource) {
+              attachPdfPreview(resource, folder, entry);
+              const openButton = document.createElement('button');
+              openButton.type = 'button';
+              openButton.className = 'launch-btn';
+              openButton.textContent = 'Open';
+              openButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                openEntryFromFolder(folder, entry, projectContext);
+              });
+              actionButtons.appendChild(openButton);
             }
 
             if (isImageUpload) {
-              const pointInlineInput = document.createElement('input');
-              pointInlineInput.type = 'text';
-              pointInlineInput.className = 'launch-btn';
-              pointInlineInput.style.minWidth = '120px';
-              pointInlineInput.style.textAlign = 'left';
-              pointInlineInput.placeholder = 'Point #';
-              pointInlineInput.value = String(entry?.reference?.metadata?.pointNumber || '');
-              pointInlineInput.title = 'Set linked point number for this photo';
-              pointInlineInput.addEventListener('click', (event) => event.stopPropagation());
-              pointInlineInput.addEventListener('keydown', (event) => event.stopPropagation());
-              resource.appendChild(pointInlineInput);
-
-              const pointButton = document.createElement('button');
-              pointButton.type = 'button';
-              pointButton.className = 'launch-btn';
-              pointButton.textContent = 'Save Point #';
-              pointButton.title = 'Save linked point number for LineSmith photo lookup';
-              pointButton.addEventListener('click', async (event) => {
+              attachImagePreview(resource, entry);
+              const openButton = document.createElement('button');
+              openButton.type = 'button';
+              openButton.className = 'launch-btn';
+              openButton.textContent = 'Open';
+              openButton.addEventListener('click', (event) => {
                 event.stopPropagation();
-                if (typeof setPointNumberForUploadedResource === 'function') {
-                  await setPointNumberForUploadedResource(folder, entry, pointInlineInput.value, projectContext);
-                  return;
-                }
-                projectContext.setUploadStatus('Point-number helper unavailable in this browser session; retry after refresh.');
+                openEntryFromFolder(folder, entry, projectContext);
               });
-              resource.appendChild(pointButton);
+              actionButtons.appendChild(openButton);
             }
-
-          }
-
-          if (!canLaunchPointForge && !canOpenLineSmithDrawing && !canOpenCpfPdf && !isServerUpload) {
-            const starButton = document.createElement('button');
-            const syncStarButton = (isBusy = false) => {
-              const starred = isCpfStarredForFieldBook(entry);
-              starButton.textContent = starred ? '★' : '☆';
-              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
-              starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
-              starButton.disabled = Boolean(isBusy);
-            };
-            starButton.type = 'button';
-            starButton.className = 'cpf-star-btn';
-            syncStarButton(false);
-            starButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              syncStarButton(true);
-              try {
-                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
-                syncStarButton(false);
-                const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
-                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
-                saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isCpfStarredForFieldBook(e));
-              } catch (error) {
-                syncStarButton(false);
-                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
-              }
-            });
-            resource.appendChild(starButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'launch-btn';
-            deleteButton.textContent = 'Delete';
-            deleteButton.title = 'Remove this file from the project';
-            deleteButton.addEventListener('click', async (event) => {
-              event.stopPropagation();
-              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
-            });
-            actionButtons.appendChild(deleteButton);
 
             const renameButton = document.createElement('button');
             renameButton.type = 'button';
             renameButton.className = 'launch-btn';
             renameButton.textContent = 'Rename';
-            renameButton.title = 'Rename this file in the project EvidenceDesk index';
             renameButton.addEventListener('click', async (event) => {
               event.stopPropagation();
               await renameResourceFromEvidenceDesk(folder, entry, projectContext);
             });
             actionButtons.appendChild(renameButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'launch-btn';
+            deleteButton.textContent = 'Delete';
+            deleteButton.addEventListener('click', async (event) => {
+              event.stopPropagation();
+              await deleteResourceFromEvidenceDesk(folder, entry, projectContext);
+            });
+            actionButtons.appendChild(deleteButton);
+
+            return resource;
           }
 
-          if (folder.key === 'point-files' && entry?.reference?.type === 'project-point-file') {
-            attachProjectPointFileVersionTimeline(resource, entry, projectContext).catch(() => {});
-          }
-
-          return resource;
-        }
-        if (folder.key === 'cpfs' && folder.index.length) {
-          const loadingDiv = document.createElement('div');
-          loadingDiv.className = 'empty';
-          loadingDiv.textContent = 'Grouping CP&Fs by corner…';
-          fileListContainer.appendChild(loadingDiv);
-          (async () => {
-            try {
-              const entriesWithCoords = await Promise.all(folder.index.map(async (entry) => {
-                const instrument = String(entry?.reference?.value || entry?.reference?.metadata?.instrument || '').trim();
-                const links = instrument ? await findCpfPointLinksAsync(projectContext?.projectFile, resolvePointFileText, instrument) : [];
-                const first = links.find((l) => l.north != null && l.east != null);
-                return { entry, north: first?.north, east: first?.east };
-              }));
-              const groups = groupCpfsByCorner(entriesWithCoords, CPF_CORNER_GROUP_RADIUS_FEET);
-              loadingDiv.remove();
-              for (const group of groups) {
-                const groupDiv = document.createElement('div');
-                groupDiv.className = 'corner-group';
-                const labelEl = document.createElement('div');
-                labelEl.className = 'corner-group-label';
-                labelEl.textContent = group.label;
-                groupDiv.appendChild(labelEl);
-
-                const entries = Array.isArray(group.entries) ? group.entries : [];
-                if (!entries.length) {
-                  fileListContainer.appendChild(groupDiv);
-                  continue;
-                }
-
-                groupDiv.appendChild(buildOneFileRow(entries[0]));
-
-                if (entries.length > 1) {
-                  const moreDetails = document.createElement('details');
-                  moreDetails.className = 'corner-group-more';
-
-                  const moreSummary = document.createElement('summary');
-                  moreSummary.className = 'launch-btn';
-                  const extraCount = entries.length - 1;
-                  moreSummary.textContent = `Show ${extraCount} more CP&F${extraCount === 1 ? '' : 's'}`;
-                  moreDetails.appendChild(moreSummary);
-
-                  for (const entry of entries.slice(1)) {
-                    moreDetails.appendChild(buildOneFileRow(entry));
-                  }
-
-                  groupDiv.appendChild(moreDetails);
-                }
-                fileListContainer.appendChild(groupDiv);
-              }
-            } catch (e) {
-              loadingDiv.textContent = 'Could not group by corner. Showing flat list.';
-              loadingDiv.classList.add('err');
-              for (const entry of folder.index) {
-                fileListContainer.appendChild(buildOneFileRow(entry));
-              }
-            }
-          })();
-        } else {
           for (const entry of folder.index) {
             fileListContainer.appendChild(buildOneFileRow(entry));
           }
         }
-        } // end else
 
         const childrenContainer = document.createElement('div');
         childrenContainer.className = 'folder-children';
+        childrenContainer.hidden = isCollapsed;
         folderGroupWrapper.appendChild(childrenContainer);
         folderChildrenContainerMap.set(folder.key, childrenContainer);
 
@@ -3424,104 +2539,49 @@
       manifest.style.marginLeft = '0';
       manifest.innerHTML = '<span class="icon">📄</span>project-file.json';
       treeContainer.appendChild(manifest);
-
     }
 
     function renderError(message) {
-      treeContainer.innerHTML = `<div class="error">${message}</div>`;
+      treeContainer.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
     }
 
+    /* --------------------- Initialize with either server project-file or local fallback --------------------- */
+
     async function initialize() {
+      // Minimal bootstrap: try to GET /api/project-files?projectId=... if present, else local fallback.
       const params = new URLSearchParams(window.location.search);
-      const activeProjectId = params.get('activeProjectId') || params.get('projectId') || '';
-      const activeProjectName = params.get('activeProjectName') || '';
-      const activeProject = activeProjectId ? loadActiveProjectContext(activeProjectId) : null;
-      const projectName = activeProject?.name || activeProjectName || 'Untitled Project';
-      const client = activeProject?.client || '';
-      const address = activeProject?.address || '';
+      const activeProjectId = params.get('projectId') || params.get('activeProjectId') || 'demo';
+      const activeProjectName = params.get('projectName') || params.get('activeProjectName') || 'Demo Project';
 
-      projectLabel.textContent = activeProjectId
-        ? `Active project: ${projectName} (${activeProjectId})`
-        : 'No active project selected. Showing a template project structure.';
-
-      let uploadStatus = '';
       const projectContext = {
         activeProjectId,
         projectId: activeProjectId,
-        projectName,
+        projectName: activeProjectName,
         projectFile: null,
-        uploadStatus: '',
-        uploadProgress: null,
         uploadStatusListeners: [],
-        setUploadStatus(message) {
-          uploadStatus = message;
-          this.uploadStatus = message;
-          for (const listener of this.uploadStatusListeners) {
-            listener(this.uploadStatus, this.uploadProgress);
-          }
-        },
-        setUploadProgress(percent) {
-          this.uploadProgress = typeof percent === 'number' && Number.isFinite(percent) ? percent : null;
-          for (const listener of this.uploadStatusListeners) {
-            listener(this.uploadStatus, this.uploadProgress);
-          }
-        },
-        addUploadStatusListener(listener) {
-          if (typeof listener !== 'function') return;
-          this.uploadStatusListeners.push(listener);
-          listener(this.uploadStatus, this.uploadProgress);
-        },
+        setUploadStatus: () => {},
+        setUploadProgress: () => {},
       };
 
-      const storedProjectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
-        if (storedProjectFile) {
-        projectContext.projectFile = storedProjectFile;
-        projectContext.uploadStatus = uploadStatus;
-        if (activeProjectId) {
-          try {
-            await syncProjectDrawingsFromApi(projectContext);
-          } catch {}
-          try {
-            await syncProjectPointFilesFromApi(projectContext);
-          } catch {}
-          try {
-            await syncProjectCpfsFromApi(projectContext);
-          } catch {}
-        }
-        renderTree(storedProjectFile, projectContext);
-        return;
-      }
-
-      const templateUrl = new URL('/api/project-file/template', window.location.origin);
-      templateUrl.searchParams.set('projectId', activeProjectId || 'project-browser-preview');
-      templateUrl.searchParams.set('projectName', projectName);
-      if (client) templateUrl.searchParams.set('client', client);
-      if (address) templateUrl.searchParams.set('address', address);
-
       try {
-        const response = await fetch(templateUrl.toString());
-        if (!response.ok) {
-          throw new Error(`Unable to load project file (${response.status})`);
-        }
-        const payload = await response.json();
-        if (!payload?.projectFile) {
-          throw new Error('Malformed response from project template endpoint.');
+        let projectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
+
+        if (!projectFile) {
+          // Minimal default skeleton
+          projectFile = {
+            archive: { rootFolderName: activeProjectName },
+            folders: [
+              { key: 'cpfs', label: 'CP&Fs', description: 'Corner perpetuation & filing PDFs', parentKey: '', index: [] },
+              { key: 'point-files', label: 'Point Files', description: 'CSV/TXT point files', parentKey: '', index: [] },
+              { key: 'drawings', label: 'Drawings', description: 'LineSmith drawings', parentKey: '', index: [] },
+              { key: '__other__', label: 'Other', description: 'Everything else', parentKey: '', index: [] },
+            ],
+          };
+          saveStoredProjectFile(window.localStorage, activeProjectId, projectFile);
         }
 
-        projectContext.projectFile = payload.projectFile;
-        projectContext.uploadStatus = uploadStatus;
-        if (activeProjectId) {
-          try {
-            await syncProjectDrawingsFromApi(projectContext);
-          } catch {}
-          try {
-            await syncProjectPointFilesFromApi(projectContext);
-          } catch {}
-          try {
-            await syncProjectCpfsFromApi(projectContext);
-          } catch {}
-        }
-        renderTree(payload.projectFile, projectContext);
+        projectContext.projectFile = projectFile;
+        renderTree(projectFile, projectContext);
       } catch (err) {
         renderError(`Project browser failed to load: ${err.message}`);
       }
