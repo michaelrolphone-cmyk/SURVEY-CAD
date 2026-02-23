@@ -213,6 +213,13 @@
       border-color: rgba(56, 189, 248, 0.6);
       box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
     }
+    .file-list-container {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.35rem;
+      padding-bottom: 0.25rem;
+    }
+
 
     .file-list-container.file-list-drop-target {
       border-radius: 8px;
@@ -650,6 +657,7 @@
 
     .folder-children {
       margin-left: 1.25rem;
+      margin-top: 0.35rem;
       padding-left: 0.75rem;
       border-left: 2px solid rgba(148, 163, 184, 0.12);
     }
@@ -2008,15 +2016,26 @@
       return /\.(csv|txt)$/i.test(name);
     }
 
-    async function uploadPointFilesToServer(files, context) {
+    async function uploadPointFilesToServer(files, context, onStatus) {
       const accepted = Array.from(files || []).filter(isSupportedPointFile);
+
+      function setStatus(message) {
+        if (onStatus) { onStatus(message, null); } else { context.setUploadStatus(message); }
+      }
+      function setProgress(percent) {
+        if (onStatus) { onStatus(null, percent); } else { context.setUploadProgress(percent); }
+      }
+      function setStatusAndProgress(message, percent) {
+        if (onStatus) { onStatus(message, percent); } else { context.setUploadProgress(percent); context.setUploadStatus(message); }
+      }
+
       if (!accepted.length) {
-        context.setUploadStatus('No supported files found. Use .csv or .txt files.');
+        setStatus('No supported files found. Use .csv or .txt files.');
         return;
       }
 
       if (!context.activeProjectId || !context.projectFile) {
-        context.setUploadStatus('Select an active project before uploading point files.');
+        setStatus('Select an active project before uploading point files.');
         return;
       }
 
@@ -2026,8 +2045,8 @@
         const file = accepted[index];
         const currentFileNumber = index + 1;
         try {
-          context.setUploadProgress(null);
-          context.setUploadStatus(`Uploading point file ${currentFileNumber}/${totalFiles}: ${file.name}…`);
+          setProgress(null);
+          setStatus(`Uploading point file ${currentFileNumber}/${totalFiles}: ${file.name}…`);
           const text = await file.text();
           const actorMetadata = buildPointFileActorMetadata('evidence-desk-upload');
           const response = await fetch(buildProjectPointFileApiUrl(context.activeProjectId), {
@@ -2043,25 +2062,25 @@
           });
           if (!response.ok) {
             const err = await response.json().catch(() => ({ error: 'Upload failed.' }));
-            context.setUploadStatus(`Failed to upload ${file.name}: ${err.error}`);
+            setStatus(`Failed to upload ${file.name}: ${err.error}`);
             continue;
           }
           uploadedCount += 1;
-          context.setUploadStatus(`Uploaded point file ${uploadedCount}/${totalFiles}: ${file.name}`);
+          setStatus(`Uploaded point file ${uploadedCount}/${totalFiles}: ${file.name}`);
         } catch (err) {
-          context.setUploadStatus(`Network error uploading ${file.name}: ${err.message}`);
+          setStatus(`Network error uploading ${file.name}: ${err.message}`);
         }
       }
 
       if (!uploadedCount) {
-        context.setUploadProgress(null);
-        context.setUploadStatus('No point files were uploaded successfully.');
+        setProgress(null);
+        setStatus('No point files were uploaded successfully.');
         return;
       }
 
       await syncProjectPointFilesFromApi(context);
-      context.setUploadProgress(null);
-      context.setUploadStatus(`Uploaded ${uploadedCount} point file${uploadedCount === 1 ? '' : 's'} to this project.`);
+      setProgress(null);
+      setStatus(`Uploaded ${uploadedCount} point file${uploadedCount === 1 ? '' : 's'} to this project.`);
       renderTree(context.projectFile, context);
     }
 
@@ -2214,7 +2233,7 @@
       picker.style.display = 'none';
       picker.addEventListener('change', () => {
         if (picker.files.length) {
-          uploadFilesToServer(picker.files, folderSelect.value, context);
+          (folderSelect.value === 'point-files' ? uploadPointFilesToServer(picker.files, context) : uploadFilesToServer(picker.files, folderSelect.value, context));
         }
       });
 
@@ -2274,7 +2293,7 @@
           if (statusEl) statusEl.textContent = context.uploadStatus;
           return;
         }
-        uploadFilesToServer(event.dataTransfer?.files, folderSelect.value, context);
+        (folderSelect.value === 'point-files' ? uploadPointFilesToServer(event.dataTransfer?.files, context) : uploadFilesToServer(event.dataTransfer?.files, folderSelect.value, context));
       });
 
       return panel;
@@ -2876,7 +2895,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
             return;
           }
           if (event.dataTransfer?.files?.length) {
-            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus);
+            await (folder.key === 'point-files' ? uploadPointFilesToServer(event.dataTransfer.files, projectContext, onFolderUploadStatus) : uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus));
           }
         });
 
@@ -2935,12 +2954,6 @@ function openEntryFromFolder(folder, entry, projectContext) {
         folderUploadFeedback.appendChild(folderUploadProgressBar);
         folderGroupWrapper.appendChild(folderUploadFeedback);
 
-        if (folder.key === 'point-files') {
-          pointFileUploadPanel = createPointFileUploadPanel(projectContext);
-          pointFileUploadPanel.hidden = isCollapsed;
-          folderGroupWrapper.appendChild(pointFileUploadPanel);
-        }
-
         const fileListContainer = document.createElement('div');
         fileListContainer.className = 'file-list-container';
         fileListContainer.hidden = isCollapsed;
@@ -2981,7 +2994,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
             return;
           }
           if (event.dataTransfer?.files?.length) {
-            await uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus);
+            await (folder.key === 'point-files' ? uploadPointFilesToServer(event.dataTransfer.files, projectContext, onFolderUploadStatus) : uploadFilesToServer(event.dataTransfer.files, folder.key, projectContext, onFolderUploadStatus));
           }
         });
         folderGroupWrapper.appendChild(fileListContainer);
