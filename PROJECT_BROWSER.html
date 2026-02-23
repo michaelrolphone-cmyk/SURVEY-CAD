@@ -533,16 +533,64 @@
       padding: 0.75rem;
     }
 
-    .add-folder-panel {
+    .add-folder-inline {
       display: flex;
       gap: 0.45rem;
       align-items: center;
       flex-wrap: wrap;
-      margin-top: 0.75rem;
-      padding: 0.65rem 0.75rem;
-      border: 1px dashed rgba(148, 163, 184, 0.3);
-      border-radius: 10px;
-      background: rgba(15, 23, 42, 0.45);
+      margin-top: 0.45rem;
+      padding: 0.4rem 0.65rem;
+      border: 1px dashed rgba(56, 189, 248, 0.28);
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .add-folder-icon-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0.15rem 0.4rem;
+      border-radius: 5px;
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1;
+      flex: none;
+      opacity: 0.55;
+    }
+
+    .add-folder-icon-btn:hover {
+      opacity: 1;
+      color: #bae6fd;
+    }
+
+    .add-folder-cancel-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0.15rem 0.35rem;
+      border-radius: 5px;
+      font-size: 0.85rem;
+      line-height: 1;
+      flex: none;
+      opacity: 0.6;
+    }
+
+    .add-folder-cancel-btn:hover {
+      opacity: 1;
+      color: #fca5a5;
+    }
+
+    .tree-header-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0.4rem;
+    }
+
+    .tree-header-row .tree-root {
+      flex: 1;
+      margin: 0;
     }
 
     .add-folder-input {
@@ -582,10 +630,6 @@
       border-left: 2px solid rgba(148, 163, 184, 0.12);
     }
 
-    .add-subfolder-panel {
-      margin-top: 0.35rem;
-      padding: 0.45rem 0.65rem;
-    }
   </style>
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
@@ -2282,7 +2326,72 @@
       const root = document.createElement('div');
       root.className = 'tree-root';
       root.innerHTML = `<span class="icon">🗂️</span><strong>${projectFile.archive.rootFolderName}</strong><span class="muted">(symbolic root folder)</span>`;
-      treeContainer.appendChild(root);
+
+      const addRootFolderIconBtn = document.createElement('button');
+      addRootFolderIconBtn.type = 'button';
+      addRootFolderIconBtn.className = 'add-folder-icon-btn';
+      addRootFolderIconBtn.title = 'New folder';
+      addRootFolderIconBtn.textContent = '+';
+      addRootFolderIconBtn.addEventListener('click', () => {
+        const existing = treeContainer.querySelector('.add-root-folder-inline');
+        if (existing) { existing.querySelector('input').focus(); return; }
+
+        const inlineForm = document.createElement('div');
+        inlineForm.className = 'add-folder-inline add-root-folder-inline';
+
+        const folderIcon = document.createElement('span');
+        folderIcon.className = 'icon';
+        folderIcon.textContent = '📁';
+
+        const inlineInput = document.createElement('input');
+        inlineInput.type = 'text';
+        inlineInput.className = 'add-folder-input';
+        inlineInput.placeholder = 'Folder name…';
+        inlineInput.maxLength = 60;
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'launch-btn';
+        saveBtn.textContent = 'Add';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'add-folder-cancel-btn';
+        cancelBtn.textContent = '✕';
+        cancelBtn.title = 'Cancel';
+
+        inlineInput.addEventListener('keydown', (ev) => {
+          ev.stopPropagation();
+          if (ev.key === 'Enter') saveBtn.click();
+          if (ev.key === 'Escape') inlineForm.remove();
+        });
+        saveBtn.addEventListener('click', () => {
+          const label = inlineInput.value.trim();
+          if (!label) { inlineInput.focus(); return; }
+          const newFolder = addCustomFolder(projectContext.projectFile, { label });
+          if (!newFolder) {
+            projectContext.setUploadStatus(`Could not create folder "${label}".`);
+            inlineForm.remove();
+            return;
+          }
+          saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+          renderTree(projectContext.projectFile, projectContext);
+        });
+        cancelBtn.addEventListener('click', () => inlineForm.remove());
+
+        inlineForm.appendChild(folderIcon);
+        inlineForm.appendChild(inlineInput);
+        inlineForm.appendChild(saveBtn);
+        inlineForm.appendChild(cancelBtn);
+        treeContainer.insertBefore(inlineForm, manifest);
+        inlineInput.focus();
+      });
+
+      const treeHeaderRow = document.createElement('div');
+      treeHeaderRow.className = 'tree-header-row';
+      treeHeaderRow.appendChild(root);
+      treeHeaderRow.appendChild(addRootFolderIconBtn);
+      treeContainer.appendChild(treeHeaderRow);
 
       treeContainer.appendChild(createFileUploadPanel(projectContext));
 
@@ -2998,42 +3107,67 @@
 
         const currentFolderDepth = getFolderDepth(projectFile, folder.key);
         if (currentFolderDepth < MAX_FOLDER_DEPTH) {
-          const addSubfolderPanel = document.createElement('div');
-          addSubfolderPanel.className = 'add-folder-panel add-subfolder-panel';
+          const addSubfolderIconBtn = document.createElement('button');
+          addSubfolderIconBtn.type = 'button';
+          addSubfolderIconBtn.className = 'add-folder-icon-btn';
+          addSubfolderIconBtn.title = 'Add subfolder';
+          addSubfolderIconBtn.textContent = '+';
+          addSubfolderIconBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const existing = childrenContainer.querySelector('.add-folder-inline');
+            if (existing) { existing.querySelector('input').focus(); return; }
 
-          const addSubfolderLabel = document.createElement('span');
-          addSubfolderLabel.className = 'muted';
-          addSubfolderLabel.textContent = 'Add subfolder:';
-          addSubfolderPanel.appendChild(addSubfolderLabel);
+            const inlineForm = document.createElement('div');
+            inlineForm.className = 'add-folder-inline';
 
-          const addSubfolderInput = document.createElement('input');
-          addSubfolderInput.type = 'text';
-          addSubfolderInput.className = 'add-folder-input';
-          addSubfolderInput.placeholder = 'Subfolder name…';
-          addSubfolderInput.maxLength = 60;
-          addSubfolderInput.addEventListener('keydown', (event) => event.stopPropagation());
-          addSubfolderPanel.appendChild(addSubfolderInput);
+            const folderIcon = document.createElement('span');
+            folderIcon.className = 'icon';
+            folderIcon.textContent = '📁';
 
-          const addSubfolderBtn = document.createElement('button');
-          addSubfolderBtn.type = 'button';
-          addSubfolderBtn.className = 'launch-btn';
-          addSubfolderBtn.textContent = 'Add subfolder';
-          addSubfolderBtn.addEventListener('click', () => {
-            const label = addSubfolderInput.value.trim();
-            if (!label) {
-              projectContext.setUploadStatus('Enter a subfolder name first.');
-              return;
-            }
-            const subfolder = addCustomFolder(projectContext.projectFile, { label, parentKey: folder.key });
-            if (!subfolder) {
-              projectContext.setUploadStatus(`Could not create subfolder "${label}" — maximum folder depth (${MAX_FOLDER_DEPTH}) reached.`);
-              return;
-            }
-            saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
-            renderTree(projectContext.projectFile, projectContext);
+            const inlineInput = document.createElement('input');
+            inlineInput.type = 'text';
+            inlineInput.className = 'add-folder-input';
+            inlineInput.placeholder = 'Subfolder name…';
+            inlineInput.maxLength = 60;
+
+            const saveBtn = document.createElement('button');
+            saveBtn.type = 'button';
+            saveBtn.className = 'launch-btn';
+            saveBtn.textContent = 'Add';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'add-folder-cancel-btn';
+            cancelBtn.textContent = '✕';
+            cancelBtn.title = 'Cancel';
+
+            inlineInput.addEventListener('keydown', (event) => {
+              event.stopPropagation();
+              if (event.key === 'Enter') saveBtn.click();
+              if (event.key === 'Escape') inlineForm.remove();
+            });
+            saveBtn.addEventListener('click', () => {
+              const label = inlineInput.value.trim();
+              if (!label) { inlineInput.focus(); return; }
+              const subfolder = addCustomFolder(projectContext.projectFile, { label, parentKey: folder.key });
+              if (!subfolder) {
+                projectContext.setUploadStatus(`Could not create subfolder — max depth (${MAX_FOLDER_DEPTH}) reached.`);
+                inlineForm.remove();
+                return;
+              }
+              saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+              renderTree(projectContext.projectFile, projectContext);
+            });
+            cancelBtn.addEventListener('click', () => inlineForm.remove());
+
+            inlineForm.appendChild(folderIcon);
+            inlineForm.appendChild(inlineInput);
+            inlineForm.appendChild(saveBtn);
+            inlineForm.appendChild(cancelBtn);
+            childrenContainer.prepend(inlineForm);
+            inlineInput.focus();
           });
-          addSubfolderPanel.appendChild(addSubfolderBtn);
-          childrenContainer.appendChild(addSubfolderPanel);
+          folderRow.appendChild(addSubfolderIconBtn);
         }
       }
 
@@ -3043,43 +3177,6 @@
       manifest.innerHTML = '<span class="icon">📄</span>project-file.json';
       treeContainer.appendChild(manifest);
 
-      const addFolderPanel = document.createElement('div');
-      addFolderPanel.className = 'add-folder-panel';
-
-      const addFolderLabel = document.createElement('span');
-      addFolderLabel.className = 'muted';
-      addFolderLabel.textContent = 'Add folder:';
-      addFolderPanel.appendChild(addFolderLabel);
-
-      const addFolderInput = document.createElement('input');
-      addFolderInput.type = 'text';
-      addFolderInput.className = 'add-folder-input';
-      addFolderInput.placeholder = 'Folder name…';
-      addFolderInput.maxLength = 60;
-      addFolderInput.addEventListener('keydown', (event) => event.stopPropagation());
-      addFolderPanel.appendChild(addFolderInput);
-
-      const addFolderBtn = document.createElement('button');
-      addFolderBtn.type = 'button';
-      addFolderBtn.className = 'launch-btn';
-      addFolderBtn.textContent = 'Add';
-      addFolderBtn.addEventListener('click', () => {
-        const label = addFolderInput.value.trim();
-        if (!label) {
-          projectContext.setUploadStatus('Enter a folder name first.');
-          return;
-        }
-        const folder = addCustomFolder(projectContext.projectFile, { label });
-        if (!folder) {
-          projectContext.setUploadStatus(`Could not create folder "${label}".`);
-          return;
-        }
-        saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
-        renderTree(projectContext.projectFile, projectContext);
-      });
-      addFolderPanel.appendChild(addFolderBtn);
-
-      treeContainer.appendChild(addFolderPanel);
     }
 
     function renderError(message) {
