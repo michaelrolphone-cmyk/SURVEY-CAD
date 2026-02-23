@@ -644,6 +644,99 @@
       border-left: 2px solid rgba(148, 163, 184, 0.12);
     }
 
+    /* Folder collapse/expand toggle */
+    .folder-row {
+      cursor: pointer;
+      user-select: none;
+    }
+    .folder-collapse-chevron {
+      font-size: 0.65rem;
+      display: inline-block;
+      transition: transform 180ms ease;
+      flex: none;
+      color: var(--muted);
+      width: 0.85rem;
+      text-align: center;
+    }
+    .folder-row[data-collapsed="false"] .folder-collapse-chevron {
+      transform: rotate(90deg);
+    }
+    /* Thumbnail strip shown when folder is collapsed */
+    .folder-thumbnail-strip {
+      display: flex;
+      flex-direction: row;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding: 0.35rem 0.5rem 0.45rem 1.65rem;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+      align-items: flex-start;
+    }
+    .folder-thumbnail-strip::-webkit-scrollbar {
+      height: 4px;
+    }
+    .folder-thumbnail-strip::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 2px;
+    }
+    .folder-thumb-item {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      cursor: pointer;
+      border-radius: 7px;
+      padding: 4px;
+      border: 1px solid transparent;
+      transition: border-color 100ms ease, background-color 100ms ease;
+    }
+    .folder-thumb-item:hover {
+      border-color: rgba(56, 189, 248, 0.5);
+      background: rgba(30, 41, 59, 0.72);
+    }
+    .folder-thumb-img {
+      width: 58px;
+      height: 58px;
+      border-radius: 5px;
+      object-fit: cover;
+      display: block;
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid var(--border);
+      flex: none;
+    }
+    .folder-thumb-img.pdf-thumb-bg {
+      background: #ffffff;
+    }
+    .folder-thumb-label {
+      font-size: 0.6rem;
+      color: var(--muted);
+      max-width: 58px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .folder-thumb-placeholder {
+      width: 58px;
+      height: 58px;
+      border-radius: 5px;
+      border: 1px dashed rgba(148, 163, 184, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      background: rgba(15, 23, 42, 0.5);
+      flex: none;
+    }
+    .folder-thumb-empty {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 0.82rem;
+      padding: 0.3rem 0;
+    }
+
   </style>
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
@@ -678,6 +771,9 @@
     const MAX_FOLDER_DEPTH = Number.isFinite(projectBrowserState.MAX_FOLDER_DEPTH)
       ? projectBrowserState.MAX_FOLDER_DEPTH
       : 5;
+
+    // Persists folder collapse state across renderTree calls (true = collapsed, default)
+    const folderCollapseState = new Map();
 
     const POINTFORGE_PROJECT_BROWSER_IMPORT_STORAGE_KEY = 'pointforgeProjectBrowserImport';
     const LINESMITH_PROJECT_BROWSER_DRAWING_IMPORT_STORAGE_KEY = 'lineSmithProjectBrowserDrawingImport';
@@ -1523,41 +1619,94 @@
       const tooltip = ensureCpfHoverPreviewTooltip();
       const previewImage = tooltip.querySelector('.cpf-hover-preview-image');
       if (!previewImage) return;
+
       previewImage.src = imageSrc;
       previewImage.alt = altText;
 
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const maxHeight = Math.max(220, Math.floor(viewportHeight * 0.9));
       const anchorRect = anchor.getBoundingClientRect();
+
       const imageNaturalWidth = Number(sourceDimensions?.width || previewImage.naturalWidth || anchor.naturalWidth || 0);
       const imageNaturalHeight = Number(sourceDimensions?.height || previewImage.naturalHeight || anchor.naturalHeight || 0);
       const safeImageHeight = imageNaturalHeight > 0 ? imageNaturalHeight : 1;
       const imageAspectRatio = imageNaturalWidth > 0 ? (imageNaturalWidth / safeImageHeight) : (8.5 / 11);
-      const maxWidth = Math.max(180, viewportWidth - (CPH_TOOLTIP_MARGIN * 2));
-      const maxPreviewWidth = Math.min(maxWidth, Math.floor(viewportWidth * 0.6));
-      const previewHeight = Math.max(160, Math.min(maxHeight, Math.floor(maxPreviewWidth / imageAspectRatio)));
-      const previewWidth = Math.max(160, Math.min(maxPreviewWidth, Math.floor(previewHeight * imageAspectRatio)));
 
-      const availableRight = viewportWidth - anchorRect.right - CPH_GAP - CPH_TOOLTIP_MARGIN;
-      const availableLeft = anchorRect.left - CPH_GAP - CPH_TOOLTIP_MARGIN;
-      const shouldPlaceRight = availableRight >= previewWidth || availableRight >= availableLeft;
-      const preferredLeft = shouldPlaceRight
-        ? Math.round(anchorRect.right + CPH_GAP)
-        : Math.round(anchorRect.left - CPH_GAP - previewWidth);
-      const clampedLeft = Math.min(
-        Math.max(CPH_TOOLTIP_MARGIN, preferredLeft),
-        viewportWidth - previewWidth - CPH_TOOLTIP_MARGIN,
-      );
+      const maxBoxWidth = Math.max(180, viewportWidth - (CPH_TOOLTIP_MARGIN * 2));
+      const maxBoxHeight = Math.max(220, Math.floor(viewportHeight * 0.9));
+
+      const availableRight = Math.max(0, viewportWidth - anchorRect.right - CPH_GAP - CPH_TOOLTIP_MARGIN);
+      const availableLeft = Math.max(0, anchorRect.left - CPH_GAP - CPH_TOOLTIP_MARGIN);
+      const availableBelow = Math.max(0, viewportHeight - anchorRect.bottom - CPH_GAP - CPH_TOOLTIP_MARGIN);
+      const availableAbove = Math.max(0, anchorRect.top - CPH_GAP - CPH_TOOLTIP_MARGIN);
+
+      const minVisible = 88;
+
+      const estimateSide = (sideWidth) => {
+        const width = Math.min(maxBoxWidth, sideWidth);
+        if (width <= 0) return { score: 0, width: 0, height: 0 };
+        const height = Math.min(maxBoxHeight, Math.max(minVisible, Math.floor(width / imageAspectRatio)));
+        const finalWidth = Math.min(width, Math.max(minVisible, Math.floor(height * imageAspectRatio)));
+        const finalHeight = Math.min(maxBoxHeight, Math.max(minVisible, Math.floor(finalWidth / imageAspectRatio)));
+        const score = finalWidth * finalHeight;
+        return { score, width: finalWidth, height: finalHeight };
+      };
+
+      const estimateVertical = (verticalHeight) => {
+        const height = Math.min(maxBoxHeight, verticalHeight);
+        if (height <= 0) return { score: 0, width: 0, height: 0 };
+        const width = Math.min(maxBoxWidth, Math.max(minVisible, Math.floor(height * imageAspectRatio)));
+        const finalHeight = Math.min(height, Math.max(minVisible, Math.floor(width / imageAspectRatio)));
+        const finalWidth = Math.min(maxBoxWidth, Math.max(minVisible, Math.floor(finalHeight * imageAspectRatio)));
+        const score = finalWidth * finalHeight;
+        return { score, width: finalWidth, height: finalHeight };
+      };
+
+      const rightFit = estimateSide(availableRight);
+      const leftFit = estimateSide(availableLeft);
+      const belowFit = estimateVertical(availableBelow);
+      const aboveFit = estimateVertical(availableAbove);
+
+      const placements = [
+        { key: 'right', fit: rightFit },
+        { key: 'left', fit: leftFit },
+        { key: 'below', fit: belowFit },
+        { key: 'above', fit: aboveFit },
+      ].sort((a, b) => b.fit.score - a.fit.score);
+
+      const chosen = placements.find((p) => p.fit.width >= minVisible && p.fit.height >= minVisible) || placements[0];
+      const placement = chosen.key;
+      const previewWidth = chosen.fit.width;
+      const previewHeight = chosen.fit.height;
+
+      if (!previewWidth || !previewHeight) return;
 
       tooltip.style.width = `${Math.round(previewWidth)}px`;
       tooltip.style.height = `${Math.round(previewHeight)}px`;
 
-      const centeredTop = anchorRect.top + (anchorRect.height / 2) - (previewHeight / 2);
-      const maxTop = Math.max(CPH_TOOLTIP_MARGIN, viewportHeight - previewHeight - CPH_TOOLTIP_MARGIN);
-      const clampedTop = Math.min(Math.max(CPH_TOOLTIP_MARGIN, centeredTop), maxTop);
-      tooltip.style.left = `${Math.round(clampedLeft)}px`;
-      tooltip.style.top = `${Math.round(clampedTop)}px`;
+      let left = CPH_TOOLTIP_MARGIN;
+      let top = CPH_TOOLTIP_MARGIN;
+
+      if (placement === 'right') {
+        left = Math.round(anchorRect.right + CPH_GAP);
+        top = Math.round(anchorRect.top + (anchorRect.height / 2) - (previewHeight / 2));
+      } else if (placement === 'left') {
+        left = Math.round(anchorRect.left - CPH_GAP - previewWidth);
+        top = Math.round(anchorRect.top + (anchorRect.height / 2) - (previewHeight / 2));
+      } else if (placement === 'below') {
+        top = Math.round(anchorRect.bottom + CPH_GAP);
+        left = Math.round(anchorRect.left + (anchorRect.width / 2) - (previewWidth / 2));
+      } else if (placement === 'above') {
+        top = Math.round(anchorRect.top - CPH_GAP - previewHeight);
+        left = Math.round(anchorRect.left + (anchorRect.width / 2) - (previewWidth / 2));
+      }
+
+      // Clamp into viewport while preserving the non-overlap gap (width/height already fit available space).
+      left = Math.min(Math.max(CPH_TOOLTIP_MARGIN, left), viewportWidth - previewWidth - CPH_TOOLTIP_MARGIN);
+      top = Math.min(Math.max(CPH_TOOLTIP_MARGIN, top), viewportHeight - previewHeight - CPH_TOOLTIP_MARGIN);
+
+      tooltip.style.left = `${Math.round(left)}px`;
+      tooltip.style.top = `${Math.round(top)}px`;
       tooltip.classList.add('visible');
     }
 
@@ -2240,6 +2389,129 @@
       projectContext.setUploadStatus(`Saved point # ${pointNumber || '(cleared)'} for ${entry?.title || storedFileName}.`);
     }
 
+    
+    function isFolderCollapsed(folderKey) {
+      // Default: collapsed (true). Only expanded if explicitly set to false.
+      return folderCollapseState.get(folderKey) !== false;
+    }
+    function openEntryFromFolder(folder, entry, projectContext) {
+      const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
+      const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
+      const canLaunchPointForge = folder.key === 'point-files'
+        && isPointFileFormat
+        && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
+      const canOpenLineSmithDrawing = folder.key === 'drawings'
+        && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
+      const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
+      if (canLaunchPointForge) {
+        launchPointForgeFromResource(entry, projectContext).catch(() => {});
+      } else if (canOpenLineSmithDrawing) {
+        launchLineSmithFromDrawingResource(entry, projectContext).catch(() => {});
+      } else if (canOpenCpfPdf) {
+        openCpfPdfFromResource(entry);
+      } else if (entry?.reference?.type === 'server-upload') {
+        const downloadUrl = String(entry.reference.value || '').trim();
+        if (entry?.exportFormat === 'pdf') {
+          openPdfInNewWindow(downloadUrl);
+        } else if (downloadUrl) {
+          window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+        }
+      }
+    }
+    async function attachThumbStripItemPreview(thumbImg, folder, entry) {
+      const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
+      const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
+      const canLaunchPointForge = folder.key === 'point-files' && isPointFileFormat
+        && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
+      const canOpenLineSmithDrawing = folder.key === 'drawings'
+        && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
+      const isPdfResource = entry?.exportFormat === 'pdf';
+      if (canLaunchPointForge) {
+        const text = await resolvePointFileText(entry);
+        if (!text?.trim()) return;
+        const url = renderPointFileThumbnailDataUrl(text, { width: 58, height: 58 });
+        if (url) { thumbImg.src = url; thumbImg.dataset.thumbLoaded = 'true'; }
+      } else if (canOpenLineSmithDrawing) {
+        const points = await resolveDrawingPoints(entry);
+        if (!Array.isArray(points) || !points.length) return;
+        const url = renderLineworkThumbnailDataUrl(points, { width: 58, height: 58 });
+        if (url) { thumbImg.src = url; thumbImg.dataset.thumbLoaded = 'true'; }
+      } else if (isPdfResource) {
+        const pdfUrl = getPdfPreviewUrl(folder, entry);
+        if (!pdfUrl) return;
+        try {
+          const dataUrl = await fetchPdfThumbnailDataUrl(pdfUrl);
+          if (dataUrl) {
+            thumbImg.src = dataUrl;
+            thumbImg.classList.add('pdf-thumb-bg');
+            thumbImg.dataset.thumbLoaded = 'true';
+          }
+        } catch { /* thumbnail unavailable */ }
+      } else if (isImageResource(entry)) {
+        const previewUrl = String(entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
+        if (previewUrl) {
+          thumbImg.src = previewUrl;
+          thumbImg.dataset.thumbLoaded = 'true';
+        }
+      }
+    }
+    function buildFolderThumbnailStrip(folder, projectContext) {
+      const strip = document.createElement('div');
+      strip.className = 'folder-thumbnail-strip';
+      const entries = Array.isArray(folder.index) ? folder.index : [];
+      if (!entries.length) {
+        const emptyMsg = document.createElement('span');
+        emptyMsg.className = 'folder-thumb-empty';
+        emptyMsg.textContent = 'No files';
+        strip.appendChild(emptyMsg);
+        return strip;
+      }
+      for (const entry of entries) {
+        const pointFileFormat = String(entry?.exportFormat || '').toLowerCase();
+        const isPointFileFormat = pointFileFormat === 'csv' || pointFileFormat === 'txt';
+        const canLaunchPointForge = folder.key === 'point-files' && isPointFileFormat
+          && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
+        const canOpenLineSmithDrawing = folder.key === 'drawings'
+          && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
+        const hasThumbnail = canLaunchPointForge || canOpenLineSmithDrawing
+          || entry?.exportFormat === 'pdf' || isImageResource(entry);
+        const item = document.createElement('div');
+        item.className = 'folder-thumb-item';
+        item.title = entry?.title || entry?.id || 'File';
+        if (hasThumbnail) {
+          const thumbImg = document.createElement('img');
+          thumbImg.className = 'folder-thumb-img';
+          thumbImg.alt = entry?.title || entry?.id || 'File';
+          thumbImg.decoding = 'async';
+          attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
+          thumbImg.addEventListener('mouseenter', () => {
+            if (thumbImg.dataset.thumbLoaded !== 'true') return;
+            showCpfHoverPreviewTooltip(
+              thumbImg,
+              thumbImg.src,
+              entry?.title || entry?.id || 'File preview',
+              { width: thumbImg.naturalWidth, height: thumbImg.naturalHeight },
+            );
+          });
+          thumbImg.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
+          item.appendChild(thumbImg);
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'folder-thumb-placeholder';
+          placeholder.textContent = '📄';
+          item.appendChild(placeholder);
+        }
+        const label = document.createElement('div');
+        label.className = 'folder-thumb-label';
+        label.textContent = entry?.title || entry?.id || 'File';
+        item.appendChild(label);
+        item.addEventListener('click', () => openEntryFromFolder(folder, entry, projectContext));
+        strip.appendChild(item);
+      }
+      return strip;
+    }
+
+
     async function openProjectPointFileVersionInPointForge(resource, versionId, projectContext = {}) {
       const text = await resolvePointFileText(resource, { versionId });
       if (!text || !text.trim()) {
@@ -2414,6 +2686,9 @@
       const folderChildrenContainerMap = new Map();
       for (const folder of projectFile.folders || []) {
         const parentChildrenContainer = folder.parentKey ? folderChildrenContainerMap.get(folder.parentKey) : null;
+                let thumbnailStrip = null;
+        let pointFileUploadPanel = null;
+        const isCollapsed = isFolderCollapsed(folder.key);
         const folderGroupWrapper = document.createElement('div');
         folderGroupWrapper.className = 'folder-group';
         (parentChildrenContainer || treeContainer).appendChild(folderGroupWrapper);
@@ -2441,7 +2716,19 @@
         const folderRow = document.createElement('div');
         folderRow.className = 'folder-row';
         folderRow.dataset.folderKey = folder.key;
-        folderRow.innerHTML = `<span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
+        folderRow.dataset.collapsed = isCollapsed ? 'true' : 'false';
+        folderRow.innerHTML = `<span class="folder-collapse-chevron" aria-hidden="true">▶</span><span class="folder-title"><span class="icon">📁</span><strong>${folder.label}</strong><span class="muted">${folder.description}</span></span>`;
+        folderRow.addEventListener('click', (event) => {
+          if (event.target.closest('button, input, select, a')) return;
+          const nowCollapsed = !isFolderCollapsed(folder.key);
+          folderCollapseState.set(folder.key, nowCollapsed);
+          folderRow.dataset.collapsed = nowCollapsed ? 'true' : 'false';
+          if (thumbnailStrip) thumbnailStrip.hidden = !nowCollapsed;
+          folderUploadFeedback.hidden = nowCollapsed;
+          fileListContainer.hidden = nowCollapsed;
+          if (pointFileUploadPanel) pointFileUploadPanel.hidden = nowCollapsed;
+          childrenContainer.hidden = nowCollapsed;
+        });
         folderRow.addEventListener('dragover', (event) => {
           const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
           if (dragTypes.includes('application/x-surveycad-resource-move')) {
@@ -2524,18 +2811,27 @@
 
         folderGroupWrapper.appendChild(folderRow);
 
+        // Collapsed mode: show a horizontal thumbnail strip (expanded mode hides it).
+        thumbnailStrip = buildFolderThumbnailStrip(folder, projectContext);
+        thumbnailStrip.hidden = !isCollapsed;
+        folderGroupWrapper.appendChild(thumbnailStrip);
+
         const folderUploadFeedback = document.createElement('div');
         folderUploadFeedback.className = 'folder-upload-feedback';
+        folderUploadFeedback.hidden = isCollapsed;
         folderUploadFeedback.appendChild(folderUploadStatusText);
         folderUploadFeedback.appendChild(folderUploadProgressBar);
         folderGroupWrapper.appendChild(folderUploadFeedback);
 
         if (folder.key === 'point-files') {
-          folderGroupWrapper.appendChild(createPointFileUploadPanel(projectContext));
+          pointFileUploadPanel = createPointFileUploadPanel(projectContext);
+          pointFileUploadPanel.hidden = isCollapsed;
+          folderGroupWrapper.appendChild(pointFileUploadPanel);
         }
 
         const fileListContainer = document.createElement('div');
         fileListContainer.className = 'file-list-container';
+        fileListContainer.hidden = isCollapsed;
         fileListContainer.addEventListener('dragover', (event) => {
           const dragTypes = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
           if (dragTypes.includes('application/x-surveycad-resource-move')) {
@@ -3116,6 +3412,7 @@
 
         const childrenContainer = document.createElement('div');
         childrenContainer.className = 'folder-children';
+        childrenContainer.hidden = isCollapsed;
         folderGroupWrapper.appendChild(childrenContainer);
         folderChildrenContainerMap.set(folder.key, childrenContainer);
 
