@@ -1334,3 +1334,16 @@ EvidenceDesk CP&F rows now support a persisted `starredInFieldBook` flag so crew
 ### CLI and server commands
 - `npm start`
 - `npm test`
+
+
+## RecordQuarry ROS thumbnail API
+
+RecordQuarry now lazy-loads cached 1024px PNG thumbnails for Record of Survey TIFF sources.
+
+- API endpoints:
+  - `GET /api/project-files/ros-thumbnail?source=<tif-source-url>`
+  - `GET /api/project-files/pdf-thumbnail?source=<pdf-source-url>`
+- Commands:
+  - `npm start`
+  - `npm test -- test/server-ros-thumbnail.test.js`
+

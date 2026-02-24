@@ -2156,7 +2156,9 @@
                       "$ref": "#/components/schemas/RecordQuarryCacheRecord"
                     }
                   },
-                  "required": ["cache"]
+                  "required": [
+                    "cache"
+                  ]
                 }
               }
             }
@@ -2195,7 +2197,9 @@
                       "$ref": "#/components/schemas/RecordQuarryCacheRecord"
                     }
                   },
-                  "required": ["cache"]
+                  "required": [
+                    "cache"
+                  ]
                 }
               }
             }
@@ -2234,7 +2238,9 @@
                       "$ref": "#/components/schemas/RecordQuarryCacheRecord"
                     }
                   },
-                  "required": ["cache"]
+                  "required": [
+                    "cache"
+                  ]
                 }
               }
             }
@@ -2262,7 +2268,9 @@
                       "type": "boolean"
                     }
                   },
-                  "required": ["deleted"]
+                  "required": [
+                    "deleted"
+                  ]
                 }
               }
             }
@@ -2304,7 +2312,9 @@
                       "$ref": "#/components/schemas/RecordQuarryCacheRecord"
                     }
                   },
-                  "required": ["cache"]
+                  "required": [
+                    "cache"
+                  ]
                 }
               }
             }
@@ -2357,7 +2367,9 @@
                       "$ref": "#/components/schemas/RecordQuarryCacheRecord"
                     }
                   },
-                  "required": ["cache"]
+                  "required": [
+                    "cache"
+                  ]
                 }
               }
             }
@@ -2407,7 +2419,9 @@
                       "$ref": "#/components/schemas/RecordQuarryCacheRecord"
                     }
                   },
-                  "required": ["cache"]
+                  "required": [
+                    "cache"
+                  ]
                 }
               }
             }
@@ -2446,7 +2460,9 @@
                       "type": "boolean"
                     }
                   },
-                  "required": ["deleted"]
+                  "required": [
+                    "deleted"
+                  ]
                 }
               }
             }
@@ -3606,6 +3622,98 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/project-files/ros-thumbnail": {
+      "get": {
+        "tags": [
+          "Project Files"
+        ],
+        "summary": "Get or trigger generation of a cached ROS TIFF thumbnail.",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Source URL for a ROS TIFF (/api/project-files/download... with .tif/.tiff or absolute http(s) .tif/.tiff URL)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PNG thumbnail image (1024px width target).",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Thumbnail generation in progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters."
+          },
+          "404": {
+            "description": "Source TIFF file was not found."
+          },
+          "405": {
+            "description": "Method not allowed."
+          },
+          "502": {
+            "description": "Thumbnail generation failed. Retry after cooldown.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "status",
+                    "source"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "failed"
+                      ]
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
                 }
               }
             }
@@ -6931,11 +7039,15 @@
               },
               "selectedAliquotKeys": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               },
               "deselectedAliquotKeys": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -6945,7 +7057,9 @@
             "description": "ISO 8601 timestamp set by the client when the snapshot was captured. Overwritten by the server on save."
           }
         },
-        "required": ["lookup"]
+        "required": [
+          "lookup"
+        ]
       },
       "RecordQuarryCacheRecord": {
         "type": "object",
@@ -6979,11 +7093,15 @@
               },
               "selectedAliquotKeys": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               },
               "deselectedAliquotKeys": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -6993,7 +7111,12 @@
             "description": "ISO 8601 timestamp of when this snapshot was last saved on the server."
           }
         },
-        "required": ["schemaVersion", "address", "lookup", "savedAt"]
+        "required": [
+          "schemaVersion",
+          "address",
+          "lookup",
+          "savedAt"
+        ]
       }
     }
   }
