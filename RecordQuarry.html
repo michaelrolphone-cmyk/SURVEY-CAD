@@ -369,7 +369,40 @@
       float:left;
       padding:10px 0 10px 10px;
     }
-    .ros-thumb-float > .ros-scan-thumb{
+    
+    /* Address card: parcel geometry thumbnail (aligned right) */
+    .card.address-card > .chead,
+    .card.address-card > .cbody{
+      padding-right:120px;
+    }
+    .card.address-card .addr-parcel-thumb{
+      position:absolute;
+      top:10px;
+      right:10px;
+      width:92px;
+      height:92px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.18);
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+    }
+    .card.address-card .addr-parcel-thumb svg{
+      width:100%;
+      height:100%;
+      display:block;
+      color:var(--text);
+    }
+    .card.address-card .addr-parcel-thumb path{
+      fill:none;
+      stroke:currentColor;
+      stroke-width:2;
+      vector-effect:non-scaling-stroke;
+    }
+.ros-thumb-float > .ros-scan-thumb{
       float:none;
       display:block;
       margin:0;
@@ -1408,6 +1441,44 @@
         if (x > xmax) xmax = x;
         if (y > ymax) ymax = y;
       }
+
+  function createParcelGeometryThumbSvg(geom, size=92, pad=8) {
+    const rings = geom?.rings || [];
+    if (!rings.length) return null;
+
+    const ext = arcExtentFromPolygon(geom);
+    if (!isFinite(ext.xmin) || !isFinite(ext.ymin) || !isFinite(ext.xmax) || !isFinite(ext.ymax)) return null;
+
+    const w = Math.max(1e-12, ext.xmax - ext.xmin);
+    const h = Math.max(1e-12, ext.ymax - ext.ymin);
+    const scale = (size - 2*pad) / Math.max(w, h);
+
+    const parts = [];
+    for (const ring of rings) {
+      if (!ring || ring.length < 2) continue;
+      for (let i=0;i<ring.length;i++) {
+        const pt = ring[i];
+        if (!pt || pt.length < 2) continue;
+        const x = pad + (pt[0] - ext.xmin) * scale;
+        const y = pad + (ext.ymax - pt[1]) * scale; // invert Y for screen
+        parts.push((i===0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2));
+      }
+      parts.push('Z');
+    }
+    const d = parts.join(' ');
+    if (!d.trim()) return null;
+
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Parcel geometry thumbnail');
+
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+    return svg;
+  }
     }
     if (!isFinite(xmin)) return null;
     return { xmin, ymin, xmax, ymax };
@@ -3421,7 +3492,18 @@
           ["Location", `${lat.toFixed(7)}, ${lon.toFixed(7)}`],
           ["Candidates", `${candidates.length}`],
         ],
-        []
+        [],
+        {
+          onRender: (cardEl) => {
+            // Show parcel geometry thumbnail on the Address card (aligned right).
+            cardEl.classList.add("address-card");
+            const thumb = document.createElement("div");
+            thumb.className = "addr-parcel-thumb";
+            const svg = createParcelGeometryThumbSvg(parcel.geometry, 92, 8);
+            if (svg) thumb.appendChild(svg);
+            cardEl.appendChild(thumb);
+          }
+        }
       ));
 
       if (state.projectContext.projectId) {
@@ -3481,9 +3563,9 @@
       cards.push(parcelCard);
 
       // Place Subdivision, Township, Section, and Utilities above Aliquots (below Parcel card).
-      if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
-      if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
-      if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
+      if (subdiv) { const c = card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []); c.style.display = "none"; cards.push(c); }
+      if (township) { const c = card("Township", "Containing feature", summarizeAttrs(township.attributes), []); c.style.display = "none"; cards.push(c); }
+      if (section) { const c = card("Section", "Containing feature", summarizeAttrs(section.attributes), []); c.style.display = "none"; cards.push(c); }
       if (state.utilityLocations.length) {
         const utilitiesCard = card(
           "Utilities",
