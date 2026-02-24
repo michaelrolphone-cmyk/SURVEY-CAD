@@ -398,6 +398,10 @@
 
 <body>
 <div class="app">
+  <header>
+    <div class="title">RecordQuarry — Ada County Survey Context Lookup (Standalone)</div>
+    <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
+  </header>
   <div class="main">
     <!-- LEFT -->
     <div class="panel">
@@ -440,7 +444,6 @@
 
     <!-- RIGHT -->
     <div class="panel">
-      <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
       <div class="pbody rightBody">
         <div class="mapWrap">
           <div id="map"></div>
@@ -638,16 +641,9 @@
     } catch {}
   }
 
-  async function loadAddressLookupSnapshot(address) {
+  function loadAddressLookupSnapshot(address) {
     const normalized = normalizeAddressStorageKey(address);
     if (!normalized) return null;
-    try {
-      const resp = await fetch(`/api/record-quarry-cache?address=${encodeURIComponent(normalized)}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data?.cache?.lookup) return data.cache;
-      }
-    } catch {}
     try {
       const raw = localStorage.getItem(addressLookupStorageKey(normalized));
       if (!raw) return null;
@@ -675,7 +671,7 @@
     } catch {}
   }
 
-  async function loadMostRecentAddressLookupSnapshot() {
+  function loadMostRecentAddressLookupSnapshot() {
     const recentAddress = normalizeAddressStorageKey(localStorage.getItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY));
     if (!recentAddress) return null;
     return loadAddressLookupSnapshot(recentAddress);
@@ -3069,7 +3065,7 @@
             if (cpfHost) {
               const cpfWrap = document.createElement('div');
               cpfWrap.setAttribute('data-aliquot-cpf-links', token);
-              cpfWrap.innerHTML = '<span class="small">Loading CP&amp;F records…</span>';
+              cpfWrap.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 0 2px;">Corner CP&amp;F records</div><span class="small">Loading CP&amp;F records…</span>';
               cpfHost.appendChild(cpfWrap);
             }
 
@@ -3148,8 +3144,6 @@
         }
       }
 
-            const rosCardSliceStart = cards.length;
-
       if (ros.length) {
         const ROS_COLLAPSE_DIST_M = 500; // metres
 
@@ -3161,7 +3155,7 @@
           return centroidOfPolygon(g);
         }
 
-        const rosSorted = ros.slice(0, 10)
+        const rosSorted = ros
           .map((f) => {
             const c = rosFeatureCentroid(f);
             const dist = (c && state.lastLonLat)
@@ -3396,7 +3390,7 @@
       });
       if (!uniquePart.count) throw new Error('No parcel points or CP&F-backed aliquot corners available to export to PointForge.');
 
-      const utilityMarkers = buildPowerUtilityMarkersForPointForge(getUtilityLocationsForExport(), uniquePart.nextPoint);
+      const utilityMarkers = buildPowerUtilityMarkersForPointForge(state.utilityLocations, uniquePart.nextPoint);
       const utilityRows = buildPointMarkerCsvRowsPNEZD(utilityMarkers, uniquePart.nextPoint, '');
       const pointForgeCsv = `${uniquePart.csv}${utilityRows.csv}`;
 
@@ -3482,7 +3476,7 @@
 
     const hasProjectAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
     const projectSnapshot = await loadProjectLookupSnapshot(state.projectContext.projectId);
-    const projectAddressSnapshot = hasProjectAddress ? await loadAddressLookupSnapshot(state.projectContext.address) : null;
+    const projectAddressSnapshot = hasProjectAddress ? loadAddressLookupSnapshot(state.projectContext.address) : null;
 
     let launchLookupPayload = null;
     let launchSelectionSnapshot = null;
@@ -3521,10 +3515,8 @@
     }
   } else {
     const hasLaunchAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
-    const launchAddressSnapshot = hasLaunchAddress
-      ? await loadAddressLookupSnapshot(state.projectContext.address)
-      : null;
-    const snapshot = await loadMostRecentAddressLookupSnapshot();
+    const launchAddressSnapshot = hasLaunchAddress ? loadAddressLookupSnapshot(state.projectContext.address) : null;
+    const snapshot = loadMostRecentAddressLookupSnapshot();
 
     if (hasLaunchAddress) {
       if (launchAddressSnapshot?.lookup) {
