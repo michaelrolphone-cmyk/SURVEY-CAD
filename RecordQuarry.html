@@ -413,18 +413,6 @@
         <label for="addr">Address (Ada County, ID)</label>
         <input id="addr" type="text" placeholder="e.g. 5707 W Castle Dr, Boise ID" value=""/>
 
-        <div class="hr"></div>
-
-        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
-          <div class="h">Utilities Export Radius</div>
-        </div>
-        <div class="small" id="utilRadiusHelp">
-          Include utility points within <b><span id="utilRadiusVal">500</span> m</b> of any parcel corner —
-          <b><span id="utilRadiusCount">0</span></b> selected for export.
-        </div>
-        <input id="utilRadius" type="range" min="0" max="2000" step="25" value="500" disabled />
-        <div class="small" id="utilRadiusHint" style="margin-top:6px">Selected utilities are highlighted on the map and included in PointForge export.</div>
-
         <div class="hr" style="display:none"></div>
 
         <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start;display:none">
@@ -1465,6 +1453,12 @@
     document.querySelectorAll(`[data-aliquot-select-key="${key}"]`).forEach((node) => {
       node.checked = selected;
     });
+    // Sync the star button in the list card (bidirectional map ↔ list).
+    document.querySelectorAll(`button[data-aliquot-star-key="${key}"]`).forEach((btn) => {
+      btn.textContent = selected ? '★' : '☆';
+      btn.title = selected ? 'Exclude from export' : 'Include in export';
+      btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
     // Expand a far aliquot card when selected; re-collapse it when deselected.
     document.querySelectorAll('.aliquot-card.is-far').forEach((cardEl) => {
       if (cardEl.dataset.aliquotCardKey === key) cardEl.classList.toggle('is-expanded', selected);
@@ -2082,9 +2076,10 @@
 
   /* ---------- Utilities export radius (parcel-corner distance) ---------- */
 
-  const UTIL_RADIUS_DEFAULT_M = 500;
-  const UTIL_RADIUS_STEP_M = 25;
-  const UTIL_RADIUS_MAX_CAP_M = 10000;
+  const FEET_TO_M = 0.3048;
+  const UTIL_RADIUS_MAX_FT = 600;
+  const UTIL_RADIUS_DEFAULT_FT = 100;
+  const UTIL_RADIUS_DEFAULT_M = UTIL_RADIUS_DEFAULT_FT * FEET_TO_M;
 
   function getUtilityLatLon(utility) {
     const lon = Number(utility?.location?.lon ?? utility?.location?.x ?? utility?.lon ?? utility?.x);
@@ -2145,22 +2140,6 @@
     }
 
     state.utilityMinDistToParcelCornerM = minDists;
-
-    // Adjust slider max dynamically so the UI can reach all utilities if desired
-    const utilRadiusEl = $("utilRadius");
-    if (utilRadiusEl) {
-      const finite = minDists.filter((d) => Number.isFinite(d));
-      const maxDist = finite.length ? Math.max(...finite) : UTIL_RADIUS_DEFAULT_M;
-      const suggestedMax = Math.min(UTIL_RADIUS_MAX_CAP_M, Math.max(2000, Math.ceil(maxDist / UTIL_RADIUS_STEP_M) * UTIL_RADIUS_STEP_M));
-      utilRadiusEl.max = String(suggestedMax);
-
-      // Clamp current value to new max
-      const current = Number(utilRadiusEl.value);
-      if (!Number.isFinite(current) || current > suggestedMax) {
-        utilRadiusEl.value = String(Math.min(UTIL_RADIUS_DEFAULT_M, suggestedMax));
-      }
-      state.utilityRadiusM = Number(utilRadiusEl.value);
-    }
   }
 
   function setUtilityRadiusEnabled(enabled) {
@@ -2170,14 +2149,14 @@
       state.utilityIncludedIdx = new Set();
       state.utilityMinDistToParcelCornerM = [];
       state.parcelCornerLatLngs = [];
-      syncUtilityRadiusUi(0, 0, utilRadiusEl ? Number(utilRadiusEl.value) : UTIL_RADIUS_DEFAULT_M);
+      syncUtilityRadiusUi(0, 0, UTIL_RADIUS_DEFAULT_M);
     }
   }
 
   function syncUtilityRadiusUi(selectedCount, totalCount, radiusM) {
     const valEl = $("utilRadiusVal");
     const countEl = $("utilRadiusCount");
-    if (valEl) valEl.textContent = String(Math.round(Number(radiusM) || 0));
+    if (valEl) valEl.textContent = String(Math.round((Number(radiusM) || 0) / FEET_TO_M));
     if (countEl) countEl.textContent = String(Number(selectedCount) || 0);
     const help = $("utilRadiusHelp");
     if (help && totalCount != null) {
@@ -2188,7 +2167,8 @@
 
   function updateUtilitySelectionAndMap() {
     const utilRadiusEl = $("utilRadius");
-    const radiusM = utilRadiusEl ? Number(utilRadiusEl.value) : Number(state.utilityRadiusM || UTIL_RADIUS_DEFAULT_M);
+    const radiusFt = utilRadiusEl ? Number(utilRadiusEl.value) : Math.round((Number(state.utilityRadiusM) || UTIL_RADIUS_DEFAULT_M) / FEET_TO_M);
+    const radiusM = radiusFt * FEET_TO_M;
     state.utilityRadiusM = Number.isFinite(radiusM) ? radiusM : UTIL_RADIUS_DEFAULT_M;
 
     const utils = state.utilityLocations || [];
@@ -2233,7 +2213,7 @@
     const utilRadiusEl = $("utilRadius");
     if (!utilRadiusEl || utilRadiusEl.dataset.rqBound === '1') return;
 
-    utilRadiusEl.value = String(state.utilityRadiusM || UTIL_RADIUS_DEFAULT_M);
+    utilRadiusEl.value = String(Math.round((state.utilityRadiusM || UTIL_RADIUS_DEFAULT_M) / FEET_TO_M));
     utilRadiusEl.addEventListener('input', () => updateUtilitySelectionAndMap());
     utilRadiusEl.dataset.rqBound = '1';
   }
@@ -2242,8 +2222,10 @@
     initUtilityRadiusUiOnce();
     const utilRadiusEl = $("utilRadius");
     if (utilRadiusEl) {
-      utilRadiusEl.value = String(UTIL_RADIUS_DEFAULT_M);
-      utilRadiusEl.max = '2000';
+      utilRadiusEl.value = String(UTIL_RADIUS_DEFAULT_FT);
+      utilRadiusEl.max = String(UTIL_RADIUS_MAX_FT);
+      utilRadiusEl.min = '0';
+      utilRadiusEl.step = '1';
       utilRadiusEl.disabled = true;
     }
     state.utilityRadiusM = UTIL_RADIUS_DEFAULT_M;
@@ -2498,9 +2480,12 @@
             const svH = sv
               ? `<div class="small" style="color:var(--muted)">Surveyor: <span style="color:var(--text)">${escapeHtml(sv)}</span></div>`
               : '';
-            const openUrl = rec.links?.[0] ? escapeHtml(buildRosPdfProxyUrl(rec.links[0])) : '';
-            const openAttr = openUrl ? ` data-cpf-open="${openUrl}"` : '';
-            return `<div class="cpf-record-row"${openAttr}><b>${escapeHtml(inst)}</b>${msH}${svH}</div>`;
+            const proxyUrl = rec.links?.[0] ? buildRosPdfProxyUrl(rec.links[0]) : null;
+            const openAttr = proxyUrl ? ` data-cpf-open="${escapeHtml(proxyUrl)}"` : '';
+            const thumbHtml = proxyUrl
+              ? `<img class="cpf-thumb" style="display:none;flex-shrink:0" alt="CP&amp;F PDF thumbnail" data-cpf-proxy="${escapeHtml(proxyUrl)}"/>`
+              : '';
+            return `<div class="cpf-record-row" style="display:flex;gap:8px;align-items:flex-start"${openAttr}>${thumbHtml}<div style="flex:1;min-width:0"><b>${escapeHtml(inst)}</b>${msH}${svH}</div></div>`;
           }).join('');
         }
 
@@ -2537,6 +2522,17 @@
             expanded = !expanded;
             allDiv.style.display = expanded ? '' : 'none';
             syncLabel();
+            // Lazy-load thumbnails for secondary records on first expand.
+            if (expanded) {
+              allDiv.querySelectorAll('img[data-cpf-proxy]').forEach((imgEl) => {
+                if (imgEl.dataset.rqLoaded) return;
+                imgEl.dataset.rqLoaded = '1';
+                const proxyUrl = imgEl.dataset.cpfProxy;
+                if (!proxyUrl) return;
+                imgEl.addEventListener('click', (e) => { e.stopPropagation(); window.open(proxyUrl, '_blank', 'noopener'); });
+                loadCpfThumbnailWithRetry(imgEl, buildCpfPdfThumbnailUrl(proxyUrl));
+              });
+            }
           });
         }
 
@@ -2954,7 +2950,27 @@
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
       if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (state.utilityLocations.length) {
-        cards.push(card("Utilities", "Idaho Power residential utility locations", [["Count", String(state.utilityLocations.length)]], []));
+        const utilitiesCard = card(
+          "Utilities",
+          "Idaho Power residential utility locations",
+          [["Count", String(state.utilityLocations.length)]],
+          [],
+          {
+            onRender: (cardEl) => {
+              const body = cardEl.querySelector('.cbody');
+              if (!body) return;
+              const sliderWrap = document.createElement('div');
+              sliderWrap.innerHTML = `
+                <div class="hr" style="margin:8px 0"></div>
+                <div class="small" id="utilRadiusHelp">Export radius: <b><span id="utilRadiusVal">${UTIL_RADIUS_DEFAULT_FT}</span> ft</b> from parcel corners — <b><span id="utilRadiusCount">0</span></b> of ${state.utilityLocations.length} selected.</div>
+                <input id="utilRadius" type="range" min="0" max="${UTIL_RADIUS_MAX_FT}" step="1" value="${UTIL_RADIUS_DEFAULT_FT}" disabled style="margin-top:8px;width:100%"/>
+                <div class="small" id="utilRadiusHint" style="margin-top:4px;color:var(--muted)">Highlighted on map · included in PointForge export</div>
+              `;
+              body.appendChild(sliderWrap);
+            },
+          }
+        );
+        cards.push(utilitiesCard);
       }
 
 
@@ -3031,6 +3047,7 @@
                   };
                   starBtn.type = 'button';
                   starBtn.className = 'rq-star-btn';
+                  starBtn.dataset.aliquotStarKey = selectionKey;
                   syncStar();
                   starBtn.addEventListener('click', (evt) => {
                     evt.stopPropagation();
@@ -3229,6 +3246,8 @@
       }
 
       setSummaryCards(cards);
+      // Re-init utility radius slider now that its card is in the DOM.
+      if (state.utilityLocations.length) afterUtilitiesLoadedOrUpdated();
       if (aliquotSummaryCpfTargets.length) {
         lazyLoadAliquotSummaryCpfLinks(aliquotSummaryCpfTargets);
       }
