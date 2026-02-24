@@ -349,6 +349,15 @@
     .card.ros-card.is-far > .cbody{display:none}
     .card.ros-card.is-far.is-expanded > .cbody{display:block}
     .card.ros-card.is-far:not(.is-expanded) .chead-chevron{transform:rotate(-90deg)}
+    .ros-scan-thumb{
+      display:block;
+      max-width:100%;
+      width:260px;
+      border-radius:8px;
+      border:1px solid var(--line);
+      margin:6px 0;
+      background:rgba(0,0,0,.2);
+    }
 
     /* Distance-group collapse ("See More") */
     .rq-distance-group{border-style:dashed;background:rgba(255,255,255,.03)}
@@ -1853,6 +1862,12 @@
       body.appendChild(kv);
     }
 
+    if (options.extraHtml) {
+      const extra = document.createElement('div');
+      extra.innerHTML = options.extraHtml;
+      body.appendChild(extra);
+    }
+
     if (links.length) {
       const hr = document.createElement("div");
       hr.className = "hr";
@@ -2354,7 +2369,52 @@
     const desc = bestRosLabel(attrs);
     const links = buildPdfProxyLinks(attrs, "Open PDF (API)");
     const linkHtml = links.length ? links.map((l, i) => `${i + 1}. ${l}`).join("<br/>") : "No PDF links found";
-    return `<b>Record of Survey</b><br/>${escapeHtml(desc)}<div class="hr"></div><div class="small"><b>PDFs</b><br/>${linkHtml}</div>`;
+    const imageHtml = buildRosImageHtml(attrs);
+    return `<b>Record of Survey</b><br/>${escapeHtml(desc)}${imageHtml}<div class="hr"></div><div class="small"><b>PDFs</b><br/>${linkHtml}</div>`;
+  }
+
+  function buildAdaCountyRosImageMeta(attrs = {}) {
+    const values = Object.values(attrs || {});
+    let rosNumber = null;
+    for (const value of values) {
+      const s = String(value || '').trim();
+      if (!s) continue;
+      const tagged = s.match(/\bRS_(\d{4,6})\b/i);
+      if (tagged) {
+        rosNumber = Number(tagged[1]);
+        break;
+      }
+      const plain = s.match(/\b(?:ROS|RS)\D*(\d{4,6})\b/i);
+      if (plain) {
+        rosNumber = Number(plain[1]);
+        break;
+      }
+    }
+    if (!Number.isInteger(rosNumber) || rosNumber < 1) return null;
+
+    const versionCandidates = ['VERSION', 'VER', 'REVISION', 'SHEET', 'DRAWING'];
+    let version = 1;
+    for (const key of versionCandidates) {
+      for (const [attrKey, attrVal] of Object.entries(attrs || {})) {
+        if (!String(attrKey).toUpperCase().includes(key)) continue;
+        const n = Number.parseInt(String(attrVal || '').match(/\d+/)?.[0] || '', 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 99) {
+          version = n;
+          break;
+        }
+      }
+    }
+
+    const rangeBase = Math.floor(rosNumber / 1000) * 1000;
+    const folder = `surv${rangeBase}`;
+    const fullSizeUrl = `https://adacountyassessor.org/docs/recordsofsurvey/${folder}/R${String(rosNumber)}${String(version).padStart(2, '0')}.tif`;
+    return { rosNumber, version, fullSizeUrl };
+  }
+
+  function buildRosImageHtml(attrs = {}) {
+    const meta = buildAdaCountyRosImageMeta(attrs);
+    if (!meta?.fullSizeUrl) return '';
+    return `<div class="small" style="margin-top:8px"><b>Record image</b><br/><a target="_blank" rel="noopener" href="${escapeHtml(meta.fullSizeUrl)}">Open full-size ROS image</a><img class="ros-scan-thumb" loading="lazy" alt="ROS ${escapeHtml(String(meta.rosNumber))} thumbnail" src="${escapeHtml(meta.fullSizeUrl)}"/></div>`;
   }
 
   function buildAliquotPopupHtml(feature, label = 'Aliquot') {
@@ -3177,7 +3237,10 @@
             rosLabel,
             summarizeAttrs(a),
             buildPdfProxyLinks(a),
-            { onSelect: () => centerMapOnFeature(f, layers.ros, rosLabel) }
+            {
+              onSelect: () => centerMapOnFeature(f, layers.ros, rosLabel),
+              extraHtml: buildRosImageHtml(a)
+            }
           );
           cardEl.classList.add('ros-card');
           if (isFar) cardEl.classList.add('is-far');
