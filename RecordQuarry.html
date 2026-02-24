@@ -1391,12 +1391,10 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     document.querySelectorAll(`[data-aliquot-select-key="${key}"]`).forEach((node) => {
       node.checked = selected;
     });
-    // Auto-expand a far aliquot card when it becomes selected (e.g. from map click)
-    if (selected) {
-      document.querySelectorAll('.aliquot-card.is-far').forEach((cardEl) => {
-        if (cardEl.dataset.aliquotCardKey === key) cardEl.classList.add('is-expanded');
-      });
-    }
+    // Expand a far aliquot card when selected; re-collapse it when deselected.
+    document.querySelectorAll('.aliquot-card.is-far').forEach((cardEl) => {
+      if (cardEl.dataset.aliquotCardKey === key) cardEl.classList.toggle('is-expanded', selected);
+    });
     if (state.lastLookupPayload) {
       saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
     }
