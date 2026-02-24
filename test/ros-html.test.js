@@ -45,6 +45,12 @@ test('RecordQuarry.html keeps ROS scoped to containing section and includes popu
   assert.match(html, /l\.bindPopup\(buildRosPopupHtml\(/, 'ROS line popups should use shared popup HTML with PDF links');
   assert.match(html, /p\.bindPopup\(buildRosPopupHtml\(/, 'ROS polygon popups should use shared popup HTML with PDF links');
   assert.match(html, /function\s+buildRosPopupHtml\s*\(/, 'ROS popup helper should include description and PDF links');
+  assert.match(html, /function\s+buildAdaCountyRosImageMeta\s*\(/, 'ROS cards should derive Ada County scan URLs from RS lookup identifiers');
+  assert.match(html, /function\s+buildRosImageHtml\s*\(/, 'ROS cards should render a reusable scan thumbnail/link block');
+  assert.match(html, /Open full-size ROS image/, 'ROS image block should include a link to the full-resolution scan');
+  assert.match(html, /class=\"ros-scan-thumb\"/, 'ROS image block should include a thumbnail image element');
+  assert.match(html, /extraHtml:\s*buildRosImageHtml\(a\)/, 'ROS summary cards should render scan thumbnails for each record entry');
+  assert.match(html, /const\s+imageHtml\s*=\s*buildRosImageHtml\(attrs\);/, 'ROS map popup should include the same scan thumbnail/link block');
 });
 
 
