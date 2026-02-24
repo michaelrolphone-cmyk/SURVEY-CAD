@@ -244,6 +244,12 @@
       gap:8px;
       align-items:flex-start;
     }
+
+    /* Prevent star button from overlapping distance badge in card headers */
+    .card.aliquot-card > .chead,
+    .card.ros-card > .chead{
+      padding-right:44px;
+    }
     .card .cbody{padding:10px;}
     .kv{
       display:grid;
@@ -1766,7 +1772,7 @@
         btn.textContent = expanded ? `Hide (${farEls.length})` : `See More (${farEls.length})`;
         btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       }
-      if (sub) sub.textContent = `${farEls.length} ${labelPlural} beyond ${cutoffMeters} m`;
+      if (sub) sub.textContent = `${farEls.length} ${labelPlural} beyond ${fmtDist(cutoffMeters)}`;
     };
     sync();
 
@@ -1787,12 +1793,18 @@
       <div class="chead" style="align-items:center">
         <div style="min-width:0">
           <div class="rq-distance-group-title">See More</div>
-          <div class="rq-distance-group-sub" data-rq-see-more-sub>${count} ${labelPlural} beyond ${cutoffMeters} m</div>
+          <div class="rq-distance-group-sub" data-rq-see-more-sub>${count} ${labelPlural} beyond ${fmtDist(cutoffMeters)}</div>
         </div>
         <button type="button" class="secondary rq-see-more-btn" data-rq-see-more-btn aria-expanded="false">See More (${count})</button>
       </div>
     `;
     return el;
+  }
+
+  function fmtDist(m) {
+    const mi = m / 1609.344;
+    const decimals = mi < 0.1 ? 3 : 2;
+    return `${mi.toFixed(decimals)} mi`;
   }
 
   function escapeHtml(s) {
@@ -2874,9 +2886,6 @@
       }
 
 
-      function fmtDist(m) {
-        return m < 1609.34 ? `${Math.round(m)} m` : `${(m / 1609.34).toFixed(2)} mi`;
-      }
 
             const aliquotCardSliceStart = cards.length;
       const aliquotSummaryCpfTargets = [];
@@ -3026,7 +3035,7 @@
               btn.textContent = expanded ? `Hide (${farCount})` : `See More (${farCount})`;
               btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
             }
-            if (sub) sub.textContent = `${farCount} Aliquots beyond ${COLLAPSE_DIST_M} m`;
+            if (sub) sub.textContent = `${farCount} Aliquots beyond ${fmtDist(COLLAPSE_DIST_M)}`;
           };
           sync();
 
@@ -3123,7 +3132,7 @@
               btn.textContent = expanded ? `Hide (${farCount})` : `See More (${farCount})`;
               btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
             }
-            if (sub) sub.textContent = `${farCount} Records of Survey beyond ${ROS_COLLAPSE_DIST_M} m`;
+            if (sub) sub.textContent = `${farCount} Records of Survey beyond ${fmtDist(ROS_COLLAPSE_DIST_M)}`;
           };
           sync();
 
