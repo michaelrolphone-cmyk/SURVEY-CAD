@@ -114,6 +114,11 @@
       color:var(--muted);
       outline:none;
     }
+
+    input[type="range"]{
+      width:100%;
+      margin-top:8px;
+    }
     button{
       padding:10px 12px;
       border-radius:10px;
@@ -392,6 +397,18 @@
       <div class="pbody">
         <label for="addr">Address (Ada County, ID)</label>
         <input id="addr" type="text" placeholder="e.g. 5707 W Castle Dr, Boise ID" value=""/>
+
+        <div class="hr"></div>
+
+        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
+          <div class="h">Utilities Export Radius</div>
+        </div>
+        <div class="small" id="utilRadiusHelp">
+          Include utility points within <b><span id="utilRadiusVal">500</span> m</b> of any parcel corner —
+          <b><span id="utilRadiusCount">0</span></b> selected for export.
+        </div>
+        <input id="utilRadius" type="range" min="0" max="2000" step="25" value="500" disabled />
+        <div class="small" id="utilRadiusHint" style="margin-top:6px">Selected utilities are highlighted on the map and included in PointForge export.</div>
 
         <div class="hr"></div>
 
@@ -1702,6 +1719,11 @@
     exportGeoJSON: null,
     lastLonLat: null,
     utilityLocations: [],
+    utilityRadiusM: 500,
+    utilityMinDistToParcelCornerM: [],
+    utilityIncludedIdx: new Set(),
+    utilityMarkers: [],
+    parcelCornerLatLngs: [],
     projectContext: initialProjectContext
   };
 
@@ -2009,18 +2031,214 @@
 
   function drawUtilityLocations(utilities = []) {
     layers.utilities.clearLayers();
-    for (const utility of (utilities || [])) {
-      const lon = Number(utility?.location?.lon);
-      const lat = Number(utility?.location?.lat);
-      if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+    state.utilityMarkers = [];
+
+    for (let i = 0; i < (utilities || []).length; i++) {
+      const utility = utilities[i];
+      const ll = getUtilityLatLon(utility);
+      if (!ll) continue;
+
       const label = utility?.code || utility?.name || utility?.provider || 'Utility';
-      const marker = L.circleMarker([lat, lon], { radius: 6, weight: 2, color: '#ffffff', fillColor: '#ffcc66', fillOpacity: 0.9 });
+
+      const marker = L.circleMarker([ll.lat, ll.lon], {
+        radius: 6,
+        weight: 2,
+        color: '#ffffff',
+        fillColor: '#ffcc66',
+        fillOpacity: 0.9
+      });
+
+      marker._rqUtilityIndex = i;
       marker.bindPopup(`<b>Utility</b><br/>${escapeHtml(label)}<br/><span class="small">${escapeHtml(utility?.provider || 'Idaho Power')}</span>`);
       layers.utilities.addLayer(marker);
+      state.utilityMarkers[i] = marker;
+    }
+
+  }
+
+  /* ---------- Utilities export radius (parcel-corner distance) ---------- */
+
+  const UTIL_RADIUS_DEFAULT_M = 500;
+  const UTIL_RADIUS_STEP_M = 25;
+  const UTIL_RADIUS_MAX_CAP_M = 10000;
+
+  function getUtilityLatLon(utility) {
+    const lon = Number(utility?.location?.lon ?? utility?.location?.x ?? utility?.lon ?? utility?.x);
+    const lat = Number(utility?.location?.lat ?? utility?.location?.y ?? utility?.lat ?? utility?.y);
+    if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat };
+    return null;
+  }
+
+  function getParcelCornerLatLngs(parcelFeature) {
+    const rings = parcelFeature?.geometry?.rings || [];
+    if (!rings.length) return [];
+    const ring = rings[0] || [];
+    if (!ring.length) return [];
+
+    // Remove duplicated closing vertex if present
+    const pts = (ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1])
+      ? ring.slice(0, -1)
+      : ring.slice();
+
+    // Filter obvious duplicates
+    const out = [];
+    const seen = new Set();
+    for (const [x, y] of pts) {
+      const lon = Number(x);
+      const lat = Number(y);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+      const key = `${lon.toFixed(7)},${lat.toFixed(7)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ lon, lat });
+    }
+    return out;
+  }
+
+  function recomputeUtilityMinDistances() {
+    state.parcelCornerLatLngs = getParcelCornerLatLngs(state.parcelFeature);
+    const corners = state.parcelCornerLatLngs;
+
+    const utils = state.utilityLocations || [];
+    const minDists = new Array(utils.length).fill(Infinity);
+
+    if (!corners.length || !utils.length) {
+      state.utilityMinDistToParcelCornerM = minDists;
+      return;
+    }
+
+    for (let i = 0; i < utils.length; i++) {
+      const ll = getUtilityLatLon(utils[i]);
+      if (!ll) continue;
+      let best = Infinity;
+      for (let j = 0; j < corners.length; j++) {
+        const c = corners[j];
+        const d = haversineMeters(c.lat, c.lon, ll.lat, ll.lon);
+        if (d < best) best = d;
+        if (best <= 0.5) break;
+      }
+      minDists[i] = best;
+    }
+
+    state.utilityMinDistToParcelCornerM = minDists;
+
+    // Adjust slider max dynamically so the UI can reach all utilities if desired
+    const utilRadiusEl = $("utilRadius");
+    if (utilRadiusEl) {
+      const finite = minDists.filter((d) => Number.isFinite(d));
+      const maxDist = finite.length ? Math.max(...finite) : UTIL_RADIUS_DEFAULT_M;
+      const suggestedMax = Math.min(UTIL_RADIUS_MAX_CAP_M, Math.max(2000, Math.ceil(maxDist / UTIL_RADIUS_STEP_M) * UTIL_RADIUS_STEP_M));
+      utilRadiusEl.max = String(suggestedMax);
+
+      // Clamp current value to new max
+      const current = Number(utilRadiusEl.value);
+      if (!Number.isFinite(current) || current > suggestedMax) {
+        utilRadiusEl.value = String(Math.min(UTIL_RADIUS_DEFAULT_M, suggestedMax));
+      }
+      state.utilityRadiusM = Number(utilRadiusEl.value);
     }
   }
 
-  function drawPolygonFeature(f, group, geojsonOptions, label) {
+  function setUtilityRadiusEnabled(enabled) {
+    const utilRadiusEl = $("utilRadius");
+    if (utilRadiusEl) utilRadiusEl.disabled = !enabled;
+    if (!enabled) {
+      state.utilityIncludedIdx = new Set();
+      state.utilityMinDistToParcelCornerM = [];
+      state.parcelCornerLatLngs = [];
+      syncUtilityRadiusUi(0, 0, utilRadiusEl ? Number(utilRadiusEl.value) : UTIL_RADIUS_DEFAULT_M);
+    }
+  }
+
+  function syncUtilityRadiusUi(selectedCount, totalCount, radiusM) {
+    const valEl = $("utilRadiusVal");
+    const countEl = $("utilRadiusCount");
+    if (valEl) valEl.textContent = String(Math.round(Number(radiusM) || 0));
+    if (countEl) countEl.textContent = String(Number(selectedCount) || 0);
+    const help = $("utilRadiusHelp");
+    if (help && totalCount != null) {
+      // keep the existing copy but ensure it stays correct if radius is NaN
+      // (text nodes are already wired via spans)
+    }
+  }
+
+  function updateUtilitySelectionAndMap() {
+    const utilRadiusEl = $("utilRadius");
+    const radiusM = utilRadiusEl ? Number(utilRadiusEl.value) : Number(state.utilityRadiusM || UTIL_RADIUS_DEFAULT_M);
+    state.utilityRadiusM = Number.isFinite(radiusM) ? radiusM : UTIL_RADIUS_DEFAULT_M;
+
+    const utils = state.utilityLocations || [];
+    const minDists = state.utilityMinDistToParcelCornerM || [];
+    const included = new Set();
+
+    for (let i = 0; i < utils.length; i++) {
+      const d = Number(minDists[i]);
+      if (Number.isFinite(d) && d <= state.utilityRadiusM) included.add(i);
+    }
+
+    state.utilityIncludedIdx = included;
+
+    // Update UI count
+    syncUtilityRadiusUi(included.size, utils.length, state.utilityRadiusM);
+
+    // Highlight included markers on map
+    const markers = state.utilityMarkers || [];
+    for (let i = 0; i < markers.length; i++) {
+      const marker = markers[i];
+      if (!marker) continue;
+      if (included.has(i)) {
+        marker.setStyle({ color: '#ffffff', fillColor: '#ffcc66', fillOpacity: 0.95, weight: 2 });
+        if (typeof marker.setRadius === 'function') marker.setRadius(7);
+      } else {
+        marker.setStyle({ color: 'rgba(255,255,255,0.25)', fillColor: 'rgba(100,116,139,0.35)', fillOpacity: 0.25, weight: 1 });
+        if (typeof marker.setRadius === 'function') marker.setRadius(6);
+      }
+    }
+  }
+
+  function getUtilityLocationsForExport() {
+    const utils = state.utilityLocations || [];
+    const minDists = state.utilityMinDistToParcelCornerM || [];
+    const radius = Number(state.utilityRadiusM);
+    if (!utils.length) return [];
+    if (!Number.isFinite(radius) || minDists.length !== utils.length) return utils; // preserve prior behavior as fallback
+    return utils.filter((_, i) => Number(minDists[i]) <= radius);
+  }
+
+  function initUtilityRadiusUiOnce() {
+    const utilRadiusEl = $("utilRadius");
+    if (!utilRadiusEl || utilRadiusEl.dataset.rqBound === '1') return;
+
+    utilRadiusEl.value = String(state.utilityRadiusM || UTIL_RADIUS_DEFAULT_M);
+    utilRadiusEl.addEventListener('input', () => updateUtilitySelectionAndMap());
+    utilRadiusEl.dataset.rqBound = '1';
+  }
+
+  function resetUtilitiesRadiusUiAndState() {
+    initUtilityRadiusUiOnce();
+    const utilRadiusEl = $("utilRadius");
+    if (utilRadiusEl) {
+      utilRadiusEl.value = String(UTIL_RADIUS_DEFAULT_M);
+      utilRadiusEl.max = '2000';
+      utilRadiusEl.disabled = true;
+    }
+    state.utilityRadiusM = UTIL_RADIUS_DEFAULT_M;
+    state.utilityMinDistToParcelCornerM = [];
+    state.utilityIncludedIdx = new Set();
+    state.utilityMarkers = [];
+    state.parcelCornerLatLngs = [];
+    syncUtilityRadiusUi(0, 0, UTIL_RADIUS_DEFAULT_M);
+  }
+
+  function afterUtilitiesLoadedOrUpdated() {
+    initUtilityRadiusUiOnce();
+    recomputeUtilityMinDistances();
+    const enabled = Boolean(state.parcelFeature && (state.utilityLocations || []).length);
+    setUtilityRadiusEnabled(enabled);
+    updateUtilitySelectionAndMap();
+  }
+
+  function drawPolygonFeature(f, group, geojsonOptions, label) {(f, group, geojsonOptions, label) {
     const gj = arcPolygonToGeoJSON(f.geometry);
     const options = geojsonOptions || {};
     if (!options.pane) options.pane = 'contextPolygons';
@@ -2450,6 +2668,7 @@
     state.selectedAliquotKeys.clear();
     setSummaryCards([]);
     clearMapLayers();
+    resetUtilitiesRadiusUiAndState();
 
     const rawAddr = $("addr").value.trim();
     if (!rawAddr) { log("Enter an address.", "warn"); return; }
@@ -2555,6 +2774,7 @@
       }
       state.utilityLocations = utilityLocations;
       drawUtilityLocations(state.utilityLocations);
+      afterUtilitiesLoadedOrUpdated();
       log(`Utility locations found: ${state.utilityLocations.length}`);
       state.rosFeatures = ros;
       log(`ROS in containing section: ${ros.length} (from ${rosFromLookup.length} nearby ROS)`);
@@ -2885,6 +3105,7 @@
     state.lastLookupAddress = '';
     clearLog();
     clearMapLayers();
+    resetUtilitiesRadiusUiAndState();
     setSummaryCards([]);
     $("btnExportParcelCSV").disabled = true;
     $("btnExportPointForge").disabled = true;
@@ -2981,7 +3202,7 @@
       });
       if (!uniquePart.count) throw new Error('No parcel points or CP&F-backed aliquot corners available to export to PointForge.');
 
-      const utilityMarkers = buildPowerUtilityMarkersForPointForge(state.utilityLocations, uniquePart.nextPoint);
+      const utilityMarkers = buildPowerUtilityMarkersForPointForge(getUtilityLocationsForExport(), uniquePart.nextPoint);
       const utilityRows = buildPointMarkerCsvRowsPNEZD(utilityMarkers, uniquePart.nextPoint, '');
       const pointForgeCsv = `${uniquePart.csv}${utilityRows.csv}`;
 
@@ -3058,6 +3279,7 @@
 
   // initial log
   clearLog();
+  resetUtilitiesRadiusUiAndState();
   if (state.projectContext.address) {
     $("addr").value = state.projectContext.address;
   }
