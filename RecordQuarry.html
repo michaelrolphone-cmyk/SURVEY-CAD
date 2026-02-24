@@ -407,10 +407,6 @@
 
 <body>
 <div class="app">
-  <header>
-    <div class="title">RecordQuarry — Ada County Survey Context Lookup (Standalone)</div>
-    <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
-  </header>
   <div class="main">
     <!-- LEFT -->
     <div class="panel">
@@ -453,6 +449,7 @@
 
     <!-- RIGHT -->
     <div class="panel">
+      <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
       <div class="pbody rightBody">
         <div class="mapWrap">
           <div id="map"></div>
@@ -2407,7 +2404,11 @@
 
     const rangeBase = Math.floor(rosNumber / 1000) * 1000;
     const folder = `surv${rangeBase}`;
-    const fullSizeUrl = `https://adacountyassessor.org/docs/recordsofsurvey/${folder}/R${String(rosNumber)}${String(version).padStart(2, '0')}.tif`;
+    let padding = "";
+    if (rosNumber < 10000) {
+      padding = "0";
+    }
+    const fullSizeUrl = `https://adacountyassessor.org/docs/recordsofsurvey/${folder}/R${padding}${String(rosNumber)}${String(version).padStart(2, '0')}.tif`;
     return { rosNumber, version, fullSizeUrl };
   }
 
