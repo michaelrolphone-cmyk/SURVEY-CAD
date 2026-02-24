@@ -8,10 +8,10 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+ <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
+ 
   <!-- pdf.js (UMD build defining window.pdfjsLib) -->
   <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
- <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
 
   <style>
     :root{
@@ -2904,6 +2904,7 @@
 
       // Place Subdivision, Township, Section, and Utilities above Aliquots (below Parcel card).
       if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
+      if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
       if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (state.utilityLocations.length) {
         cards.push(card("Utilities", "Idaho Power residential utility locations", [["Count", String(state.utilityLocations.length)]], []));
@@ -3077,8 +3078,6 @@
           cards.push(...farEls);
         }
       }
-
-      if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
 
             const rosCardSliceStart = cards.length;
 
