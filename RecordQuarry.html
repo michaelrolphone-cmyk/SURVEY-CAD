@@ -364,6 +364,21 @@
       margin: 5px;
      float:left;
      }
+    /* ROS card compact layout */
+    .ros-thumb-float{
+      float:left;
+      padding:10px 0 10px 10px;
+    }
+    .ros-thumb-float > .ros-scan-thumb{
+      float:none;
+      display:block;
+      margin:0;
+    }
+    /* Hide ROS card body unless expanded (content is preserved, just collapsed). */
+    .card.ros-card > .cbody{ display:none; }
+    .card.ros-card.is-expanded > .cbody{ display:block; }
+    .card.ros-card:not(.is-expanded) .chead-chevron{ transform:rotate(-90deg); }
+
 
     .rq-hover-preview-tooltip{
       position:fixed;
@@ -3619,6 +3634,15 @@
           );
           cardEl.classList.add('ros-card');
           if (isFar) cardEl.classList.add('is-far');
+          // ROS card layout: move thumbnail outside of chead/cbody so it can float left of the header/content.
+          const rosThumb = cardEl.querySelector('img.ros-scan-thumb[data-ros-thumbnail]');
+          if (rosThumb) {
+            const wrap = document.createElement('div');
+            wrap.className = 'ros-thumb-float';
+            wrap.appendChild(rosThumb);
+            cardEl.insertBefore(wrap, cardEl.firstChild);
+          }
+
           const chead = cardEl.querySelector('.chead');
           if (chead) {
             const starBtn = document.createElement('button');
@@ -3644,17 +3668,19 @@
             badge.className = 'dist-badge' + (isFar ? ' is-far' : '');
             badge.textContent = fmtDist(dist);
             chead.appendChild(badge);
-            if (isFar) {
-              const chevron = document.createElement('span');
-              chevron.className = 'chead-chevron';
-              chevron.textContent = '▾';
-              chead.appendChild(chevron);
-              chead.addEventListener('click', (evt) => {
-                evt.stopPropagation();
-                cardEl.classList.toggle('is-expanded');
-                centerMapOnFeature(f, layers.ros, rosLabel);
-              });
-            }
+
+            // Make ROS cards compact by default: the body is hidden unless expanded.
+            // Allow expand/collapse on both near and far ROS cards.
+            const chevron = document.createElement('span');
+            chevron.className = 'chead-chevron';
+            chevron.textContent = '▾';
+            chead.appendChild(chevron);
+
+            chead.addEventListener('click', (evt) => {
+              evt.stopPropagation();
+              cardEl.classList.toggle('is-expanded');
+              centerMapOnFeature(f, layers.ros, rosLabel);
+            });
           }
           (isFar ? rosFarEls : rosNearEls).push(cardEl);
         }
