@@ -574,6 +574,27 @@ header {
       gap: 0.8rem;
     }
 
+
+    .app-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .app-section-title {
+      margin: 0 0 0.5rem;
+      font-size: 0.9rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.8rem;
+    }
+
     .app-card {
       position: relative;
       isolation: isolate;
