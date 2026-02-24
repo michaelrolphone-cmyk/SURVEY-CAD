@@ -74,6 +74,7 @@
       display:flex;
       flex-direction:column;
       min-height:0;
+      position: relative;
     }
     .panel .phead{
       padding:10px 12px;
@@ -144,6 +145,13 @@
     }
     button:disabled{opacity:.5;cursor:not-allowed}
 
+    #btnExportPointForge {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      z-index: 10000;
+    }
+    
     .workflowAction{
       margin-left:auto;
     }
@@ -385,20 +393,10 @@
 
 <body>
 <div class="app">
-  <header>
-    <div>
-      <div class="title">RecordQuarry — Ada County Survey Context Lookup (Standalone)</div>
-      <div class="subtitle">Address → Parcel → Subdivision / Section / Township + nearby ROS (JSONP, no CORS failures)</div>
-    </div>
-    <div class="row">
-      <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
-    </div>
-  </header>
-
   <div class="main">
     <!-- LEFT -->
     <div class="panel">
-      <div class="phead">
+      <div class="phead" style="display:none;>
         <div class="h">Lookup</div>
         <div class="row">
           <button id="btnLookup">Lookup</button>
@@ -449,6 +447,7 @@
 
     <!-- RIGHT -->
     <div class="panel">
+      <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
       <div class="pbody rightBody">
         <div class="mapWrap">
           <div id="map"></div>
