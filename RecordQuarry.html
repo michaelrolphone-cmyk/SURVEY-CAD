@@ -688,10 +688,15 @@
     const allAliquotKeys = buildAllSelectedAliquotKeys(state.aliquotFeatures);
     const selectedAliquotKeys = [...state.selectedAliquotKeys];
     const deselectedAliquotKeys = [...allAliquotKeys].filter((key) => !state.selectedAliquotKeys.has(key));
+    const allRosKeys = buildAllRosSelectionKeys(state.rosFeatures);
+    const selectedRosKeys = [...state.selectedRosKeys];
+    const deselectedRosKeys = [...allRosKeys].filter((key) => !state.selectedRosKeys.has(key));
     return {
       selectedParcel: Boolean(state.selectedParcel),
       selectedAliquotKeys,
       deselectedAliquotKeys,
+      selectedRosKeys,
+      deselectedRosKeys,
     };
   }
 
@@ -712,9 +717,35 @@
       }
       return;
     }
-    if (!deselectedKeys) return;
-    for (const key of allAliquotKeys) {
-      if (!deselectedKeys.has(key)) state.selectedAliquotKeys.add(key);
+    if (!selectedKeys?.length && deselectedKeys) {
+      for (const key of allAliquotKeys) {
+        if (!deselectedKeys.has(key)) state.selectedAliquotKeys.add(key);
+      }
+    }
+
+    state.selectedRosKeys.clear();
+    const allRosKeys = buildAllRosSelectionKeys(state.rosFeatures);
+    const selectedRosKeys = Array.isArray(selection?.selectedRosKeys)
+      ? selection.selectedRosKeys
+      : null;
+    const deselectedRosKeys = Array.isArray(selection?.deselectedRosKeys)
+      ? new Set(selection.deselectedRosKeys)
+      : null;
+
+    if (selectedRosKeys && selectedRosKeys.length) {
+      for (const key of selectedRosKeys) {
+        if (allRosKeys.has(key)) state.selectedRosKeys.add(key);
+      }
+      return;
+    }
+
+    if (!deselectedRosKeys) {
+      for (const key of allRosKeys) state.selectedRosKeys.add(key);
+      return;
+    }
+
+    for (const key of allRosKeys) {
+      if (!deselectedRosKeys.has(key)) state.selectedRosKeys.add(key);
     }
   }
 
@@ -876,6 +907,9 @@
     const projectFile = loadProjectFileSnapshot(resolvedProjectContext) || defaultProjectFile(resolvedProjectContext);
     const exportTimestamp = new Date().toISOString();
     const cpfInstruments = parseCpfInstrumentsFromNotesMap(notesByCoordinate);
+    const selectedRos = (state.rosFeatures || [])
+      .map((feature, index) => ({ feature, index }))
+      .filter(({ feature, index }) => isRosSelected(feature, index));
 
     for (const instrument of cpfInstruments) {
       addProjectFileResource(projectFile, {
@@ -889,6 +923,42 @@
           resolverHint: 'lookup-cpf-pdf',
           metadata: { instrument },
         },
+      });
+    }
+
+    const rosPayload = [];
+    for (const { feature, index } of selectedRos) {
+      const attrs = feature?.attributes || {};
+      const label = bestRosLabel(attrs) || `Record of Survey #${index + 1}`;
+      const rosNumber = String(attrs.ROS || attrs.RS || attrs.SurveyNo || attrs.SURVEYNO || '').trim() || `UNLISTED-${index + 1}`;
+      const imageMeta = deriveRosImageMeta(attrs);
+      const rosId = slugify(rosNumber, `ros-${index + 1}`);
+      addProjectFileResource(projectFile, {
+        id: `ros-${rosId}`,
+        folder: 'ros',
+        title: label,
+        exportFormat: 'pdf',
+        reference: {
+          type: 'ros-number',
+          value: rosNumber,
+          resolverHint: 'lookup-ros',
+          metadata: {
+            rosId,
+            rosNumber,
+            label,
+            source: 'RecordQuarry',
+            mapImageUrl: imageMeta?.fullSizeUrl || '',
+            starredInFieldBook: true,
+          },
+        },
+      });
+      rosPayload.push({
+        rosId,
+        rosNumber,
+        title: label,
+        source: 'RecordQuarry',
+        mapImageUrl: imageMeta?.fullSizeUrl || null,
+        starredInFieldBook: true,
       });
     }
 
@@ -931,7 +1001,19 @@
       }
     }
 
-    return { projectFile, cpfCount: cpfInstruments.length };
+    if (rosPayload.length && resolvedProjectContext.projectId) {
+      try {
+        await fetch(`/api/projects/${encodeURIComponent(resolvedProjectContext.projectId)}/ros`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ros: rosPayload }),
+        });
+      } catch {
+        // Non-fatal: server sync is best-effort; local snapshot was already saved.
+      }
+    }
+
+    return { projectFile, cpfCount: cpfInstruments.length, rosCount: rosPayload.length };
   }
 
   // -----------------------------
@@ -1727,6 +1809,7 @@
     selectedParcel: true,
     selectedAliquot: null,
     selectedAliquotKeys: new Set(),
+    selectedRosKeys: new Set(),
     lastLookupPayload: null,
     lastLookupAddress: '',
     exportGeoJSON: null,
@@ -2278,6 +2361,30 @@
     return rosItems
       .map((item) => (item?.feature?.geometry ? item.feature : item))
       .filter((f) => f?.geometry);
+  }
+
+  function buildRosSelectionKey(feature, index = 0) {
+    const attrs = feature?.attributes || {};
+    const best = String(attrs.ROS || attrs.RS || attrs.SurveyNo || attrs.SURVEYNO || attrs.DOC || attrs.Document || '').trim();
+    return best ? `ros:${best.toUpperCase()}` : `ros-index:${Number(index)}`;
+  }
+
+  function buildAllRosSelectionKeys(rosFeatures = []) {
+    const keys = new Set();
+    (rosFeatures || []).forEach((feature, index) => {
+      keys.add(buildRosSelectionKey(feature, index));
+    });
+    return keys;
+  }
+
+  function isRosSelected(feature, index = 0) {
+    return state.selectedRosKeys.has(buildRosSelectionKey(feature, index));
+  }
+
+  function setRosSelected(feature, index, selected) {
+    const key = buildRosSelectionKey(feature, index);
+    if (selected) state.selectedRosKeys.add(key);
+    else state.selectedRosKeys.delete(key);
   }
 
   function rosIntersectsSection(rosFeature, sectionFeature) {
@@ -2854,6 +2961,7 @@
     state.selectedParcel = true;
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
+    state.selectedRosKeys.clear();
     setSummaryCards([]);
     clearMapLayers();
     resetUtilitiesRadiusUiAndState();
@@ -2965,6 +3073,11 @@
       afterUtilitiesLoadedOrUpdated();
       log(`Utility locations found: ${state.utilityLocations.length}`);
       state.rosFeatures = ros;
+      state.selectedRosKeys = buildAllRosSelectionKeys(ros);
+      const selectionSnapshot = options.selectionSnapshot || cachedAddressSnapshot?.selection || null;
+      if (Array.isArray(selectionSnapshot?.selectedRosKeys) || Array.isArray(selectionSnapshot?.deselectedRosKeys)) {
+        applySelectionSnapshot(selectionSnapshot);
+      }
       log(`ROS in containing section: ${ros.length} (from ${rosFromLookup.length} nearby ROS)`);
 
       for (const f of ros) {
@@ -3269,19 +3382,19 @@
         }
 
         const rosSorted = ros
-          .map((f) => {
+          .map((f, index) => {
             const c = rosFeatureCentroid(f);
             const dist = (c && state.lastLonLat)
               ? haversineMeters(state.lastLonLat.lat, state.lastLonLat.lon, c.y, c.x)
               : 0;
-            return { f, dist };
+            return { f, dist, index };
           })
           .sort((a, b) => a.dist - b.dist);
 
         const rosNearEls = [];
         const rosFarEls = [];
 
-        for (const [sortIdx, { f, dist }] of rosSorted.entries()) {
+        for (const [sortIdx, { f, dist, index }] of rosSorted.entries()) {
           const a = f.attributes || {};
           const isFar = dist > ROS_COLLAPSE_DIST_M;
           const rosLabel = bestRosLabel(a) || `Record of Survey #${sortIdx + 1}`;
@@ -3299,6 +3412,25 @@
           if (isFar) cardEl.classList.add('is-far');
           const chead = cardEl.querySelector('.chead');
           if (chead) {
+            const starBtn = document.createElement('button');
+            const syncRosStar = () => {
+              const selected = isRosSelected(f, index);
+              starBtn.textContent = selected ? '★' : '☆';
+              starBtn.title = selected ? 'Exclude ROS from export' : 'Include ROS in export';
+              starBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            };
+            starBtn.type = 'button';
+            starBtn.className = 'rq-star-btn';
+            starBtn.addEventListener('click', (evt) => {
+              evt.stopPropagation();
+              const next = !isRosSelected(f, index);
+              setRosSelected(f, index, next);
+              syncRosStar();
+              log(`${next ? 'Included' : 'Excluded'} ROS ${rosLabel} in export.`);
+            });
+            syncRosStar();
+            chead.appendChild(starBtn);
+
             const badge = document.createElement('span');
             badge.className = 'dist-badge' + (isFar ? ' is-far' : '');
             badge.textContent = fmtDist(dist);
@@ -3424,6 +3556,7 @@
     state.selectedParcel = true;
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
+    state.selectedRosKeys.clear();
     state.lastLonLat = null;
     state.utilityLocations = [];
     $("pdfFindings").style.display = "none";
@@ -3523,7 +3656,7 @@
         pointCount: uniquePart.count + utilityRows.count,
       });
       if (projectFileUpdate) {
-        log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references).`);
+        log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references, ${projectFileUpdate.rosCount || 0} ROS references).`);
       }
       openLinkedApp(buildPointForgeLaunchPath());
       log(`Sent ${uniquePart.count + utilityRows.count} points to PointForge (${utilityRows.count} utility point(s)).`);
