@@ -108,7 +108,7 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   assert.match(html, /referenceType === 'instrument-number'[\s\S]*normalizeCpInstrumentNumber\(item\?\.reference\?\.value\) === referenceValue/, 'project file duplicate check should compare normalized instrument-number references');
   assert.match(html, /folder:\s*'cpfs'[\s\S]*reference:\s*\{[\s\S]*type:\s*'instrument-number'/, 'PointForge export project file should add CP&F instrument references');
   assert.match(html, /folder:\s*'ros'[\s\S]*reference:\s*\{[\s\S]*type:\s*'ros-number'/, 'PointForge export project file should add selected ROS references');
-  assert.match(html, /state\.selectedRosKeys\s*=\s*buildAllRosSelectionKeys\(ros\);/, 'lookup should default ROS records to selected for export');
+  assert.match(html, /state\.selectedRosKeys\s*=\s*new\s+Set\(\);/, 'lookup should leave ROS records unselected by default for export');
   assert.match(html, /setRosSelected\(f, index, next\);/, 'ROS cards should support star-based include/exclude export toggling');
   assert.match(html, /folder:\s*'point-files'[\s\S]*type:\s*'local-storage'[\s\S]*POINTFORGE_ROS_IMPORT_STORAGE_KEY/, 'PointForge export project file should add the PointForge CSV handoff reference');
   assert.match(html, /\$\("btnExportPointForge"\)\.disabled\s*=\s*false/, 'ROS should enable PointForge export after loading export geometry');
@@ -228,6 +228,7 @@ test('RecordQuarry.html keeps aliquots deselected by default and behind parcel i
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(html, /state\.selectedAliquotKeys\.clear\(\);[\s\S]*drawAliquots\(state\.aliquotFeatures, section\);/, 'lookup should leave all aliquots deselected by default before drawing aliquot geometry');
+  assert.match(html, /state\.selectedRosKeys\s*=\s*new\s+Set\(\);/, 'lookup should initialize ROS selection state as empty so RoS starts deselected');
   assert.match(html, /map\.createPane\('aliquotPolygons'\);[\s\S]*map\.getPane\('aliquotPolygons'\)\.style\.zIndex\s*=\s*'380';/, 'aliquot polygons should render on their own lower pane');
   assert.match(html, /const\s+layer\s*=\s*L\.geoJSON\(gj,\s*\{[\s\S]*pane:\s*'aliquotPolygons',/, 'aliquot polygons should use the lower aliquot pane');
   assert.match(html, /function\s+buildCornerMarkerEntries\(\)\s*\{[\s\S]*\{\s*role:\s*'aliquot'[\s\S]*\{\s*role:\s*'subdivision'[\s\S]*\{\s*role:\s*'parcel'/, 'corner marker layering should add aliquot markers before subdivision and parcel markers so parcel interactions remain reachable');
@@ -260,6 +261,8 @@ test('RecordQuarry.html hardens CP&F persistence parsing and project-context res
   assert.match(html, /function\s+resolveProjectContextForProjectFile\s*\(/, 'RecordQuarry should define a helper to recover project context before saving handoff artifacts');
   assert.match(html, /const\s+runtimeContext\s*=\s*getProjectContext\(\);/, 'project-context recovery should inspect runtime launch params when state context is missing');
   assert.match(html, /const\s+resolvedProjectContext\s*=\s*resolveProjectContextForProjectFile\(projectContext\);/, 'PointForge export persistence should always use resolved project context');
+  assert.match(html, /if\s*\(!deselectedRosKeys\)\s*\{\s*return;\s*\}/, 'ROS selection restore should keep RoS deselected when no prior selection snapshot is present');
+  assert.match(html, /function\s+deriveRosImageMeta\s*\(attrs\s*=\s*\{\}\)\s*\{\s*return\s+buildAdaCountyRosImageMeta\(attrs\);\s*\}/, 'PointForge export persistence should use a defined ROS image metadata helper when creating RoS project file links');
   assert.match(html, /replace\(\/\^CPNFS\?:\\s\*\/i, ''\)/, 'CP&F note parsing should accept both CPNF and CPNFS prefixes');
   assert.match(html, /split\(\/\(\?:\\\.\{3\}\|…\|,\|;\|\\n\)\+\/g\)/, 'CP&F note parsing should tolerate multiple separators to avoid dropping instrument references');
 });
