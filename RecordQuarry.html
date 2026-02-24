@@ -13,7 +13,6 @@
   <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
  <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
 
-
   <style>
     :root{
       --bg:#0b1020;
@@ -2307,8 +2306,21 @@
     const keys = Object.keys(attrs);
     const used = new Set();
 
+    // Hide verbose/low-signal division identifiers and internal IDs (per current UI needs).
+    const BLOCK = new Set([
+      "FRSTDIVID",
+      "OBJECTID",
+      "OBJECTID_1",
+      "PLSSID",
+      "SECDIVID",
+      "SECDIVTYP",
+      "SECDIVTXT",
+      "SECDIVNO"
+    ]);
+
     function add(k) {
-      if (String(k || '').toUpperCase() === 'FRSTDIVID') return;
+      const up = String(k || '').toUpperCase();
+      if (BLOCK.has(up)) return;
       if (used.has(k)) return;
       const v = attrs[k];
       if (v === null || v === undefined || v === "") return;
@@ -2323,7 +2335,7 @@
       }
       if (picks.length >= 10) break;
     }
-    if (!picks.length) for (const k of keys.slice(0,8)) add(k);
+    if (!picks.length) for (const k of keys.slice(0, 10)) add(k);
     return picks;
   }
 
