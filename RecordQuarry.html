@@ -2510,14 +2510,22 @@
       `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(p.url))}">${escapeHtml(linkText)}</a> <span class="small">(${escapeHtml(p.key)})</span>`
     ));
   }
-
   function buildRosPopupHtml(attrs = {}) {
     const desc = bestRosLabel(attrs);
     const links = buildPdfProxyLinks(attrs, "Open PDF (API)");
     const linkHtml = links.length ? links.map((l, i) => `${i + 1}. ${l}`).join("<br/>") : "No PDF links found";
     const imageHtml = buildRosImageHtml(attrs);
-    return `<b>Record of Survey</b><br/>${escapeHtml(desc)}${imageHtml}<div class="hr"></div><div class="small"><b>PDFs</b><br/>${linkHtml}</div>`;
+
+    const meta = buildAdaCountyRosImageMeta(attrs);
+    const tifName = meta?.fullSizeUrl ? extractRosTifNameFromUrl(meta.fullSizeUrl) : null;
+    const titleHtml = tifName
+      ? `<span data-ros-title-tif="${escapeHtml(tifName)}">Record of Survey</span>`
+      : "Record of Survey";
+
+    return `<b>${titleHtml}</b><br/>${escapeHtml(desc)}${imageHtml}<div class="hr"></div><div class="small"><b>PDFs</b><br/>${linkHtml}</div>`;
   }
+
+
 
   function buildAdaCountyRosImageMeta(attrs = {}) {
     const values = Object.values(attrs || {});
@@ -2569,6 +2577,88 @@
     if (!meta?.fullSizeUrl) return '';
     const thumbnailUrl = `/api/project-files/ros-thumbnail?${new URLSearchParams({ source: meta.fullSizeUrl })}`;
     return `<div class="small" style="margin-top:8px"><b>Record image</b><br/><a target="_blank" rel="noopener" href="${escapeHtml(meta.fullSizeUrl)}">Open full-size ROS image</a><img class="ros-scan-thumb" loading="lazy" alt="ROS ${escapeHtml(String(meta.rosNumber))} thumbnail" data-ros-thumbnail="${escapeHtml(thumbnailUrl)}"/></div>`;
+  }
+
+
+  // -----------------------------
+  // Ada County SurveysPageList ROS titles
+  // -----------------------------
+  const ADA_ROS_SURVEYS_PAGE_LIST_URL = "https://adacountyassessor.org/docs/recordsofsurvey/SurveysPageList.txt";
+  let _rosSurveyPageListIndexPromise = null;
+
+  function extractRosTifNameFromUrl(url) {
+    const s = String(url || "");
+    const m = s.match(/\/((?:R\d{7})\.(?:tif|TIF))(?:\?|$)/);
+    return m ? String(m[1]).toUpperCase() : null;
+  }
+
+  function parseRosNameFromSurveysPageListLine(line) {
+    // User rule: split on township-range-section token like "1N1E01" and take everything after it.
+    const parts = String(line || "").split(/\b\d+[NS]\d+[EW]\d{2}\b/);
+    if (parts.length < 2) return null;
+    const name = parts.slice(1).join("").trim();
+    return name || null;
+  }
+
+  function buildRosSurveyPageListIndex(text) {
+    const idx = new Map();
+    const lines = String(text || "").split(/\r?\n/);
+    for (const line of lines) {
+      const m = line.match(/\bR\d{7}\.(?:tif|TIF)\b/);
+      if (!m) continue;
+      const tifName = String(m[0]).toUpperCase();
+      if (idx.has(tifName)) continue;
+      const name = parseRosNameFromSurveysPageListLine(line);
+      if (name) idx.set(tifName, name);
+    }
+    return idx;
+  }
+
+  async function fetchRosSurveysPageListText() {
+    // Try direct CORS fetch first. If blocked, fall back to same-origin proxy (buildRosPdfProxyUrl) if available.
+    try {
+      const resp = await fetch(ADA_ROS_SURVEYS_PAGE_LIST_URL, { cache: "force-cache" });
+      if (resp.ok) return await resp.text();
+    } catch {}
+
+    // Proxy fallback: the server-side proxy can typically fetch arbitrary URLs without CORS.
+    try {
+      if (typeof buildRosPdfProxyUrl === "function") {
+        const proxyUrl = buildRosPdfProxyUrl(ADA_ROS_SURVEYS_PAGE_LIST_URL);
+        const resp = await fetch(proxyUrl, { cache: "force-cache" });
+        if (resp.ok) return await resp.text();
+      }
+    } catch {}
+
+    return null;
+  }
+
+  async function loadRosSurveyPageListIndex() {
+    if (_rosSurveyPageListIndexPromise) return _rosSurveyPageListIndexPromise;
+    _rosSurveyPageListIndexPromise = (async () => {
+      const text = await fetchRosSurveysPageListText();
+      if (!text) return new Map();
+      return buildRosSurveyPageListIndex(text);
+    })();
+    return _rosSurveyPageListIndexPromise;
+  }
+
+  function applyRosTitlesInNode(rootNode) {
+    const container = rootNode || document;
+    const nodes = Array.from(container.querySelectorAll("[data-ros-title-tif]"));
+    if (!nodes.length) return;
+
+    loadRosSurveyPageListIndex().then((idx) => {
+      for (const node of nodes) {
+        if (!node || node.dataset.rosTitleResolved === "1") continue;
+        const tif = String(node.getAttribute("data-ros-title-tif") || "").toUpperCase();
+        if (!tif) continue;
+        const name = idx.get(tif);
+        if (!name) continue;
+        node.textContent = name;
+        node.dataset.rosTitleResolved = "1";
+      }
+    }).catch(() => {});
   }
 
   async function loadRosThumbnailWithRetry(imgEl, thumbnailUrl, maxAttempts = 9) {
@@ -2648,14 +2738,14 @@
     map.on('popupopen', (evt) => {
       try {
         const el = evt?.popup?.getElement?.();
-        if (el) loadRosScanThumbnailsInNode(el);
+        if (el) { loadRosScanThumbnailsInNode(el); applyRosTitlesInNode(el); }
       } catch {}
     });
 
     map.on('tooltipopen', (evt) => {
       try {
         const el = evt?.tooltip?.getElement?.();
-        if (el) loadRosScanThumbnailsInNode(el);
+        if (el) { loadRosScanThumbnailsInNode(el); applyRosTitlesInNode(el); }
       } catch {}
     });
   }
@@ -3622,8 +3712,12 @@
           const a = f.attributes || {};
           const isFar = dist > ROS_COLLAPSE_DIST_M;
           const rosLabel = bestRosLabel(a) || `Record of Survey #${sortIdx + 1}`;
+          const titleDefault = `Record of Survey #${sortIdx + 1}`;
+          const meta = buildAdaCountyRosImageMeta(a);
+          const tifName = meta?.fullSizeUrl ? extractRosTifNameFromUrl(meta.fullSizeUrl) : null;
+
           const cardEl = card(
-            `Record of Survey #${sortIdx + 1}`,
+            titleDefault,
             rosLabel,
             summarizeAttrs(a),
             buildPdfProxyLinks(a),
@@ -3632,6 +3726,16 @@
               extraHtml: buildRosImageHtml(a)
             }
           );
+
+          if (tifName) {
+            const titleNode = cardEl.querySelector('.chead > div > div');
+            if (titleNode) {
+              titleNode.dataset.rosTitleTif = tifName;
+              titleNode.dataset.rosTitleDefault = titleDefault;
+            }
+          }
+          applyRosTitlesInNode(cardEl);
+
           cardEl.classList.add('ros-card');
           if (isFar) cardEl.classList.add('is-far');
           // ROS card layout: move thumbnail outside of chead/cbody so it can float left of the header/content.
