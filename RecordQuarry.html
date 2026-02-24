@@ -12,6 +12,8 @@
   <!-- pdf.js (UMD build defining window.pdfjsLib) -->
   <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
  <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
+
+
   <style>
     :root{
       --bg:#0b1020;
@@ -416,16 +418,16 @@
         <input id="utilRadius" type="range" min="0" max="2000" step="25" value="500" disabled />
         <div class="small" id="utilRadiusHint" style="margin-top:6px">Selected utilities are highlighted on the map and included in PointForge export.</div>
 
-        <div class="hr"></div>
+        <div class="hr" style="display:none"></div>
 
-        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
+        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start;display:none">
           <div class="h">PDF Basis of Bearing (local upload)</div>
         </div>
-        <input id="pdfFile" type="file" accept="application/pdf"/>
-        <button id="btnScanPdf" class="secondary" style="width:100%;margin-top:10px">Scan Uploaded PDF</button>
+        <input id="pdfFile" type="file" accept="application/pdf" style="display:none"/>
+        <button id="btnScanPdf" class="secondary" style="width:100%;margin-top:10px;display:none">Scan Uploaded PDF</button>
         <div id="pdfFindings" class="log" style="margin-top:10px;display:none"></div>
 
-        <div class="hr"></div>
+        <div class="hr" style="display:none"></div>
 
         <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
           <div class="h">Summary</div>
@@ -2472,18 +2474,24 @@
           </div>
         </div>`;
 
-        // Wire expand button
+        // Wire expand/collapse button
         const expandBtn = node.querySelector('[data-cpf-expand]');
         const allDiv = node.querySelector('[data-cpf-all]');
         if (expandBtn && allDiv) {
+          let expanded = false;
+          const total = records.length;
+          const syncLabel = () => {
+            expandBtn.textContent = expanded ? 'Hide records' : `Show all ${total} records`;
+          };
+          syncLabel();
           expandBtn.addEventListener('click', (evt) => {
             evt.stopPropagation();
-            allDiv.style.display = '';
-            expandBtn.parentElement.remove();
+            expanded = !expanded;
+            allDiv.style.display = expanded ? '' : 'none';
+            syncLabel();
           });
         }
-
-        // Load thumbnail for the first record's PDF
+// Load thumbnail for the first record's PDF
         const firstProxyUrl = first.links[0] ? buildRosPdfProxyUrl(first.links[0]) : null;
         if (firstProxyUrl) {
           const thumbEl = node.querySelector('.cpf-thumb');
@@ -2882,7 +2890,7 @@
       parcelCard.style.display = 'none';
       cards.push(parcelCard);
 
-      // Place Subdivision, Section, and Utilities above Aliquots (below Parcel card).
+      // Place Subdivision, Township, Section, and Utilities above Aliquots (below Parcel card).
       if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
       if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (state.utilityLocations.length) {
