@@ -2537,12 +2537,11 @@
     }
 
     const rangeBase = Math.floor(rosNumber / 1000) * 1000;
-    const folder = `surv${rangeBase}`;
-    let padding = "";
-    if (rosNumber < 10000) {
-      padding = "0";
-    }
-    const fullSizeUrl = `https://adacountyassessor.org/docs/recordsofsurvey/${folder}/R${padding}${String(rosNumber)}${String(version).padStart(2, '0')}.tif`;
+    // Ada County ROS images are bucketed by 1000s using a 4-digit folder suffix (e.g., surv0000, surv1000, ...)
+    // and the file name uses a 5-digit, zero-padded ROS number followed by a 2-digit version (e.g., R00463 + 01).
+    const folder = `surv${String(rangeBase).padStart(4, '0')}`;
+    const rosPart = String(rosNumber).padStart(5, '0');
+    const fullSizeUrl = `https://adacountyassessor.org/docs/recordsofsurvey/${folder}/R${rosPart}${String(version).padStart(2, '0')}.tif`;
     return { rosNumber, version, fullSizeUrl };
   }
 
