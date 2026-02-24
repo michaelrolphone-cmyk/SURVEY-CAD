@@ -349,15 +349,21 @@
     .card.ros-card.is-far > .cbody{display:none}
     .card.ros-card.is-far.is-expanded > .cbody{display:block}
     .card.ros-card.is-far:not(.is-expanded) .chead-chevron{transform:rotate(-90deg)}
-    .ros-scan-thumb{
-      display:block;
-      max-width:100%;
-      width:260px;
-      border-radius:8px;
-      border:1px solid var(--line);
-      margin:6px 0;
-      background:rgba(0,0,0,.2);
+    .card.ros-card .cbody {
+      /* display:none; */
     }
+     .ros-scan-thumb{
+      display:flex;
+       max-width:100%;
+       width:120px;
+       border-radius:8px;
+       border:1px solid var(--line);
+       margin:6px 0;
+       background:rgba(0,0,0,.2);
+      padding: 2px;
+      margin: 5px;
+      float:left;
+     }
 
     /* Distance-group collapse ("See More") */
     .rq-distance-group{border-style:dashed;background:rgba(255,255,255,.03)}
