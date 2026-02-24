@@ -409,12 +409,12 @@
         </div>
         <div id="summary" class="list" style="margin-top:10px"></div>
 
-        <div class="hr"></div>
+        <div class="hr" style="display:none"></div>
 
-        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start">
+        <div class="phead" style="padding:0;border:0;background:transparent;justify-content:flex-start;display:none">
           <div class="h">Diagnostics</div>
         </div>
-        <div id="log" class="log" style="margin-top:10px"></div>
+        <div id="log" class="log" style="margin-top:10px;display:none"></div>
       </div>
     </div>
 
@@ -2591,7 +2591,7 @@
       ));
 
       if (state.projectContext.projectId) {
-        cards.push(card(
+        const projectCard = card(
           "Project",
           state.projectContext.projectName || state.projectContext.projectId,
           [
@@ -2599,11 +2599,14 @@
             ["Address", addressDisplay],
           ],
           []
-        ));
+        );
+        projectCard.style.display = 'none';
+        cards.push(projectCard);
+
       }
 
       const pAttrs = parcel.attributes || {};
-      cards.push(card(
+      const parcelCard = card(
         "Parcel",
         "Parcel feature",
         [
@@ -2639,7 +2642,17 @@
             cardEl.appendChild(starBtn);
           },
         }
-      ));
+      );
+      parcelCard.style.display = 'none';
+      cards.push(parcelCard);
+
+      // Place Subdivision, Section, and Utilities above Aliquots (below Parcel card).
+      if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
+      if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
+      if (state.utilityLocations.length) {
+        cards.push(card("Utilities", "Idaho Power residential utility locations", [["Count", String(state.utilityLocations.length)]], []));
+      }
+
 
       function fmtDist(m) {
         return m < 1609.34 ? `${Math.round(m)} m` : `${(m / 1609.34).toFixed(2)} mi`;
@@ -2756,12 +2769,6 @@
 
       applyDistanceGroupSeeMore(cards, aliquotCardSliceStart, 'aliquot-card', 'Aliquots', 500);
 
-      if (state.utilityLocations.length) {
-        cards.push(card("Utilities", "Idaho Power residential utility locations", [["Count", String(state.utilityLocations.length)]], []));
-      }
-
-      if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
-      if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
 
       const rosCardSliceStart = cards.length;
