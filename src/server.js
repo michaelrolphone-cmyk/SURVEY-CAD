@@ -42,6 +42,13 @@ import {
   deleteProjectCpf,
 } from './project-cpf-store.js';
 import {
+  listProjectRos,
+  getProjectRos,
+  createOrUpdateProjectRos,
+  batchUpsertProjectRos,
+  deleteProjectRos,
+} from './project-ros-store.js';
+import {
   getProjectRecordQuarryCache,
   saveProjectRecordQuarryCache,
   deleteProjectRecordQuarryCache,
@@ -218,6 +225,15 @@ function parseProjectCpfRoute(pathname = '') {
   return {
     projectId: decodeURIComponent(match[1]),
     cpfId: match[2] ? decodeURIComponent(match[2]) : '',
+  };
+}
+
+function parseProjectRosRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/ros(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
+  return {
+    projectId: decodeURIComponent(match[1]),
+    rosId: match[2] ? decodeURIComponent(match[2]) : '',
   };
 }
 
@@ -2488,6 +2504,125 @@ export function createSurveyServer({
           const deletedResult = await deleteProjectCpf(localStorageSyncStore, projectId, cpfId);
           if (!deletedResult) {
             sendJson(res, 404, { error: 'CP&F record not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: deletedResult?.sync?.allOperations || [],
+            state: {
+              version: deletedResult?.sync?.state?.version,
+              checksum: deletedResult?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
+        return;
+      }
+
+      const rosRoute = parseProjectRosRoute(urlObj.pathname);
+      if (rosRoute) {
+        const { projectId, rosId } = rosRoute;
+
+        if (req.method === 'GET' && !rosId) {
+          const ros = await listProjectRos(localStorageSyncStore, projectId);
+          sendJson(res, 200, { projectId, ros });
+          return;
+        }
+
+        if (req.method === 'GET' && rosId) {
+          const ros = await getProjectRos(localStorageSyncStore, projectId, rosId);
+          if (!ros) {
+            sendJson(res, 404, { error: 'ROS record not found.' });
+            return;
+          }
+          sendJson(res, 200, { ros });
+          return;
+        }
+
+        if (req.method === 'POST' && !rosId) {
+          const body = await readJsonBody(req);
+          if (Array.isArray(body?.ros)) {
+            const result = await batchUpsertProjectRos(localStorageSyncStore, projectId, body.ros);
+            if (result.sync) {
+              localStorageSyncWsService.broadcast({
+                type: 'sync-differential-applied',
+                operations: result.sync?.allOperations || [],
+                state: {
+                  version: result.sync?.state?.version,
+                  checksum: result.sync?.state?.checksum,
+                },
+                originClientId: null,
+                requestId: null,
+              });
+            }
+            sendJson(res, 200, { ros: result.ros });
+            return;
+          }
+
+          if (!body?.rosNumber) {
+            sendJson(res, 400, { error: 'rosNumber is required.' });
+            return;
+          }
+          const result = await createOrUpdateProjectRos(localStorageSyncStore, {
+            projectId,
+            rosNumber: body.rosNumber,
+            title: body.title,
+            source: body.source,
+            mapImageUrl: body.mapImageUrl,
+            starredInFieldBook: body.starredInFieldBook,
+          });
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { ros: result.ros });
+          return;
+        }
+
+        if ((req.method === 'PUT' || req.method === 'PATCH') && rosId) {
+          const body = await readJsonBody(req);
+          if (!body?.rosNumber) {
+            sendJson(res, 400, { error: 'rosNumber is required.' });
+            return;
+          }
+          const result = await createOrUpdateProjectRos(localStorageSyncStore, {
+            projectId,
+            rosId,
+            rosNumber: body.rosNumber,
+            title: body.title,
+            source: body.source,
+            mapImageUrl: body.mapImageUrl,
+            starredInFieldBook: body.starredInFieldBook,
+          });
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { ros: result.ros });
+          return;
+        }
+
+        if (req.method === 'DELETE' && rosId) {
+          const deletedResult = await deleteProjectRos(localStorageSyncStore, projectId, rosId);
+          if (!deletedResult) {
+            sendJson(res, 404, { error: 'ROS record not found.' });
             return;
           }
           localStorageSyncWsService.broadcast({

@@ -2013,7 +2013,7 @@
           "CP&F Records"
         ],
         "summary": "Update (upsert) a CP&F record",
-        "description": "Updates the record identified by `cpfId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectCpf",
         "requestBody": {
           "required": true,
@@ -3717,6 +3717,259 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/ros": {
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Project ID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "ROS Records"
+        ],
+        "summary": "List project ROS records",
+        "description": "Returns all ROS records for the project sorted by updatedAt descending.",
+        "operationId": "listProjectRoss",
+        "responses": {
+          "200": {
+            "description": "ROS record list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRosListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ROS Records"
+        ],
+        "summary": "Create or batch-upsert ROS record(s)",
+        "description": "Accepts either a single record body (`{ rosNumber, ... }`) or a batch body (`{ ros: [...] }`).\n\n- **Single**: creates a new record or upserts an existing one by derived `rosId`. Returns `201` for new, `200` for updated.\n- **Batch**: all entries are upserted atomically. Always returns `200`. Entries missing `rosNumber` are silently skipped.",
+        "operationId": "createOrBatchUpsertProjectRoss",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ProjectRosMutationRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ProjectRosBatchUpsertRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch upsert result or single upsert of existing record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProjectRosResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ProjectRosBatchUpsertResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Single ROS record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRosResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/ros/{rosId}": {
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Project ID"
+        },
+        {
+          "name": "rosId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Slugified rosNumber number (e.g. `2024-123456`)"
+        }
+      ],
+      "get": {
+        "tags": [
+          "ROS Records"
+        ],
+        "summary": "Get a single ROS record",
+        "operationId": "getProjectRos",
+        "responses": {
+          "200": {
+            "description": "ROS record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRosResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ROS Records"
+        ],
+        "summary": "Update (upsert) a ROS record",
+        "description": "Updates the record identified by `rosId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "operationId": "updateProjectRos",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectRosMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ROS record updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRosResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "ROS record created via upsert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRosResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "ROS Records"
+        ],
+        "summary": "Patch (upsert) a ROS record",
+        "description": "Identical behaviour to `PUT`. Updates the record identified by `rosId`, or creates it if absent.",
+        "operationId": "patchProjectRos",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectRosMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ROS record updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRosResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "ROS record created via upsert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRosResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ROS Records"
+        ],
+        "summary": "Delete a ROS record",
+        "operationId": "deleteProjectRos",
+        "responses": {
+          "200": {
+            "description": "Record deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       }
@@ -7116,6 +7369,203 @@
           "address",
           "lookup",
           "savedAt"
+        ]
+      },
+      "ProjectRosSummary": {
+        "type": "object",
+        "description": "Lightweight ROS summary stored in the project index (returned by list).",
+        "properties": {
+          "rosId": {
+            "type": "string",
+            "description": "Slugified rosNumber number (e.g. \"2024-123456\")"
+          },
+          "rosNumber": {
+            "type": "string",
+            "description": "Normalized rosNumber number (uppercase)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating app (e.g. \"RecordQuarry\") or null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "starredInFieldBook": {
+            "type": "boolean",
+            "description": "Whether this ROS is starred for field-book print jobs."
+          },
+          "mapImageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Full-size ROS map image URL when available"
+          }
+        },
+        "required": [
+          "rosId",
+          "rosNumber",
+          "title",
+          "createdAt",
+          "updatedAt",
+          "starredInFieldBook"
+        ]
+      },
+      "ProjectRos": {
+        "type": "object",
+        "description": "Full ROS record persisted in the sync snapshot.",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "example": "1.0.0"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "rosId": {
+            "type": "string",
+            "description": "Slugified rosNumber number derived at write time"
+          },
+          "rosNumber": {
+            "type": "string",
+            "description": "Normalized rosNumber number (uppercase)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title (defaults to \"ROS {rosNumber}\")"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating app (e.g. \"RecordQuarry\") or null"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "starredInFieldBook": {
+            "type": "boolean",
+            "description": "Whether this ROS is starred for field-book print jobs."
+          },
+          "mapImageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Full-size ROS map image URL when available"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "projectId",
+          "rosId",
+          "rosNumber",
+          "title",
+          "createdAt",
+          "updatedAt",
+          "starredInFieldBook"
+        ]
+      },
+      "ProjectRosMutationRequest": {
+        "type": "object",
+        "description": "Request body for single ROS create/update (POST without batch, PUT, or PATCH).",
+        "properties": {
+          "rosNumber": {
+            "type": "string",
+            "description": "Instrument number. Normalized to uppercase; `rosId` is derived by slugifying this value."
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title. Defaults to \"ROS {rosNumber}\" when omitted."
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating app label (e.g. \"RecordQuarry\")"
+          },
+          "starredInFieldBook": {
+            "type": "boolean",
+            "description": "Whether this ROS is starred for field-book print jobs."
+          },
+          "mapImageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Full-size ROS map image URL when available"
+          }
+        },
+        "required": [
+          "rosNumber"
+        ]
+      },
+      "ProjectRosBatchUpsertRequest": {
+        "type": "object",
+        "description": "Request body for atomic batch upsert of multiple ROS records.",
+        "properties": {
+          "ros": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRosMutationRequest"
+            },
+            "description": "Array of ROS entries to upsert. Entries missing `rosNumber` are silently skipped."
+          }
+        },
+        "required": [
+          "ros"
+        ]
+      },
+      "ProjectRosListResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "ros": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRosSummary"
+            },
+            "description": "ROS summaries sorted by updatedAt descending"
+          }
+        },
+        "required": [
+          "projectId",
+          "ros"
+        ]
+      },
+      "ProjectRosResponse": {
+        "type": "object",
+        "properties": {
+          "ros": {
+            "$ref": "#/components/schemas/ProjectRos"
+          }
+        },
+        "required": [
+          "ros"
+        ]
+      },
+      "ProjectRosBatchUpsertResponse": {
+        "type": "object",
+        "properties": {
+          "ros": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRos"
+            },
+            "description": "Full records for all successfully upserted entries"
+          }
+        },
+        "required": [
+          "ros"
         ]
       }
     }

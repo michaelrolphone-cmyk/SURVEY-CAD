@@ -1330,6 +1330,9 @@ EvidenceDesk CP&F rows now support a persisted `starredInFieldBook` flag so crew
 - `GET /api/projects/{projectId}/cpfs` — returns CP&F summaries including `starredInFieldBook`.
 - `POST /api/projects/{projectId}/cpfs` — accepts single and batch upserts with optional `starredInFieldBook`.
 - `PATCH /api/projects/{projectId}/cpfs/{cpfId}` — updates a CP&F record (including `starredInFieldBook`).
+- `GET /api/projects/{projectId}/ros` — returns Record of Survey summaries including `starredInFieldBook`.
+- `POST /api/projects/{projectId}/ros` — accepts single and batch upserts with optional `starredInFieldBook`.
+- `PATCH /api/projects/{projectId}/ros/{rosId}` — updates a Record of Survey record (including `starredInFieldBook`).
 
 ### CLI and server commands
 - `npm start`
@@ -1346,4 +1349,3 @@ RecordQuarry now lazy-loads cached 1024px PNG thumbnails for Record of Survey TI
 - Commands:
   - `npm start`
   - `npm test -- test/server-ros-thumbnail.test.js`
-
