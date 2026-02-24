@@ -8,10 +8,11 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
- <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
- 
+
   <!-- pdf.js (UMD build defining window.pdfjsLib) -->
   <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+ <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
+
 
   <style>
     :root{
@@ -318,6 +319,10 @@
     .cpf-thumb{width:60px;height:76px;object-fit:cover;border-radius:4px;border:1px solid var(--line);flex-shrink:0;background:rgba(0,0,0,.3);cursor:pointer}
     .cpf-collapsed-info{flex:1;min-width:0}
     .cpf-expand-btn{font-size:11px;padding:3px 8px;margin-top:5px}
+    .cpf-record-row{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);cursor:pointer}
+    .cpf-record-row:hover{background:rgba(255,255,255,.03)}
+    .cpf-inst{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 
     /* Aliquot distance badge & collapsible cards */
     .dist-badge{font-size:10px;color:var(--muted);background:rgba(255,255,255,.07);border-radius:4px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
@@ -1840,17 +1845,19 @@
     const body = document.createElement("div");
     body.className = "cbody";
 
-    const kv = document.createElement("div");
-    kv.className = "kv";
-    for (const [k,v] of kvPairs) {
-      const kdiv = document.createElement("div");
-      kdiv.textContent = k;
-      const vdiv = document.createElement("div");
-      vdiv.innerHTML = v;
-      kv.appendChild(kdiv);
-      kv.appendChild(vdiv);
+    if (Array.isArray(kvPairs) && kvPairs.length) {
+      const kv = document.createElement("div");
+      kv.className = "kv";
+      for (const [k,v] of kvPairs) {
+        const kdiv = document.createElement("div");
+        kdiv.textContent = k;
+        const vdiv = document.createElement("div");
+        vdiv.innerHTML = v;
+        kv.appendChild(kdiv);
+        kv.appendChild(vdiv);
+      }
+      body.appendChild(kv);
     }
-    body.appendChild(kv);
 
     if (links.length) {
       const hr = document.createElement("div");
@@ -2315,7 +2322,8 @@
       "SECDIVID",
       "SECDIVTYP",
       "SECDIVTXT",
-      "SECDIVNO"
+      "SECDIVNO",
+      "SECDIVLAB"
     ]);
 
     function add(k) {
@@ -2456,32 +2464,56 @@
           log(`No CP&F PDF links found for summary ${target.label}.`, 'warn');
           continue;
         }
-
-        // Collapsed view: show only the most recent (first) record with a thumbnail
+        // Collapsed view: minimal CP&F preview (thumbnail + instrument + monument set + surveyor)
         const first = records[0];
+        const firstProxyUrl = first.links?.[0] ? buildRosPdfProxyUrl(first.links[0]) : null;
+
         const resolvedInstrument = resolveCpfRecordInstrument(first);
-        const instrumentHtml = resolvedInstrument ? escapeHtml(resolvedInstrument) : 'CP&amp;F Record';
-        const monsetHtml = first.monset != null && String(first.monset).trim()
-          ? `<div style="margin-top:2px;color:var(--muted)">Monument Set: <span style="color:var(--text)">${escapeHtml(String(first.monset).trim())}</span></div>`
+        const instrumentText = resolvedInstrument ? String(resolvedInstrument).trim() : '';
+        const instrumentHtml = instrumentText ? escapeHtml(instrumentText) : 'CP&amp;F';
+
+        const monsetText = first.monset != null ? String(first.monset).trim() : '';
+        const surveyorText = first.surveyor != null ? String(first.surveyor).trim() : '';
+
+        const monsetHtml = monsetText
+          ? `<div class="small" style="margin-top:2px;color:var(--muted)">Monument Set: <span style="color:var(--text)">${escapeHtml(monsetText)}</span></div>`
           : '';
-        const surveyorHtml = first.surveyor != null && String(first.surveyor).trim()
-          ? `<div style="color:var(--muted)">Surveyor: <span style="color:var(--text)">${escapeHtml(String(first.surveyor).trim())}</span></div>`
+        const surveyorHtml = surveyorText
+          ? `<div class="small" style="color:var(--muted)">Surveyor: <span style="color:var(--text)">${escapeHtml(surveyorText)}</span></div>`
           : '';
-        const linkHtml = first.links.map((url, i) => (
-          `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(url))}">CP&amp;F PDF${first.links.length > 1 ? ` ${i + 1}` : ''}</a>`
-        )).join(' ');
+
+        let moreRowsHtml = '';
+        if (records.length > 1) {
+          moreRowsHtml = records.slice(1).map((rec, idx) => {
+            const inst = resolveCpfRecordInstrument(rec) || `Record ${idx + 2}`;
+            const ms = rec.monset != null ? String(rec.monset).trim() : '';
+            const sv = rec.surveyor != null ? String(rec.surveyor).trim() : '';
+            const msH = ms
+              ? `<div class="small" style="margin-top:2px;color:var(--muted)">Monument Set: <span style="color:var(--text)">${escapeHtml(ms)}</span></div>`
+              : '';
+            const svH = sv
+              ? `<div class="small" style="color:var(--muted)">Surveyor: <span style="color:var(--text)">${escapeHtml(sv)}</span></div>`
+              : '';
+            const openUrl = rec.links?.[0] ? escapeHtml(buildRosPdfProxyUrl(rec.links[0])) : '';
+            const openAttr = openUrl ? ` data-cpf-open="${openUrl}"` : '';
+            return `<div class="cpf-record-row"${openAttr}><b>${escapeHtml(inst)}</b>${msH}${svH}</div>`;
+          }).join('');
+        }
+
         const expandHtml = records.length > 1
-          ? `<div><button class="secondary cpf-expand-btn" data-cpf-expand>Show all ${records.length} records</button></div>`
+          ? `<div style="margin-top:6px"><button class="secondary cpf-expand-btn" data-cpf-expand>Show all ${records.length} records</button></div>`
           : '';
         const allRecordsHtml = records.length > 1
-          ? `<div data-cpf-all style="display:none;margin-top:6px">${cpfLinksHtml(records)}</div>`
+          ? `<div data-cpf-all style="display:none;margin-top:8px">${moreRowsHtml}</div>`
           : '';
+
+        const openAttr = firstProxyUrl ? ` data-cpf-open="${escapeHtml(firstProxyUrl)}"` : '';
 
         node.innerHTML = `<div class="cpf-collapsed">
           <img class="cpf-thumb" style="display:none" alt="CP&amp;F PDF thumbnail"/>
           <div class="cpf-collapsed-info">
-            <b>${instrumentHtml}</b>${monsetHtml}${surveyorHtml}
-            <div data-cpf-text-links style="margin-top:4px">${linkHtml}</div>
+            <b class="cpf-inst"${openAttr} style="cursor:${firstProxyUrl ? 'pointer' : 'default'}">${instrumentHtml}</b>
+            ${monsetHtml}${surveyorHtml}
             ${expandHtml}${allRecordsHtml}
           </div>
         </div>`;
@@ -2503,17 +2535,28 @@
             syncLabel();
           });
         }
-// Load thumbnail for the first record's PDF
-        const firstProxyUrl = first.links[0] ? buildRosPdfProxyUrl(first.links[0]) : null;
+
+        // Make instrument + record rows open their PDFs (no extra text links)
+        node.querySelectorAll('[data-cpf-open]').forEach((el) => {
+          el.addEventListener('click', (evt) => {
+            evt.stopPropagation();
+            const url = el.getAttribute('data-cpf-open');
+            if (url) window.open(url, '_blank', 'noopener');
+          });
+        });
+
+        // Load thumbnail for the first record's PDF (clicking thumbnail opens the PDF)
         if (firstProxyUrl) {
           const thumbEl = node.querySelector('.cpf-thumb');
           if (thumbEl) {
-            // Clicking thumbnail opens the PDF
-            const pdfHref = escapeHtml(firstProxyUrl);
-            thumbEl.addEventListener('click', () => window.open(pdfHref, '_blank', 'noopener'));
-            const linksEl = node.querySelector('[data-cpf-text-links]');
+            thumbEl.addEventListener('click', (evt) => {
+              evt.stopPropagation();
+              window.open(firstProxyUrl, '_blank', 'noopener');
+            });
             const okThumb = await loadCpfThumbnailWithRetry(thumbEl, buildCpfPdfThumbnailUrl(firstProxyUrl));
-            if (okThumb && linksEl) linksEl.style.display = 'none';
+            if (!okThumb) {
+              // If thumbnail failed, keep it hidden; instrument text remains clickable.
+            }
           }
         }
 
@@ -2967,16 +3010,11 @@
 
             aliquotSummaryCpfTargets.push({ token, feature: f, label: indexLabel });
 
-            const kvPairs = summarizeAttrs(a);
-            kvPairs.push(["CP&F", `<span data-aliquot-cpf-links="${token}">Loading CP&amp;F records…</span>`]);
-
             const cardEl = card(
               indexLabel,
               group.label,
-              kvPairs,
-              [
-                ...buildPdfProxyLinks(a, "Open CP&F PDF (API)")
-              ],
+              [],
+              [],
               {
                 onSelect: () => centerMapOnFeature(f, layers.aliquots, indexLabel),
                 onRender: (el) => {
@@ -3003,6 +3041,16 @@
                 },
               }
             );
+
+
+            // CP&F preview (thumbnail + instrument + monument set + surveyor)
+            const cpfHost = cardEl.querySelector('.cbody');
+            if (cpfHost) {
+              const cpfWrap = document.createElement('div');
+              cpfWrap.setAttribute('data-aliquot-cpf-links', token);
+              cpfWrap.innerHTML = '<span class="small">Loading CP&amp;F records…</span>';
+              cpfHost.appendChild(cpfWrap);
+            }
 
             cardEl.classList.add('aliquot-card');
             cardEl.dataset.aliquotCardKey = selectionKey;
