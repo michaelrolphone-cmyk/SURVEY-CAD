@@ -2878,7 +2878,7 @@
         return m < 1609.34 ? `${Math.round(m)} m` : `${(m / 1609.34).toFixed(2)} mi`;
       }
 
-      const aliquotCardSliceStart = cards.length;
+            const aliquotCardSliceStart = cards.length;
       const aliquotSummaryCpfTargets = [];
       if (state.aliquotFeatures.length) {
         const COLLAPSE_DIST_M = 500; // metres
@@ -2909,12 +2909,20 @@
         const sortedGroups = [...groups.values()].sort((a, b) => a.minDist - b.minDist);
         for (const grp of sortedGroups) grp.items.sort((a, b) => a.distMeters - b.distMeters);
 
-        for (const group of sortedGroups) {
-          // Group header — shown for every group so the Township/Range/Section is always visible.
+        const makeAliquotHeader = (label) => {
           const headerEl = document.createElement('div');
+          headerEl.className = 'aliquot-group-header';
           headerEl.style.cssText = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 2px 2px;margin-top:4px;';
-          headerEl.textContent = group.label;
-          cards.push(headerEl);
+          headerEl.textContent = label;
+          return headerEl;
+        };
+
+        const nearEls = [];
+        const farEls = [];
+
+        for (const group of sortedGroups) {
+          const groupNearEls = [];
+          const groupFarEls = [];
 
           for (const { f, idx, loc, distMeters } of group.items) {
             const a = f.attributes || {};
@@ -2922,7 +2930,9 @@
             const token = `aliquot-${idx + 1}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const selectionKey = buildAliquotSelectionKey(f, idx);
             const isFar = distMeters > COLLAPSE_DIST_M && !isAliquotSelected(f, idx);
+
             aliquotSummaryCpfTargets.push({ token, feature: f, label: indexLabel });
+
             const cardEl = card(
               indexLabel,
               group.label,
@@ -2957,6 +2967,7 @@
                 },
               }
             );
+
             cardEl.classList.add('aliquot-card');
             cardEl.dataset.aliquotCardKey = selectionKey;
             if (isFar) cardEl.classList.add('is-far');
@@ -2968,11 +2979,13 @@
               badge.className = 'dist-badge' + (isFar ? ' is-far' : '');
               badge.textContent = fmtDist(distMeters);
               chead.appendChild(badge);
+
               if (isFar) {
                 const chevron = document.createElement('span');
                 chevron.className = 'chead-chevron';
                 chevron.textContent = '▾';
                 chead.appendChild(chevron);
+
                 // Clicking the header of a far (collapsed) card expands/collapses it.
                 chead.addEventListener('click', (evt) => {
                   evt.stopPropagation();
@@ -2982,16 +2995,57 @@
               }
             }
 
-            cards.push(cardEl);
+            (isFar ? groupFarEls : groupNearEls).push(cardEl);
           }
+
+          if (groupNearEls.length) {
+            nearEls.push(makeAliquotHeader(group.label));
+            nearEls.push(...groupNearEls);
+          }
+          if (groupFarEls.length) {
+            farEls.push(makeAliquotHeader(group.label));
+            farEls.push(...groupFarEls);
+          }
+        }
+
+        cards.push(...nearEls);
+
+        // Group all far (>500m) aliquots under a single drawer at the bottom.
+        if (farEls.length) {
+          const farCount = farEls.filter((el) => el?.classList?.contains('aliquot-card')).length;
+          const toggleCard = createDistanceGroupToggleCard('Aliquots', farCount, COLLAPSE_DIST_M);
+          cards.push(toggleCard);
+
+          for (const el of farEls) el.style.display = 'none';
+
+          let expanded = false;
+          const btn = toggleCard.querySelector('[data-rq-see-more-btn]');
+          const sub = toggleCard.querySelector('[data-rq-see-more-sub]');
+          const sync = () => {
+            if (btn) {
+              btn.textContent = expanded ? `Hide (${farCount})` : `See More (${farCount})`;
+              btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            }
+            if (sub) sub.textContent = `${farCount} Aliquots beyond ${COLLAPSE_DIST_M} m`;
+          };
+          sync();
+
+          if (btn) {
+            btn.addEventListener('click', (evt) => {
+              evt.stopPropagation();
+              expanded = !expanded;
+              for (const el of farEls) el.style.display = expanded ? '' : 'none';
+              sync();
+            });
+          }
+
+          cards.push(...farEls);
         }
       }
 
-      applyDistanceGroupSeeMore(cards, aliquotCardSliceStart, 'aliquot-card', 'Aliquots', 500);
-
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
 
-      const rosCardSliceStart = cards.length;
+            const rosCardSliceStart = cards.length;
 
       if (ros.length) {
         const ROS_COLLAPSE_DIST_M = 500; // metres
@@ -3013,6 +3067,9 @@
             return { f, dist };
           })
           .sort((a, b) => a.dist - b.dist);
+
+        const rosNearEls = [];
+        const rosFarEls = [];
 
         for (const [sortIdx, { f, dist }] of rosSorted.entries()) {
           const a = f.attributes || {};
@@ -3045,13 +3102,45 @@
               });
             }
           }
-          cards.push(cardEl);
+          (isFar ? rosFarEls : rosNearEls).push(cardEl);
+        }
+
+        // Render near ROS first, then a single drawer containing all far ROS at the bottom.
+        cards.push(...rosNearEls);
+
+        if (rosFarEls.length) {
+          const farCount = rosFarEls.length;
+          const toggleCard = createDistanceGroupToggleCard('Records of Survey', farCount, ROS_COLLAPSE_DIST_M);
+          cards.push(toggleCard);
+
+          for (const el of rosFarEls) el.style.display = 'none';
+
+          let expanded = false;
+          const btn = toggleCard.querySelector('[data-rq-see-more-btn]');
+          const sub = toggleCard.querySelector('[data-rq-see-more-sub]');
+          const sync = () => {
+            if (btn) {
+              btn.textContent = expanded ? `Hide (${farCount})` : `See More (${farCount})`;
+              btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            }
+            if (sub) sub.textContent = `${farCount} Records of Survey beyond ${ROS_COLLAPSE_DIST_M} m`;
+          };
+          sync();
+
+          if (btn) {
+            btn.addEventListener('click', (evt) => {
+              evt.stopPropagation();
+              expanded = !expanded;
+              for (const el of rosFarEls) el.style.display = expanded ? '' : 'none';
+              sync();
+            });
+          }
+
+          cards.push(...rosFarEls);
         }
       } else {
         cards.push(card("Record of Survey", "None within 1600m of parcel centroid", [["Note","Increase search distance in code if needed."]], []));
       }
-
-      applyDistanceGroupSeeMore(cards, rosCardSliceStart, 'ros-card', 'Records of Survey', 500);
 
       setSummaryCards(cards);
       if (aliquotSummaryCpfTargets.length) {
