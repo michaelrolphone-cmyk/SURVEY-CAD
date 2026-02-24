@@ -280,6 +280,15 @@
     .cpf-collapsed-info{flex:1;min-width:0}
     .cpf-expand-btn{font-size:11px;padding:3px 8px;margin-top:5px}
 
+    /* Aliquot distance badge & collapsible cards */
+    .dist-badge{font-size:10px;color:var(--muted);background:rgba(255,255,255,.07);border-radius:4px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
+    .dist-badge.is-far{color:var(--warn)}
+    .chead-chevron{font-size:10px;opacity:.55;transition:transform .18s ease;flex-shrink:0;margin-left:2px}
+    .card.aliquot-card > .chead{cursor:pointer;user-select:none}
+    .card.aliquot-card.is-far > .cbody{display:none}
+    .card.aliquot-card.is-far.is-expanded > .cbody{display:block}
+    .card.aliquot-card.is-far:not(.is-expanded) .chead-chevron{transform:rotate(-90deg)}
+
     .busyModal{
       position:fixed;
       inset:0;
@@ -1355,6 +1364,12 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     document.querySelectorAll(`[data-aliquot-select-key="${key}"]`).forEach((node) => {
       node.checked = selected;
     });
+    // Auto-expand a far aliquot card when it becomes selected (e.g. from map click)
+    if (selected) {
+      document.querySelectorAll('.aliquot-card.is-far').forEach((cardEl) => {
+        if (cardEl.dataset.aliquotCardKey === key) cardEl.classList.add('is-expanded');
+      });
+    }
     if (state.lastLookupPayload) {
       saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
     }
@@ -2493,6 +2508,20 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
 
       const aliquotSummaryCpfTargets = [];
       if (state.aliquotFeatures.length) {
+        const COLLAPSE_DIST_M = 1609.34; // 1 mile in meters
+
+        function aliquotDistMeters(feature) {
+          if (!state.lastLonLat) return 0;
+          const centroid = centroidOfPolygon(feature.geometry);
+          if (!centroid) return 0;
+          // outSR 4326: centroid.x = lon, centroid.y = lat
+          return haversineMeters(state.lastLonLat.lat, state.lastLonLat.lon, centroid.y, centroid.x);
+        }
+
+        function fmtDist(m) {
+          return m < 1609.34 ? `${Math.round(m)} m` : `${(m / 1609.34).toFixed(2)} mi`;
+        }
+
         // Group aliquots by Township + Range + Section (parsed from BLM PLSSID/FRSTDIVID).
         // The Index (SECDIVNO/SECDIVLAB) identifies each aliquot within the group.
         const groups = new Map();
@@ -2500,24 +2529,32 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
           const loc = parsePlssFromAliquot(f);
           const sectionLabel = loc.section ? `Sec ${loc.section}` : '';
           const groupKey = [loc.township, loc.range, sectionLabel].filter(Boolean).join(' ') || 'Aliquots';
-          if (!groups.has(groupKey)) groups.set(groupKey, { label: groupKey, items: [] });
-          groups.get(groupKey).items.push({ f, idx, loc });
+          if (!groups.has(groupKey)) groups.set(groupKey, { label: groupKey, items: [], minDist: Infinity });
+          const distMeters = aliquotDistMeters(f);
+          const grp = groups.get(groupKey);
+          grp.items.push({ f, idx, loc, distMeters });
+          if (distMeters < grp.minDist) grp.minDist = distMeters;
         }
 
-        for (const [, group] of groups) {
+        // Sort groups by nearest member, then items within each group by distance.
+        const sortedGroups = [...groups.values()].sort((a, b) => a.minDist - b.minDist);
+        for (const grp of sortedGroups) grp.items.sort((a, b) => a.distMeters - b.distMeters);
+
+        for (const group of sortedGroups) {
           // Group header — shown for every group so the Township/Range/Section is always visible.
           const headerEl = document.createElement('div');
           headerEl.style.cssText = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 2px 2px;margin-top:4px;';
           headerEl.textContent = group.label;
           cards.push(headerEl);
 
-          for (const { f, idx, loc } of group.items) {
+          for (const { f, idx, loc, distMeters } of group.items) {
             const a = f.attributes || {};
             const indexLabel = loc.index || a.ALIQUOT || a.ALIQUOT_LABEL || `Aliquot #${idx + 1}`;
             const token = `aliquot-${idx + 1}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const selectionKey = buildAliquotSelectionKey(f, idx);
+            const isFar = distMeters > COLLAPSE_DIST_M && !isAliquotSelected(f, idx);
             aliquotSummaryCpfTargets.push({ token, feature: f, label: indexLabel });
-            cards.push(card(
+            const cardEl = card(
               indexLabel,
               group.label,
               summarizeAttrs(a),
@@ -2528,8 +2565,8 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
               ],
               {
                 onSelect: () => centerMapOnFeature(f, layers.aliquots, indexLabel),
-                onRender: (cardEl) => {
-                  const checkbox = cardEl.querySelector(`[data-aliquot-select-key="${selectionKey}"]`);
+                onRender: (el) => {
+                  const checkbox = el.querySelector(`[data-aliquot-select-key="${selectionKey}"]`);
                   if (!checkbox) return;
                   checkbox.addEventListener('click', (evt) => evt.stopPropagation());
                   checkbox.addEventListener('change', () => {
@@ -2540,7 +2577,33 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
                   });
                 },
               }
-            ));
+            );
+            cardEl.classList.add('aliquot-card');
+            cardEl.dataset.aliquotCardKey = selectionKey;
+            if (isFar) cardEl.classList.add('is-far');
+
+            // Append distance badge (and chevron for far cards) to the card header.
+            const chead = cardEl.querySelector('.chead');
+            if (chead) {
+              const badge = document.createElement('span');
+              badge.className = 'dist-badge' + (isFar ? ' is-far' : '');
+              badge.textContent = fmtDist(distMeters);
+              chead.appendChild(badge);
+              if (isFar) {
+                const chevron = document.createElement('span');
+                chevron.className = 'chead-chevron';
+                chevron.textContent = '▾';
+                chead.appendChild(chevron);
+                // Clicking the header of a far (collapsed) card expands/collapses it.
+                chead.addEventListener('click', (evt) => {
+                  evt.stopPropagation();
+                  cardEl.classList.toggle('is-expanded');
+                  centerMapOnFeature(f, layers.aliquots, indexLabel);
+                });
+              }
+            }
+
+            cards.push(cardEl);
           }
         }
       }
