@@ -222,6 +222,13 @@ test('RecordQuarry.html lazy loads ROS TIFF thumbnails through cached API thumbn
   assert.match(html, /async\s+function\s+loadRosThumbnailWithRetry\s*\(/, 'RecordQuarry should include a retry-capable ROS thumbnail loader');
   assert.match(html, /function\s+lazyLoadRosScanThumbnails\s*\(/, 'RecordQuarry should lazily initialize ROS thumbnail loading');
   assert.match(html, /new\s+IntersectionObserver\(/, 'ROS thumbnail loading should be intersection-driven for visible cards');
+  assert.match(html, /function\s+showRqHoverPreviewTooltip\s*\(/, 'RecordQuarry should include a hover preview tooltip renderer for thumbnails');
+  assert.match(html, /const\s+availableRight\s*=\s*Math\.max\(0, viewportWidth - anchorRect\.right - RQ_HOVER_GAP - RQ_HOVER_MARGIN\);/, 'hover preview placement should measure right-side space from the hovered thumbnail');
+  assert.match(html, /const\s+placements\s*=\s*\[[\s\S]*\]\.sort\(\(a, b\) => b\.fit\.score - a\.fit\.score\);/, 'hover preview placement should choose the largest non-overlapping viewport fit');
+  assert.match(html, /bindRqHoverPreview\(imgEl, imgEl\.alt \|\| 'ROS preview'\);/, 'ROS thumbnails should enable enlarged hover preview behavior once loaded');
+  assert.match(html, /bindRqHoverPreview\(imgEl, imgEl\.alt \|\| 'CP&F preview'\);/, 'CP&F thumbnails should enable enlarged hover preview behavior once loaded');
+  assert.match(html, /left\s*=\s*Math\.min\(Math\.max\(RQ_HOVER_MARGIN, left\), viewportWidth - previewWidth - RQ_HOVER_MARGIN\);/, 'hover preview should clamp inside viewport bounds');
+  assert.match(html, /window\.addEventListener\('scroll', \(\) => hideRqHoverPreviewTooltip\(\), \{ passive: true \}\);/, 'hover preview should dismiss on scroll to avoid stale placement');
   assert.match(html, /lazyLoadRosScanThumbnails\(\);/, 'lookup completion should trigger ROS thumbnail lazy loading');
 });
 test('RecordQuarry.html keeps aliquots deselected by default and behind parcel interaction layers', async () => {

@@ -362,8 +362,29 @@
        background:rgba(0,0,0,.2);
       padding: 2px;
       margin: 5px;
-      float:left;
+     float:left;
      }
+
+    .rq-hover-preview-tooltip{
+      position:fixed;
+      pointer-events:none;
+      opacity:0;
+      z-index:12000;
+      border-radius:10px;
+      overflow:hidden;
+      border:1px solid var(--line);
+      background:rgba(4,8,24,.96);
+      box-shadow:0 18px 48px rgba(0,0,0,.48);
+      transition:opacity .12s ease;
+    }
+    .rq-hover-preview-tooltip.visible{opacity:1}
+    .rq-hover-preview-image{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      background:rgba(0,0,0,.3);
+    }
 
     /* Distance-group collapse ("See More") */
     .rq-distance-group{border-style:dashed;background:rgba(255,255,255,.03)}
@@ -2547,6 +2568,7 @@
           const blob = await resp.blob();
           imgEl.src = URL.createObjectURL(blob);
           imgEl.style.display = '';
+          bindRqHoverPreview(imgEl, imgEl.alt || 'ROS preview');
           return true;
         }
         if (resp.status === 202) continue;
@@ -2585,6 +2607,143 @@
 
     for (const img of thumbs) observer.observe(img);
   }
+
+  const RQ_HOVER_MARGIN = 16;
+  const RQ_HOVER_GAP = 14;
+  let rqHoverPreviewTooltip = null;
+
+  function ensureRqHoverPreviewTooltip() {
+    if (rqHoverPreviewTooltip && document.body.contains(rqHoverPreviewTooltip)) {
+      return rqHoverPreviewTooltip;
+    }
+    const tooltip = document.createElement('div');
+    tooltip.className = 'rq-hover-preview-tooltip';
+    tooltip.setAttribute('aria-hidden', 'true');
+
+    const image = document.createElement('img');
+    image.className = 'rq-hover-preview-image';
+    image.alt = '';
+    tooltip.appendChild(image);
+    document.body.appendChild(tooltip);
+    rqHoverPreviewTooltip = tooltip;
+    return tooltip;
+  }
+
+  function hideRqHoverPreviewTooltip() {
+    if (!rqHoverPreviewTooltip) return;
+    rqHoverPreviewTooltip.classList.remove('visible');
+    rqHoverPreviewTooltip.style.width = '';
+    rqHoverPreviewTooltip.style.height = '';
+    rqHoverPreviewTooltip.style.left = '';
+    rqHoverPreviewTooltip.style.top = '';
+  }
+
+  function showRqHoverPreviewTooltip(anchor, imageSrc, altText = 'Record preview', sourceDimensions = null) {
+    if (!anchor || !imageSrc) return;
+
+    const tooltip = ensureRqHoverPreviewTooltip();
+    const previewImage = tooltip.querySelector('.rq-hover-preview-image');
+    if (!previewImage) return;
+
+    previewImage.src = imageSrc;
+    previewImage.alt = altText;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const anchorRect = anchor.getBoundingClientRect();
+
+    const imageNaturalWidth = Number(sourceDimensions?.width || previewImage.naturalWidth || anchor.naturalWidth || 0);
+    const imageNaturalHeight = Number(sourceDimensions?.height || previewImage.naturalHeight || anchor.naturalHeight || 0);
+    const safeImageHeight = imageNaturalHeight > 0 ? imageNaturalHeight : 1;
+    const imageAspectRatio = imageNaturalWidth > 0 ? (imageNaturalWidth / safeImageHeight) : (8.5 / 11);
+
+    const maxBoxWidth = Math.max(180, viewportWidth - (RQ_HOVER_MARGIN * 2));
+    const maxBoxHeight = Math.max(220, Math.floor(viewportHeight * 0.9));
+
+    const availableRight = Math.max(0, viewportWidth - anchorRect.right - RQ_HOVER_GAP - RQ_HOVER_MARGIN);
+    const availableLeft = Math.max(0, anchorRect.left - RQ_HOVER_GAP - RQ_HOVER_MARGIN);
+    const availableBelow = Math.max(0, viewportHeight - anchorRect.bottom - RQ_HOVER_GAP - RQ_HOVER_MARGIN);
+    const availableAbove = Math.max(0, anchorRect.top - RQ_HOVER_GAP - RQ_HOVER_MARGIN);
+    const minVisible = 88;
+
+    const estimateSide = (sideWidth) => {
+      const width = Math.min(maxBoxWidth, sideWidth);
+      if (width <= 0) return { score: 0, width: 0, height: 0 };
+      const height = Math.min(maxBoxHeight, Math.max(minVisible, Math.floor(width / imageAspectRatio)));
+      const finalWidth = Math.min(width, Math.max(minVisible, Math.floor(height * imageAspectRatio)));
+      const finalHeight = Math.min(maxBoxHeight, Math.max(minVisible, Math.floor(finalWidth / imageAspectRatio)));
+      return { score: finalWidth * finalHeight, width: finalWidth, height: finalHeight };
+    };
+
+    const estimateVertical = (verticalHeight) => {
+      const height = Math.min(maxBoxHeight, verticalHeight);
+      if (height <= 0) return { score: 0, width: 0, height: 0 };
+      const width = Math.min(maxBoxWidth, Math.max(minVisible, Math.floor(height * imageAspectRatio)));
+      const finalHeight = Math.min(height, Math.max(minVisible, Math.floor(width / imageAspectRatio)));
+      const finalWidth = Math.min(maxBoxWidth, Math.max(minVisible, Math.floor(finalHeight * imageAspectRatio)));
+      return { score: finalWidth * finalHeight, width: finalWidth, height: finalHeight };
+    };
+
+    const placements = [
+      { key: 'right', fit: estimateSide(availableRight) },
+      { key: 'left', fit: estimateSide(availableLeft) },
+      { key: 'below', fit: estimateVertical(availableBelow) },
+      { key: 'above', fit: estimateVertical(availableAbove) },
+    ].sort((a, b) => b.fit.score - a.fit.score);
+
+    const chosen = placements.find((p) => p.fit.width >= minVisible && p.fit.height >= minVisible) || placements[0];
+    const placement = chosen.key;
+    const previewWidth = chosen.fit.width;
+    const previewHeight = chosen.fit.height;
+    if (!previewWidth || !previewHeight) return;
+
+    tooltip.style.width = `${Math.round(previewWidth)}px`;
+    tooltip.style.height = `${Math.round(previewHeight)}px`;
+
+    let left = RQ_HOVER_MARGIN;
+    let top = RQ_HOVER_MARGIN;
+    if (placement === 'right') {
+      left = Math.round(anchorRect.right + RQ_HOVER_GAP);
+      top = Math.round(anchorRect.top + (anchorRect.height / 2) - (previewHeight / 2));
+    } else if (placement === 'left') {
+      left = Math.round(anchorRect.left - RQ_HOVER_GAP - previewWidth);
+      top = Math.round(anchorRect.top + (anchorRect.height / 2) - (previewHeight / 2));
+    } else if (placement === 'below') {
+      top = Math.round(anchorRect.bottom + RQ_HOVER_GAP);
+      left = Math.round(anchorRect.left + (anchorRect.width / 2) - (previewWidth / 2));
+    } else if (placement === 'above') {
+      top = Math.round(anchorRect.top - RQ_HOVER_GAP - previewHeight);
+      left = Math.round(anchorRect.left + (anchorRect.width / 2) - (previewWidth / 2));
+    }
+
+    left = Math.min(Math.max(RQ_HOVER_MARGIN, left), viewportWidth - previewWidth - RQ_HOVER_MARGIN);
+    top = Math.min(Math.max(RQ_HOVER_MARGIN, top), viewportHeight - previewHeight - RQ_HOVER_MARGIN);
+
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+    tooltip.classList.add('visible');
+  }
+
+  function bindRqHoverPreview(thumb, altText = 'Record preview') {
+    if (!thumb || thumb.dataset.rqHoverBound === '1') return;
+    thumb.dataset.rqHoverBound = '1';
+
+    const show = () => {
+      if (!thumb.src) return;
+      showRqHoverPreviewTooltip(thumb, thumb.src, altText, {
+        width: thumb.naturalWidth,
+        height: thumb.naturalHeight,
+      });
+    };
+
+    thumb.addEventListener('mouseenter', show);
+    thumb.addEventListener('focus', show);
+    thumb.addEventListener('mouseleave', () => hideRqHoverPreviewTooltip());
+    thumb.addEventListener('blur', () => hideRqHoverPreviewTooltip());
+  }
+
+  window.addEventListener('scroll', () => hideRqHoverPreviewTooltip(), { passive: true });
+  window.addEventListener('resize', () => hideRqHoverPreviewTooltip());
 
   function buildAliquotPopupHtml(feature, label = 'Aliquot') {
     const attrs = feature?.attributes || {};
@@ -2653,6 +2812,7 @@
           const blob = await resp.blob();
           imgEl.src = URL.createObjectURL(blob);
           imgEl.style.display = '';
+          bindRqHoverPreview(imgEl, imgEl.alt || 'CP&F preview');
           return true;
         }
         if (resp.status === 202) continue; // still generating — retry
