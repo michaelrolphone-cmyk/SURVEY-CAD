@@ -315,6 +315,10 @@
     .card.aliquot-card.is-far > .cbody{display:none}
     .card.aliquot-card.is-far.is-expanded > .cbody{display:block}
     .card.aliquot-card.is-far:not(.is-expanded) .chead-chevron{transform:rotate(-90deg)}
+    .card.ros-card > .chead{cursor:pointer;user-select:none}
+    .card.ros-card.is-far > .cbody{display:none}
+    .card.ros-card.is-far.is-expanded > .cbody{display:block}
+    .card.ros-card.is-far:not(.is-expanded) .chead-chevron{transform:rotate(-90deg)}
 
     .busyModal{
       position:fixed;
@@ -2542,9 +2546,13 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         }
       ));
 
+      function fmtDist(m) {
+        return m < 1609.34 ? `${Math.round(m)} m` : `${(m / 1609.34).toFixed(2)} mi`;
+      }
+
       const aliquotSummaryCpfTargets = [];
       if (state.aliquotFeatures.length) {
-        const COLLAPSE_DIST_M = 1609.34; // 1 mile in meters
+        const COLLAPSE_DIST_M = 500; // metres
 
         function aliquotDistMeters(feature) {
           if (!state.lastLonLat) return 0;
@@ -2552,10 +2560,6 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
           if (!centroid) return 0;
           // outSR 4326: centroid.x = lon, centroid.y = lat
           return haversineMeters(state.lastLonLat.lat, state.lastLonLat.lon, centroid.y, centroid.x);
-        }
-
-        function fmtDist(m) {
-          return m < 1609.34 ? `${Math.round(m)} m` : `${(m / 1609.34).toFixed(2)} mi`;
         }
 
         // Group aliquots by Township + Range + Section (parsed from BLM PLSSID/FRSTDIVID).
@@ -2663,17 +2667,59 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
 
       if (ros.length) {
-        const rosCards = ros.slice(0, 10).map((f, idx) => {
+        const ROS_COLLAPSE_DIST_M = 500; // metres
+
+        function rosFeatureCentroid(feature) {
+          const g = feature?.geometry;
+          if (!g) return null;
+          if (Number.isFinite(Number(g.x)) && Number.isFinite(Number(g.y))) return { x: Number(g.x), y: Number(g.y) };
+          if (g.paths?.length) { const p = g.paths[0]?.[0]; return p ? { x: p[0], y: p[1] } : null; }
+          return centroidOfPolygon(g);
+        }
+
+        const rosSorted = ros.slice(0, 10)
+          .map((f) => {
+            const c = rosFeatureCentroid(f);
+            const dist = (c && state.lastLonLat)
+              ? haversineMeters(state.lastLonLat.lat, state.lastLonLat.lon, c.y, c.x)
+              : 0;
+            return { f, dist };
+          })
+          .sort((a, b) => a.dist - b.dist);
+
+        for (const [sortIdx, { f, dist }] of rosSorted.entries()) {
           const a = f.attributes || {};
-          return card(
-            `Record of Survey #${idx+1}`,
-            bestRosLabel(a),
+          const isFar = dist > ROS_COLLAPSE_DIST_M;
+          const rosLabel = bestRosLabel(a) || `Record of Survey #${sortIdx + 1}`;
+          const cardEl = card(
+            `Record of Survey #${sortIdx + 1}`,
+            rosLabel,
             summarizeAttrs(a),
             buildPdfProxyLinks(a),
-            { onSelect: () => centerMapOnFeature(f, layers.ros, `ROS #${idx + 1}`) }
+            { onSelect: () => centerMapOnFeature(f, layers.ros, rosLabel) }
           );
-        });
-        cards.push(...rosCards);
+          cardEl.classList.add('ros-card');
+          if (isFar) cardEl.classList.add('is-far');
+          const chead = cardEl.querySelector('.chead');
+          if (chead) {
+            const badge = document.createElement('span');
+            badge.className = 'dist-badge' + (isFar ? ' is-far' : '');
+            badge.textContent = fmtDist(dist);
+            chead.appendChild(badge);
+            if (isFar) {
+              const chevron = document.createElement('span');
+              chevron.className = 'chead-chevron';
+              chevron.textContent = '▾';
+              chead.appendChild(chevron);
+              chead.addEventListener('click', (evt) => {
+                evt.stopPropagation();
+                cardEl.classList.toggle('is-expanded');
+                centerMapOnFeature(f, layers.ros, rosLabel);
+              });
+            }
+          }
+          cards.push(cardEl);
+        }
       } else {
         cards.push(card("Record of Survey", "None within 1600m of parcel centroid", [["Note","Increase search distance in code if needed."]], []));
       }
