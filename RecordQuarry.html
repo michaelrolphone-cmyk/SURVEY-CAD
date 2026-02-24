@@ -746,7 +746,6 @@
     }
 
     if (!deselectedRosKeys) {
-      for (const key of allRosKeys) state.selectedRosKeys.add(key);
       return;
     }
 
@@ -2526,6 +2525,10 @@
     return { rosNumber, version, fullSizeUrl };
   }
 
+  function deriveRosImageMeta(attrs = {}) {
+    return buildAdaCountyRosImageMeta(attrs);
+  }
+
   function buildRosImageHtml(attrs = {}) {
     const meta = buildAdaCountyRosImageMeta(attrs);
     if (!meta?.fullSizeUrl) return '';
@@ -3079,7 +3082,7 @@
       afterUtilitiesLoadedOrUpdated();
       log(`Utility locations found: ${state.utilityLocations.length}`);
       state.rosFeatures = ros;
-      state.selectedRosKeys = buildAllRosSelectionKeys(ros);
+      state.selectedRosKeys = new Set();
       const selectionSnapshot = options.selectionSnapshot || cachedAddressSnapshot?.selection || null;
       if (Array.isArray(selectionSnapshot?.selectedRosKeys) || Array.isArray(selectionSnapshot?.deselectedRosKeys)) {
         applySelectionSnapshot(selectionSnapshot);
