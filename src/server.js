@@ -167,6 +167,14 @@ async function renderImageThumbnailFromBuffer(imageBuffer, { width = IMAGE_THUMB
     .toBuffer();
 }
 
+async function renderRosThumbnailFromBuffer(imageBuffer, { width = PDF_THUMBNAIL_TARGET_WIDTH } = {}) {
+  const sharp = (await import('sharp')).default;
+  return await sharp(imageBuffer)
+    .resize({ width, fit: 'inside', withoutEnlargement: true })
+    .png()
+    .toBuffer();
+}
+
 function canGenerateImageThumbnail({ extension = '', mimeType = '' } = {}) {
   const normalizedExt = String(extension || '').replace(/^\./, '').toLowerCase();
   const normalizedMime = String(mimeType || '').toLowerCase();
@@ -1147,6 +1155,7 @@ export function createSurveyServer({
   localStorageSyncStore = new LocalStorageSyncStore(),
   evidenceDeskFileStore,
   pdfThumbnailRenderer = renderPdfThumbnailFromBuffer,
+  rosThumbnailRenderer = renderRosThumbnailFromBuffer,
   idahoHarvestSupervisor = createIdahoHarvestSupervisor(),
   mapTileObjectStore = null,
 } = {}) {
@@ -1169,6 +1178,8 @@ export function createSurveyServer({
   const inMemoryPdfThumbnailCache = new Map();
   const inFlightPdfThumbnailGenerations = new Map();
   const pdfThumbnailFailures = new Map();
+  const inFlightRosThumbnailGenerations = new Map();
+  const rosThumbnailFailures = new Map();
   const sharedRedisClient = (() => {
     if (typeof localStorageSyncStore?.getRedisClient === 'function') {
       return localStorageSyncStore.getRedisClient();
@@ -1303,6 +1314,31 @@ export function createSurveyServer({
     return normalizedSource;
   }
 
+  function parseRosThumbnailSource(urlObj) {
+    const source = String(urlObj.searchParams.get('source') || '').trim();
+    if (!source) throw new Error('source query parameter is required.');
+    const normalizedSource = (() => {
+      if (source.startsWith('/')) return source;
+      let parsed;
+      try {
+        parsed = new URL(source);
+      } catch {
+        throw new Error('source must be a relative /api URL or an absolute http(s) URL.');
+      }
+      if (!/^https?:$/i.test(parsed.protocol)) {
+        throw new Error('source absolute URL protocol must be http or https.');
+      }
+      return parsed.toString();
+    })();
+    if (normalizedSource.startsWith('/api/project-files/download')) {
+      return normalizedSource;
+    }
+    if (/^https?:\/\//i.test(normalizedSource)) {
+      return normalizedSource;
+    }
+    throw new Error('source must target /api/project-files/download or an absolute http(s) URL.');
+  }
+
   async function fetchPdfSourceBuffer(sourceUrl, runtime) {
     const sourceObj = new URL(sourceUrl, 'http://localhost');
     if (sourceObj.pathname === '/api/project-files/download') {
@@ -1330,6 +1366,34 @@ export function createSurveyServer({
     }
 
     throw createHttpError(400, 'Unsupported PDF thumbnail source path.');
+  }
+
+  async function fetchRosThumbnailSourceBuffer(sourceUrl, runtime) {
+    if (sourceUrl.startsWith('/api/project-files/download')) {
+      const sourceObj = new URL(sourceUrl, 'http://localhost');
+      const projectId = sourceObj.searchParams.get('projectId');
+      const folderKey = sourceObj.searchParams.get('folderKey');
+      const requestedFileName = sourceObj.searchParams.get('fileName');
+      if (!projectId || !folderKey || !requestedFileName) throw createHttpError(400, 'Invalid project file download source URL.');
+      const safeName = path.basename(requestedFileName);
+      if (!/\.tiff?$/i.test(safeName)) throw createHttpError(400, 'ROS thumbnail source must be a .tif or .tiff file.');
+      const file = await runtime.store.getFile(projectId, folderKey, safeName);
+      if (!file?.buffer) throw createHttpError(404, 'ROS TIFF source file not found.');
+      return file.buffer;
+    }
+
+    const remoteUrl = new URL(sourceUrl);
+    if (!/\.tiff?$/i.test(remoteUrl.pathname)) throw createHttpError(400, 'ROS thumbnail source must be a .tif or .tiff URL.');
+    const remoteResponse = await fetch(remoteUrl, {
+      headers: {
+        Accept: 'image/tiff,image/*;q=0.9,*/*;q=0.8',
+        'User-Agent': 'SurveyCAD-RecordQuarry/1.0 (+thumbnail)',
+      },
+    });
+    if (!remoteResponse.ok) {
+      throw createHttpError(502, `Could not fetch remote ROS TIFF for thumbnail generation: HTTP ${remoteResponse.status}`);
+    }
+    return Buffer.from(await remoteResponse.arrayBuffer());
   }
 
   async function findStoredProjectObjectFileName(runtime, projectId, folderKey, desiredFileName) {
@@ -2828,6 +2892,67 @@ export function createSurveyServer({
             inFlightPdfThumbnailGenerations.delete(cacheKey);
           });
           inFlightPdfThumbnailGenerations.set(cacheKey, generationPromise);
+        }
+
+        sendJson(res, 202, { status: 'generating', source: sourceUrl });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/project-files/ros-thumbnail') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { error: 'Only GET is supported.' });
+          return;
+        }
+
+        let sourceUrl = '';
+        try {
+          sourceUrl = parseRosThumbnailSource(urlObj);
+        } catch (error) {
+          sendJson(res, 400, { error: error.message || 'Invalid source query parameter.' });
+          return;
+        }
+
+        const runtime = await resolveEvidenceDeskStore();
+        const cacheKey = buildPdfThumbnailCacheKey(sourceUrl);
+        const cachedPng = await readCachedPdfThumbnail(cacheKey, runtime);
+        if (cachedPng?.length) {
+          rosThumbnailFailures.delete(cacheKey);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.end(cachedPng);
+          return;
+        }
+
+        const failure = rosThumbnailFailures.get(cacheKey);
+        if (failure && (Date.now() - failure.at) < PDF_THUMBNAIL_FAILURE_COOLDOWN_MS) {
+          sendJson(res, failure.status, {
+            error: 'Thumbnail generation failed.',
+            status: 'failed',
+            source: sourceUrl,
+            detail: failure.message,
+          });
+          return;
+        }
+
+        if (!inFlightRosThumbnailGenerations.has(cacheKey)) {
+          const generationPromise = (async () => {
+            try {
+              const tifBuffer = await fetchRosThumbnailSourceBuffer(sourceUrl, runtime);
+              const pngBuffer = await rosThumbnailRenderer(tifBuffer, { width: PDF_THUMBNAIL_TARGET_WIDTH });
+              await writeCachedPdfThumbnail(cacheKey, pngBuffer, runtime);
+              rosThumbnailFailures.delete(cacheKey);
+            } catch (error) {
+              rosThumbnailFailures.set(cacheKey, {
+                at: Date.now(),
+                status: Number(error?.status) || 502,
+                message: error?.message || 'Unknown thumbnail generation error.',
+              });
+            }
+          })().finally(() => {
+            inFlightRosThumbnailGenerations.delete(cacheKey);
+          });
+          inFlightRosThumbnailGenerations.set(cacheKey, generationPromise);
         }
 
         sendJson(res, 202, { status: 'generating', source: sourceUrl });

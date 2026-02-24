@@ -208,6 +208,18 @@ test('RecordQuarry.html restores and saves project lookup snapshots when launche
   assert.match(html, /const\s+snapshot\s*=\s*loadMostRecentAddressLookupSnapshot\(\);/, 'standalone boot flow should attempt loading the most recent cached address lookup');
 });
 
+
+
+test('RecordQuarry.html lazy loads ROS TIFF thumbnails through cached API thumbnails', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /\/api\/project-files\/ros-thumbnail\?\$\{new URLSearchParams\(\{ source: meta\.fullSizeUrl \}\)\}/, 'RecordQuarry should derive ROS thumbnail URLs from the ros-thumbnail API endpoint');
+  assert.match(html, /data-ros-thumbnail=/, 'ROS image previews should defer network work with data-ros-thumbnail attributes');
+  assert.match(html, /async\s+function\s+loadRosThumbnailWithRetry\s*\(/, 'RecordQuarry should include a retry-capable ROS thumbnail loader');
+  assert.match(html, /function\s+lazyLoadRosScanThumbnails\s*\(/, 'RecordQuarry should lazily initialize ROS thumbnail loading');
+  assert.match(html, /new\s+IntersectionObserver\(/, 'ROS thumbnail loading should be intersection-driven for visible cards');
+  assert.match(html, /lazyLoadRosScanThumbnails\(\);/, 'lookup completion should trigger ROS thumbnail lazy loading');
+});
 test('RecordQuarry.html keeps aliquots deselected by default and behind parcel interaction layers', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 

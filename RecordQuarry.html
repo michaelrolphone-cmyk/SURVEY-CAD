@@ -407,6 +407,7 @@
 
 <body>
 <div class="app">
+  <header><div class="title">RecordQuarry — Ada County Survey Context Lookup (Standalone)</div></header>
   <div class="main">
     <!-- LEFT -->
     <div class="panel">
@@ -2415,7 +2416,58 @@
   function buildRosImageHtml(attrs = {}) {
     const meta = buildAdaCountyRosImageMeta(attrs);
     if (!meta?.fullSizeUrl) return '';
-    return `<div class="small" style="margin-top:8px"><b>Record image</b><br/><a target="_blank" rel="noopener" href="${escapeHtml(meta.fullSizeUrl)}">Open full-size ROS image</a><img class="ros-scan-thumb" loading="lazy" alt="ROS ${escapeHtml(String(meta.rosNumber))} thumbnail" src="${escapeHtml(meta.fullSizeUrl)}"/></div>`;
+    const thumbnailUrl = `/api/project-files/ros-thumbnail?${new URLSearchParams({ source: meta.fullSizeUrl })}`;
+    return `<div class="small" style="margin-top:8px"><b>Record image</b><br/><a target="_blank" rel="noopener" href="${escapeHtml(meta.fullSizeUrl)}">Open full-size ROS image</a><img class="ros-scan-thumb" loading="lazy" alt="ROS ${escapeHtml(String(meta.rosNumber))} thumbnail" data-ros-thumbnail="${escapeHtml(thumbnailUrl)}"/></div>`;
+  }
+
+  async function loadRosThumbnailWithRetry(imgEl, thumbnailUrl, maxAttempts = 9) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, Math.min(600 * Math.pow(2, attempt - 1), 10000)));
+      }
+      try {
+        const resp = await fetch(thumbnailUrl);
+        if (resp.ok && resp.headers.get('content-type')?.startsWith('image/')) {
+          const blob = await resp.blob();
+          imgEl.src = URL.createObjectURL(blob);
+          imgEl.style.display = '';
+          return true;
+        }
+        if (resp.status === 202) continue;
+        break;
+      } catch {
+        break;
+      }
+    }
+    return false;
+  }
+
+  function lazyLoadRosScanThumbnails() {
+    const thumbs = Array.from(document.querySelectorAll('img.ros-scan-thumb[data-ros-thumbnail]'));
+    if (!thumbs.length) return;
+    const loadThumb = async (img) => {
+      if (!img || img.dataset.thumbLoaded === '1') return;
+      const thumbnailUrl = img.getAttribute('data-ros-thumbnail');
+      if (!thumbnailUrl) return;
+      img.dataset.thumbLoaded = '1';
+      const ok = await loadRosThumbnailWithRetry(img, thumbnailUrl);
+      if (!ok) img.style.display = 'none';
+    };
+
+    if (!('IntersectionObserver' in window)) {
+      thumbs.forEach((img) => loadThumb(img));
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        observer.unobserve(entry.target);
+        loadThumb(entry.target);
+      }
+    }, { rootMargin: '120px 0px' });
+
+    for (const img of thumbs) observer.observe(img);
   }
 
   function buildAliquotPopupHtml(feature, label = 'Aliquot') {
@@ -3309,6 +3361,7 @@
       if (aliquotSummaryCpfTargets.length) {
         lazyLoadAliquotSummaryCpfLinks(aliquotSummaryCpfTargets);
       }
+      lazyLoadRosScanThumbnails();
 
       state.exportGeoJSON = buildExportGeoJSON();
 

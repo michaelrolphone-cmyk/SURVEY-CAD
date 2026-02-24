@@ -452,6 +452,43 @@ Download a generated thumbnail for an uploaded image file.
 
 ---
 
+
+### `GET /api/project-files/pdf-thumbnail`
+
+Get a cached PNG thumbnail for a PDF source, or trigger background generation when not cached yet.
+
+| Query Param | Type | Required | Description |
+|-------------|------|----------|-------------|
+| `source` | `string` | Yes | Relative PDF source URL (`/api/project-files/download?...` or `/api/ros-pdf?...`) |
+
+**Response `200`:** PNG thumbnail (`image/png`) with a 1024px width target.
+
+**Response `202`:** Thumbnail generation is in progress.
+
+**Response `404`:** Source PDF not found.
+
+**Response `502`:** Thumbnail generation failed.
+
+---
+
+### `GET /api/project-files/ros-thumbnail`
+
+Get a cached PNG thumbnail for a Record of Survey TIFF source, or trigger background generation when not cached yet.
+
+| Query Param | Type | Required | Description |
+|-------------|------|----------|-------------|
+| `source` | `string` | Yes | TIFF source URL (`/api/project-files/download?...fileName=*.tif(f)` or absolute `http(s)` `.tif/.tiff` URL) |
+
+**Response `200`:** PNG thumbnail (`image/png`) with a 1024px width target.
+
+**Response `202`:** Thumbnail generation is in progress.
+
+**Response `404`:** Source TIFF not found.
+
+**Response `502`:** Thumbnail generation failed.
+
+---
+
 ### `DELETE /api/project-files/file`
 
 Delete a previously uploaded file.

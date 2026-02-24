@@ -47,6 +47,14 @@ test('server OpenAPI spec documents EvidenceDesk upload CRUD endpoints', async (
   assert.ok(thumbPath.get.responses?.['404'], 'PDF thumbnail endpoint should document source-not-found failures');
   assert.ok(thumbPath.get.responses?.['502'], 'PDF thumbnail endpoint should document generation failure response');
 
+
+  const rosThumbPath = spec?.paths?.['/api/project-files/ros-thumbnail'];
+  assert.ok(rosThumbPath?.get, 'spec should include ROS thumbnail endpoint');
+  assert.ok(rosThumbPath.get.responses?.['200'], 'ROS thumbnail endpoint should document image response');
+  assert.ok(rosThumbPath.get.responses?.['202'], 'ROS thumbnail endpoint should document generation-in-progress response');
+  assert.ok(rosThumbPath.get.responses?.['404'], 'ROS thumbnail endpoint should document source-not-found failures');
+  assert.ok(rosThumbPath.get.responses?.['502'], 'ROS thumbnail endpoint should document generation failure response');
+
   const listSchema = spec?.components?.schemas?.ProjectFilesListResponse;
   assert.ok(listSchema?.properties?.filesByFolder, 'spec should include filesByFolder in list response');
   const listItemSchema = listSchema?.properties?.files?.items;
