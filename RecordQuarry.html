@@ -192,6 +192,33 @@
       border-radius:12px;
       background:rgba(0,0,0,.14);
       overflow:hidden;
+      position:relative;
+    }
+    .rq-star-btn{
+      position:absolute;
+      top:0.3rem;
+      right:0.45rem;
+      background:none;
+      border:none;
+      cursor:pointer;
+      font-size:1.05rem;
+      line-height:1;
+      padding:2px;
+      color:#64748b;
+      opacity:0.65;
+      transition:color 150ms ease,opacity 150ms ease;
+    }
+    .rq-star-btn:hover:not(:disabled){
+      opacity:1;
+      color:#e2e8f0;
+    }
+    .rq-star-btn[aria-pressed="true"]{
+      color:#eab308;
+      opacity:1;
+    }
+    .rq-star-btn:disabled{
+      cursor:not-allowed;
+      opacity:0.35;
     }
     .card.clickable{
       cursor:pointer;
@@ -2487,21 +2514,32 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
           ["Attrs", `${Object.keys(pAttrs).length} fields`],
           ["Export", `Unique parcel/subdivision/aliquots CSV in P,N,E,Z,D (EPSG:${EXPORT_OUT_SR}, ID West ftUS)`],
         ],
-        [
-          `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-parcel-include-export ${state.selectedParcel ? 'checked' : ''}/> Include in export</label>`
-        ],
+        [],
         {
           onSelect: () => centerMapOnFeature(parcel, layers.parcel, 'Parcel'),
           onRender: (cardEl) => {
-            const checkbox = cardEl.querySelector('[data-parcel-include-export]');
-            if (!checkbox) return;
-            checkbox.addEventListener('click', (evt) => evt.stopPropagation());
-            checkbox.addEventListener('change', () => {
-              setParcelSelected(checkbox.checked);
+            const starBtn = document.createElement('button');
+            const syncStar = (isBusy = false) => {
+              const selected = state.selectedParcel;
+              starBtn.textContent = selected ? '★' : '☆';
+              starBtn.title = selected ? 'Exclude parcel from export' : 'Include parcel in export';
+              starBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+              starBtn.disabled = Boolean(isBusy);
+            };
+            starBtn.type = 'button';
+            starBtn.className = 'rq-star-btn';
+            syncStar(false);
+            starBtn.addEventListener('click', (evt) => {
+              evt.stopPropagation();
+              syncStar(true);
+              const next = !state.selectedParcel;
+              setParcelSelected(next);
+              syncStar(false);
               drawParcel();
               drawCornerMarkers(buildCornerMarkerEntries());
-              log(`${checkbox.checked ? 'Included' : 'Excluded'} parcel in export.`);
+              log(`${next ? 'Included' : 'Excluded'} parcel in export.`);
             });
+            cardEl.appendChild(starBtn);
           },
         }
       ));
@@ -2559,22 +2597,32 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
               group.label,
               summarizeAttrs(a),
               [
-                `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-aliquot-select-key="${selectionKey}" ${isAliquotSelected(f, idx) ? 'checked' : ''}/> Include in export</label>`,
                 ...buildPdfProxyLinks(a, "Open CP&F PDF (API)"),
                 `<div class="small"><b>Corner CP&amp;F records</b><br/><span data-aliquot-cpf-links="${token}">Loading CP&amp;F records…</span></div>`
               ],
               {
                 onSelect: () => centerMapOnFeature(f, layers.aliquots, indexLabel),
                 onRender: (el) => {
-                  const checkbox = el.querySelector(`[data-aliquot-select-key="${selectionKey}"]`);
-                  if (!checkbox) return;
-                  checkbox.addEventListener('click', (evt) => evt.stopPropagation());
-                  checkbox.addEventListener('change', () => {
-                    setAliquotSelected(f, idx, checkbox.checked);
+                  const starBtn = document.createElement('button');
+                  const syncStar = () => {
+                    const selected = isAliquotSelected(f, idx);
+                    starBtn.textContent = selected ? '★' : '☆';
+                    starBtn.title = selected ? 'Exclude from export' : 'Include in export';
+                    starBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                  };
+                  starBtn.type = 'button';
+                  starBtn.className = 'rq-star-btn';
+                  syncStar();
+                  starBtn.addEventListener('click', (evt) => {
+                    evt.stopPropagation();
+                    const next = !isAliquotSelected(f, idx);
+                    setAliquotSelected(f, idx, next);
+                    syncStar();
                     drawAliquots(state.aliquotFeatures, section);
                     drawCornerMarkers(buildCornerMarkerEntries());
-                    log(`${checkbox.checked ? 'Included' : 'Excluded'} aliquot in export: ${indexLabel}`);
+                    log(`${next ? 'Included' : 'Excluded'} aliquot in export: ${indexLabel}`);
                   });
+                  el.appendChild(starBtn);
                 },
               }
             );
