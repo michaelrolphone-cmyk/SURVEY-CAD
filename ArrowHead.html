@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>ArrowHead — Mobile AR Overlay</title>
+  <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
   <style>
     :root { color-scheme: dark; }
     html, body { margin: 0; height: 100%; background: #020617; color: #e2e8f0; font-family: Inter, system-ui, sans-serif; }
@@ -37,7 +38,7 @@
   </style>
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
-<body>
+<body class="sf-ui-controls">
   <div class="app">
     <video id="camera" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
