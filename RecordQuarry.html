@@ -11,7 +11,6 @@
 
   <!-- pdf.js (UMD build defining window.pdfjsLib) -->
   <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-
   <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
   <style>
     :root{
@@ -321,6 +320,14 @@
     .card.ros-card.is-far.is-expanded > .cbody{display:block}
     .card.ros-card.is-far:not(.is-expanded) .chead-chevron{transform:rotate(-90deg)}
 
+    /* Distance-group collapse ("See More") */
+    .rq-distance-group{border-style:dashed;background:rgba(255,255,255,.03)}
+    .rq-distance-group .chead{border-bottom:0}
+    .rq-distance-group-title{font-weight:700;letter-spacing:.2px}
+    .rq-distance-group-sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .rq-see-more-btn{white-space:nowrap}
+
+
     .busyModal{
       position:fixed;
       inset:0;
@@ -359,7 +366,7 @@
   <script type="module" src="/src/browser-localstorage-sync.js"></script>
 </head>
 
-<body class="sf-ui-controls">
+<body>
 <div class="app">
   <header>
     <div>
@@ -432,10 +439,39 @@
 </div>
 
 <script type="module">
-import { lookupByAddress, findParcelNearPoint as fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, loadUtilitiesByAddress, buildRosPdfProxyUrl } from "./src/browser-survey-client.js";
-import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtilityMarkersForPointForge, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport } from "./src/ros-export.js";
-
 (async () => {
+  // --- module deps (robust paths) ---
+  let lookupByAddress, fetchParcelNearPoint, loadAliquotsAtPoint, loadSubdivisionAtPoint, loadUtilitiesByAddress, buildRosPdfProxyUrl;
+  let buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtilityMarkersForPointForge, buildRosBoundaryCsvRowsPNEZD, filterAliquotFeaturesForExport, filterParcelFeatureForExport;
+
+  try {
+    const [surveyClientMod, rosExportMod] = await Promise.all([
+      import('/src/browser-survey-client.js').catch(() => import('./src/browser-survey-client.js')),
+      import('/src/ros-export.js').catch(() => import('./src/ros-export.js')),
+    ]);
+
+    ({
+      lookupByAddress,
+      findParcelNearPoint: fetchParcelNearPoint,
+      loadAliquotsAtPoint,
+      loadSubdivisionAtPoint,
+      loadUtilitiesByAddress,
+      buildRosPdfProxyUrl,
+    } = surveyClientMod);
+
+    ({
+      buildAliquotSelectionKey,
+      buildPointMarkerCsvRowsPNEZD,
+      buildPowerUtilityMarkersForPointForge,
+      buildRosBoundaryCsvRowsPNEZD,
+      filterAliquotFeaturesForExport,
+      filterParcelFeatureForExport,
+    } = rosExportMod);
+  } catch (e) {
+    console.error(e);
+    alert("RecordQuarry failed to load required modules (/src/browser-survey-client.js, /src/ros-export.js). Check network paths.");
+    return;
+  }
   // -----------------------------
   // Configuration (Ada County)
   // -----------------------------
@@ -1679,6 +1715,64 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     for (const c of cards) root.appendChild(c);
   }
 
+  // Collapse distance-threshold cards as a group under a single "See More" control.
+  // This preserves per-card collapse (the cards keep their own .is-far / .is-expanded behavior).
+  function applyDistanceGroupSeeMore(cards, startIndex, cardClass, labelPlural, cutoffMeters = 500) {
+    if (!Array.isArray(cards) || !cards.length) return;
+    const farIndices = [];
+    for (let i = Math.max(0, startIndex || 0); i < cards.length; i++) {
+      const el = cards[i];
+      if (!el || !el.classList) continue;
+      if (el.classList.contains(cardClass) && el.classList.contains('is-far')) farIndices.push(i);
+    }
+    if (!farIndices.length) return;
+
+    const firstFarIndex = farIndices[0];
+    const farEls = farIndices.map((i) => cards[i]);
+
+    const toggleCard = createDistanceGroupToggleCard(labelPlural, farEls.length, cutoffMeters);
+    cards.splice(firstFarIndex, 0, toggleCard);
+
+    // Hide far cards by default (group-collapsed).
+    for (const el of farEls) el.style.display = 'none';
+
+    let expanded = false;
+    const btn = toggleCard.querySelector('[data-rq-see-more-btn]');
+    const sub = toggleCard.querySelector('[data-rq-see-more-sub]');
+    const sync = () => {
+      if (btn) {
+        btn.textContent = expanded ? `Hide (${farEls.length})` : `See More (${farEls.length})`;
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      }
+      if (sub) sub.textContent = `${farEls.length} ${labelPlural} beyond ${cutoffMeters} m`;
+    };
+    sync();
+
+    if (btn) {
+      btn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        expanded = !expanded;
+        for (const el of farEls) el.style.display = expanded ? '' : 'none';
+        sync();
+      });
+    }
+  }
+
+  function createDistanceGroupToggleCard(labelPlural, count, cutoffMeters) {
+    const el = document.createElement('div');
+    el.className = 'card rq-distance-group';
+    el.innerHTML = `
+      <div class="chead" style="align-items:center">
+        <div style="min-width:0">
+          <div class="rq-distance-group-title">See More</div>
+          <div class="rq-distance-group-sub" data-rq-see-more-sub>${count} ${labelPlural} beyond ${cutoffMeters} m</div>
+        </div>
+        <button type="button" class="secondary rq-see-more-btn" data-rq-see-more-btn aria-expanded="false">See More (${count})</button>
+      </div>
+    `;
+    return el;
+  }
+
   function escapeHtml(s) {
     return String(s ?? "")
       .replace(/&/g,"&amp;").replace(/</g,"&lt;")
@@ -2551,6 +2645,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         return m < 1609.34 ? `${Math.round(m)} m` : `${(m / 1609.34).toFixed(2)} mi`;
       }
 
+      const aliquotCardSliceStart = cards.length;
       const aliquotSummaryCpfTargets = [];
       if (state.aliquotFeatures.length) {
         const COLLAPSE_DIST_M = 500; // metres
@@ -2659,6 +2754,8 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         }
       }
 
+      applyDistanceGroupSeeMore(cards, aliquotCardSliceStart, 'aliquot-card', 'Aliquots', 500);
+
       if (state.utilityLocations.length) {
         cards.push(card("Utilities", "Idaho Power residential utility locations", [["Count", String(state.utilityLocations.length)]], []));
       }
@@ -2666,6 +2763,8 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       if (subdiv) cards.push(card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []));
       if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
+
+      const rosCardSliceStart = cards.length;
 
       if (ros.length) {
         const ROS_COLLAPSE_DIST_M = 500; // metres
@@ -2724,6 +2823,8 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       } else {
         cards.push(card("Record of Survey", "None within 1600m of parcel centroid", [["Note","Increase search distance in code if needed."]], []));
       }
+
+      applyDistanceGroupSeeMore(cards, rosCardSliceStart, 'ros-card', 'Records of Survey', 500);
 
       setSummaryCards(cards);
       if (aliquotSummaryCpfTargets.length) {
