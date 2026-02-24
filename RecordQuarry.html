@@ -2554,7 +2554,7 @@
     const meta = buildAdaCountyRosImageMeta(attrs);
     if (!meta?.fullSizeUrl) return '';
     const thumbnailUrl = `/api/project-files/ros-thumbnail?${new URLSearchParams({ source: meta.fullSizeUrl })}`;
-    return `<div class="small" style="margin-top:8px"><b>Record image</b><br/><a target="_blank" rel="noopener" href="${escapeHtml(meta.fullSizeUrl)}">Open full-size ROS image</a><img class="ros-scan-thumb" loading="lazy" alt="ROS ${escapeHtml(String(meta.rosNumber))} thumbnail" data-ros-thumbnail="${escapeHtml(thumbnailUrl)}"/></div>`;
+    return `<div class="small" style="margin-top:8px"><b>Record image</b><br/><a target="_blank" rel="noopener" href="${escapeHtml(meta.fullSizeUrl)}">Open full-size ROS image</a><img class="ros-scan-thumb" style="display:none" loading="lazy" alt="ROS ${escapeHtml(String(meta.rosNumber))} thumbnail" data-ros-thumbnail="${escapeHtml(thumbnailUrl)}"/></div>`;
   }
 
   async function loadRosThumbnailWithRetry(imgEl, thumbnailUrl, maxAttempts = 9) {
@@ -2607,6 +2607,47 @@
 
     for (const img of thumbs) observer.observe(img);
   }
+
+  // Load ROS thumbnails inside a specific DOM node (Leaflet popups/tooltips are injected after initial render).
+  function loadRosScanThumbnailsInNode(rootNode) {
+    const container = rootNode || document;
+    const thumbs = Array.from(container.querySelectorAll('img.ros-scan-thumb[data-ros-thumbnail]'));
+    if (!thumbs.length) return;
+    for (const img of thumbs) {
+      if (!img || img.dataset.thumbLoaded === '1') continue;
+      const thumbnailUrl = img.getAttribute('data-ros-thumbnail');
+      if (!thumbnailUrl) continue;
+      img.dataset.thumbLoaded = '1';
+      // Keep hidden until we have a real src to avoid broken-image glyphs in Leaflet UI.
+      img.style.display = 'none';
+      loadRosThumbnailWithRetry(img, thumbnailUrl).then((ok) => {
+        if (!ok) img.style.display = 'none';
+      });
+    }
+  }
+
+  // Ensure ROS thumbnails load when Leaflet popups/tooltips open (they are not present during initial lazy-load scan).
+  function bindRosMapPopupThumbnailLoader() {
+    if (!map || map.__rqRosThumbLoaderBound) return;
+    map.__rqRosThumbLoaderBound = true;
+
+    map.on('popupopen', (evt) => {
+      try {
+        const el = evt?.popup?.getElement?.();
+        if (el) loadRosScanThumbnailsInNode(el);
+      } catch {}
+    });
+
+    map.on('tooltipopen', (evt) => {
+      try {
+        const el = evt?.tooltip?.getElement?.();
+        if (el) loadRosScanThumbnailsInNode(el);
+      } catch {}
+    });
+  }
+
+  bindRosMapPopupThumbnailLoader();
+
 
   const RQ_HOVER_MARGIN = 16;
   const RQ_HOVER_GAP = 14;
