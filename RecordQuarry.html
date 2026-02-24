@@ -11,7 +11,7 @@
 
   <!-- pdf.js (UMD build defining window.pdfjsLib) -->
   <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-  <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
+ <link rel="stylesheet" href="/assets/styles/shared-ui.css" />
   <style>
     :root{
       --bg:#0b1020;
@@ -2306,6 +2306,7 @@
     const used = new Set();
 
     function add(k) {
+      if (String(k || '').toUpperCase() === 'FRSTDIVID') return;
       if (used.has(k)) return;
       const v = attrs[k];
       if (v === null || v === undefined || v === "") return;
@@ -2419,7 +2420,7 @@
           const blob = await resp.blob();
           imgEl.src = URL.createObjectURL(blob);
           imgEl.style.display = '';
-          return;
+          return true;
         }
         if (resp.status === 202) continue; // still generating — retry
         break; // permanent error
@@ -2427,6 +2428,7 @@
         break;
       }
     }
+    return false;
   }
 
   async function lazyLoadAliquotSummaryCpfLinks(targets = []) {
@@ -2465,7 +2467,7 @@
           <img class="cpf-thumb" style="display:none" alt="CP&amp;F PDF thumbnail"/>
           <div class="cpf-collapsed-info">
             <b>${instrumentHtml}</b>${monsetHtml}${surveyorHtml}
-            <div style="margin-top:4px">${linkHtml}</div>
+            <div data-cpf-text-links style="margin-top:4px">${linkHtml}</div>
             ${expandHtml}${allRecordsHtml}
           </div>
         </div>`;
@@ -2489,7 +2491,9 @@
             // Clicking thumbnail opens the PDF
             const pdfHref = escapeHtml(firstProxyUrl);
             thumbEl.addEventListener('click', () => window.open(pdfHref, '_blank', 'noopener'));
-            loadCpfThumbnailWithRetry(thumbEl, buildCpfPdfThumbnailUrl(firstProxyUrl));
+            const linksEl = node.querySelector('[data-cpf-text-links]');
+            const okThumb = await loadCpfThumbnailWithRetry(thumbEl, buildCpfPdfThumbnailUrl(firstProxyUrl));
+            if (okThumb && linksEl) linksEl.style.display = 'none';
           }
         }
 
@@ -2942,13 +2946,15 @@
 
             aliquotSummaryCpfTargets.push({ token, feature: f, label: indexLabel });
 
+            const kvPairs = summarizeAttrs(a);
+            kvPairs.push(["CP&F", `<span data-aliquot-cpf-links="${token}">Loading CP&amp;F records…</span>`]);
+
             const cardEl = card(
               indexLabel,
               group.label,
-              summarizeAttrs(a),
+              kvPairs,
               [
-                ...buildPdfProxyLinks(a, "Open CP&F PDF (API)"),
-                `<div class="small"><b>Corner CP&amp;F records</b><br/><span data-aliquot-cpf-links="${token}">Loading CP&amp;F records…</span></div>`
+                ...buildPdfProxyLinks(a, "Open CP&F PDF (API)")
               ],
               {
                 onSelect: () => centerMapOnFeature(f, layers.aliquots, indexLabel),
