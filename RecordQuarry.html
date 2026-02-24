@@ -2238,7 +2238,7 @@
     updateUtilitySelectionAndMap();
   }
 
-  function drawPolygonFeature(f, group, geojsonOptions, label) {(f, group, geojsonOptions, label) {
+  function drawPolygonFeature(f, group, geojsonOptions, label) {
     const gj = arcPolygonToGeoJSON(f.geometry);
     const options = geojsonOptions || {};
     if (!options.pane) options.pane = 'contextPolygons';
