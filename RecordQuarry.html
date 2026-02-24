@@ -101,7 +101,7 @@
       padding:10px 10px;
       border-radius:10px;
       border:1px solid var(--line);
-      background:rgba(0,0,0,.2);
+      background:rgba(0,0,0,2);
       color:var(--text);
       outline:none;
     }
@@ -110,30 +110,30 @@
       padding:10px 10px;
       border-radius:10px;
       border:1px dashed var(--line);
-      background:rgba(0,0,0,.18);
+      background:rgba(0,0,0,18);
       color:var(--muted);
       outline:none;
     }
     button{
       padding:10px 12px;
       border-radius:10px;
-      border:1px solid rgba(255,255,255,.12);
-      background:linear-gradient(180deg, rgba(42,61,255,.9), rgba(26,37,95,.9));
+      border:1px solid rgba(255,255,255,12);
+      background:linear-gradient(180deg, rgba(42,61,255,9), rgba(26,37,95,9));
       color:white;
       font-weight:700;
       cursor:pointer;
       white-space:nowrap;
     }
     button.secondary{
-      background:rgba(255,255,255,.06);
+      background:rgba(255,255,255,06);
       border:1px solid var(--line);
       color:var(--text);
       font-weight:600;
     }
     button.workflowPrimary{
-      background:linear-gradient(180deg, rgba(42,61,255,1), rgba(26,37,95,.96));
-      border:1px solid rgba(116,140,255,.85);
-      box-shadow:0 0 0 1px rgba(255,255,255,.16) inset, 0 10px 26px rgba(42,61,255,.28);
+      background:linear-gradient(180deg, rgba(42,61,255,1), rgba(26,37,95,96));
+      border:1px solid rgba(116,140,255,85);
+      box-shadow:0 0 0 1px rgba(255,255,255,16) inset, 0 10px 26px rgba(42,61,255,28);
     }
     button:disabled{opacity:.5;cursor:not-allowed}
 
@@ -190,7 +190,7 @@
     .card{
       border:1px solid var(--line);
       border-radius:12px;
-      background:rgba(0,0,0,.14);
+      background:rgba(0,0,0,14);
       overflow:hidden;
       position:relative;
     }
@@ -226,8 +226,8 @@
     }
     .card.clickable:hover,
     .card.clickable:focus-visible{
-      border-color:rgba(106,169,255,.7);
-      box-shadow:0 0 0 2px rgba(106,169,255,.25);
+      border-color:rgba(106,169,255,7);
+      box-shadow:0 0 0 2px rgba(106,169,255,25);
       transform:translateY(-1px);
       outline:none;
     }
@@ -308,7 +308,7 @@
     .cpf-expand-btn{font-size:11px;padding:3px 8px;margin-top:5px}
 
     /* Aliquot distance badge & collapsible cards */
-    .dist-badge{font-size:10px;color:var(--muted);background:rgba(255,255,255,.07);border-radius:4px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
+    .dist-badge{font-size:10px;color:var(--muted);background:rgba(255,255,255,07);border-radius:4px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
     .dist-badge.is-far{color:var(--warn)}
     .chead-chevron{font-size:10px;opacity:.55;transition:transform .18s ease;flex-shrink:0;margin-left:2px}
     .card.aliquot-card > .chead{cursor:pointer;user-select:none}
@@ -319,6 +319,26 @@
     .card.ros-card.is-far > .cbody{display:none}
     .card.ros-card.is-far.is-expanded > .cbody{display:block}
     .card.ros-card.is-far:not(.is-expanded) .chead-chevron{transform:rotate(-90deg)}
+
+    
+    /* Distance group "See More" controls (for far Aliquots / ROS) */
+    .rq-see-more-card{
+      border-style:dashed;
+      background:rgba(255,255,255,.02);
+    }
+    .rq-see-more-card .chead{
+      cursor:default;
+    }
+    .rq-see-more-card .cbody{
+      padding:12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .rq-see-more-btn{
+      width:100%;
+      max-width:360px;
+    }
 
     .busyModal{
       position:fixed;
@@ -337,7 +357,7 @@
       border-radius:14px;
       border:1px solid var(--line);
       background:var(--panel2);
-      box-shadow:0 18px 46px rgba(0,0,0,.42);
+      box-shadow:0 18px 46px rgba(0,0,0,42);
       padding:18px 16px;
       text-align:center;
     }
@@ -346,7 +366,7 @@
       height:34px;
       margin:0 auto 10px;
       border-radius:50%;
-      border:3px solid rgba(255,255,255,.2);
+      border:3px solid rgba(255,255,255,2);
       border-top-color:var(--good);
       animation:spinBusy .85s linear infinite;
     }
@@ -486,230 +506,310 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   }
   function clearLog() { logEl.textContent = ""; }
 
-  function setBusyModalOpen(isOpen, message = 'Processing export…', detail = 'Gathering CPNF instrument numbers for exported points.') {
+  // -----------------------------
+  // Far-distance group collapsing ("See More")
+  // -----------------------------
+  function rqHideEl(el) {
+    if (!el || !el.style) return;
+    if (el.dataset && el.dataset.rqPrevDisplay === undefined) {
+      el.dataset.rqPrevDisplay = el.style.display || '';
+    }
+    el.style.display = 'none';
+  }
+
+  function rqShowEl(el) {
+    if (!el || !el.style) return;
+    const prev = el.dataset ? el.dataset.rqPrevDisplay : '';
+    el.style.display = prev != null ? prev : '';
+  }
+
+  function rqMakeSeeMoreCard(title, subtitle, buttonLabel) {
+    const el = document.createElement('div');
+    el.className = 'card rq-see-more-card';
+
+    const head = document.createElement('div');
+    head.className = 'chead';
+    const headWrap = document.createElement('div');
+    const headTitle = document.createElement('div');
+    headTitle.style.fontWeight = '800';
+    headTitle.textContent = title;
+    const headSub = document.createElement('div');
+    headSub.className = 'small';
+    headSub.textContent = subtitle;
+    headWrap.appendChild(headTitle);
+    headWrap.appendChild(headSub);
+    head.appendChild(headWrap);
+
+    const body = document.createElement('div');
+    body.className = 'cbody';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'secondary rq-see-more-btn';
+    btn.textContent = buttonLabel;
+
+    body.appendChild(btn);
+    el.appendChild(head);
+    el.appendChild(body);
+
+    return { el, btn };
+  }
+
+  // Collapses "far" cards inside cards[startIdx..endIdx) into a single See More control.
+  // Supports optional group headers (e.g., aliquot-group-header) that should be hidden when they
+  // would otherwise display with zero visible cards beneath them.
+  function rqApplyDistanceGroupSeeMore(cards, startIdx, endIdx, options = {}) {
+    const cardClass = options.cardClass || '';
+    const farClass = options.farClass || 'is-far';
+    const headerClass = options.headerClass || '';
+    const title = options.title || 'See More';
+    const thresholdMeters = Number(options.thresholdMeters) || 500;
+
+    const slice = cards.slice(startIdx, endIdx);
+    if (!slice.length) return;
+
+    const isCard = (el) => Boolean(el && el.classList && cardClass && el.classList.contains(cardClass));
+    const isFarCard = (el) => isCard(el) && el.classList.contains(farClass);
+    const isHeader = (el) => Boolean(headerClass && el && el.classList && el.classList.contains(headerClass));
+
+    const hideIdx = new Set();
+
+    // Always hide far cards.
+    for (let i = 0; i < slice.length; i++) {
+      if (isFarCard(slice[i])) hideIdx.add(i);
+    }
+    if (!hideIdx.size) return;
+
+    // Hide headers that would otherwise appear with no visible cards under them.
+    if (headerClass) {
+      for (let i = 0; i < slice.length; i++) {
+        if (!isHeader(slice[i])) continue;
+
+        let hasVisibleCard = false;
+        for (let j = i + 1; j < slice.length; j++) {
+          if (isHeader(slice[j])) break;
+          if (isCard(slice[j]) && !isFarCard(slice[j])) { hasVisibleCard = true; break; }
+        }
+
+        if (!hasVisibleCard) {
+          hideIdx.add(i);
+          for (let j = i + 1; j < slice.length; j++) {
+            if (isHeader(slice[j])) break;
+            if (isCard(slice[j])) hideIdx.add(j);
+          }
+        }
+      }
+    }
+
+    const firstHiddenRel = Math.min(...hideIdx.values());
+    const hiddenCardsCount = [...hideIdx.values()].filter((i) => isCard(slice[i])).length;
+
+    const hiddenEls = [...hideIdx.values()].map((i) => slice[i]).filter(Boolean);
+
+    // Initial state: hide group.
+    for (const el of hiddenEls) rqHideEl(el);
+
+    let expanded = false;
+    const collapsedLabel = `See More (${hiddenCardsCount} beyond ${Math.round(thresholdMeters)}m)`;
+    const expandedLabel = `Hide (${hiddenCardsCount} beyond ${Math.round(thresholdMeters)}m)`;
+
+    const control = rqMakeSeeMoreCard(
+      title,
+      `${hiddenCardsCount} result(s) hidden by distance`,
+      collapsedLabel
+    );
+
+    control.btn.addEventListener('click', (evt) => {
+      evt.stopPropagation();
+      expanded = !expanded;
+      control.btn.textContent = expanded ? expandedLabel : collapsedLabel;
+      if (expanded) {
+        for (const el of hiddenEls) rqShowEl(el);
+      } else {
+        for (const el of hiddenEls) rqHideEl(el);
+      }
+    });
+
+    // Insert the control card just before the first hidden element, preserving order.
+    cards.splice(startIdx + firstHiddenRel, 0, control.el);
+  }
+
+  function setBusyModalOpen(isOpen, message = 'Loading…', detail = '') {
     const modal = $("busyModal");
-    const msg = $("busyModalMessage");
+    const msgEl = $("busyModalMessage");
     const detailEl = $("busyModalDetail");
-    msg.textContent = message;
-    detailEl.textContent = detail;
-    modal.classList.toggle('is-open', !!isOpen);
-    modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-  }
-
-  function getProjectContext() {
-    const params = new URLSearchParams(window.location.search || "");
-    const projectId = params.get("projectId") || params.get("activeProjectId") || "";
-    const launchProject = loadLaunchProject(projectId);
-    const address = launchProject?.address
-      || params.get("address")
-      || params.get("activeAddress")
-      || "";
-    const projectName = launchProject?.name
-      || params.get("projectName")
-      || params.get("activeProjectName")
-      || "";
-    const client = launchProject?.client
-      || params.get("client")
-      || params.get("activeClient")
-      || "";
-    const autostart = params.get("autostart") === "1";
-    return { projectId, address, projectName, client, autostart };
-  }
-
-  function loadLaunchProject(projectId) {
-    const normalizedProjectId = String(projectId || '').trim();
-    if (!normalizedProjectId) return null;
-    try {
-      const raw = localStorage.getItem('surveyfoundryProjects');
-      if (!raw) return null;
-      const projects = JSON.parse(raw);
-      if (!Array.isArray(projects)) return null;
-      return projects.find((entry) => String(entry?.id || '') === normalizedProjectId) || null;
-    } catch {
-      return null;
+    if (!modal || !msgEl || !detailEl) return;
+    if (isOpen) {
+      msgEl.textContent = message || 'Loading…';
+      detailEl.textContent = detail || '';
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+    } else {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
     }
   }
 
-  function projectLookupStorageKey(projectId) {
-    return `${PROJECT_LOOKUP_STORAGE_PREFIX}:${projectId}`;
-  }
-
-  function projectFileStorageKey(projectId) {
-    return `${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`;
-  }
-
+  // -----------------------------
+  // Local snapshot storage
+  // -----------------------------
   function normalizeAddressStorageKey(address) {
-    return String(address || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const raw = String(address || '').trim();
+    if (!raw) return '';
+    return raw.toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function projectLookupStorageKey(projectId) {
+    return `${PROJECT_LOOKUP_STORAGE_PREFIX}:${String(projectId || '').trim()}`;
   }
 
   function addressLookupStorageKey(address) {
     return `${ADDRESS_LOOKUP_STORAGE_PREFIX}:${normalizeAddressStorageKey(address)}`;
   }
 
-  async function loadProjectLookupSnapshot(projectId) {
-    if (!projectId) return null;
+  function projectFileStorageKey(projectId) {
+    return `${PROJECT_FILE_STORAGE_PREFIX}:${String(projectId || '').trim()}`;
+  }
+
+  function getProjectContext() {
     try {
-      const resp = await fetch(`/api/projects/${encodeURIComponent(projectId)}/record-quarry-cache`);
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data?.cache?.lookup) return data.cache;
-      }
-    } catch {}
+      const params = new URLSearchParams(window.location.search || '');
+      return {
+        projectId: params.get('projectId') || '',
+        projectName: params.get('projectName') || '',
+        address: params.get('address') || '',
+        client: params.get('client') || '',
+        autostart: params.get('autostart') === '1' || params.get('autostart') === 'true',
+      };
+    } catch {
+      return { projectId: '', projectName: '', address: '', client: '', autostart: false };
+    }
+  }
+
+  function loadLaunchProject(projectId) {
     try {
-      const raw = localStorage.getItem(projectLookupStorageKey(projectId));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object" || !parsed.lookup) return null;
-      return parsed;
+      const raw = localStorage.getItem(`surveyfoundryLaunchProject:${String(projectId || '').trim()}`);
+      return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   }
 
-  async function saveProjectLookupSnapshot(projectId, snapshot) {
-    if (!projectId || !snapshot) return;
+  function loadProjectLookupSnapshot(projectId) {
+    const key = projectLookupStorageKey(projectId);
+    if (!key || !key.includes(':')) return null;
     try {
-      await fetch(`/api/projects/${encodeURIComponent(projectId)}/record-quarry-cache`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(snapshot),
-      });
-    } catch {}
-    try {
-      localStorage.setItem(projectLookupStorageKey(projectId), JSON.stringify(snapshot));
-    } catch {}
-  }
-
-  async function loadAddressLookupSnapshot(address) {
-    const normalized = normalizeAddressStorageKey(address);
-    if (!normalized) return null;
-    try {
-      const resp = await fetch(`/api/record-quarry-cache?address=${encodeURIComponent(normalized)}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data?.cache?.lookup) return data.cache;
-      }
-    } catch {}
-    try {
-      const raw = localStorage.getItem(addressLookupStorageKey(normalized));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || !parsed.lookup) return null;
-      return parsed;
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   }
 
-  async function saveAddressLookupSnapshot(address, snapshot) {
-    const normalized = normalizeAddressStorageKey(address);
-    if (!normalized || !snapshot) return;
+  function saveProjectLookupSnapshot(projectId, payload, selectionSnapshot = null, address = '') {
+    const key = projectLookupStorageKey(projectId);
+    if (!key || !key.includes(':') || !payload) return;
+    const snap = {
+      savedAt: new Date().toISOString(),
+      address: String(address || ''),
+      lookup: payload,
+      selection: selectionSnapshot || null,
+    };
     try {
-      await fetch(`/api/record-quarry-cache?address=${encodeURIComponent(normalized)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...snapshot, address: normalized }),
-      });
-    } catch {}
-    try {
-      localStorage.setItem(addressLookupStorageKey(normalized), JSON.stringify(snapshot));
-      localStorage.setItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY, normalized);
+      localStorage.setItem(key, JSON.stringify(snap));
     } catch {}
   }
 
-  async function loadMostRecentAddressLookupSnapshot() {
-    const recentAddress = normalizeAddressStorageKey(localStorage.getItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY));
-    if (!recentAddress) return null;
-    return loadAddressLookupSnapshot(recentAddress);
+  function loadAddressLookupSnapshot(address) {
+    const key = addressLookupStorageKey(address);
+    if (!key || !key.includes(':')) return null;
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
   }
 
-  function readSelectionSnapshot() {
-    const allAliquotKeys = buildAllSelectedAliquotKeys(state.aliquotFeatures);
-    const selectedAliquotKeys = [...state.selectedAliquotKeys];
-    const deselectedAliquotKeys = [...allAliquotKeys].filter((key) => !state.selectedAliquotKeys.has(key));
+  function saveAddressLookupSnapshot(address, payload, selectionSnapshot = null) {
+    const key = addressLookupStorageKey(address);
+    if (!key || !key.includes(':') || !payload) return;
+    const snap = {
+      savedAt: new Date().toISOString(),
+      address: String(address || ''),
+      lookup: payload,
+      selection: selectionSnapshot || null,
+    };
+    try {
+      localStorage.setItem(key, JSON.stringify(snap));
+      localStorage.setItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY, normalizeAddressStorageKey(address));
+    } catch {}
+  }
+
+  function loadMostRecentAddressLookupSnapshot() {
+    try {
+      const lastKey = localStorage.getItem(LAST_LOOKUP_ADDRESS_STORAGE_KEY) || '';
+      if (!lastKey) return null;
+      const foundKey = `${ADDRESS_LOOKUP_STORAGE_PREFIX}:${lastKey}`;
+      const raw = localStorage.getItem(foundKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function buildSelectionSnapshot() {
     return {
       selectedParcel: Boolean(state.selectedParcel),
-      selectedAliquotKeys,
-      deselectedAliquotKeys,
+      selectedAliquotKeys: Array.from(state.selectedAliquotKeys || []),
     };
   }
 
-  function applySelectionSnapshot(selection = null) {
-    const selectedParcel = selection?.selectedParcel;
-    setParcelSelected(selectedParcel == null ? true : Boolean(selectedParcel));
-    state.selectedAliquotKeys.clear();
-    const allAliquotKeys = buildAllSelectedAliquotKeys(state.aliquotFeatures);
-    const selectedKeys = Array.isArray(selection?.selectedAliquotKeys)
-      ? selection.selectedAliquotKeys
-      : null;
-    const deselectedKeys = Array.isArray(selection?.deselectedAliquotKeys)
-      ? new Set(selection.deselectedAliquotKeys)
-      : null;
-    if (selectedKeys && selectedKeys.length) {
-      for (const key of selectedKeys) {
-        if (allAliquotKeys.has(key)) state.selectedAliquotKeys.add(key);
-      }
-      return;
+  function applySelectionSnapshot(selectionSnapshot) {
+    const snap = selectionSnapshot && typeof selectionSnapshot === 'object' ? selectionSnapshot : null;
+    if (!snap) return;
+    if (snap.selectedParcel != null) {
+      state.selectedParcel = Boolean(snap.selectedParcel);
     }
-    if (!deselectedKeys) return;
-    for (const key of allAliquotKeys) {
-      if (!deselectedKeys.has(key)) state.selectedAliquotKeys.add(key);
+    if (Array.isArray(snap.selectedAliquotKeys)) {
+      state.selectedAliquotKeys = new Set(snap.selectedAliquotKeys.map((k) => String(k)));
     }
   }
 
-  async function saveLookupSnapshotsForCurrentState(address) {
-    const normalizedAddress = normalizeAddressStorageKey(address);
-    if (!normalizedAddress || !state.lastLookupPayload) return;
-    const snapshot = {
-      savedAt: new Date().toISOString(),
-      address: normalizedAddress,
-      lookup: state.lastLookupPayload,
-      selection: readSelectionSnapshot(),
-    };
-    await saveAddressLookupSnapshot(normalizedAddress, snapshot);
+  function saveLookupSnapshotsForCurrentState(address) {
+    const selectionSnapshot = buildSelectionSnapshot();
+    saveAddressLookupSnapshot(address, state.lastLookupPayload, selectionSnapshot);
+
     if (state.projectContext.projectId) {
-      await saveProjectLookupSnapshot(state.projectContext.projectId, snapshot);
+      const projectId = state.projectContext.projectId;
+      saveProjectLookupSnapshot(projectId, state.lastLookupPayload, selectionSnapshot, address);
     }
   }
 
-  function slugify(value, fallback = 'resource') {
-    const slug = String(value || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    return slug || fallback;
-  }
-
-  function createProjectFileFolder(key, label, description) {
-    return { key, label, description, index: [] };
-  }
-
-  function defaultProjectFile(context = {}) {
-    const projectId = context.projectId || `project-${Date.now()}`;
-    const projectName = context.projectName || 'Untitled Project';
+  function defaultProjectFile(projectContext = {}) {
+    const projectId = String(projectContext.projectId || '').trim();
+    const projectName = String(projectContext.projectName || '').trim();
+    const client = String(projectContext.client || '').trim();
     return {
-      schemaVersion: '1.0.0',
+      type: 'surveyfoundry-project-file',
+      version: 1,
+      projectId,
+      projectName,
+      client,
       generatedAt: new Date().toISOString(),
-      project: {
-        id: projectId,
-        name: projectName,
-        client: context.client || '',
-        address: context.address || '',
-      },
-      archive: {
-        type: 'zip',
-        rootFolderName: `${slugify(projectName, 'surveyfoundry-project')}-${slugify(projectId, 'project')}`,
-      },
       folders: [
-        createProjectFileFolder('drawings', 'Drawings', 'LineSmith drawing packages generated from linked point files.'),
-        createProjectFileFolder('ros', 'RoS', 'Record of Survey source files and exports.'),
-        createProjectFileFolder('cpfs', 'CP&Fs', 'Corner Perpetuation & Filing references resolved by instrument number.'),
-        createProjectFileFolder('point-files', 'Point Files', 'PointForge-managed points exported as CSV.'),
-        createProjectFileFolder('deeds', 'Deeds', 'Deed references and exported documents.'),
-        createProjectFileFolder('plats', 'Plats', 'Subdivision plats and plat-related exhibits.'),
-        createProjectFileFolder('invoices', 'Invoices', 'Billing artifacts and project invoices.'),
-        createProjectFileFolder('other', 'Other', 'Future expansion area for additional project evidence types.'),
+        createProjectFileFolder('cpfs', 'CP&F Records', 'CP&F PDFs collected from RecordQuarry and other apps.'),
+        createProjectFileFolder('point-files', 'Point Files', 'Point exports (e.g., PointForge import CSV).'),
       ],
+    };
+  }
+
+  function createProjectFileFolder(key, name, description) {
+    return {
+      key,
+      name,
+      description: String(description || ''),
+      index: [],
     };
   }
 
@@ -718,10 +818,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     if (!projectId) return null;
     try {
       const raw = localStorage.getItem(projectFileStorageKey(projectId));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.folders)) return null;
-      return parsed;
+      return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
@@ -932,60 +1029,32 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   let cpfLayerInfo = null;
   let cpfLayerInfoPromise = null;
 
-  function canonicalizeUrl(url) {
-    try {
-      const u = new URL(url);
-      u.hash = '';
-      return `${u.origin}${u.pathname}`.toLowerCase() + (u.search ? u.search.toLowerCase() : '');
-    } catch {
-      return String(url || '').trim().toLowerCase();
-    }
-  }
-
-  function pickField(attrs, layerMeta, patterns) {
+  function pickField(attrs, layerMeta, regexList) {
     const keys = Object.keys(attrs || {});
     const fields = layerMeta?.fields || [];
-    for (const re of patterns) {
-      const key = keys.find((k) => re.test(k));
-      if (key) return key;
-      const field = fields.find((f) => re.test(f.name || '') || re.test(f.alias || ''));
-      if (field && attrs[field.name] !== undefined) return field.name;
+    for (const re of regexList) {
+      const k = keys.find((key) => re.test(key));
+      if (k) return k;
+      const f = fields.find((field) => re.test(field?.name || '') || re.test(field?.alias || ''));
+      if (f?.name) return f.name;
     }
     return null;
   }
 
-  function buildCpfPdfLinks(instrument, maybeUrl, maybeFileName) {
-    const out = [];
-    const seen = new Set();
-
-    function add(url) {
-      if (!url) return;
-      const text = String(url).trim();
-      if (!text) return;
-      const key = canonicalizeUrl(text);
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push(text);
+  function buildCpfPdfLinks(instrument, pdfUrl, pdfName) {
+    const links = [];
+    const rawUrl = String(pdfUrl || '').trim();
+    if (rawUrl) {
+      links.push(rawUrl);
     }
-
-    if (maybeUrl) {
-      const text = String(maybeUrl).trim();
-      if (/^https?:\/\//i.test(text)) add(text);
-      else if (/\.pdf$/i.test(text)) add(ADA_CPF_PDF_BASE + text.replace(/^\/+/, ''));
+    const name = String(pdfName || '').trim();
+    const inst = String(instrument || '').trim();
+    if (name && /\.pdf$/i.test(name)) {
+      links.push(`${ADA_CPF_PDF_BASE}${encodeURIComponent(name)}`);
+    } else if (inst) {
+      links.push(`${ADA_CPF_PDF_BASE}${encodeURIComponent(inst)}.pdf`);
     }
-
-    if (maybeFileName) {
-      const text = String(maybeFileName).trim();
-      if (/^https?:\/\//i.test(text)) add(text);
-      else if (/\.pdf$/i.test(text)) add(ADA_CPF_PDF_BASE + text.replace(/^\/+/, ''));
-      else add(ADA_CPF_PDF_BASE + encodeURIComponent(text) + '.pdf');
-    }
-
-    if (instrument != null && instrument !== '') {
-      add(ADA_CPF_PDF_BASE + encodeURIComponent(String(instrument).trim()) + '.pdf');
-    }
-
-    return out;
+    return [...new Set(links)];
   }
 
   async function discoverAdaCpfLayerViaJsonp() {
@@ -1047,6 +1116,65 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return cpfLayerInfoPromise;
   }
 
+  function haversineMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a =
+      Math.sin(dLat/2)**2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  function pointInRing(pointXY, ring) {
+    let inside = false;
+    const [x, y] = pointXY;
+    for (let i=0, j=ring.length-1; i<ring.length; j=i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-30) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function pointInPolygon(pointXY, geom) {
+    const rings = geom?.rings || [];
+    if (!rings.length) return false;
+    if (!pointInRing(pointXY, rings[0])) return false;
+    for (let i=1; i<rings.length; i++) {
+      if (pointInRing(pointXY, rings[i])) return false;
+    }
+    return true;
+  }
+
+  function centroidOfPolygon(geom) {
+    const rings = geom?.rings || [];
+    if (!rings.length || !rings[0].length) return null;
+    const pts = rings[0];
+    let area = 0, cx = 0, cy = 0;
+    for (let i=0, j=pts.length-1; i<pts.length; j=i++) {
+      const [x0, y0] = pts[j];
+      const [x1, y1] = pts[i];
+      const a = x0*y1 - x1*y0;
+      area += a;
+      cx += (x0 + x1) * a;
+      cy += (y0 + y1) * a;
+    }
+    if (Math.abs(area) < 1e-12) {
+      // fallback: average
+      let sx = 0, sy = 0;
+      for (const [x,y] of pts) { sx += x; sy += y; }
+      return { x: sx/pts.length, y: sy/pts.length };
+    }
+    area *= 0.5;
+    cx /= (6*area);
+    cy /= (6*area);
+    return { x: cx, y: cy };
+  }
+
   async function queryCpfRecordsNearCorner(north, east, maxMeters = 250, inSR = 4326) {
     const { layerUrl, layerMeta } = await ensureCpfLayerInfo();
     const radii = [5, 10, 25, 50, 100, 150, maxMeters];
@@ -1088,12 +1216,14 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         const attrs = feature.attributes || {};
         const instrument = instrumentKey ? attrs[instrumentKey] : null;
         const pdfUrl = pdfUrlKey ? attrs[pdfUrlKey] : null;
-        const pdfName = pdfNameKey ? attrs[pdfNameKey] : null;
+        const pdfName = pdfNameKey ?
+          attrs[pdfNameKey] : null;
         const monset = monsetKey ? attrs[monsetKey] : null;
         const surveyor = surveyorKey ? attrs[surveyorKey] : null;
         const township = townshipKey ? attrs[townshipKey] : null;
         const range = rangeKey ? attrs[rangeKey] : null;
-        const section = sectionKey ? attrs[sectionKey] : null;
+        const section = sectionKey ?
+          attrs[sectionKey] : null;
         const indexNumber = indexNumberKey ? attrs[indexNumberKey] : null;
         return {
           distanceMeters,
@@ -1169,470 +1299,13 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     }).join('');
   }
 
-  function uniqueCpInstrumentNote(records = []) {
-    const values = [];
-    const seen = new Set();
-    for (const record of records) {
-      const inst = resolveCpfRecordInstrument(record);
-      if (!inst || seen.has(inst)) continue;
-      seen.add(inst);
-      values.push(inst);
-    }
-    if (!values.length) return '';
-    return `CPNFS: ${values.join('...')}`;
+  function slugify(value, fallback = 'item') {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return fallback;
+    return raw
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || fallback;
   }
-
-  async function buildCpfNotesByCoordinate(plssPointsMap) {
-    const notes = new Map();
-    for (const [key, point] of (plssPointsMap || new Map()).entries()) {
-      try {
-        const records = await queryCpfRecordsNearCorner(point.north, point.east, 250, EXPORT_OUT_SR);
-        const note = uniqueCpInstrumentNote(records);
-        if (note) notes.set(key, note);
-      } catch (e) {
-        log(`CP&F export note lookup failed for ${point.north.toFixed(3)}, ${point.east.toFixed(3)}: ${e.message || e}`, 'warn');
-      }
-    }
-    return notes;
-  }
-
-  // -----------------------------
-  // Geometry helpers
-  // -----------------------------
-  function arcPointToLatLng(g) {
-    if (!g) return null;
-    return [g.y, g.x];
-  }
-
-  function arcPolygonToGeoJSON(geom) {
-    return {
-      type: "Feature",
-      properties: {},
-      geometry: {
-        type: "Polygon",
-        coordinates: (geom?.rings || []).map(ring => ring.map(([x,y]) => [x,y]))
-      }
-    };
-  }
-
-  function arcExtentFromPolygon(geom) {
-    const rings = geom?.rings || [];
-    let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;
-    for (const ring of rings) {
-      for (const [x,y] of ring) {
-        if (x < xmin) xmin = x;
-        if (y < ymin) ymin = y;
-        if (x > xmax) xmax = x;
-        if (y > ymax) ymax = y;
-      }
-    }
-    if (!isFinite(xmin)) return null;
-    return { xmin, ymin, xmax, ymax };
-  }
-
-  function arcExtentFromGeometry(geom) {
-    if (!geom) return null;
-    if (geom.x != null && geom.y != null) {
-      return { xmin: geom.x, ymin: geom.y, xmax: geom.x, ymax: geom.y };
-    }
-    if (Array.isArray(geom.paths)) {
-      let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
-      for (const path of geom.paths) {
-        for (const [x, y] of (path || [])) {
-          if (x < xmin) xmin = x;
-          if (y < ymin) ymin = y;
-          if (x > xmax) xmax = x;
-          if (y > ymax) ymax = y;
-        }
-      }
-      if (isFinite(xmin)) return { xmin, ymin, xmax, ymax };
-    }
-    return arcExtentFromPolygon(geom);
-  }
-
-  function centerMapOnFeature(feature, layerGroup, label = 'feature') {
-    const ext = arcExtentFromGeometry(feature?.geometry);
-    if (!ext) return;
-    const samePoint = Math.abs(ext.xmax - ext.xmin) < 1e-12 && Math.abs(ext.ymax - ext.ymin) < 1e-12;
-    if (samePoint) {
-      map.setView([ext.ymin, ext.xmin], Math.max(map.getZoom(), 19));
-    } else {
-      map.fitBounds(L.latLngBounds([ext.ymin, ext.xmin], [ext.ymax, ext.xmax]).pad(0.2));
-    }
-    if (layerGroup?.getLayers) {
-      for (const item of layerGroup.getLayers()) {
-        if (typeof item.getBounds === 'function') {
-          const b = item.getBounds();
-          if (b?.isValid?.() && b.contains([ext.ymin, ext.xmin])) {
-            item.openPopup?.();
-            break;
-          }
-        } else if (typeof item.getLatLng === 'function') {
-          const ll = item.getLatLng();
-          if (ll && Math.abs(ll.lat - ext.ymin) < 1e-10 && Math.abs(ll.lng - ext.xmin) < 1e-10) {
-            item.openPopup?.();
-            break;
-          }
-        }
-      }
-    }
-    invalidateMapSoon(`summary select: ${label}`);
-  }
-
-  function centroidOfPolygon(geom) {
-    const ring = geom?.rings?.[0] || [];
-    if (!ring.length) return null;
-    let sx=0, sy=0, n=0;
-    for (const [x,y] of ring) { sx += x; sy += y; n++; }
-    return { x: sx/n, y: sy/n };
-  }
-
-  function haversineMeters(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const toRad = d => d * Math.PI / 180;
-    const dLat = toRad(lat2-lat1);
-    const dLon = toRad(lon2-lon1);
-    const a =
-      Math.sin(dLat/2)**2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-    return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
-  }
-
-  function pointInRing(pointXY, ring) {
-    let inside = false;
-    const [x, y] = pointXY;
-    for (let i=0, j=ring.length-1; i<ring.length; j=i++) {
-      const xi = ring[i][0], yi = ring[i][1];
-      const xj = ring[j][0], yj = ring[j][1];
-      const intersect = ((yi > y) !== (yj > y)) &&
-        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-30) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
-
-  function pointInPolygon(pointXY, geom) {
-    const rings = geom?.rings || [];
-    if (!rings.length) return false;
-    if (!pointInRing(pointXY, rings[0])) return false;
-    for (let i=1; i<rings.length; i++) {
-      if (pointInRing(pointXY, rings[i])) return false;
-    }
-    return true;
-  }
-
-  function normalizedAliquotLabel(feature, sectionFeature) {
-    const attrs = feature?.attributes || {};
-    if (attrs.ALIQUOT) return String(attrs.ALIQUOT).toUpperCase();
-
-    const ring = feature?.geometry?.rings?.[0] || [];
-    const secRing = sectionFeature?.geometry?.rings?.[0] || [];
-    if (!ring.length || !secRing.length) return 'ALIQUOT';
-
-    const center = centroidOfPolygon(feature.geometry);
-    if (!center) return 'ALIQUOT';
-
-    let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
-    for (const [x, y] of secRing) {
-      xmin = Math.min(xmin, x);
-      ymin = Math.min(ymin, y);
-      xmax = Math.max(xmax, x);
-      ymax = Math.max(ymax, y);
-    }
-    if (!isFinite(xmin) || !isFinite(ymin) || !isFinite(xmax) || !isFinite(ymax)) return 'ALIQUOT';
-
-    const nx = (center.x - xmin) / Math.max(1e-9, xmax - xmin);
-    const ny = (center.y - ymin) / Math.max(1e-9, ymax - ymin);
-
-    const h = nx >= 0.5 ? 'E' : 'W';
-    const v = ny >= 0.5 ? 'N' : 'S';
-    return `${v}${h}`;
-  }
-
-  function buildAllSelectedAliquotKeys(aliquotFeatures) {
-    return new Set((aliquotFeatures || []).map((feature, index) => buildAliquotSelectionKey(feature, index)));
-  }
-
-  // Parse Township, Range, Section, and Index from BLM aliquot attributes.
-  // PLSSID format: {ST(2)}{PM(2)}{TWP(3)}{zone(1)}{TWPDIR(1)}{RNG(3)}{zone(1)}{RNGDIR(1)}{extra}
-  // e.g. "ID080030N0020E0" → T3N R2E
-  // FRSTDIVID appends "SN{sec*10}" e.g. "SN150" → Section 15
-  // SECDIVNO / SECDIVLAB is the Index e.g. "SWNE"
-  function parsePlssFromAliquot(feature) {
-    const attrs = feature?.attributes || {};
-    const plssid = String(attrs.PLSSID || '');
-    const frstdivid = String(attrs.FRSTDIVID || '');
-    const index = String(attrs.SECDIVNO || attrs.SECDIVLAB || '').trim();
-
-    let township = '', range = '';
-    const plssMatch = plssid.match(/^[A-Z]{2}\d{2}(\d{3})\d([NS])(\d{3})\d([EW])/);
-    if (plssMatch) {
-      const twpNum = parseInt(plssMatch[1], 10);
-      if (twpNum) township = `T${twpNum}${plssMatch[2]}`;
-      const rngNum = parseInt(plssMatch[3], 10);
-      if (rngNum) range = `R${rngNum}${plssMatch[4]}`;
-    }
-
-    let section = '';
-    const suffix = plssid ? frstdivid.slice(plssid.length) : '';
-    const secMatch = suffix.match(/^SN(\d+)/);
-    if (secMatch) {
-      const secNum = Math.round(parseInt(secMatch[1], 10) / 10);
-      if (secNum >= 1 && secNum <= 36) section = String(secNum);
-    }
-
-    return { township, range, section, index };
-  }
-
-  function isAliquotSelected(feature, index) {
-    return state.selectedAliquotKeys.has(buildAliquotSelectionKey(feature, index));
-  }
-
-  function setAliquotSelected(feature, index, selected) {
-    const key = buildAliquotSelectionKey(feature, index);
-    if (selected) state.selectedAliquotKeys.add(key);
-    else state.selectedAliquotKeys.delete(key);
-    document.querySelectorAll(`[data-aliquot-select-key="${key}"]`).forEach((node) => {
-      node.checked = selected;
-    });
-    // Expand a far aliquot card when selected; re-collapse it when deselected.
-    document.querySelectorAll('.aliquot-card.is-far').forEach((cardEl) => {
-      if (cardEl.dataset.aliquotCardKey === key) cardEl.classList.toggle('is-expanded', selected);
-    });
-    if (state.lastLookupPayload) {
-      saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
-    }
-  }
-
-  function setParcelSelected(selected) {
-    state.selectedParcel = Boolean(selected);
-    document.querySelectorAll('[data-parcel-include-export]').forEach((node) => {
-      node.checked = state.selectedParcel;
-    });
-    if (state.lastLookupPayload) {
-      saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
-    }
-  }
-
-  function buildParcelStyle() {
-    return {
-      color: state.selectedParcel ? '#24d18f' : '#4a7c66',
-      weight: state.selectedParcel ? 3 : 2,
-      fillOpacity: state.selectedParcel ? 0.08 : 0.03,
-      dashArray: state.selectedParcel ? null : '4 4',
-      pane: 'selectablePolygons',
-    };
-  }
-
-  function drawParcel() {
-    layers.parcel.clearLayers();
-    if (!state.parcelFeature) return;
-    const layer = drawPolygonFeature(state.parcelFeature, layers.parcel, { pane: 'selectablePolygons', style: () => buildParcelStyle() }, 'Parcel');
-    layer.eachLayer((polygonLayer) => {
-      polygonLayer.on('click', () => {
-        const nextSelected = !state.selectedParcel;
-        setParcelSelected(nextSelected);
-        drawParcel();
-        drawCornerMarkers(buildCornerMarkerEntries());
-        log(`${nextSelected ? 'Included' : 'Excluded'} parcel in export.`);
-      });
-    });
-  }
-
-  function drawAliquots(aliquotFeatures, sectionFeature) {
-    layers.aliquots.clearLayers();
-    for (const [index, feature] of (aliquotFeatures || []).entries()) {
-      const gj = arcPolygonToGeoJSON(feature.geometry);
-      const label = normalizedAliquotLabel(feature, sectionFeature);
-      const popupHtml = buildAliquotPopupHtml(feature, label);
-      const selected = isAliquotSelected(feature, index);
-      const layer = L.geoJSON(gj, {
-        pane: 'aliquotPolygons',
-        style: {
-          color: selected ? '#6aa9ff' : '#4b5f8a',
-          weight: selected ? 1.8 : 1.3,
-          fillOpacity: selected ? 0.14 : 0.03,
-          dashArray: selected ? null : '4 4',
-        },
-      });
-      layer.eachLayer((l) => {
-        l.bindPopup(popupHtml);
-        l.on('click', () => {
-          state.selectedAliquot = feature;
-          const nextSelected = !isAliquotSelected(feature, index);
-          setAliquotSelected(feature, index, nextSelected);
-          drawAliquots(state.aliquotFeatures, sectionFeature);
-          drawCornerMarkers(buildCornerMarkerEntries());
-          log(`${nextSelected ? 'Included' : 'Excluded'} aliquot in export: ${label}`);
-        });
-      });
-      layers.aliquots.addLayer(layer);
-    }
-  }
-
-
-
-  function getPolygonCornerMarkers(feature, role, options = {}) {
-    const rings = feature?.geometry?.rings || [];
-    const points = [];
-    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
-      const ring = rings[ringIndex] || [];
-      const trimmed = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
-        ? ring.slice(0, -1)
-        : ring;
-      for (let vertexIndex = 0; vertexIndex < trimmed.length; vertexIndex++) {
-        const vertex = trimmed[vertexIndex];
-        const x = Number(vertex[0]);
-        const y = Number(vertex[1]);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-        points.push({
-          east: x,
-          north: y,
-          label: `${role.toUpperCase()}_CORNER R${ringIndex + 1} V${vertexIndex + 1}`,
-          color: options.color || '#ffffff',
-        });
-      }
-    }
-    return points;
-  }
-
-  function buildCornerMarkerEntries() {
-    return [
-      { role: 'aliquot', features: state.aliquotFeatures || [], color: '#6aa9ff' },
-      { role: 'subdivision', features: state.subdivisionFeature ? [state.subdivisionFeature] : [], color: '#9ab0ff' },
-      { role: 'parcel', features: state.parcelFeature ? [state.parcelFeature] : [], color: '#24d18f' },
-    ];
-  }
-
-  function drawCornerMarkers(featuresByRole = []) {
-    layers.cornerMarkers.clearLayers();
-    for (const entry of featuresByRole) {
-      const role = entry.role;
-      const featureList = entry.features || [];
-      for (const [featureIndex, feature] of featureList.entries()) {
-        const corners = getPolygonCornerMarkers(feature, role, entry);
-        const aliquotSelected = role === 'aliquot' ? isAliquotSelected(feature, featureIndex) : null;
-        const roleSelected = role === 'aliquot' ? aliquotSelected : role === 'parcel' ? state.selectedParcel : true;
-        for (const corner of corners) {
-          const marker = L.circleMarker([corner.north, corner.east], {
-            radius: roleSelected ? 5 : 3,
-            weight: roleSelected ? 2 : 1,
-            color: roleSelected ? '#ffcc66' : '#101834',
-            fillColor: corner.color,
-            fillOpacity: roleSelected ? 1 : 0.95,
-          });
-          marker.bindPopup(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px">Loading CP&amp;F records…</div>`);
-          marker.on('click', async () => {
-            if (role === 'aliquot') {
-              const nextSelected = !isAliquotSelected(feature, featureIndex);
-              setAliquotSelected(feature, featureIndex, nextSelected);
-              drawAliquots(state.aliquotFeatures, state.sectionFeature);
-              log(`${nextSelected ? 'Included' : 'Excluded'} aliquot in export via corner: ${normalizedAliquotLabel(feature, state.sectionFeature)}`);
-            } else if (role === 'parcel') {
-              const nextSelected = !state.selectedParcel;
-              setParcelSelected(nextSelected);
-              drawParcel();
-              log(`${nextSelected ? 'Included' : 'Excluded'} parcel in export via corner selection.`);
-            }
-            drawCornerMarkers(featuresByRole);
-            marker.setPopupContent(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px">Loading CP&amp;F records…</div>`);
-            try {
-              const cpfRecords = await queryCpfRecordsNearCorner(corner.north, corner.east);
-              marker.setPopupContent(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="hr"></div>${cpfLinksHtml(cpfRecords)}`);
-              if (cpfRecords.length) log(`Loaded CP&F PDF links for ${role} corner ${corner.label}.`);
-              else log(`No CP&F PDF links found for ${role} corner ${corner.label}.`, 'warn');
-            } catch (e) {
-              marker.setPopupContent(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px;color:#ffb3b3">CP&amp;F lookup failed: ${escapeHtml(e.message || e)}</div>`);
-              log(`CP&F corner lookup failed: ${e.message || e}`, 'warn');
-            }
-          });
-          layers.cornerMarkers.addLayer(marker);
-        }
-      }
-    }
-  }
-
-  // -----------------------------
-  // Address parsing
-  // -----------------------------
-  const DIRS = new Set(["N","S","E","W","NE","NW","SE","SW"]);
-  const SUFFIXES = new Set(["ST","AVE","AV","DR","RD","LN","CT","PL","WAY","BLVD","CIR","PKWY","TRL","TER","HWY"]);
-  function normalizeSpaces(s){ return (s||"").trim().replace(/\s+/g," "); }
-
-  function parseAddress(raw) {
-    raw = normalizeSpaces(raw);
-    const parts = raw.split(",").map(s => s.trim()).filter(Boolean);
-    const streetPart = parts[0] || "";
-    const cityPart = parts[1] || "";
-
-    const toks = streetPart.toUpperCase().split(/\s+/).filter(Boolean);
-    const out = { AddNum: null, StPreDir: null, StName: null, StSuffix: null, City: null };
-
-    if (toks.length && /^\d+$/.test(toks[0])) {
-      out.AddNum = parseInt(toks[0], 10);
-      toks.shift();
-    }
-    if (toks.length && DIRS.has(toks[0])) {
-      out.StPreDir = toks.shift();
-    }
-    let suffix = null;
-    if (toks.length && SUFFIXES.has(toks[toks.length-1])) {
-      suffix = toks.pop();
-    }
-    out.StSuffix = suffix;
-    out.StName = toks.length ? toks.join(" ") : null;
-
-    if (cityPart) out.City = cityPart.toUpperCase().split(/\s+/)[0];
-    return out;
-  }
-
-  // -----------------------------
-  // Map setup
-  // -----------------------------
-  const map = L.map("map", { zoomControl: true });
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 20,
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
-  map.setView([43.615, -116.202], 12);
-
-  map.createPane('contextPolygons');
-  map.getPane('contextPolygons').style.zIndex = '320';
-  map.createPane('aliquotPolygons');
-  map.getPane('aliquotPolygons').style.zIndex = '380';
-  map.createPane('selectablePolygons');
-  map.getPane('selectablePolygons').style.zIndex = '430';
-
-  const layers = {
-    address: L.layerGroup().addTo(map),
-    parcel: L.layerGroup().addTo(map),
-    subdivision: L.layerGroup().addTo(map),
-    section: L.layerGroup().addTo(map),
-    township: L.layerGroup().addTo(map),
-    ros: L.layerGroup().addTo(map),
-    utilities: L.layerGroup().addTo(map),
-    aliquots: L.layerGroup().addTo(map),
-    cornerMarkers: L.layerGroup().addTo(map),
-  };
-
-  function clearMapLayers() {
-    Object.values(layers).forEach(g => g.clearLayers());
-  }
-
-  // ---- Leaflet display fix helpers ----
-  function invalidateMapSoon(reason="") {
-    requestAnimationFrame(() => map.invalidateSize());
-    setTimeout(() => map.invalidateSize(), 50);
-    setTimeout(() => map.invalidateSize(), 250);
-    if (reason) log(`map.invalidateSize() (${reason})`);
-  }
-  window.addEventListener("load", () => invalidateMapSoon("window load"));
-  window.addEventListener("resize", () => invalidateMapSoon("window resize"));
-  try {
-    const ro = new ResizeObserver(() => map.invalidateSize());
-    ro.observe($("map"));
-    ro.observe(document.querySelector(".mapWrap"));
-  } catch {}
 
   // -----------------------------
   // Results state
@@ -1741,106 +1414,123 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   }
 
   // -----------------------------
-  // Address lookup
+  // Map setup
   // -----------------------------
-  function buildAddressWhere(p) {
-    const clauses = ["1=1"];
-    if (p.AddNum != null) clauses.push(`AddNum = ${p.AddNum}`);
-    if (p.StName) clauses.push(`UPPER(StName) LIKE '%${p.StName.replace(/'/g,"''")}%'`);
-    if (p.StPreDir) clauses.push(`UPPER(StPreDir) = '${p.StPreDir.replace(/'/g,"''")}'`);
-    if (p.StSuffix) clauses.push(`UPPER(StSuffix) = '${p.StSuffix.replace(/'/g,"''")}'`);
-    if (p.City) clauses.push(`UPPER(CommName) LIKE '%${p.City.replace(/'/g,"''")}%'`);
-    return clauses.join(" AND ");
+  const map = L.map("map", { zoomControl: true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 20,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+  map.setView([43.615, -116.202], 12);
+
+  map.createPane('contextPolygons');
+  map.getPane('contextPolygons').style.zIndex = '320';
+  map.createPane('aliquotPolygons');
+  map.getPane('aliquotPolygons').style.zIndex = '380';
+  map.createPane('selectablePolygons');
+  map.getPane('selectablePolygons').style.zIndex = '430';
+
+  const layers = {
+    address: L.layerGroup().addTo(map),
+    parcel: L.layerGroup().addTo(map),
+    subdivision: L.layerGroup().addTo(map),
+    section: L.layerGroup().addTo(map),
+    township: L.layerGroup().addTo(map),
+    ros: L.layerGroup().addTo(map),
+    utilities: L.layerGroup().addTo(map),
+    aliquots: L.layerGroup().addTo(map),
+    cornerMarkers: L.layerGroup().addTo(map),
+  };
+
+  function clearMapLayers() {
+    Object.values(layers).forEach(g => g.clearLayers());
   }
 
-  function scoreAddressCandidate(p, attrs) {
-    let s = 0;
-    if (p.AddNum != null && attrs.AddNum == p.AddNum) s += 10;
-    if (p.StPreDir && String(attrs.StPreDir||"").toUpperCase() === p.StPreDir) s += 4;
-    if (p.StSuffix && String(attrs.StSuffix||"").toUpperCase() === p.StSuffix) s += 4;
-    if (p.City && String(attrs.CommName||"").toUpperCase().includes(p.City)) s += 2;
-    if (p.StName && String(attrs.StName||"").toUpperCase().includes(p.StName.split(" ")[0])) s += 2;
-    return s;
+  // ---- Leaflet display fix helpers ----
+  function invalidateMapSoon(reason="") {
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => map.invalidateSize(), 50);
+    setTimeout(() => map.invalidateSize(), 250);
+    if (reason) log(`map.invalidateSize() (${reason})`);
   }
+  window.addEventListener("load", () => invalidateMapSoon("window load"));
+  window.addEventListener("resize", () => invalidateMapSoon("window resize"));
+  try {
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe($("map"));
+    ro.observe(document.querySelector(".mapWrap"));
+  } catch {}
 
-  async function findBestAddressFeature(rawAddr) {
-    const parsed = parseAddress(rawAddr);
-    log(`Parsed address: AddNum=${parsed.AddNum ?? "-"} PreDir=${parsed.StPreDir ?? "-"} StName=${parsed.StName ?? "-"} Suffix=${parsed.StSuffix ?? "-"} City=${parsed.City ?? "-"}`);
+  // -----------------------------
+  // Address parsing
+  // -----------------------------
+  const DIRS = new Set(["N","S","E","W","NE","NW","SE","SW"]);
+  const SUFFIXES = new Set(["ST","AVE","AV","DR","RD","LN","CT","PL","WAY","BLVD","CIR","PKWY","TRL","TER","HWY"]);
+  function normalizeSpaces(s){ return (s||"").trim().replace(/\s+/g," "); }
 
-    const where = buildAddressWhere(parsed);
-    log(`Address query WHERE: ${where}`);
+  function parseAddress(raw) {
+    raw = normalizeSpaces(raw);
+    const parts = raw.split(",").map(s => s.trim()).filter(Boolean);
+    const streetPart = parts[0] || "";
+    const cityPart = parts[1] || "";
 
-    const resp = await arcQuery(LAYERS.address, {
-      where,
-      outFields: "*",
-      returnGeometry: true,
-      outSR: 4326
-    });
-    const feats = resp?.features || [];
-    log(`Address query returned ${feats.length} feature(s).`);
-    if (!feats.length) return { best: null, candidates: [] };
+    const toks = streetPart.toUpperCase().split(/\s+/).filter(Boolean);
+    const out = { AddNum: null, StPreDir: null, StName: null, StSuffix: null, City: null };
 
-    const scored = feats
-      .map(f => ({ f, score: scoreAddressCandidate(parsed, f.attributes || {}) }))
-      .sort((a,b) => b.score - a.score);
+    if (toks.length && /^\d+$/.test(toks[0])) {
+      out.AddNum = parseInt(toks[0], 10);
+      toks.shift();
+    }
+    if (toks.length && DIRS.has(toks[0])) {
+      out.StPreDir = toks.shift();
+    }
+    let suffix = null;
+    if (toks.length && SUFFIXES.has(toks[toks.length-1])) {
+      suffix = toks.pop();
+    }
+    out.StSuffix = suffix;
+    out.StName = toks.length ? toks.join(" ") : null;
 
-    return { best: scored[0].f, candidates: scored.map(x => x.f) };
+    if (cityPart) out.City = cityPart.toUpperCase().split(/\s+/)[0];
+    return out;
   }
 
   // -----------------------------
-  // Parcel query (point+distance)
+  // ArcGIS helpers
   // -----------------------------
-  async function findParcelNearPoint(lon, lat, outSR=4326) {
-    const distances = [0, 10, 30, 150];
-    let best = null;
+  function arcPointToLatLng(geom) {
+    if (!geom) return null;
+    if (geom.x == null || geom.y == null) return null;
+    return [geom.y, geom.x];
+  }
 
-    for (const d of distances) {
-      const params = {
-        where: "1=1",
-        outFields: "*",
-        returnGeometry: true,
-        outSR,
-        geometry: `${lon},${lat}`,
-        geometryType: "esriGeometryPoint",
-        inSR: 4326,
-        spatialRel: "esriSpatialRelIntersects",
-      };
-      if (d > 0) {
-        params.distance = d;
-        params.units = "esriSRUnit_Meter";
-      }
+  function arcPolygonToGeoJSON(geom) {
+    const rings = geom?.rings;
+    if (!rings || !rings.length) return null;
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: { type:"Polygon", coordinates: rings.map(r => r.map(([x,y]) => [x,y])) }
+    };
+  }
 
-      log(`Parcel search: point+distance ${d}m (outSR=${outSR})`);
-      const resp = await arcQuery(LAYERS.parcels, params);
-      const feats = resp?.features || [];
-      log(`Parcel candidates @ ${d}m: ${feats.length}`);
-
-      if (feats.length) {
-        if (outSR === 4326) {
-          const pointXY = [lon, lat];
-          const containing = feats.find(f => pointInPolygon(pointXY, f.geometry));
-          if (containing) { best = containing; break; }
-
-          let nearest = null;
-          let bestDist = Infinity;
-          for (const f of feats) {
-            const c = centroidOfPolygon(f.geometry);
-            if (!c) continue;
-            const meters = haversineMeters(lat, lon, c.y, c.x);
-            if (meters < bestDist) { bestDist = meters; nearest = f; }
-          }
-          best = nearest || feats[0];
-          break;
-        } else {
-          best = feats[0];
-          break;
-        }
+  function arcExtentFromPolygon(geom) {
+    const rings = geom?.rings || [];
+    if (!rings.length || !rings[0].length) return null;
+    let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;
+    for (const ring of rings) {
+      for (const [x,y] of ring) {
+        xmin = Math.min(xmin,x);
+        ymin = Math.min(ymin,y);
+        xmax = Math.max(xmax,x);
+        ymax = Math.max(ymax,y);
       }
     }
-    return best;
+    if (!isFinite(xmin) || !isFinite(ymin) || !isFinite(xmax) || !isFinite(ymax)) return null;
+    return { xmin,ymin,xmax,ymax };
   }
 
-  async function findContainingPolygon(layerId, lon, lat, searchMeters, outSR = 4326) {
+  async function findContainingPolygon(layerId, lon, lat, searchMeters=2500, outSR=4326) {
     const resp = await arcQuery(layerId, {
       where: "1=1",
       outFields: "*",
@@ -1856,8 +1546,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     const feats = resp?.features || [];
     if (!feats.length) return null;
 
-    if (outSR !== 4326) return feats[0];
-
+    // Prefer true containment if possible.
     const pointXY = [lon, lat];
     const containing = feats.find(f => pointInPolygon(pointXY, f.geometry));
     if (containing) return containing;
@@ -1871,6 +1560,35 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       if (meters < bestDist) { bestDist = meters; nearest = f; }
     }
     return nearest || feats[0];
+  }
+
+  async function findParcelNearPoint(lon, lat, outSR=4326, searchMeters=150) {
+    const resp = await arcQuery(LAYERS.parcels, {
+      where: "1=1",
+      outFields: "*",
+      returnGeometry: true,
+      outSR,
+      geometry: `${lon},${lat}`,
+      geometryType: "esriGeometryPoint",
+      inSR: 4326,
+      spatialRel: "esriSpatialRelIntersects",
+      distance: searchMeters,
+      units: "esriSRUnit_Meter",
+      resultRecordCount: 1
+    });
+    return resp?.features?.[0] || null;
+  }
+
+  async function findSubdivisionNearPoint(lon, lat, outSR=4326, searchMeters=2500) {
+    return findContainingPolygon(LAYERS.subdivisions, lon, lat, searchMeters, outSR);
+  }
+
+  async function findSectionNearPoint(lon, lat, outSR=4326, searchMeters=2500) {
+    return findContainingPolygon(LAYERS.sections, lon, lat, searchMeters, outSR);
+  }
+
+  async function findTownshipNearPoint(lon, lat, outSR=4326, searchMeters=2500) {
+    return findContainingPolygon(LAYERS.townships, lon, lat, searchMeters, outSR);
   }
 
   async function findRosNearPoint(lon, lat, searchMeters=1600) {
@@ -1935,6 +1653,231 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return layer;
   }
 
+  function setParcelSelected(isSelected) {
+    state.selectedParcel = Boolean(isSelected);
+  }
+
+  function isAliquotSelected(feature, index) {
+    const key = buildAliquotSelectionKey(feature, index);
+    return state.selectedAliquotKeys.has(key);
+  }
+
+  function setAliquotSelected(feature, index, isSelected) {
+    const key = buildAliquotSelectionKey(feature, index);
+    if (isSelected) state.selectedAliquotKeys.add(key);
+    else state.selectedAliquotKeys.delete(key);
+  }
+
+  function drawParcel() {
+    layers.parcel.clearLayers();
+    const parcel = state.parcelFeature;
+    if (!parcel?.geometry) return;
+    const gj = arcPolygonToGeoJSON(parcel.geometry);
+    const layer = L.geoJSON(gj, {
+      pane: 'contextPolygons',
+      style: () => ({
+        color: state.selectedParcel ? "#24d18f" : "#4b5f8a",
+        weight: state.selectedParcel ? 2 : 1.5,
+        fillOpacity: state.selectedParcel ? 0.12 : 0.03,
+        dashArray: state.selectedParcel ? null : '4 4',
+      }),
+    });
+    const a = parcel.attributes || {};
+    layer.bindPopup(`<b>Parcel</b><br/>${escapeHtml(a.PARCELNO || a.PARCEL || a.PIN || '')}`);
+    layer.eachLayer((l) => {
+      l.on('click', () => {
+        const next = !state.selectedParcel;
+        setParcelSelected(next);
+        drawParcel();
+        drawCornerMarkers(buildCornerMarkerEntries());
+        log(`${next ? 'Included' : 'Excluded'} parcel in export via parcel click.`);
+      });
+    });
+    layers.parcel.addLayer(layer);
+  }
+
+  function normalizedAliquotLabel(feature, sectionFeature) {
+    const attrs = feature?.attributes || {};
+    if (attrs.ALIQUOT) return String(attrs.ALIQUOT).toUpperCase();
+
+    const ring = feature?.geometry?.rings?.[0] || [];
+    const secRing = sectionFeature?.geometry?.rings?.[0] || [];
+    if (!ring.length || !secRing.length) return 'ALIQUOT';
+
+    const center = centroidOfPolygon(feature.geometry);
+    if (!center) return 'ALIQUOT';
+
+    let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+    for (const [x, y] of secRing) {
+      xmin = Math.min(xmin, x);
+      ymin = Math.min(ymin, y);
+      xmax = Math.max(xmax, x);
+      ymax = Math.max(ymax, y);
+    }
+    if (!isFinite(xmin) || !isFinite(ymin) || !isFinite(xmax) || !isFinite(ymax)) return 'ALIQUOT';
+
+    const nx = (center.x - xmin) / Math.max(1e-9, xmax - xmin);
+    const ny = (center.y - ymin) / Math.max(1e-9, ymax - ymin);
+
+    const h = nx >= 0.5 ? 'E' : 'W';
+    const v = ny >= 0.5 ? 'N' : 'S';
+    return `${v}${h}`;
+  }
+
+  function buildAllSelectedAliquotKeys(aliquotFeatures) {
+    return new Set((aliquotFeatures || []).map((feature, index) => buildAliquotSelectionKey(feature, index)));
+  }
+
+  // Parse Township, Range, Section, and Index from BLM aliquot attributes.
+  // PLSSID format: {ST(2)}{PM(2)}{TWP(3)}{zone(1)}{TWPDIR(1)}{RNG(3)}{zone(1)}{RNGDIR(1)}{extra}
+  // e.g. "ID080030N0020E0" → T3N R2E
+  // FRSTDIVID appends "SN{sec*10}" e.g. "SN150" → Section 15
+  // SECDIVNO / SECDIVLAB is the Index e.g. "SWNE"
+  function parsePlssFromAliquot(feature) {
+    const attrs = feature?.attributes || {};
+    const plssid = String(attrs.PLSSID || '');
+    const frstdivid = String(attrs.FRSTDIVID || '');
+    const index = String(attrs.SECDIVNO || attrs.SECDIVLAB || '').trim();
+
+    let township = '', range = '';
+    const plssMatch = plssid.match(/^[A-Z]{2}\d{2}(\d{3})\d([NS])(\d{3})\d([EW])/);
+    if (plssMatch) {
+      const twpNum = parseInt(plssMatch[1], 10);
+      if (twpNum) township = `T${twpNum}${plssMatch[2]}`;
+      const rngNum = parseInt(plssMatch[3], 10);
+      if (rngNum) range = `R${rngNum}${plssMatch[4]}`;
+    }
+
+    let section = '';
+    const suffix = plssid ? frstdivid.slice(plssid.length) : '';
+    const secMatch = suffix.match(/^SN(\d+)/);
+    if (secMatch) {
+      const secNum = Math.round(parseInt(secMatch[1], 10) / 10);
+      if (secNum >= 1 && secNum <= 36) section = String(secNum);
+    }
+
+    return {
+      township,
+      range,
+      section,
+      index,
+    };
+  }
+
+  function drawAliquots(aliquotFeatures = [], sectionFeature) {
+    layers.aliquots.clearLayers();
+    for (const [index, feature] of (aliquotFeatures || []).entries()) {
+      if (!feature?.geometry) continue;
+      const selectionKey = buildAliquotSelectionKey(feature, index);
+      const selected = state.selectedAliquotKeys.has(selectionKey);
+      const gj = arcPolygonToGeoJSON(feature.geometry);
+      const label = normalizedAliquotLabel(feature, sectionFeature);
+      const popupHtml = `<b>Aliquot</b><br/>${escapeHtml(label)}<br/><span class="small">${escapeHtml(selectionKey)}</span>`;
+      const layer = L.geoJSON(gj, {
+        pane: 'aliquotPolygons',
+        style: () => ({
+          color: selected ? '#6aa9ff' : '#4b5f8a',
+          weight: selected ? 1.8 : 1.3,
+          fillOpacity: selected ? 0.14 : 0.03,
+          dashArray: selected ? null : '4 4',
+        }),
+      });
+      layer.eachLayer((l) => {
+        l.bindPopup(popupHtml);
+        l.on('click', () => {
+          state.selectedAliquot = feature;
+          const nextSelected = !isAliquotSelected(feature, index);
+          setAliquotSelected(feature, index, nextSelected);
+          drawAliquots(state.aliquotFeatures, sectionFeature);
+          drawCornerMarkers(buildCornerMarkerEntries());
+          log(`${nextSelected ? 'Included' : 'Excluded'} aliquot in export: ${label}`);
+        });
+      });
+      layers.aliquots.addLayer(layer);
+    }
+  }
+
+  function getPolygonCornerMarkers(feature, role, options = {}) {
+    const rings = feature?.geometry?.rings || [];
+    const points = [];
+    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+      const ring = rings[ringIndex] || [];
+      const trimmed = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+        ? ring.slice(0, -1)
+        : ring;
+      for (let vertexIndex = 0; vertexIndex < trimmed.length; vertexIndex++) {
+        const vertex = trimmed[vertexIndex];
+        const x = Number(vertex[0]);
+        const y = Number(vertex[1]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        points.push({
+          east: x,
+          north: y,
+          label: `${role.toUpperCase()}_CORNER R${ringIndex + 1} V${vertexIndex + 1}`,
+          color: options.color || '#ffffff',
+        });
+      }
+    }
+    return points;
+  }
+
+  function buildCornerMarkerEntries() {
+    return [
+      { role: 'aliquot', features: state.aliquotFeatures || [], color: '#6aa9ff' },
+      { role: 'subdivision', features: state.subdivisionFeature ? [state.subdivisionFeature] : [], color: '#9ab0ff' },
+      { role: 'parcel', features: state.parcelFeature ? [state.parcelFeature] : [], color: '#24d18f' },
+    ];
+  }
+
+  function drawCornerMarkers(featuresByRole = []) {
+    layers.cornerMarkers.clearLayers();
+    for (const entry of featuresByRole) {
+      const role = entry.role;
+      const featureList = entry.features || [];
+      for (const [featureIndex, feature] of featureList.entries()) {
+        const corners = getPolygonCornerMarkers(feature, role, entry);
+        const aliquotSelected = role === 'aliquot' ? isAliquotSelected(feature, featureIndex) : null;
+        const roleSelected = role === 'aliquot' ? aliquotSelected : role === 'parcel' ? state.selectedParcel : true;
+        for (const corner of corners) {
+          const marker = L.circleMarker([corner.north, corner.east], {
+            radius: roleSelected ? 5 : 3,
+            weight: roleSelected ? 2 : 1,
+            color: roleSelected ? '#ffcc66' : '#101834',
+            fillColor: corner.color,
+            fillOpacity: roleSelected ? 0.9 : 0.6,
+          });
+          marker.bindPopup(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px">Click for CP&amp;F records…</div>`);
+          marker.on('click', async () => {
+            if (role === 'aliquot') {
+              state.selectedAliquot = feature;
+              const nextSelected = !isAliquotSelected(feature, featureIndex);
+              setAliquotSelected(feature, featureIndex, nextSelected);
+              drawAliquots(state.aliquotFeatures, state.sectionFeature);
+              log(`${nextSelected ? 'Included' : 'Excluded'} aliquot in export via corner: ${normalizedAliquotLabel(feature, state.sectionFeature)}`);
+            } else if (role === 'parcel') {
+              const nextSelected = !state.selectedParcel;
+              setParcelSelected(nextSelected);
+              drawParcel();
+              log(`${nextSelected ? 'Included' : 'Excluded'} parcel in export via corner selection.`);
+            }
+            drawCornerMarkers(featuresByRole);
+            marker.setPopupContent(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px">Loading CP&amp;F records…</div>`);
+            try {
+              const cpfRecords = await queryCpfRecordsNearCorner(corner.north, corner.east);
+              marker.setPopupContent(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="hr"></div>${cpfLinksHtml(cpfRecords)}`);
+              if (cpfRecords.length) log(`Loaded CP&F PDF links for ${role} corner ${corner.label}.`);
+              else log(`No CP&F PDF links found for ${role} corner ${corner.label}.`, 'warn');
+            } catch (e) {
+              marker.setPopupContent(`<b>${escapeHtml(role)} corner</b><br/>${escapeHtml(corner.label)}<div class="small" style="margin-top:6px;color:#ffb3b3">CP&amp;F lookup failed: ${escapeHtml(e.message || e)}</div>`);
+              log(`CP&F corner lookup failed: ${e.message || e}`, 'warn');
+            }
+          });
+          layers.cornerMarkers.addLayer(marker);
+        }
+      }
+    }
+  }
+
   function bestRosLabel(a) {
     const fields = ["RS","ROS","Survey","SurveyNo","SURVEYNO","Book","BOOK","Page","PAGE","Document","DOC","Description","DESC","Name","NAME"];
     const parts = [];
@@ -1973,206 +1916,75 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     return (rosFeatures || []).filter((feature) => rosIntersectsSection(feature, sectionFeature));
   }
 
-  function summarizeAttrs(attrs) {
-    if (!attrs) return [["(no attrs)",""]];
-    const picks = [];
-    const prefer = ["PARCEL","PIN","RP","AIN","SUB","TOWNSHIP","RANGE","SECTION","BOOK","PAGE","RS","ROS","DOC","URL","PDF","LINK","NAME","DESC"];
-    const keys = Object.keys(attrs);
-    const used = new Set();
-
-    function add(k) {
-      if (used.has(k)) return;
-      const v = attrs[k];
-      if (v === null || v === undefined || v === "") return;
-      used.add(k);
-      picks.push([k, escapeHtml(v)]);
-    }
-
-    for (const token of prefer) {
-      for (const k of keys) {
-        if (k.toUpperCase().includes(token)) add(k);
-        if (picks.length >= 10) break;
-      }
-      if (picks.length >= 10) break;
-    }
-    if (!picks.length) for (const k of keys.slice(0,8)) add(k);
-    return picks;
-  }
-
-  function findPdfLinks(attrs) {
-    const links = [];
-    for (const [k,v] of Object.entries(attrs || {})) {
-      if (!v) continue;
-      const sv = String(v);
-      if (/^https?:\/\//i.test(sv) && /\.pdf(\?|$)/i.test(sv)) links.push({ key: k, url: sv });
-      if (!/^https?:\/\//i.test(sv) && /\.pdf(\?|$)/i.test(sv)) {
-        links.push({ key: k, url: new URL(sv, BASE).toString() });
-      }
-    }
-    const seen = new Set();
-    return links.filter(l => (seen.has(l.url) ? false : (seen.add(l.url), true)));
-  }
-
-  function buildPdfProxyLinks(attrs, linkText = "Open PDF (API)") {
-    const pdfs = findPdfLinks(attrs || {});
-    return pdfs.map((p) => (
-      `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(p.url))}">${escapeHtml(linkText)}</a> <span class="small">(${escapeHtml(p.key)})</span>`
-    ));
-  }
-
-  function buildRosPopupHtml(attrs = {}) {
-    const desc = bestRosLabel(attrs);
-    const links = buildPdfProxyLinks(attrs, "Open PDF (API)");
-    const linkHtml = links.length ? links.map((l, i) => `${i + 1}. ${l}`).join("<br/>") : "No PDF links found";
-    return `<b>Record of Survey</b><br/>${escapeHtml(desc)}<div class="hr"></div><div class="small"><b>PDFs</b><br/>${linkHtml}</div>`;
-  }
-
-  function buildAliquotPopupHtml(feature, label = 'Aliquot') {
+  function buildRosPopupHtml(feature) {
     const attrs = feature?.attributes || {};
-    const links = buildPdfProxyLinks(attrs, 'Open CP&F PDF (API)');
-    const linkHtml = links.length ? links.map((l, i) => `${i + 1}. ${l}`).join('<br/>') : 'No CP&amp;F PDF links found';
-    return `<b>Aliquot</b><br/>${escapeHtml(label)}<div class="hr"></div><div class="small"><b>CP&amp;F PDFs</b><br/>${linkHtml}</div>`;
+    const label = bestRosLabel(attrs);
+    const links = buildPdfProxyLinks(attrs);
+    const linkHtml = links.length ? `<div class="hr"></div><div class="small">${links.map(l => `• ${l}`).join('<br/>')}</div>` : '';
+    return `<b>Record of Survey</b><br/>${escapeHtml(label)}${linkHtml}`;
   }
 
-  function flattenCpfRecordLinks(records = []) {
-    const links = [];
-    const seen = new Set();
-    for (const record of records) {
-      for (const url of (record?.links || [])) {
-        const key = canonicalizeUrl(url);
-        if (!key || seen.has(key)) continue;
-        seen.add(key);
-        links.push(url);
+  function buildPdfProxyLinks(attrs, linkText = 'Open PDF (API)') {
+    const urls = [];
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (!v) continue;
+      const key = String(k || '').toLowerCase();
+      if (!/(pdf|doc|document|url|hyperlink|link|path)/i.test(key)) continue;
+      const raw = String(v).trim();
+      if (!raw) continue;
+      if (/^https?:\/\//i.test(raw) || /\.pdf(\?|#|$)/i.test(raw)) {
+        urls.push(raw);
       }
     }
-    return links;
+    const uniq = [...new Set(urls)];
+    return uniq.slice(0, 4).map((u) => `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(u))}">${escapeHtml(linkText)}</a>`);
   }
 
-  async function queryCpfRecordsForAliquot(feature) {
-    const corners = getPolygonCornerMarkers(feature, 'aliquot');
-    const out = [];
-    const seen = new Set();
-
-    for (const corner of corners) {
-      const records = await queryCpfRecordsNearCorner(corner.north, corner.east);
-      for (const record of records) {
-        const links = [];
-        for (const url of (record?.links || [])) {
-          const key = canonicalizeUrl(url);
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          links.push(url);
-        }
-        if (!links.length) continue;
-        out.push({
-          instrument: record.instrument,
-          monset: record.monset,
-          surveyor: record.surveyor,
-          distanceMeters: record.distanceMeters,
-          links,
-        });
-      }
-      if (out.length >= 8) break;
+  function summarizeAttrs(a) {
+    const pairs = [];
+    const skip = new Set(["SHAPE","SHAPE_AREA","SHAPE_LENGTH","OBJECTID","OBJECTID_1","GLOBALID"]);
+    for (const [k,v] of Object.entries(a || {})) {
+      if (skip.has(String(k).toUpperCase())) continue;
+      if (v === null || v === undefined) continue;
+      const s = typeof v === "string" ? v.trim() : String(v);
+      if (!s) continue;
+      pairs.push([k, escapeHtml(s)]);
+      if (pairs.length >= 10) break;
     }
-
-    return out;
+    if (!pairs.length) pairs.push(["Attrs", `${Object.keys(a||{}).length} fields`]);
+    return pairs;
   }
 
-  function buildCpfPdfThumbnailUrl(pdfProxyUrl) {
-    // pdfProxyUrl is a relative URL like /api/ros-pdf?url=... from buildRosPdfProxyUrl
-    return `/api/project-files/pdf-thumbnail?${new URLSearchParams({ source: pdfProxyUrl })}`;
-  }
-
-  async function loadCpfThumbnailWithRetry(imgEl, thumbnailUrl, maxAttempts = 9) {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (attempt > 0) {
-        await new Promise((r) => setTimeout(r, Math.min(600 * Math.pow(2, attempt - 1), 10000)));
+  function centerMapOnFeature(feature, layerGroup, label="Feature") {
+    try {
+      if (!feature?.geometry) return;
+      const g = feature.geometry;
+      if (g.x != null && g.y != null) {
+        map.setView([g.y, g.x], Math.max(16, map.getZoom()));
+        invalidateMapSoon("center point");
+        return;
       }
-      try {
-        const resp = await fetch(thumbnailUrl);
-        if (resp.ok && resp.headers.get('content-type')?.startsWith('image/')) {
-          const blob = await resp.blob();
-          imgEl.src = URL.createObjectURL(blob);
-          imgEl.style.display = '';
-          return;
-        }
-        if (resp.status === 202) continue; // still generating — retry
-        break; // permanent error
-      } catch {
-        break;
+      const ext = arcExtentFromPolygon(g);
+      if (ext) {
+        const bounds = L.latLngBounds([ext.ymin, ext.xmin], [ext.ymax, ext.xmax]);
+        map.fitBounds(bounds.pad(0.18));
+        invalidateMapSoon("center polygon");
+        return;
       }
-    }
-  }
-
-  async function lazyLoadAliquotSummaryCpfLinks(targets = []) {
-    for (const target of targets) {
-      const node = document.querySelector(`[data-aliquot-cpf-links="${target.token}"]`);
-      if (!node) continue;
-      try {
-        const records = await queryCpfRecordsForAliquot(target.feature);
-        if (!flattenCpfRecordLinks(records).length) {
-          node.innerHTML = '<span class="small">No CP&amp;F PDF links found.</span>';
-          log(`No CP&F PDF links found for summary ${target.label}.`, 'warn');
-          continue;
+      if (g.paths?.length && g.paths[0]?.length) {
+        const pts = g.paths[0];
+        let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;
+        for (const [x,y] of pts) {
+          xmin=Math.min(xmin,x); ymin=Math.min(ymin,y); xmax=Math.max(xmax,x); ymax=Math.max(ymax,y);
         }
-
-        // Collapsed view: show only the most recent (first) record with a thumbnail
-        const first = records[0];
-        const resolvedInstrument = resolveCpfRecordInstrument(first);
-        const instrumentHtml = resolvedInstrument ? escapeHtml(resolvedInstrument) : 'CP&amp;F Record';
-        const monsetHtml = first.monset != null && String(first.monset).trim()
-          ? `<div style="margin-top:2px;color:var(--muted)">Monument Set: <span style="color:var(--text)">${escapeHtml(String(first.monset).trim())}</span></div>`
-          : '';
-        const surveyorHtml = first.surveyor != null && String(first.surveyor).trim()
-          ? `<div style="color:var(--muted)">Surveyor: <span style="color:var(--text)">${escapeHtml(String(first.surveyor).trim())}</span></div>`
-          : '';
-        const linkHtml = first.links.map((url, i) => (
-          `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(url))}">CP&amp;F PDF${first.links.length > 1 ? ` ${i + 1}` : ''}</a>`
-        )).join(' ');
-        const expandHtml = records.length > 1
-          ? `<div><button class="secondary cpf-expand-btn" data-cpf-expand>Show all ${records.length} records</button></div>`
-          : '';
-        const allRecordsHtml = records.length > 1
-          ? `<div data-cpf-all style="display:none;margin-top:6px">${cpfLinksHtml(records)}</div>`
-          : '';
-
-        node.innerHTML = `<div class="cpf-collapsed">
-          <img class="cpf-thumb" style="display:none" alt="CP&amp;F PDF thumbnail"/>
-          <div class="cpf-collapsed-info">
-            <b>${instrumentHtml}</b>${monsetHtml}${surveyorHtml}
-            <div style="margin-top:4px">${linkHtml}</div>
-            ${expandHtml}${allRecordsHtml}
-          </div>
-        </div>`;
-
-        // Wire expand button
-        const expandBtn = node.querySelector('[data-cpf-expand]');
-        const allDiv = node.querySelector('[data-cpf-all]');
-        if (expandBtn && allDiv) {
-          expandBtn.addEventListener('click', (evt) => {
-            evt.stopPropagation();
-            allDiv.style.display = '';
-            expandBtn.parentElement.remove();
-          });
+        if (isFinite(xmin) && isFinite(ymin) && isFinite(xmax) && isFinite(ymax)) {
+          const bounds = L.latLngBounds([ymin, xmin], [ymax, xmax]);
+          map.fitBounds(bounds.pad(0.18));
+          invalidateMapSoon("center line");
         }
-
-        // Load thumbnail for the first record's PDF
-        const firstProxyUrl = first.links[0] ? buildRosPdfProxyUrl(first.links[0]) : null;
-        if (firstProxyUrl) {
-          const thumbEl = node.querySelector('.cpf-thumb');
-          if (thumbEl) {
-            // Clicking thumbnail opens the PDF
-            const pdfHref = escapeHtml(firstProxyUrl);
-            thumbEl.addEventListener('click', () => window.open(pdfHref, '_blank', 'noopener'));
-            loadCpfThumbnailWithRetry(thumbEl, buildCpfPdfThumbnailUrl(firstProxyUrl));
-          }
-        }
-
-        log(`Loaded CP&F PDF links for summary ${target.label}.`);
-      } catch (e) {
-        node.innerHTML = `<span class="small" style="color:#ffb3b3">CP&amp;F lookup failed: ${escapeHtml(e.message || e)}</span>`;
-        log(`CP&F summary lookup failed for ${target.label}: ${e.message || e}`, 'warn');
       }
+    } catch (e) {
+      log(`Center map failed: ${e.message || e}`, "warn");
     }
   }
 
@@ -2192,7 +2004,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
           role,
           ...(feature.attributes || {})
         },
-        geometry
+        geometry: geometry.geometry
       });
     }
 
@@ -2469,43 +2281,20 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         if (!g) continue;
         if (g.x != null && g.y != null) {
           const m = L.circleMarker([g.y, g.x], { radius: 5, weight: 1.5, color: "#ffffff", fillColor:"#ff5a7a", fillOpacity: .7 });
-          m.bindPopup(buildRosPopupHtml(f.attributes || {}));
+          m.bindPopup(buildRosPopupHtml(f));
           layers.ros.addLayer(m);
-        } else if (g.paths) {
-          const gj = { type:"Feature", properties:{}, geometry:{ type:"LineString", coordinates: g.paths[0].map(([x,y])=>[x,y]) } };
-          const l = L.geoJSON(gj, { style:{ color:"#ff5a7a", weight:2 }});
-          l.bindPopup(buildRosPopupHtml(f.attributes || {}));
-          layers.ros.addLayer(l);
-        } else if (g.rings) {
-          const gj = arcPolygonToGeoJSON(g);
-          const p = L.geoJSON(gj, { style:{ color:"#ff5a7a", weight:2, fillOpacity:0.02 }});
-          p.bindPopup(buildRosPopupHtml(f.attributes || {}));
-          layers.ros.addLayer(p);
+        } else if (g.paths?.length || g.rings?.length) {
+          const gj = (g.rings?.length) ? arcPolygonToGeoJSON(g) : { type:"Feature", properties:{}, geometry:{ type:"LineString", coordinates: (g.paths[0]||[]).map(([x,y]) => [x,y]) } };
+          const layer = L.geoJSON(gj, { pane: 'contextPolygons', style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02 }) });
+          layer.bindPopup(buildRosPopupHtml(f));
+          layers.ros.addLayer(layer);
         }
       }
 
+      // -----------------------------
+      // Summary cards
+      // -----------------------------
       const cards = [];
-      cards.push(card(
-        "Address",
-        addressDisplay,
-        [
-          ["Location", `${lat.toFixed(7)}, ${lon.toFixed(7)}`],
-          ["Candidates", `${candidates.length}`],
-        ],
-        []
-      ));
-
-      if (state.projectContext.projectId) {
-        cards.push(card(
-          "Project",
-          state.projectContext.projectName || state.projectContext.projectId,
-          [
-            ["Client", state.projectContext.client || "(none)"],
-            ["Address", addressDisplay],
-          ],
-          []
-        ));
-      }
 
       const pAttrs = parcel.attributes || {};
       cards.push(card(
@@ -2551,6 +2340,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       }
 
       const aliquotSummaryCpfTargets = [];
+      const aliquotCardSliceStart = cards.length;
       if (state.aliquotFeatures.length) {
         const COLLAPSE_DIST_M = 500; // metres
 
@@ -2583,6 +2373,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         for (const group of sortedGroups) {
           // Group header — shown for every group so the Township/Range/Section is always visible.
           const headerEl = document.createElement('div');
+          headerEl.className = 'aliquot-group-header';
           headerEl.style.cssText = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 2px 2px;margin-top:4px;';
           headerEl.textContent = group.label;
           cards.push(headerEl);
@@ -2658,6 +2449,16 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         }
       }
 
+      const aliquotCardSliceEnd = cards.length;
+      rqApplyDistanceGroupSeeMore(cards, aliquotCardSliceStart, aliquotCardSliceEnd, {
+        cardClass: 'aliquot-card',
+        farClass: 'is-far',
+        headerClass: 'aliquot-group-header',
+        title: 'Aliquots',
+        thresholdMeters: 500,
+      });
+
+
       if (state.utilityLocations.length) {
         cards.push(card("Utilities", "Idaho Power residential utility locations", [["Count", String(state.utilityLocations.length)]], []));
       }
@@ -2666,6 +2467,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
       if (section) cards.push(card("Section", "Containing feature", summarizeAttrs(section.attributes), []));
       if (township) cards.push(card("Township", "Containing feature", summarizeAttrs(township.attributes), []));
 
+      const rosCardSliceStart = cards.length;
       if (ros.length) {
         const ROS_COLLAPSE_DIST_M = 500; // metres
 
@@ -2724,6 +2526,17 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         cards.push(card("Record of Survey", "None within 1600m of parcel centroid", [["Note","Increase search distance in code if needed."]], []));
       }
 
+      
+      const rosCardSliceEnd = cards.length;
+      if (ros.length) {
+        rqApplyDistanceGroupSeeMore(cards, rosCardSliceStart, rosCardSliceEnd, {
+          cardClass: 'ros-card',
+          farClass: 'is-far',
+          title: 'Records of Survey',
+          thresholdMeters: 500,
+        });
+      }
+
       setSummaryCards(cards);
       if (aliquotSummaryCpfTargets.length) {
         lazyLoadAliquotSummaryCpfLinks(aliquotSummaryCpfTargets);
@@ -2766,6 +2579,103 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   }
 
   // -----------------------------
+  // Lazy-load CP&F links for each aliquot card summary
+  // -----------------------------
+  async function lazyLoadAliquotSummaryCpfLinks(targets = []) {
+    for (const target of targets) {
+      const node = document.querySelector(`[data-aliquot-cpf-links="${target.token}"]`);
+      if (!node) continue;
+      node.textContent = "Loading CP&F records…";
+      try {
+        const centroid = centroidOfPolygon(target.feature.geometry);
+        if (!centroid) throw new Error("No centroid for aliquot.");
+        const records = await queryCpfRecordsNearCorner(centroid.y, centroid.x, 250, 4326);
+        if (!records.length) {
+          node.innerHTML = `<span class="small">No CP&amp;F records found within 250m.</span>`;
+          continue;
+        }
+
+        const first = records[0];
+        const rest = records.slice(1);
+
+        const firstLinks = first.links.map((u, i) => `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(u))}">CP&amp;F PDF${first.links.length > 1 ? ` ${i + 1}` : ''}</a>`).join('<br/>');
+        const restHtml = rest.map((rec, idx) => {
+          const inst = resolveCpfRecordInstrument(rec) || `Record ${idx + 2}`;
+          const links = rec.links.map((u, i) => `<a target="_blank" rel="noopener" href="${escapeHtml(buildRosPdfProxyUrl(u))}">CP&amp;F PDF${rec.links.length > 1 ? ` ${i + 1}` : ''}</a>`).join('<br/>');
+          return `<div style="margin:8px 0"><b>${escapeHtml(inst)}</b><div style="margin-top:2px">${links}</div></div>`;
+        }).join('');
+
+        node.innerHTML = `
+          <div class="cpf-collapsed">
+            <img class="cpf-thumb" alt="CP&F thumbnail"/>
+            <div class="cpf-collapsed-info">
+              <div><b>${escapeHtml(resolveCpfRecordInstrument(first) || 'CP&F')}</b></div>
+              <div style="margin-top:2px">${firstLinks}</div>
+              ${rest.length ? `<button class="secondary cpf-expand-btn" data-cpf-expand>Show all (${records.length})</button>` : ''}
+              <div data-cpf-all style="display:none;margin-top:8px">${restHtml}</div>
+            </div>
+          </div>
+        `;
+
+        // Wire expand button
+        const expandBtn = node.querySelector('[data-cpf-expand]');
+        const allDiv = node.querySelector('[data-cpf-all]');
+        if (expandBtn && allDiv) {
+          expandBtn.addEventListener('click', (evt) => {
+            evt.stopPropagation();
+            allDiv.style.display = '';
+            expandBtn.parentElement.remove();
+          });
+        }
+
+        // Load thumbnail for the first record's PDF
+        const firstProxyUrl = first.links[0] ? buildRosPdfProxyUrl(first.links[0]) : null;
+        if (firstProxyUrl) {
+          const thumbEl = node.querySelector('.cpf-thumb');
+          if (thumbEl) {
+            // Clicking thumbnail opens the PDF
+            const pdfHref = escapeHtml(firstProxyUrl);
+            thumbEl.addEventListener('click', () => window.open(pdfHref, '_blank', 'noopener'));
+            loadCpfThumbnailWithRetry(thumbEl, buildCpfPdfThumbnailUrl(firstProxyUrl));
+          }
+        }
+
+        log(`Loaded CP&F PDF links for summary ${target.label}.`);
+      } catch (e) {
+        node.innerHTML = `<span class="small" style="color:#ffb3b3">CP&amp;F lookup failed: ${escapeHtml(e.message || e)}</span>`;
+        log(`CP&F summary lookup failed for ${target.label}: ${e.message || e}`, 'warn');
+      }
+    }
+  }
+
+  function buildCpfPdfThumbnailUrl(proxyUrl) {
+    // Simple heuristic: if proxy is returning a PDF, we can let the server generate thumbnail.
+    // If no server thumbnailing exists, this will just fail silently and we fall back to blank.
+    const u = new URL(proxyUrl, window.location.origin);
+    u.searchParams.set('thumb', '1');
+    return u.toString();
+  }
+
+  async function loadCpfThumbnailWithRetry(imgEl, url, attempts = 3) {
+    let lastErr = null;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await new Promise((resolve, reject) => {
+          imgEl.onload = () => resolve();
+          imgEl.onerror = () => reject(new Error('img load failed'));
+          imgEl.src = url + (url.includes('?') ? '&' : '?') + `t=${Date.now()}-${i}`;
+        });
+        return;
+      } catch (e) {
+        lastErr = e;
+        await new Promise(r => setTimeout(r, 250 * (i + 1)));
+      }
+    }
+    // leave blank (non-fatal)
+    if (lastErr) {}
+  }
+
+  // -----------------------------
   // UI events
   // -----------------------------
   $("btnLookup").addEventListener("click", doLookup);
@@ -2776,11 +2686,9 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     state.lastLookupAddress = '';
     clearLog();
     clearMapLayers();
-    setSummaryCards([]);
     $("btnExportParcelCSV").disabled = true;
     $("btnExportPointForge").disabled = true;
     state.exportGeoJSON = null;
-    state.parcelFeature = null;
     state.parcelFeature2243 = null;
     state.subdivisionFeature2243 = null;
     state.aliquotFeatures = [];
@@ -2789,10 +2697,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     state.selectedParcel = true;
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
-    state.lastLonLat = null;
-    state.utilityLocations = [];
-    $("pdfFindings").style.display = "none";
-    $("pdfFindings").textContent = "";
+    setSummaryCards([]);
     log("Cleared.");
     invalidateMapSoon("clear");
   });
@@ -2800,8 +2705,9 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
   $("btnExportParcelCSV").addEventListener("click", async () => {
     try {
       if (!state.parcelFeature2243) {
-        throw new Error("Parcel export geometry not loaded yet. Run Lookup again.");
+        throw new Error("Export geometry not loaded yet. Run Lookup again.");
       }
+
       const selectedAliquotFeatures2243 = filterAliquotFeaturesForExport(state.aliquotFeatures2243, state.selectedAliquotKeys);
       const baseExport = buildRosBoundaryCsvRowsPNEZD({
         parcelFeature2243: filterParcelFeatureForExport(state.parcelFeature2243, state.selectedParcel),
@@ -2810,7 +2716,7 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
         aliquotFeatures2243: selectedAliquotFeatures2243,
         startPoint: 1,
       });
-      if (!baseExport.count) throw new Error('No boundary vertices available to export.');
+      if (!baseExport.count) throw new Error("No parcel/subdivision/aliquot points available for export.");
 
       const plssPoints = new Map([...baseExport.points.entries()].filter(([, point]) => (
         !point.sources.has('parcel') && !point.sources.has('subdivision')
@@ -2922,6 +2828,23 @@ import { buildAliquotSelectionKey, buildPointMarkerCsvRowsPNEZD, buildPowerUtili
     if (projectId) params.set('projectId', projectId);
     if (projectName) params.set('projectName', projectName);
     return `/POINT_TRANSFORMER.HTML?${params.toString()}`;
+  }
+
+  async function buildCpfNotesByCoordinate(pointsMap = new Map()) {
+    const notes = new Map();
+    for (const [key, point] of pointsMap.entries()) {
+      if (!point || !Number.isFinite(point.north) || !Number.isFinite(point.east)) continue;
+      try {
+        const records = await queryCpfRecordsNearCorner(point.north, point.east, 250, 4326);
+        const instruments = records.map(resolveCpfRecordInstrument).filter(Boolean);
+        if (instruments.length) {
+          notes.set(key, `CPNF: ${[...new Set(instruments)].slice(0, 6).join(', ')}`);
+        }
+      } catch {
+        // ignore missing notes
+      }
+    }
+    return notes;
   }
 
   $("btnScanPdf").addEventListener("click", async () => {
