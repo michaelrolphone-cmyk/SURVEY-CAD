@@ -1325,6 +1325,8 @@ header {
     const LAUNCHER_HISTORY_STATE_KEY = 'survey-cad-launcher-view';
 
     const PROJECT_STORAGE_KEY = 'surveyfoundryProjects';
+    const PROJECT_DELETE_TOMBSTONE_STORAGE_KEY = 'surveyfoundryDeletedProjects';
+    const PROJECT_DELETE_TOMBSTONE_RETENTION_MS = 1000 * 60 * 60 * 24 * 30;
     const ACTIVE_PROJECT_STORAGE_KEY_PREFIX = 'surveyfoundryActiveProjectId';
     const LAUNCHER_VIEW_STATE_KEY = 'surveyfoundryLauncherViewState';
     const PROJECT_STATUS_SEQUENCE = [
@@ -1713,11 +1715,44 @@ header {
       renderProjects();
     }
 
+    function loadDeletedProjectTombstones() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(PROJECT_DELETE_TOMBSTONE_STORAGE_KEY) || '{}');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+        return Object.entries(parsed).reduce((acc, [projectId, rawDeletedAt]) => {
+          const deletedAtMs = Date.parse(String(rawDeletedAt || ''));
+          if (!projectId || Number.isNaN(deletedAtMs)) return acc;
+          if (Date.now() - deletedAtMs > PROJECT_DELETE_TOMBSTONE_RETENTION_MS) return acc;
+          acc[String(projectId)] = new Date(deletedAtMs).toISOString();
+          return acc;
+        }, {});
+      } catch {
+        return {};
+      }
+    }
+
+    function saveDeletedProjectTombstones(tombstones) {
+      const normalized = tombstones && typeof tombstones === 'object' && !Array.isArray(tombstones) ? tombstones : {};
+      localStorage.setItem(PROJECT_DELETE_TOMBSTONE_STORAGE_KEY, JSON.stringify(normalized));
+    }
+
+    function markProjectDeleted(projectId) {
+      const normalizedProjectId = String(projectId || '').trim();
+      if (!normalizedProjectId) return;
+      const tombstones = loadDeletedProjectTombstones();
+      tombstones[normalizedProjectId] = new Date().toISOString();
+      saveDeletedProjectTombstones(tombstones);
+    }
+
     function loadProjects() {
       try {
         const parsed = JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY) || '[]');
-        projects = Array.isArray(parsed)
-          ? parsed.map((project) => {
+        const tombstones = loadDeletedProjectTombstones();
+        const filteredProjects = Array.isArray(parsed)
+          ? parsed.filter((project) => !tombstones[String(project?.id || '')])
+          : [];
+        projects = Array.isArray(filteredProjects)
+          ? filteredProjects.map((project) => {
               const knownStatus = PROJECT_STATUS_SEQUENCE.includes(project?.status) ? project.status : 'Proposed';
               const tsr = String(project?.tsr || project?.townshipRange || '').trim();
               const section = String(project?.section || project?.sections?.[0] || '').trim();
@@ -1730,6 +1765,10 @@ header {
               };
             })
           : [];
+        if (Array.isArray(parsed) && filteredProjects.length !== parsed.length) {
+          saveProjects();
+        }
+        saveDeletedProjectTombstones(tombstones);
       } catch {
         projects = [];
       }
@@ -1891,6 +1930,7 @@ header {
         }
 
         projects = projects.filter((entry) => entry.id !== projectId);
+        markProjectDeleted(projectId);
         if (activeProjectId === projectId) {
           activeProjectId = null;
           localStorage.removeItem(getActiveProjectStorageKey());
