@@ -605,7 +605,8 @@
   const LAST_LOOKUP_ADDRESS_STORAGE_KEY = "surveyfoundryLastLookupAddress";
   const SUBDIVISION_NEARBY_RADIUS_FT = 666;
   const SUBDIVISION_NEARBY_RADIUS_M = SUBDIVISION_NEARBY_RADIUS_FT * 0.3048;
-  const SUBDIVISION_NEARBY_MAX_RESULTS = 60;
+  const SUBDIVISION_NEARBY_MAX_RESULTS = 18;
+  const SUBDIVISION_DRAW_MAX_VERTICES = 1200;
   const SUBDIVISION_PLAT_LIST_URL = '/api/recordquarry/subdivision-plats/page-list';
   const SUBDIVISION_PLAT_BASE_URL = 'https://adacountyassessor.org/docs/subdivisionplats/';
 
@@ -843,9 +844,6 @@
       selection: readSelectionSnapshot(),
     };
     await saveAddressLookupSnapshot(normalizedAddress, snapshot);
-    if (state.projectContext.projectId) {
-      await saveProjectLookupSnapshot(state.projectContext.projectId, snapshot);
-    }
   }
 
   function slugify(value, fallback = 'resource') {
@@ -1740,9 +1738,6 @@
     document.querySelectorAll('.aliquot-card.is-far').forEach((cardEl) => {
       if (cardEl.dataset.aliquotCardKey === key) cardEl.classList.toggle('is-expanded', selected);
     });
-    if (state.lastLookupPayload) {
-      saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
-    }
   }
 
   function setParcelSelected(selected) {
@@ -1750,9 +1745,6 @@
     document.querySelectorAll('[data-parcel-include-export]').forEach((node) => {
       node.checked = state.selectedParcel;
     });
-    if (state.lastLookupPayload) {
-      saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '');
-    }
   }
 
   function buildParcelStyle() {
@@ -1786,9 +1778,10 @@
     for (const [idx, entry] of (subdivisionEntries || []).entries()) {
       const feature = entry?.feature;
       if (!feature) continue;
+      const displayFeature = simplifyPolygonForDisplay(feature, SUBDIVISION_DRAW_MAX_VERTICES);
       const selected = isSubdivisionSelected(entry, idx);
       drawPolygonFeature(
-        feature,
+        displayFeature,
         layers.subdivision,
         {
           style: () => ({
@@ -1801,6 +1794,39 @@
         'Subdivision'
       );
     }
+  }
+
+  function simplifyPolygonForDisplay(feature, maxVertices = SUBDIVISION_DRAW_MAX_VERTICES) {
+    const rings = feature?.geometry?.rings;
+    if (!Array.isArray(rings) || !rings.length) return feature;
+
+    let totalVertices = 0;
+    for (const ring of rings) totalVertices += Array.isArray(ring) ? ring.length : 0;
+    if (totalVertices <= maxVertices) return feature;
+
+    const safeMax = Math.max(200, Number(maxVertices) || SUBDIVISION_DRAW_MAX_VERTICES);
+    const stride = Math.max(1, Math.ceil(totalVertices / safeMax));
+    const simplifiedRings = rings.map((ring) => {
+      if (!Array.isArray(ring) || ring.length <= 4 || stride <= 1) return ring;
+      const sampled = [];
+      for (let i = 0; i < ring.length; i += stride) {
+        sampled.push(ring[i]);
+      }
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      const sampledLast = sampled[sampled.length - 1];
+      if (!sampled.length || sampled[0] !== first) sampled.unshift(first);
+      if (sampledLast !== last) sampled.push(last);
+      return sampled.length >= 4 ? sampled : ring;
+    });
+
+    return {
+      ...feature,
+      geometry: {
+        ...feature.geometry,
+        rings: simplifiedRings,
+      },
+    };
   }
 
   function drawAliquots(aliquotFeatures, sectionFeature) {
@@ -2334,6 +2360,31 @@
     return '';
   }
 
+  function getSubdivisionNameCandidates(attrs = {}, explicitName = '') {
+    const names = [
+      explicitName,
+      getSubdivisionNameFromAttrs(attrs),
+      attrs.SUBDIVNAME,
+      attrs.SUBDIVISION,
+      attrs.SUBDIV,
+      attrs.NAME,
+      attrs.SUB_NAME,
+      attrs.PLATNAME,
+      attrs.LEGALDESC,
+      attrs.LEGAL_DESC,
+      attrs.DESCRIPTION,
+    ];
+    const out = [];
+    const seen = new Set();
+    for (const rawName of names) {
+      const normalized = sanitizeSubdivisionName(rawName);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      out.push(normalized);
+    }
+    return out;
+  }
+
   function sanitizeSubdivisionName(value) {
     return String(value || '')
       .toUpperCase()
@@ -2356,14 +2407,25 @@
     if (!raw || raw.startsWith('#') || raw.startsWith('//')) return null;
 
     const parts = raw.split(/[|	,]+/).map((part) => part.trim()).filter(Boolean);
-    if (!parts.length) return null;
-
-    const joined = parts.join(' ');
-    const urlMatch = joined.match(/https?:\/\/[^\s]+/i);
-    const fileMatch = joined.match(/[A-Za-z0-9._\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
+    const urlMatch = raw.match(/https?:\/\/[^\s]+/i);
+    const fileMatch = raw.match(/[A-Za-z0-9._\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
     const resolvedPath = urlMatch?.[0] || fileMatch?.[0] || '';
-    const titleCandidates = parts.filter((part) => part && part !== resolvedPath && !/\.(?:pdf|jpe?g|png|tiff?)$/i.test(part));
-    const titlePart = titleCandidates.sort((a, b) => b.length - a.length)[0] || parts[0] || '';
+
+    let titlePart = raw;
+    if (resolvedPath) {
+      titlePart = titlePart.replace(resolvedPath, ' ');
+    }
+    titlePart = titlePart
+      .replace(/[|,	]+/g, ' ')
+      .replace(/\bS\d{4,}\d{0,2}\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!titlePart) {
+      const titleCandidates = parts.filter((part) => part && part !== resolvedPath && !/\.(?:pdf|jpe?g|png|tiff?)$/i.test(part));
+      titlePart = titleCandidates.sort((a, b) => b.length - a.length)[0] || parts[0] || '';
+    }
+
     if (!resolvedPath || !titlePart) return null;
 
     const normalizedName = sanitizeSubdivisionName(titlePart);
@@ -2441,8 +2503,9 @@
     const byName = lookupMap?.byName;
     const byDocId = lookupMap?.byDocId;
     if (!byName || !byName.size) return null;
-    const normalized = sanitizeSubdivisionName(subdivisionName);
-    if (normalized) {
+    const normalizedCandidates = getSubdivisionNameCandidates(attrs, subdivisionName);
+
+    for (const normalized of normalizedCandidates) {
       const direct = byName.get(normalized);
       if (direct?.length) return direct[0];
     }
@@ -2455,11 +2518,13 @@
       }
     }
 
-    if (!normalized) return null;
+    if (!normalizedCandidates.length) return null;
 
-    for (const key of (lookupMap?.byNameKeys || [])) {
-      const entries = byName.get(key);
-      if (key.includes(normalized) || normalized.includes(key)) return entries[0];
+    for (const normalized of normalizedCandidates) {
+      for (const key of (lookupMap?.byNameKeys || [])) {
+        const entries = byName.get(key);
+        if (key.includes(normalized) || normalized.includes(key)) return entries[0];
+      }
     }
     return null;
   }
@@ -2488,8 +2553,8 @@
   }
 
   async function findNearbySubdivisions(parcelFeature, outSR = 4326) {
-    const geom = parcelFeature?.geometry;
-    if (!geom?.rings?.length) return [];
+    const centroid = centroidOfPolygon(parcelFeature?.geometry || null);
+    if (!centroid || !Number.isFinite(Number(centroid.x)) || !Number.isFinite(Number(centroid.y))) return [];
 
     const resp = await arcQuery(LAYERS.subdivisions, {
       where: '1=1',
@@ -2497,14 +2562,45 @@
       returnGeometry: true,
       outSR,
       inSR: 4326,
-      geometryType: 'esriGeometryPolygon',
-      geometry: JSON.stringify(geom),
+      geometryType: 'esriGeometryPoint',
+      geometry: `${centroid.x},${centroid.y}`,
       spatialRel: 'esriSpatialRelIntersects',
       distance: SUBDIVISION_NEARBY_RADIUS_M,
       units: 'esriSRUnit_Meter',
     });
 
     return resp?.features || [];
+  }
+
+  function dedupeNearbySubdivisionEntries(entries = [], parcelFeature = null) {
+    const source = Array.isArray(entries) ? entries : [];
+    if (!source.length) return [];
+
+    const centroid = centroidOfPolygon(parcelFeature?.geometry || null);
+    const byKey = new Map();
+
+    for (const entry of source) {
+      const feature = entry?.feature;
+      if (!feature) continue;
+      const attrs = feature?.attributes || {};
+      const normalizedName = sanitizeSubdivisionName(entry?.name || getSubdivisionNameFromAttrs(attrs));
+      const objectId = String(attrs.OBJECTID ?? attrs.ObjectID ?? attrs.FID ?? '').trim();
+      const key = normalizedName ? `name:${normalizedName}` : (objectId ? `oid:${objectId}` : 'unknown');
+
+      const featureCentroid = centroidOfPolygon(feature?.geometry || null);
+      const distance = (centroid && featureCentroid)
+        ? haversineMeters(centroid.y, centroid.x, featureCentroid.y, featureCentroid.x)
+        : Number.POSITIVE_INFINITY;
+
+      const current = byKey.get(key);
+      if (!current || distance < current.distance) {
+        byKey.set(key, { entry, distance });
+      }
+    }
+
+    return [...byKey.values()]
+      .sort((a, b) => a.distance - b.distance)
+      .map((item) => item.entry);
   }
 
   async function attachSubdivisionPlatData(features = []) {
@@ -3877,15 +3973,7 @@
       try {
         const nearbySubdivisionFeatures = await findNearbySubdivisions(parcel, 4326);
         const nearbyWithPlatData = await attachSubdivisionPlatData(nearbySubdivisionFeatures);
-        const seenNearby = new Set();
-        state.nearbySubdivisions = nearbyWithPlatData.filter((entry) => {
-          const id = Number(entry?.feature?.attributes?.OBJECTID);
-          const nameKey = sanitizeSubdivisionName(entry?.name || getSubdivisionNameFromAttrs(entry?.feature?.attributes || {}));
-          const key = Number.isFinite(id) ? `oid:${id}` : `name:${nameKey}`;
-          if (!key || seenNearby.has(key)) return false;
-          seenNearby.add(key);
-          return true;
-        });
+        state.nearbySubdivisions = dedupeNearbySubdivisionEntries(nearbyWithPlatData, parcel);
         state.nearbySubdivisions = limitNearbySubdivisionEntries(state.nearbySubdivisions, parcel, SUBDIVISION_NEARBY_MAX_RESULTS);
         log(`Subdivisions within ${SUBDIVISION_NEARBY_RADIUS_FT} ft: ${state.nearbySubdivisions.length}`);
       } catch (e) {
@@ -4076,7 +4164,6 @@
                   setSubdivisionSelected(entry, idx, next);
                   syncSubdivisionStar();
                   drawSubdivisionPolygons(subdivisionCards);
-                  saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '').catch(() => {});
                   log(`${next ? 'Included' : 'Excluded'} subdivision ${subdivisionName} in EvidenceDesk export.`);
                 });
                 syncSubdivisionStar();
@@ -4455,9 +4542,7 @@
       }
 
       saveLookupSnapshotsForCurrentState(rawAddr);
-      if (state.projectContext.projectId) {
-        log(`Saved lookup results to project ${state.projectContext.projectName || state.projectContext.projectId}.`);
-      }
+      log('Saved lookup cache for this address.');
 
       invalidateMapSoon("lookup complete");
       log("Done.", "info");
@@ -4668,32 +4753,13 @@
     log(`Project loaded: ${state.projectContext.projectName || state.projectContext.projectId} (${state.projectContext.client || "no client"}).`);
 
     const hasProjectAddress = Boolean(normalizeAddressStorageKey(state.projectContext.address));
-    const projectSnapshot = await loadProjectLookupSnapshot(state.projectContext.projectId);
     const projectAddressSnapshot = hasProjectAddress ? loadAddressLookupSnapshot(state.projectContext.address) : null;
-
-    let launchLookupPayload = null;
-    let launchSelectionSnapshot = null;
 
     if (hasProjectAddress) {
       if (projectAddressSnapshot?.lookup) {
-        launchLookupPayload = projectAddressSnapshot.lookup;
-        launchSelectionSnapshot = projectAddressSnapshot.selection;
         log(`Restoring cached results for project address from ${projectAddressSnapshot.savedAt || "unknown time"}.`);
-      } else if (projectSnapshot?.lookup) {
-        launchLookupPayload = projectSnapshot.lookup;
-        launchSelectionSnapshot = projectSnapshot.selection;
-        log(`Restoring saved project results from ${projectSnapshot.savedAt || "unknown time"}.`);
       }
-      doLookup({ lookupPayload: launchLookupPayload, selectionSnapshot: launchSelectionSnapshot }).catch((err) => {
-        log(`Saved result restore failed, running live lookup: ${err.message || err}`, "warn");
-        doLookup().catch((liveErr) => {
-          log(`Lookup failed: ${liveErr.message || liveErr}`, "bad");
-          console.error(liveErr);
-        });
-      });
-    } else if (projectSnapshot?.lookup && state.projectContext.autostart) {
-      log(`Restoring saved project results from ${projectSnapshot.savedAt || "unknown time"}.`);
-      doLookup({ lookupPayload: projectSnapshot.lookup, selectionSnapshot: projectSnapshot.selection }).catch((err) => {
+      doLookup({ lookupPayload: projectAddressSnapshot?.lookup || null, selectionSnapshot: projectAddressSnapshot?.selection || null }).catch((err) => {
         log(`Saved result restore failed, running live lookup: ${err.message || err}`, "warn");
         doLookup().catch((liveErr) => {
           log(`Lookup failed: ${liveErr.message || liveErr}`, "bad");
