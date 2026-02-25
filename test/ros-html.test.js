@@ -43,8 +43,12 @@ test('RecordQuarry.html renders nearby subdivision polygons/cards and plat thumb
   assert.match(html, /SUBDIVISION_NEARBY_RADIUS_FT\s*=\s*666/, 'nearby subdivision search radius should be 666 feet');
   assert.match(html, /function\s+findNearbySubdivisions\s*\(/, 'lookup should define a nearby subdivision polygon query helper');
   assert.match(html, /distance:\s*SUBDIVISION_NEARBY_RADIUS_M/, 'nearby subdivision query should use the configured parcel buffer distance');
+  assert.match(html, /geometryType:\s*'esriGeometryPoint'/, 'nearby subdivision query should use parcel centroid point geometry to avoid mass polygon intersections');
   assert.match(html, /const\s+nearbyWithPlatData\s*=\s*await\s*attachSubdivisionPlatData\(/, 'lookup should enrich nearby subdivisions with plat metadata');
+  assert.match(html, /function\s+dedupeNearbySubdivisionEntries\s*\(/, 'lookup should collapse duplicate subdivision geometries to one card per subdivision name/id');
   assert.match(html, /function\s+drawSubdivisionPolygons\s*\(/, 'lookup should define a subdivision polygon renderer for nearby features');
+  assert.match(html, /SUBDIVISION_DRAW_MAX_VERTICES\s*=\s*1200/, 'nearby subdivision rendering should cap polygon vertices to keep the UI responsive');
+  assert.match(html, /simplifyPolygonForDisplay\(feature,\s*SUBDIVISION_DRAW_MAX_VERTICES\)/, 'subdivision renderer should simplify heavy polygon geometries before painting them');
   assert.match(html, /drawSubdivisionPolygons\(nearbySubdivisionEntries\)/, 'lookup should draw each nearby subdivision polygon on the map');
   assert.match(html, /SUBDIVISION_PLAT_LIST_URL\s*=\s*'\/api\/recordquarry\/subdivision-plats\/page-list'/, 'lookup should source plat index data from Ada County subdivision list');
   assert.match(html, /\/api\/project-files\/pdf-thumbnail\?\$\{new URLSearchParams\(\{ source: platUrl \}\)\}/, 'subdivision plat cards should resolve PDF thumbnails through the cached thumbnail API');
@@ -205,43 +209,30 @@ test('RecordQuarry.html includes mobile layout rules so map and controls stay vi
 });
 
 
-test('RecordQuarry.html restores and saves project lookup snapshots when launched from SurveyFoundry projects', async () => {
+test('RecordQuarry.html restores address lookup snapshots and avoids auto-project attachment when launched from SurveyFoundry projects', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
-  assert.match(html, /const\s+PROJECT_LOOKUP_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectLookup"/, 'RecordQuarry should use a stable localStorage prefix for project lookup snapshots');
+  assert.match(html, /const\s+PROJECT_LOOKUP_STORAGE_PREFIX\s*=\s*"surveyfoundryProjectLookup"/, 'RecordQuarry keeps the project lookup cache namespace available for explicit project workflows.');
   assert.match(html, /const\s+ADDRESS_LOOKUP_STORAGE_PREFIX\s*=\s*"surveyfoundryAddressLookup"/, 'RecordQuarry should use a stable localStorage prefix for per-address lookup snapshots');
   assert.match(html, /const\s+LAST_LOOKUP_ADDRESS_STORAGE_KEY\s*=\s*"surveyfoundryLastLookupAddress"/, 'RecordQuarry should track the latest looked-up address for restore-on-open behavior');
-  assert.match(html, /function\s+getProjectContext\(\)/, 'RecordQuarry should parse launcher-provided project context from URL params');
-  assert.match(html, /params\.get\(\"projectId\"\)\s*\|\|\s*params\.get\(\"activeProjectId\"\)/, 'RecordQuarry should accept activeProjectId launcher param aliases');
-  assert.match(html, /function\s+loadLaunchProject\(projectId\)/, 'RecordQuarry should resolve active project metadata from launcher localStorage when URL params are stale');
-  assert.match(html, /const\s+raw\s*=\s*localStorage\.getItem\('surveyfoundryProjects'\);/, 'RecordQuarry should read project records from the launcher project storage key');
-  assert.match(html, /const\s+launchProject\s*=\s*loadLaunchProject\(projectId\);/, 'RecordQuarry should load latest project metadata by id before trusting query params');
-  assert.match(html, /const\s+client\s*=\s*launchProject\?\.client[\s\S]*params\.get\("client"\)\s*\|\|\s*params\.get\("activeClient"\)/, 'RecordQuarry should prefer launcher project client metadata over stale URL client params');
-  assert.match(html, /if\s*\(!normalizeAddressStorageKey\(initialProjectContext\.address\) && initialProjectContext\.projectId\)\s*\{[\s\S]*initialProjectContext\.address\s*=\s*launchAddress;/, 'RecordQuarry should default lookup address to the active project address when URL params omit an address');
-  assert.match(html, /params\.get\(\"projectName\"\)\s*\|\|\s*params\.get\(\"activeProjectName\"\)/, 'RecordQuarry should accept activeProjectName launcher param aliases');
-  assert.match(html, /params\.get\(\"client\"\)\s*\|\|\s*params\.get\(\"activeClient\"\)/, 'RecordQuarry should accept activeClient launcher param aliases');
-  assert.match(html, /function\s+loadProjectLookupSnapshot\(projectId\)/, 'RecordQuarry should load saved project lookup snapshots');
-  assert.match(html, /function\s+saveProjectLookupSnapshot\(projectId, snapshot\)/, 'RecordQuarry should persist lookup snapshots back to project storage');
+
   assert.match(html, /function\s+loadAddressLookupSnapshot\(address\)/, 'RecordQuarry should load per-address lookup snapshots');
   assert.match(html, /function\s+saveAddressLookupSnapshot\(address, snapshot\)/, 'RecordQuarry should persist per-address lookup snapshots');
-  assert.match(html, /function\s+readSelectionSnapshot\(\)/, 'RecordQuarry should serialize selected and deselected export state');
-  assert.match(html, /function\s+applySelectionSnapshot\(selection = null\)/, 'RecordQuarry should restore selected and deselected export state');
-  assert.match(html, /const\s+cachedAddressSnapshot\s*=\s*\(!options\.lookupPayload && !options\.disableAddressCache\)/, 'lookup flow should check per-address cache before network lookups');
-  assert.match(html, /const\s+lookup\s*=\s*options\.lookupPayload\s*\|\|\s*cachedAddressSnapshot\?\.lookup\s*\|\|\s*await\s*lookupByAddress\(rawAddr\)/, 'lookup flow should support restoring cached project and address lookup payloads');
-  assert.match(html, /saveLookupSnapshotsForCurrentState\(rawAddr\);/, 'lookup flow should persist lookup and selection snapshots for project and per-address restores');
-  assert.match(html, /doLookup\(\{ lookupPayload:\s*snapshot\.lookup, selectionSnapshot:\s*snapshot\.selection \}\)/, 'autostart flow should restore cached lookup payload and selection snapshot when project snapshot exists');
+  assert.match(html, /function\s+saveLookupSnapshotsForCurrentState\(address\)/, 'RecordQuarry should centralize lookup snapshot persistence through a single helper.');
+
+  assert.match(html, /saveLookupSnapshotsForCurrentState\(rawAddr\);[\s\S]*Saved lookup cache for this address\./, 'lookup flow should persist lookup/selection snapshots to address cache only during lookup completion.');
+  assert.doesNotMatch(html, /Saved lookup results to project/, 'lookup interactions should not auto-attach fetched results to project-level records.');
+
   assert.match(html, /const\s+hasProjectAddress\s*=\s*Boolean\(normalizeAddressStorageKey\(state\.projectContext\.address\)\);/, 'project boot flow should detect when active project includes an address');
   assert.match(html, /const\s+projectAddressSnapshot\s*=\s*hasProjectAddress\s*\?\s*loadAddressLookupSnapshot\(state\.projectContext\.address\)\s*:\s*null;/, 'project boot flow should load per-address cache when active project has an address');
-  assert.match(html, /if\s*\(hasProjectAddress\)\s*\{[\s\S]*doLookup\(\{ lookupPayload:\s*launchLookupPayload, selectionSnapshot:\s*launchSelectionSnapshot \}\)/, 'project boot flow should auto-run lookup when project address is present and use cached payload when available');
-  assert.match(html, /if\s*\(projectAddressSnapshot\?\.lookup\)\s*\{[\s\S]*log\(`Restoring cached results for project address/, 'project boot flow should prefer cached per-address data before project snapshot restore');
-  assert.match(html, /\} else if \(projectSnapshot\?\.lookup\) \{[\s\S]*log\(`Restoring saved project results from/, 'project boot flow should fallback to project snapshot when no per-address cache is available');
-  assert.match(html, /\} else if \(projectSnapshot\?\.lookup && state\.projectContext\.autostart\)/, 'project autostart without a project address should continue restoring project snapshots only when requested');
+  assert.match(html, /if\s*\(hasProjectAddress\)\s*\{[\s\S]*doLookup\(\{ lookupPayload:\s*projectAddressSnapshot\?\.lookup\s*\|\|\s*null, selectionSnapshot:\s*projectAddressSnapshot\?\.selection\s*\|\|\s*null \}\)/, 'project boot flow should auto-run lookup from per-address cache when a project address is present');
+  assert.doesNotMatch(html, /else if \(projectSnapshot\?\.lookup/, 'project boot flow should not auto-restore heavy project snapshots that can freeze app startup.');
+
   assert.match(html, /const\s+hasLaunchAddress\s*=\s*Boolean\(normalizeAddressStorageKey\(state\.projectContext\.address\)\);/, 'standalone boot flow should honor launch-provided address params even without a project id');
   assert.match(html, /const\s+launchAddressSnapshot\s*=\s*hasLaunchAddress\s*\?\s*loadAddressLookupSnapshot\(state\.projectContext\.address\)\s*:\s*null;/, 'standalone boot flow should try loading cache for launch-provided address params');
   assert.match(html, /if\s*\(hasLaunchAddress\)\s*\{[\s\S]*if\s*\(state\.projectContext\.autostart\)\s*\{[\s\S]*doLookup\(\{ lookupPayload:\s*launchAddressSnapshot\?\.lookup\s*\|\|\s*null, selectionSnapshot:\s*launchAddressSnapshot\?\.selection\s*\|\|\s*null \}\)/, 'launch autostart should execute lookup for address params and reuse per-address cache when available');
   assert.match(html, /const\s+snapshot\s*=\s*loadMostRecentAddressLookupSnapshot\(\);/, 'standalone boot flow should attempt loading the most recent cached address lookup');
 });
-
 
 
 test('RecordQuarry.html lazy loads ROS TIFF thumbnails through cached API thumbnails', async () => {
