@@ -9,10 +9,12 @@ const DEFAULT_IDAHO_HARVEST_PARCEL_LAYER = 23;
 const DEFAULT_IDAHO_HARVEST_CPNF_LAYER = 18;
 
 // Records of Survey scrape (Ada County Assessor directory listing)
-const DEFAULT_ROS_SCRAPE_ENABLED = true;
 const DEFAULT_ROS_SCRAPE_BASE_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
 const DEFAULT_ROS_SCRAPE_PREFIX = 'adacounty/recordsofsurvey';
 const DEFAULT_ROS_SCRAPE_BUCKET = 'records-of-survey';
+const DEFAULT_ROS_SCRAPE_POLL_INTERVAL_MS = 1000;
+const DEFAULT_ROS_SCRAPE_FAST_LOOP = true;
+
 
 // Ada County gisprod portal — same source RecordQuarry uses to discover the CP&F layer.
 const DEFAULT_ADA_CPF_PORTAL_BASE = 'https://gisprod.adacounty.id.gov/arcgis';
@@ -169,6 +171,15 @@ export async function resolveHarvestDatasets({
   ];
 }
 
+
+function parseBooleanEnv(value, defaultValue = false) {
+  if (value === undefined || value === null || String(value).trim() === '') return defaultValue;
+  const v = String(value).trim().toLowerCase();
+  if (['0', 'false', 'no', 'off', 'disable', 'disabled'].includes(v)) return false;
+  if (['1', 'true', 'yes', 'on', 'enable', 'enabled'].includes(v)) return true;
+  return defaultValue;
+}
+
 function randomIntBetween(minInclusive, maxInclusive, randomFn = Math.random) {
   const min = Math.ceil(Number(minInclusive));
   const max = Math.floor(Number(maxInclusive));
@@ -261,14 +272,14 @@ export async function runIdahoHarvestWorker({
       env,
     });
 
-    const rosEnabled = String(env.ROS_SCRAPE_ENABLED ?? (DEFAULT_ROS_SCRAPE_ENABLED ? '1' : '0')).trim() !== '0';
-    let harvestDone = false;
-    let rosDone = !rosEnabled;
-
     while (!shuttingDown) {
+      const rosEnabled = parseBooleanEnv(env.ROS_SCRAPE_ENABLED, true);
+      // Track completion independently so finishing the parcel/CP&F harvest doesn't stop ROS scraping.
+      if (typeof runIdahoHarvestWorker.__harvestDone !== 'boolean') runIdahoHarvestWorker.__harvestDone = false;
+      if (typeof runIdahoHarvestWorker.__rosDone !== 'boolean') runIdahoHarvestWorker.__rosDone = !rosEnabled;
 
-      if (!harvestDone) {
-        const harvestResult = await runIdahoHarvestCycle({
+      if (!runIdahoHarvestWorker.__harvestDone) {
+        const result = await runIdahoHarvestCycle({
           fetchImpl: client.fetchImpl,
           objectStore: resolvedStore,
           adaMapServerBaseUrl: client.config.adaMapServer,
@@ -284,24 +295,28 @@ export async function runIdahoHarvestWorker({
             checkpoints: String(env.IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET || 'tile-server'),
           },
         });
-        harvestDone = !!harvestResult?.done;
+        runIdahoHarvestWorker.__harvestDone = !!result?.done;
       }
 
-      if (rosEnabled && !rosDone) {
+      if (rosEnabled && !runIdahoHarvestWorker.__rosDone) {
         const rosResult = await runRosScrapeCycle({
           fetchImpl: client.fetchImpl || fetch,
           objectStore: resolvedStore,
           baseUrl: String(env.ROS_SCRAPE_BASE_URL || DEFAULT_ROS_SCRAPE_BASE_URL),
           prefix: String(env.ROS_SCRAPE_PREFIX || DEFAULT_ROS_SCRAPE_PREFIX),
           bucket: String(env.ROS_SCRAPE_MINIO_BUCKET || DEFAULT_ROS_SCRAPE_BUCKET),
-          batchSize: Number(env.ROS_SCRAPE_BATCH_SIZE || 25),
+          batchSize: Number(env.ROS_SCRAPE_BATCH_SIZE || 50),
           requestDelayMs: Math.max(0, Number(env.ROS_SCRAPE_REQUEST_DELAY_MS || 0)),
         });
-        rosDone = !!rosResult?.done;
+        runIdahoHarvestWorker.__rosDone = !!rosResult?.done;
       }
 
-      if (harvestDone && rosDone) return;
-      const delayMs = resolveInterBatchDelayMs(env, randomFn);
+      if (runIdahoHarvestWorker.__harvestDone && runIdahoHarvestWorker.__rosDone) return;
+
+      let delayMs = resolveInterBatchDelayMs(env, randomFn);
+      if (rosEnabled && !runIdahoHarvestWorker.__rosDone && parseBooleanEnv(env.ROS_SCRAPE_FAST_LOOP, DEFAULT_ROS_SCRAPE_FAST_LOOP)) {
+        delayMs = Math.max(0, Number(env.ROS_SCRAPE_POLL_INTERVAL_MS || DEFAULT_ROS_SCRAPE_POLL_INTERVAL_MS));
+      }
       await sleepFn(delayMs);
     }
   } finally {

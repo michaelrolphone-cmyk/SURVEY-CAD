@@ -682,312 +682,6 @@ export async function runIdahoHarvestCycle({
   return { done: allDone && cpnfPdfDone, checkpoint, indexKey };
 }
 
-
-// ---------------------------------------------------------------------------
-// Ada County Assessor — Records of Survey directory crawler
-// Scrapes https://adacountyassessor.org/docs/recordsofsurvey/ (Apache-style listing)
-// and uploads every discovered file to MinIO/S3.
-// ---------------------------------------------------------------------------
-
-const DEFAULT_ROS_BASE_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
-const DEFAULT_ROS_PREFIX = 'adacounty/recordsofsurvey';
-const DEFAULT_ROS_BUCKET = 'records-of-survey';
-
-function normalizeTrailingSlash(url) {
-  const str = String(url || '').trim();
-  if (!str) return str;
-  return str.endsWith('/') ? str : `${str}/`;
-}
-
-function decodeHtmlEntities(input) {
-  return String(input || '')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
-}
-
-function extractHrefLinksFromHtml(html = '') {
-  const text = String(html || '');
-  const hrefs = [];
-
-  const re1 = /<a\s+[^>]*href\s*=\s*"([^"]+)"/gi;
-  for (let m = re1.exec(text); m; m = re1.exec(text)) hrefs.push(decodeHtmlEntities(m[1]));
-
-  const re2 = /<a\s+[^>]*href\s*=\s*'([^']+)'/gi;
-  for (let m = re2.exec(text); m; m = re2.exec(text)) hrefs.push(decodeHtmlEntities(m[1]));
-
-  return [...new Set(hrefs)].filter(Boolean);
-}
-
-function isParentDirectoryHref(href) {
-  const h = String(href || '').trim();
-  return h === '../' || h === '..' || h.startsWith('?') || h === '#';
-}
-
-function isDirectoryUrl(url) {
-  try {
-    return new URL(url).pathname.endsWith('/');
-  } catch {
-    return false;
-  }
-}
-
-function contentTypeFromUrl(url, fallback = 'application/octet-stream') {
-  const pathname = (() => {
-    try { return new URL(url).pathname || ''; } catch { return ''; }
-  })();
-  const ext = path.extname(pathname).toLowerCase();
-  if (ext === '.pdf') return 'application/pdf';
-  if (ext === '.tif' || ext === '.tiff') return 'image/tiff';
-  if (ext === '.txt') return 'text/plain; charset=utf-8';
-  if (ext === '.htm' || ext === '.html') return 'text/html; charset=utf-8';
-  if (ext === '.json') return 'application/json; charset=utf-8';
-  if (ext === '.xml') return 'application/xml; charset=utf-8';
-  return fallback;
-}
-
-function buildRelativePath(fileUrl, basePathname) {
-  try {
-    const u = new URL(fileUrl);
-    const filePath = decodeURIComponent(u.pathname || '').replace(/^\/+/, '');
-    const basePath = decodeURIComponent(String(basePathname || '')).replace(/^\/+/, '');
-
-    if (basePath && filePath.startsWith(basePath)) {
-      const rel = filePath.slice(basePath.length).replace(/^\/+/, '');
-      return rel || path.basename(filePath);
-    }
-
-    return filePath;
-  } catch {
-    return String(fileUrl || '').replace(/^\/+/, '');
-  }
-}
-
-async function fetchText(fetchImpl, url, { headers = {}, retries = 3 } = {}) {
-  let attempt = 0;
-  let lastErr = null;
-
-  while (attempt <= retries) {
-    try {
-      const resp = await fetchImpl(url, {
-        method: 'GET',
-        headers: { 'user-agent': 'surveyfoundry-ros-scraper/1.0', ...headers },
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      return await resp.text();
-    } catch (err) {
-      lastErr = err;
-      attempt += 1;
-      if (attempt > retries) break;
-      await new Promise((r) => setTimeout(r, 250 * attempt));
-    }
-  }
-  throw lastErr;
-}
-
-async function fetchBinary(fetchImpl, url, { headers = {}, retries = 3 } = {}) {
-  let attempt = 0;
-  let lastErr = null;
-
-  while (attempt <= retries) {
-    try {
-      const resp = await fetchImpl(url, {
-        method: 'GET',
-        headers: { 'user-agent': 'surveyfoundry-ros-scraper/1.0', ...headers },
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const buf = Buffer.from(await resp.arrayBuffer());
-      return { resp, buf };
-    } catch (err) {
-      lastErr = err;
-      attempt += 1;
-      if (attempt > retries) break;
-      await new Promise((r) => setTimeout(r, 500 * attempt));
-    }
-  }
-  throw lastErr;
-}
-
-function parseDirectoryListingUrls({ html, directoryUrl }) {
-  const base = normalizeTrailingSlash(directoryUrl);
-  const hrefs = extractHrefLinksFromHtml(html);
-
-  const dirs = [];
-  const files = [];
-
-  for (const href of hrefs) {
-    if (isParentDirectoryHref(href)) continue;
-
-    let abs;
-    try {
-      abs = new URL(href, base).toString();
-    } catch {
-      continue;
-    }
-
-    // Constrain crawl to the same origin + under the current directory path.
-    try {
-      const a = new URL(abs);
-      const b = new URL(base);
-      if (a.origin !== b.origin) continue;
-      if (!a.pathname.startsWith(b.pathname)) continue;
-    } catch {
-      continue;
-    }
-
-    if (isDirectoryUrl(abs)) dirs.push(normalizeTrailingSlash(abs));
-    else files.push(abs);
-  }
-
-  const byPath = (a, b) => {
-    try { return new URL(a).pathname.localeCompare(new URL(b).pathname); } catch { return String(a).localeCompare(String(b)); }
-  };
-
-  return {
-    dirs: [...new Set(dirs)].sort(byPath),
-    files: [...new Set(files)].sort(byPath),
-  };
-}
-
-async function readJsonStateInBucket(store, bucket, key, fallback = null) {
-  try {
-    const payload = await store.getObject(key, { bucket });
-    if (!payload) return fallback;
-    return JSON.parse(Buffer.from(payload).toString('utf8'));
-  } catch {
-    return fallback;
-  }
-}
-
-async function writeJsonStateInBucket(store, bucket, key, payload) {
-  await store.putObject(key, Buffer.from(JSON.stringify(payload, null, 2)), {
-    contentType: 'application/json; charset=utf-8',
-    bucket,
-  });
-}
-
-export async function runRosScrapeCycle({
-  fetchImpl = fetch,
-  objectStore,
-  baseUrl = DEFAULT_ROS_BASE_URL,
-  prefix = DEFAULT_ROS_PREFIX,
-  bucket = DEFAULT_ROS_BUCKET,
-  batchSize = 25,
-  requestDelayMs = 0,
-} = {}) {
-  if (!objectStore) throw new Error('objectStore is required');
-
-  const normalizedBaseUrl = normalizeTrailingSlash(baseUrl);
-  const basePathname = (() => {
-    try { return normalizeTrailingSlash(new URL(normalizedBaseUrl).pathname); } catch { return '/'; }
-  })();
-
-  const normalizedPrefix = String(prefix || DEFAULT_ROS_PREFIX).replace(/\/+$/, '');
-  const metaKey = `${normalizedPrefix}/_meta/ros-scrape-state.json`;
-
-  const checkpoint = await readJsonStateInBucket(objectStore, bucket, metaKey, {
-    version: 1,
-    baseUrl: normalizedBaseUrl,
-    basePathname,
-    prefix: normalizedPrefix,
-    bucket,
-    queue: [normalizedBaseUrl],
-    seenDirs: { [normalizedBaseUrl]: true },
-    current: null,
-    stats: { filesUploaded: 0, bytesUploaded: 0, lastFileUrl: null, lastObjectKey: null },
-    done: false,
-    updatedAt: new Date().toISOString(),
-  });
-
-  // If config changes, reset traversal but keep cumulative stats.
-  if (String(checkpoint?.baseUrl || '') !== normalizedBaseUrl
-    || String(checkpoint?.prefix || '') !== normalizedPrefix
-    || String(checkpoint?.bucket || '') !== String(bucket || '')) {
-    checkpoint.baseUrl = normalizedBaseUrl;
-    checkpoint.basePathname = basePathname;
-    checkpoint.prefix = normalizedPrefix;
-    checkpoint.bucket = bucket;
-    checkpoint.queue = [normalizedBaseUrl];
-    checkpoint.seenDirs = { [normalizedBaseUrl]: true };
-    checkpoint.current = null;
-    checkpoint.done = false;
-  }
-
-  if (checkpoint.done) return { done: true, checkpointKey: metaKey, stats: checkpoint.stats };
-
-  let remaining = Math.max(1, Number(batchSize) || 25);
-  const delayMs = Math.max(0, Number(requestDelayMs) || 0);
-
-  while (remaining > 0) {
-    if (!checkpoint.current) {
-      const nextDir = Array.isArray(checkpoint.queue) ? checkpoint.queue.shift() : null;
-      if (!nextDir) {
-        checkpoint.done = true;
-        checkpoint.updatedAt = new Date().toISOString();
-        await writeJsonStateInBucket(objectStore, bucket, metaKey, checkpoint);
-        return { done: true, checkpointKey: metaKey, stats: checkpoint.stats };
-      }
-      checkpoint.current = { dirUrl: normalizeTrailingSlash(nextDir), fileIndex: 0, subdirsEnqueued: false };
-    }
-
-    const { dirUrl } = checkpoint.current;
-    const html = await fetchText(fetchImpl, dirUrl);
-    const parsed = parseDirectoryListingUrls({ html, directoryUrl: dirUrl });
-
-    if (!checkpoint.current.subdirsEnqueued) {
-      for (const subdir of parsed.dirs) {
-        if (!checkpoint.seenDirs || typeof checkpoint.seenDirs !== 'object') checkpoint.seenDirs = {};
-        if (checkpoint.seenDirs[subdir]) continue;
-        checkpoint.seenDirs[subdir] = true;
-        checkpoint.queue = Array.isArray(checkpoint.queue) ? checkpoint.queue : [];
-        checkpoint.queue.push(subdir);
-      }
-      checkpoint.current.subdirsEnqueued = true;
-    }
-
-    const files = parsed.files;
-    const startIndex = Math.max(0, Number(checkpoint.current.fileIndex) || 0);
-    if (startIndex >= files.length) {
-      checkpoint.current = null;
-      continue;
-    }
-
-    while (remaining > 0 && checkpoint.current && checkpoint.current.fileIndex < files.length) {
-      const fileUrl = files[checkpoint.current.fileIndex];
-      const rel = buildRelativePath(fileUrl, checkpoint.basePathname);
-      const objectKey = `${normalizedPrefix}/${rel}`.replace(/\/+/, '/');
-
-      const { resp, buf } = await fetchBinary(fetchImpl, fileUrl);
-      const contentType = resp.headers?.get?.('content-type') || contentTypeFromUrl(fileUrl);
-
-      await objectStore.putObject(objectKey, buf, { contentType, bucket });
-
-      checkpoint.stats = checkpoint.stats || {};
-      checkpoint.stats.filesUploaded = Number(checkpoint.stats.filesUploaded || 0) + 1;
-      checkpoint.stats.bytesUploaded = Number(checkpoint.stats.bytesUploaded || 0) + Number(buf.byteLength || buf.length || 0);
-      checkpoint.stats.lastFileUrl = fileUrl;
-      checkpoint.stats.lastObjectKey = objectKey;
-
-      checkpoint.current.fileIndex += 1;
-      checkpoint.updatedAt = new Date().toISOString();
-
-      // Persist after every file so we don't rewind much on restarts.
-      await writeJsonStateInBucket(objectStore, bucket, metaKey, checkpoint);
-
-      remaining -= 1;
-      if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
-    }
-
-    if (checkpoint.current && checkpoint.current.fileIndex >= files.length) checkpoint.current = null;
-  }
-
-  checkpoint.updatedAt = new Date().toISOString();
-  await writeJsonStateInBucket(objectStore, bucket, metaKey, checkpoint);
-  return { done: false, checkpointKey: metaKey, stats: checkpoint.stats };
-}
-
 export function createFileObjectStore(rootDir) {
   const root = path.resolve(String(rootDir || '.data/object-store'));
   return {
@@ -1019,4 +713,365 @@ export function createMinioObjectStore({
       await minioClient.putObject(bucket, key, body, Buffer.byteLength(body), { 'Content-Type': contentType });
     },
   };
+}
+
+
+// Back-compat alias: the original harvest cycle
+export const runIdahoHarvestCycleOriginal = runIdahoHarvestCycle;
+
+
+// -------------------------------------------------------------------------------------------------
+// Records of Survey (ROS) directory scraper (Ada County Assessor)
+//
+// Scrapes all files from:
+//   https://adacountyassessor.org/docs/recordsofsurvey/
+// including all surv####/ folders and uploads them to a MinIO/S3 bucket.
+//
+// Checkpoint key:
+//   <prefix>/_meta/ros-scrape-state.json
+//
+// Object keys:
+//   <prefix>/<relative-path-under-/docs/recordsofsurvey/>
+// -------------------------------------------------------------------------------------------------
+
+const DEFAULT_ROS_BASE_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
+const DEFAULT_ROS_PREFIX = 'adacounty/recordsofsurvey';
+const DEFAULT_ROS_BUCKET = 'records-of-survey';
+
+function rosNormalizeTrailingSlash(url) {
+  const str = String(url || '').trim();
+  if (!str) return str;
+  return str.endsWith('/') ? str : `${str}/`;
+}
+
+function rosDecodeHtmlEntities(input) {
+  return String(input || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+function rosExtractHrefLinksFromHtml(html = '') {
+  const text = String(html || '');
+  const hrefs = [];
+
+  const re1 = /<a\s+[^>]*href\s*=\s*"([^"]+)"/gi;
+  for (let match = re1.exec(text); match; match = re1.exec(text)) {
+    hrefs.push(rosDecodeHtmlEntities(match[1]));
+  }
+
+  const re2 = /<a\s+[^>]*href\s*=\s*'([^']+)'/gi;
+  for (let match = re2.exec(text); match; match = re2.exec(text)) {
+    hrefs.push(rosDecodeHtmlEntities(match[1]));
+  }
+
+  return [...new Set(hrefs)].filter(Boolean);
+}
+
+function rosIsParentDirectoryHref(href) {
+  const h = String(href || '').trim();
+  return h === '../' || h === '..' || h.startsWith('?') || h === '#';
+}
+
+function rosContentTypeFromUrl(url, fallback = 'application/octet-stream') {
+  const pathname = (() => {
+    try {
+      return new URL(url).pathname || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const ext = path.extname(pathname).toLowerCase();
+  if (ext === '.pdf') return 'application/pdf';
+  if (ext === '.tif' || ext === '.tiff') return 'image/tiff';
+  if (ext === '.txt') return 'text/plain; charset=utf-8';
+  if (ext === '.htm' || ext === '.html') return 'text/html; charset=utf-8';
+  if (ext === '.json') return 'application/json; charset=utf-8';
+  if (ext === '.xml') return 'application/xml; charset=utf-8';
+  if (ext === '.db') return 'application/octet-stream';
+  if (ext === '.maxfr') return 'application/octet-stream';
+  return fallback;
+}
+
+function rosIsWithinRoot(absUrl, rootUrl) {
+  try {
+    const a = new URL(absUrl);
+    const r = new URL(rootUrl);
+    const rootPath = rosNormalizeTrailingSlash(r.pathname);
+    return a.origin === r.origin && rosNormalizeTrailingSlash(a.pathname).startsWith(rootPath);
+  } catch {
+    return false;
+  }
+}
+
+function rosParseApacheIndex({ html, directoryUrl, rootUrl }) {
+  const base = rosNormalizeTrailingSlash(directoryUrl);
+  const root = rosNormalizeTrailingSlash(rootUrl);
+  const hrefs = rosExtractHrefLinksFromHtml(html);
+
+  const dirs = [];
+  const files = [];
+
+  for (const href of hrefs) {
+    if (rosIsParentDirectoryHref(href)) continue;
+
+    let abs;
+    try {
+      abs = new URL(href, base).toString();
+    } catch {
+      continue;
+    }
+
+    if (!rosIsWithinRoot(abs, root)) continue;
+
+    // Directory listings encode directories with trailing slash.
+    const pathname = (() => {
+      try { return new URL(abs).pathname; } catch { return ''; }
+    })();
+
+    if (pathname.endsWith('/')) dirs.push(rosNormalizeTrailingSlash(abs));
+    else files.push(abs);
+  }
+
+  const byPath = (a, b) => {
+    try {
+      return new URL(a).pathname.localeCompare(new URL(b).pathname);
+    } catch {
+      return String(a).localeCompare(String(b));
+    }
+  };
+
+  return {
+    dirs: [...new Set(dirs)].sort(byPath),
+    files: [...new Set(files)].sort(byPath),
+  };
+}
+
+function rosBuildRelativePath(fileUrl, rootPathname) {
+  try {
+    const u = new URL(fileUrl);
+    const filePath = decodeURIComponent(u.pathname || '').replace(/^\/+/, '');
+    const basePath = decodeURIComponent(String(rootPathname || '')).replace(/^\/+/, '');
+
+    if (basePath && filePath.startsWith(basePath)) {
+      const rel = filePath.slice(basePath.length).replace(/^\/+/, '');
+      return rel || path.basename(filePath);
+    }
+
+    return filePath;
+  } catch {
+    return String(fileUrl || '').replace(/^\/+/, '');
+  }
+}
+
+async function rosFetchText(fetchImpl, url, { retries = 3 } = {}) {
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const resp = await fetchImpl(url, {
+        method: 'GET',
+        headers: { 'user-agent': 'surveyfoundry-ros-scraper/1.0' },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.text();
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= retries) break;
+      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+async function rosFetchBinary(fetchImpl, url, { retries = 3 } = {}) {
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const resp = await fetchImpl(url, {
+        method: 'GET',
+        headers: { 'user-agent': 'surveyfoundry-ros-scraper/1.0' },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      return { resp, buf };
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= retries) break;
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+export async function runRosScrapeCycle({
+  fetchImpl = fetch,
+  objectStore,
+  baseUrl = DEFAULT_ROS_BASE_URL,
+  prefix = DEFAULT_ROS_PREFIX,
+  bucket = DEFAULT_ROS_BUCKET,
+  batchSize = 25,
+  requestDelayMs = 0,
+} = {}) {
+  if (!objectStore) throw new Error('objectStore is required');
+
+  const rootUrl = rosNormalizeTrailingSlash(baseUrl);
+  const rootPathname = (() => {
+    try {
+      return rosNormalizeTrailingSlash(new URL(rootUrl).pathname);
+    } catch {
+      return '/';
+    }
+  })();
+
+  const normalizedPrefix = String(prefix || DEFAULT_ROS_PREFIX).replace(/\/+$/, '');
+  const metaKey = `${normalizedPrefix}/_meta/ros-scrape-state.json`;
+
+  const checkpoint = await readJsonObjectInBucket(objectStore, bucket, metaKey, {
+    version: 1,
+    baseUrl: rootUrl,
+    rootPathname,
+    prefix: normalizedPrefix,
+    bucket,
+    done: false,
+    queue: [],
+    doneDirs: {},
+    current: null,
+    stats: {
+      filesUploaded: 0,
+      bytesUploaded: 0,
+      lastFileUrl: null,
+      lastObjectKey: null,
+      lastDirUrl: null,
+    },
+    updatedAt: new Date().toISOString(),
+  });
+
+  // If config changed, reset progress but keep stats.
+  if (String(checkpoint.baseUrl || '') != rootUrl || String(checkpoint.prefix || '') != normalizedPrefix || String(checkpoint.bucket || '') != String(bucket || '')) {
+    checkpoint.baseUrl = rootUrl;
+    checkpoint.rootPathname = rootPathname;
+    checkpoint.prefix = normalizedPrefix;
+    checkpoint.bucket = bucket;
+    checkpoint.done = false;
+    checkpoint.queue = [];
+    checkpoint.doneDirs = {};
+    checkpoint.current = null;
+  }
+
+  if (checkpoint.done) {
+    return { done: true, checkpointKey: metaKey, stats: checkpoint.stats };
+  }
+
+  // Always re-seed from the root index so we never miss new surv folders.
+  try {
+    const rootHtml = await rosFetchText(fetchImpl, rootUrl);
+    const parsedRoot = rosParseApacheIndex({ html: rootHtml, directoryUrl: rootUrl, rootUrl });
+
+    checkpoint.queue = Array.isArray(checkpoint.queue) ? checkpoint.queue : [];
+    checkpoint.doneDirs = checkpoint.doneDirs && typeof checkpoint.doneDirs === 'object' ? checkpoint.doneDirs : {};
+
+    const queued = new Set(checkpoint.queue);
+    const currentDir = checkpoint.current?.dirUrl ? rosNormalizeTrailingSlash(checkpoint.current.dirUrl) : null;
+
+    // Ensure root itself is queued so root-level files get scraped.
+    if (!checkpoint.doneDirs[rootUrl] && !queued.has(rootUrl) && currentDir !== rootUrl) {
+      checkpoint.queue.unshift(rootUrl);
+      queued.add(rootUrl);
+    }
+
+    for (const dirUrl of parsedRoot.dirs) {
+      const normalizedDir = rosNormalizeTrailingSlash(dirUrl);
+      if (checkpoint.doneDirs[normalizedDir]) continue;
+      if (queued.has(normalizedDir)) continue;
+      if (currentDir === normalizedDir) continue;
+      checkpoint.queue.push(normalizedDir);
+      queued.add(normalizedDir);
+    }
+  } catch {
+    // If root fetch fails, proceed with whatever queue we already have.
+  }
+
+  let remaining = Math.max(1, Number(batchSize) || 25);
+  const delayMs = Math.max(0, Number(requestDelayMs) || 0);
+
+  while (remaining > 0) {
+    if (!checkpoint.current) {
+      checkpoint.queue = Array.isArray(checkpoint.queue) ? checkpoint.queue : [];
+      const nextDir = checkpoint.queue.shift();
+      if (!nextDir) {
+        checkpoint.done = true;
+        checkpoint.updatedAt = new Date().toISOString();
+        await writeJsonObjectInBucket(objectStore, bucket, metaKey, checkpoint);
+        return { done: true, checkpointKey: metaKey, stats: checkpoint.stats };
+      }
+      checkpoint.current = { dirUrl: rosNormalizeTrailingSlash(nextDir), fileIndex: 0 };
+    }
+
+    const dirUrl = rosNormalizeTrailingSlash(checkpoint.current.dirUrl);
+
+    // If this directory was already completed (e.g. queue reseed duplicates), skip it.
+    checkpoint.doneDirs = checkpoint.doneDirs && typeof checkpoint.doneDirs === 'object' ? checkpoint.doneDirs : {};
+    if (checkpoint.doneDirs[dirUrl]) {
+      checkpoint.current = null;
+      continue;
+    }
+
+    const html = await rosFetchText(fetchImpl, dirUrl);
+    const parsed = rosParseApacheIndex({ html, directoryUrl: dirUrl, rootUrl: rootUrl });
+
+    const files = parsed.files;
+    let idx = Math.max(0, Number(checkpoint.current.fileIndex) || 0);
+
+    if (idx >= files.length) {
+      checkpoint.doneDirs[dirUrl] = true;
+      checkpoint.current = null;
+      checkpoint.updatedAt = new Date().toISOString();
+      await writeJsonObjectInBucket(objectStore, bucket, metaKey, checkpoint);
+      continue;
+    }
+
+    while (remaining > 0 && idx < files.length) {
+      const fileUrl = files[idx];
+      const rel = rosBuildRelativePath(fileUrl, checkpoint.rootPathname);
+      const objectKey = `${normalizedPrefix}/${rel}`.replace(/\/+/g, '/');
+
+      const { resp, buf } = await rosFetchBinary(fetchImpl, fileUrl);
+      const contentType = resp.headers?.get?.('content-type') || rosContentTypeFromUrl(fileUrl);
+
+      await objectStore.putObject(objectKey, buf, { contentType, bucket });
+
+      checkpoint.stats = checkpoint.stats || {};
+      checkpoint.stats.filesUploaded = Number(checkpoint.stats.filesUploaded || 0) + 1;
+      checkpoint.stats.bytesUploaded = Number(checkpoint.stats.bytesUploaded || 0) + Number(buf.byteLength || buf.length || 0);
+      checkpoint.stats.lastFileUrl = fileUrl;
+      checkpoint.stats.lastObjectKey = objectKey;
+      checkpoint.stats.lastDirUrl = dirUrl;
+
+      idx += 1;
+      checkpoint.current.fileIndex = idx;
+      checkpoint.updatedAt = new Date().toISOString();
+
+      // Persist after each upload so restarts don't rewind much.
+      await writeJsonObjectInBucket(objectStore, bucket, metaKey, checkpoint);
+
+      remaining -= 1;
+      if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+    }
+
+    if (checkpoint.current.fileIndex >= files.length) {
+      checkpoint.doneDirs[dirUrl] = true;
+      checkpoint.current = null;
+      checkpoint.updatedAt = new Date().toISOString();
+      await writeJsonObjectInBucket(objectStore, bucket, metaKey, checkpoint);
+    }
+
+    if (remaining <= 0) break;
+  }
+
+  checkpoint.updatedAt = new Date().toISOString();
+  await writeJsonObjectInBucket(objectStore, bucket, metaKey, checkpoint);
+  return { done: false, checkpointKey: metaKey, stats: checkpoint.stats };
 }
