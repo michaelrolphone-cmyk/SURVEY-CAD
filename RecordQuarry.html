@@ -2080,14 +2080,41 @@
     projectContext: initialProjectContext
   };
 
-  function setSummaryCards(cards) {
+  const SUMMARY_RENDER_BATCH_SIZE = 24;
+
+  function yieldToBrowserFrame() {
+    return new Promise((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+      setTimeout(resolve, 0);
+    });
+  }
+
+  async function setSummaryCards(cards) {
     const root = $("summary");
     root.innerHTML = "";
     if (!cards.length) {
       root.innerHTML = `<div class="small">No results yet.</div>`;
       return;
     }
-    for (const c of cards) root.appendChild(c);
+
+    const fragment = document.createDocumentFragment();
+    const shouldChunk = cards.length > SUMMARY_RENDER_BATCH_SIZE;
+
+    for (let i = 0; i < cards.length; i++) {
+      fragment.appendChild(cards[i]);
+      const reachedBatchEnd = (i + 1) % SUMMARY_RENDER_BATCH_SIZE === 0;
+      const atTail = i === cards.length - 1;
+
+      if (!atTail && shouldChunk && reachedBatchEnd) {
+        root.appendChild(fragment);
+        await yieldToBrowserFrame();
+      }
+    }
+
+    root.appendChild(fragment);
   }
 
   // Collapse distance-threshold cards as a group under a single "See More" control.
@@ -4663,7 +4690,7 @@
         cards.push(card("Record of Survey", "None within 1600m of parcel centroid", [["Note","Increase search distance in code if needed."]], []));
       }
 
-      setSummaryCards(cards);
+      await setSummaryCards(cards);
       // Re-init utility radius slider now that its card is in the DOM.
       if (state.utilityLocations.length) afterUtilitiesLoadedOrUpdated();
       if (aliquotSummaryCpfTargets.length) {
