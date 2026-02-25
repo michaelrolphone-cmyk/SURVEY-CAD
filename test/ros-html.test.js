@@ -52,8 +52,10 @@ test('RecordQuarry.html renders nearby subdivision polygons/cards and plat thumb
   assert.match(html, /drawSubdivisionPolygons\(nearbySubdivisionEntries\)/, 'lookup should draw each nearby subdivision polygon on the map');
   assert.match(html, /SUBDIVISION_PLAT_LIST_URL\s*=\s*'\/api\/recordquarry\/subdivision-plats\/page-list'/, 'lookup should source plat index data from Ada County subdivision list');
   assert.match(html, /function\s+buildSubdivisionPlatThumbnailUrl\s*\(/, 'subdivision plat cards should build thumbnails through a dedicated plat-thumbnail helper.');
+  assert.match(html, /function\s+isDeferredApiThumbnailUrl\s*\(/, 'subdivision plat cards should detect API-backed thumbnails that require deferred generation polling.');
   assert.match(html, /\/api\/project-files\/ros-thumbnail\?\$\{new URLSearchParams\(\{ source: sourceUrl \}\)\}/, 'subdivision TIFF plat thumbnails should flow through the ros-thumbnail API endpoint.');
   assert.match(html, /buildRosPdfProxyUrl\(sourceUrl\)/, 'subdivision PDF plat thumbnails should still proxy remote PDFs through the API before thumbnail rendering.');
+  assert.match(html, /data-ros-thumbnail=/, 'subdivision plat cards should use deferred thumbnail loading for API-generated ROS/PDF thumbnails.');
   assert.match(html, /Open subdivision plat/, 'subdivision cards should include direct plat links');
   assert.match(html, /setSubdivisionSelected\(entry, idx, next\)/, 'subdivision cards should support star-based include/exclude toggles');
   assert.match(html, /function\s+extractSubdivisionSourceIdentifiers\s*\(/, 'subdivision plat matching should derive identifier hints from subdivision attributes for resilient list matching');

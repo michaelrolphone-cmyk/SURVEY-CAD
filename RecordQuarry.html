@@ -2429,8 +2429,11 @@
     const trimmed = String(rawPath || '').trim();
     if (!trimmed) return null;
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    const noLeadingSlash = trimmed.replace(/^\/+/, '');
-    return `${SUBDIVISION_PLAT_BASE_URL}${noLeadingSlash}`;
+    const normalizedPath = trimmed
+      .replace(/\\+/g, '/')
+      .replace(/^\/+/, '');
+    if (!normalizedPath) return null;
+    return `${SUBDIVISION_PLAT_BASE_URL}${normalizedPath}`;
   }
 
   function buildSubdivisionPlatThumbnailUrl(platUrl = '') {
@@ -2448,13 +2451,18 @@
     return sourceUrl;
   }
 
+  function isDeferredApiThumbnailUrl(url = '') {
+    const value = String(url || '').trim();
+    return value.startsWith('/api/project-files/ros-thumbnail?') || value.startsWith('/api/project-files/pdf-thumbnail?');
+  }
+
   function parseSubdivisionPlatListLine(line) {
     const raw = String(line || '').trim();
     if (!raw || raw.startsWith('#') || raw.startsWith('//')) return null;
 
     const parts = raw.split(/[|	,]+/).map((part) => part.trim()).filter(Boolean);
     const urlMatch = raw.match(/https?:\/\/[^\s]+/i);
-    const fileMatch = raw.match(/[A-Za-z0-9._\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
+    const fileMatch = raw.match(/[A-Za-z0-9._\\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
     const resolvedPath = urlMatch?.[0] || fileMatch?.[0] || '';
 
     let titlePart = raw;
@@ -4236,7 +4244,13 @@
                 if (body) {
                   const wrap = document.createElement('div');
                   wrap.style.marginTop = '8px';
-                  wrap.innerHTML = `<img class="ros-scan-thumb" loading="lazy" alt="${escapeHtml(subdivisionName)} plat thumbnail" src="${escapeHtml(plat.thumbnailUrl)}"/>`;
+                  const thumbUrl = String(plat.thumbnailUrl || '').trim();
+                  if (thumbUrl) {
+                    const deferredThumbAttr = isDeferredApiThumbnailUrl(thumbUrl)
+                      ? ` data-ros-thumbnail="${escapeHtml(thumbUrl)}"`
+                      : ` src="${escapeHtml(thumbUrl)}"`;
+                    wrap.innerHTML = `<img class="ros-scan-thumb" loading="lazy" alt="${escapeHtml(subdivisionName)} plat thumbnail"${deferredThumbAttr}/>`;
+                  }
                   body.appendChild(wrap);
                 }
               }
