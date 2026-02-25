@@ -129,10 +129,15 @@ test('launcher fetches and applies static map background for active project addr
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
   assert.match(launcherHtml, /const\s+backgroundMapUrlCache\s*=\s*new Map\(\);/, 'launcher should cache map background URLs per address');
+  assert.match(launcherHtml, /const\s+backgroundGeocodeCache\s*=\s*new Map\(\);/, 'launcher should cache geocode results per normalized address on the client');
+  assert.match(launcherHtml, /const\s+backgroundGeocodeInFlight\s*=\s*new Map\(\);/, 'launcher should dedupe in-flight geocode requests for duplicate addresses');
   assert.match(launcherHtml, /function\s+setLauncherBackground\(mapUrl = ''\)/, 'launcher should support dynamic background switching');
   assert.match(launcherHtml, /function\s+buildStaticMapUrl\(lat, lon, address = ''\)/, 'launcher should derive static map URL from geocoded coordinates');
   assert.match(launcherHtml, /new URL\('\/api\/static-map',\s*window\.location\.origin\)/, 'launcher should build static map URLs through the local static map proxy endpoint');
-  assert.match(launcherHtml, /fetch\(`\/api\/geocode\?address=\$\{encodeURIComponent\(address\)\}`\)/, 'launcher should geocode active project address before rendering map background');
+  assert.match(launcherHtml, /async\s+function\s+getCachedGeocodeForAddress\(address = ''\)/, 'launcher should centralize geocode lookup through a client cache helper');
+  assert.match(launcherHtml, /if \(backgroundGeocodeInFlight\.has\(cacheKey\)\) \{[\s\S]*return backgroundGeocodeInFlight\.get\(cacheKey\);[\s\S]*\}/, 'launcher should reuse an in-flight geocode request instead of issuing duplicate fetches');
+  assert.match(launcherHtml, /backgroundGeocodeCache\.set\(cacheKey, normalizedGeocode\);/, 'launcher should persist successful geocodes for future reuse');
+  assert.match(launcherHtml, /const\s+geocode\s*=\s*await\s+getCachedGeocodeForAddress\(address\);/, 'launcher should use client-side cached geocodes when rendering map backgrounds');
   assert.match(launcherHtml, /if \(!Number\.isFinite\(geocode\?\.lat\) \|\| !Number\.isFinite\(geocode\?\.lon\)\)/, 'launcher should validate geocode coordinates before using them');
   assert.match(launcherHtml, /syncActiveProjectBackground\(\);/, 'renderProjects should refresh the launcher background for active project changes');
 });
