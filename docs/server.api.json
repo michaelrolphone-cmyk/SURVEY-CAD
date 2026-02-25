@@ -2036,7 +2036,18 @@
           "400": {
             "$ref": "#/components/responses/Error400"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "overwrite",
+            "in": "query",
+            "required": false,
+            "description": "When true for batch upserts, replace existing project records in this collection with only the submitted entries.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ]
       }
     },
     "/api/projects/{projectId}/cpfs/{cpfId}": {
@@ -2087,7 +2098,7 @@
           "CP&F Records"
         ],
         "summary": "Update (upsert) a CP&F record",
-        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectCpf",
         "requestBody": {
           "required": true,
@@ -3885,7 +3896,18 @@
           "400": {
             "$ref": "#/components/responses/Error400"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "overwrite",
+            "in": "query",
+            "required": false,
+            "description": "When true for batch upserts, replace existing project records in this collection with only the submitted entries.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ]
       }
     },
     "/api/projects/{projectId}/ros/{rosId}": {
@@ -3936,7 +3958,7 @@
           "ROS Records"
         ],
         "summary": "Update (upsert) a ROS record",
-        "description": "Updates the record identified by `rosId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `rosId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectRos",
         "requestBody": {
           "required": true,
@@ -4138,7 +4160,18 @@
           "400": {
             "$ref": "#/components/responses/Error400"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "overwrite",
+            "in": "query",
+            "required": false,
+            "description": "When true for batch upserts, replace existing project records in this collection with only the submitted entries.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ]
       }
     },
     "/api/projects/{projectId}/plats/{platId}": {
@@ -4189,7 +4222,7 @@
           "Plat Records"
         ],
         "summary": "Update (upsert) a plat record",
-        "description": "Updates the record identified by `platId`. Acts as upsert — creates the record if it does not exist.",
+        "description": "Updates the record identified by `platId`. Acts as upsert \u2014 creates the record if it does not exist.",
         "operationId": "replaceProjectPlat",
         "requestBody": {
           "required": true,
@@ -7084,6 +7117,10 @@
               "$ref": "#/components/schemas/ProjectCpfMutationRequest"
             },
             "description": "Array of CP&F entries to upsert. Entries missing `instrument` are silently skipped."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "When true, remove existing project records in this collection that are not present in this batch payload."
           }
         },
         "required": [
@@ -8034,6 +8071,10 @@
             "items": {
               "$ref": "#/components/schemas/ProjectPlatMutationRequest"
             }
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "When true, remove existing project records in this collection that are not present in this batch payload."
           }
         }
       },
@@ -8256,6 +8297,10 @@
               "$ref": "#/components/schemas/ProjectRosMutationRequest"
             },
             "description": "Array of ROS entries to upsert. Entries missing `rosNumber` are silently skipped."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "When true, remove existing project records in this collection that are not present in this batch payload."
           }
         },
         "required": [

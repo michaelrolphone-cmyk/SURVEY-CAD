@@ -525,6 +525,10 @@
     <!-- RIGHT -->
     <div class="panel">
       <button id="btnExportPointForge" class="workflowPrimary workflowAction" disabled title="Sends aliquot corner coordinates to PointForge">Export to PointForge</button>
+      <label style="display:flex;align-items:center;gap:8px;margin:8px 0 2px;color:var(--muted);font-size:12px;">
+        <input id="overwriteEvidenceRecords" type="checkbox" style="margin:0"/>
+        Overwrite CP&amp;F, Record of Survey, and Subdivision records in EvidenceDesk on export
+      </label>
       <div class="pbody rightBody">
         <div class="mapWrap">
           <div id="map"></div>
@@ -971,6 +975,14 @@
     }
   }
 
+
+  function replaceProjectFileFolderResources(projectFile, folderKey, resources = []) {
+    const folder = ensureProjectFileFolder(projectFile, folderKey);
+    if (!folder) return;
+    folder.index = [];
+    for (const resource of resources) addProjectFileResource(projectFile, resource);
+  }
+
   function resolveProjectContextForProjectFile(projectContext = {}) {
     if (projectContext?.projectId) return projectContext;
     const runtimeContext = getProjectContext();
@@ -983,7 +995,7 @@
     return projectContext;
   }
 
-  async function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount }) {
+  async function persistPointForgeExportProjectFile({ projectContext = {}, notesByCoordinate, csv, pointCount, overwriteEvidenceRecords = false }) {
     const resolvedProjectContext = resolveProjectContextForProjectFile(projectContext);
     if (!resolvedProjectContext.projectId) return null;
 
@@ -996,9 +1008,12 @@
     const selectedSubdivisions = getSelectedSubdivisionEntries(state.nearbySubdivisions)
       .map((entry, index) => ({ entry, index }));
     const platsPayload = [];
+    const cpfResources = [];
+    const platResources = [];
+    const rosResources = [];
 
     for (const instrument of cpfInstruments) {
-      addProjectFileResource(projectFile, {
+      const resource = {
         id: `cpf-${slugify(instrument, 'instrument')}`,
         folder: 'cpfs',
         title: `CP&F ${instrument}`,
@@ -1009,10 +1024,13 @@
           resolverHint: 'lookup-cpf-pdf',
           metadata: { instrument },
         },
-      });
+      };
+      cpfResources.push(resource);
+      addProjectFileResource(projectFile, resource);
     }
 
     for (const { entry, index } of selectedSubdivisions) {
+
       const feature = entry?.feature || null;
       if (!feature) continue;
       const attrs = feature.attributes || {};
@@ -1022,7 +1040,7 @@
       const subdivisionMetadata = buildSubdivisionMetadataForExport(entry, index);
       const sourceId = String(subdivisionMetadata.sourceId || `${index + 1}`).trim();
       const platId = slugify(`${subdivisionName}-${sourceId}`, `subdivision-${index + 1}`);
-      addProjectFileResource(projectFile, {
+      const resource = {
         id: `plat-${platId}`,
         folder: 'plats',
         title: subdivisionName,
@@ -1033,7 +1051,9 @@
           resolverHint: 'subdivision-plat',
           metadata: subdivisionMetadata,
         },
-      });
+      };
+      platResources.push(resource);
+      addProjectFileResource(projectFile, resource);
       platsPayload.push({
         platId,
         subdivisionName,
@@ -1061,7 +1081,7 @@
       const geolocation = deriveRosGeolocationForExport(feature);
       if (geolocation) metadata.geolocation = geolocation;
       const rosId = slugify(rosNumber, `ros-${index + 1}`);
-      addProjectFileResource(projectFile, {
+      const resource = {
         id: `ros-${rosId}`,
         folder: 'ros',
         title: label,
@@ -1082,7 +1102,9 @@
             starredInFieldBook: true,
           },
         },
-      });
+      };
+      rosResources.push(resource);
+      addProjectFileResource(projectFile, resource);
       rosPayload.push({
         rosId,
         rosNumber,
@@ -1094,6 +1116,12 @@
         geolocation,
         starredInFieldBook: true,
       });
+    }
+
+    if (overwriteEvidenceRecords) {
+      replaceProjectFileFolderResources(projectFile, 'cpfs', cpfResources);
+      replaceProjectFileFolderResources(projectFile, 'plats', platResources);
+      replaceProjectFileFolderResources(projectFile, 'ros', rosResources);
     }
 
     addProjectFileResource(projectFile, {
@@ -1118,7 +1146,7 @@
     saveProjectFileSnapshot(resolvedProjectContext, projectFile);
 
     // Persist CP&F records server-side so EvidenceDesk can display them.
-    if (cpfInstruments.length && resolvedProjectContext.projectId) {
+    if (resolvedProjectContext.projectId && (overwriteEvidenceRecords || cpfInstruments.length)) {
       try {
         const cpfsPayload = cpfInstruments.map((instrument) => ({
           instrument,
@@ -1128,31 +1156,31 @@
         await fetch(`/api/projects/${encodeURIComponent(resolvedProjectContext.projectId)}/cpfs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cpfs: cpfsPayload }),
+          body: JSON.stringify({ cpfs: cpfsPayload, overwrite: overwriteEvidenceRecords }),
         });
       } catch {
         // Non-fatal: server sync is best-effort; local snapshot was already saved.
       }
     }
 
-    if (platsPayload.length && resolvedProjectContext.projectId) {
+    if (resolvedProjectContext.projectId && (overwriteEvidenceRecords || platsPayload.length)) {
       try {
         await fetch(`/api/projects/${encodeURIComponent(resolvedProjectContext.projectId)}/plats`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plats: platsPayload }),
+          body: JSON.stringify({ plats: platsPayload, overwrite: overwriteEvidenceRecords }),
         });
       } catch {
         // Non-fatal: server sync is best-effort; local snapshot was already saved.
       }
     }
 
-    if (rosPayload.length && resolvedProjectContext.projectId) {
+    if (resolvedProjectContext.projectId && (overwriteEvidenceRecords || rosPayload.length)) {
       try {
         await fetch(`/api/projects/${encodeURIComponent(resolvedProjectContext.projectId)}/ros`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ros: rosPayload }),
+          body: JSON.stringify({ ros: rosPayload, overwrite: overwriteEvidenceRecords }),
         });
       } catch {
         // Non-fatal: server sync is best-effort; local snapshot was already saved.
@@ -4918,6 +4946,7 @@
         notesByCoordinate,
         csv: pointForgeCsv,
         pointCount: uniquePart.count + utilityRows.count,
+        overwriteEvidenceRecords: Boolean($("overwriteEvidenceRecords")?.checked),
       });
       if (projectFileUpdate) {
         log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references, ${projectFileUpdate.rosCount || 0} ROS references, ${projectFileUpdate.subdivisionCount || 0} subdivision plat references).`);

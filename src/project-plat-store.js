@@ -165,15 +165,17 @@ export async function createOrUpdateProjectPlat(store, {
   return { plat: record, sync: result, created: !existing };
 }
 
-export async function batchUpsertProjectPlats(store, projectIdRaw, entries = []) {
+export async function batchUpsertProjectPlats(store, projectIdRaw, entries = [], options = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
   if (!projectId) throw new Error('projectId is required.');
-  if (!Array.isArray(entries) || !entries.length) return { plats: [], sync: null };
+  const overwriteExisting = Boolean(options?.overwriteExisting);
+  if (!Array.isArray(entries)) return { plats: [], sync: null };
 
   const now = nowIso();
   const state = await Promise.resolve(store.getState());
   const snapshot = state?.snapshot || {};
   const index = parseSnapshotJson(snapshot, platIndexKey(projectId)) || {};
+  const existingIds = new Set(Object.keys(index));
 
   const operations = [];
   const savedPlats = [];
@@ -185,6 +187,7 @@ export async function batchUpsertProjectPlats(store, projectIdRaw, entries = [])
     const platId = normalizePlatId(entry?.platId) || derivePlatId(subdivisionName);
     if (!platId) continue;
 
+    existingIds.delete(platId);
     const existing = parseSnapshotJson(snapshot, platKey(projectId, platId));
     const record = {
       schemaVersion: '1.0.0',
@@ -206,6 +209,13 @@ export async function batchUpsertProjectPlats(store, projectIdRaw, entries = [])
     index[platId] = buildPlatSummary(record);
     operations.push({ type: 'set', key: platKey(projectId, platId), value: JSON.stringify(record) });
     savedPlats.push(record);
+  }
+
+  if (overwriteExisting) {
+    for (const platId of existingIds) {
+      delete index[platId];
+      operations.push({ type: 'remove', key: platKey(projectId, platId) });
+    }
   }
 
   if (!operations.length) return { plats: [], sync: null };

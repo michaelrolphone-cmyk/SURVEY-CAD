@@ -68,3 +68,15 @@ test('batchUpsertProjectPlats preserves existing star state when omitted and app
   const starredOff = await batchUpsertProjectPlats(store, 'proj-2', [{ subdivisionName: 'RIVER RUN', starredInFieldBook: false }]);
   assert.equal(starredOff.plats[0].starredInFieldBook, false);
 });
+
+
+test('batchUpsertProjectPlats can overwrite existing project records when requested', async () => {
+  const store = createMockStore();
+
+  await batchUpsertProjectPlats(store, 'proj-overwrite', [{ subdivisionName: 'SUNSET ACRES' }]);
+  await batchUpsertProjectPlats(store, 'proj-overwrite', [{ subdivisionName: 'PINE RIDGE' }], { overwriteExisting: true });
+
+  const summaries = await listProjectPlats(store, 'proj-overwrite');
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].subdivisionName, 'PINE RIDGE');
+});

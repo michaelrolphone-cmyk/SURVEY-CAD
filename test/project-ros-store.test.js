@@ -114,3 +114,15 @@ test('createOrUpdateProjectRos persists thumbnailUrl without requiring duplicati
   assert.equal(summaries[0].thumbnailUrl, '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fros%2FR7000101.tif');
   assert.deepEqual(summaries[0].metadata, { rosName: 'SAMPLE ROS' });
 });
+
+
+test('batchUpsertProjectRos can overwrite existing project records when requested', async () => {
+  const store = createMockStore();
+
+  await batchUpsertProjectRos(store, 'proj-overwrite', [{ rosNumber: '30001' }]);
+  await batchUpsertProjectRos(store, 'proj-overwrite', [{ rosNumber: '40001' }], { overwriteExisting: true });
+
+  const summaries = await listProjectRos(store, 'proj-overwrite');
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].rosNumber, '40001');
+});

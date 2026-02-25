@@ -307,3 +307,15 @@ test('RecordQuarry.html passes active project context when opening PointForge fr
   assert.match(html, /if \(projectId\) params\.set\('projectId', projectId\);/, 'PointForge handoff helper should include active project id when available');
   assert.match(html, /if \(projectName\) params\.set\('projectName', projectName\);/, 'PointForge handoff helper should include active project name when available');
 });
+
+test('RecordQuarry.html provides overwrite option for EvidenceDesk record export replacement', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /id="overwriteEvidenceRecords"\s+type="checkbox"/, 'RecordQuarry should render an overwrite checkbox for EvidenceDesk record export.');
+  assert.match(html, /async\s+function\s+persistPointForgeExportProjectFile\s*\(\{[\s\S]*overwriteEvidenceRecords\s*=\s*false/, 'PointForge project-file persistence should accept an overwrite option.');
+  assert.match(html, /replaceProjectFileFolderResources\(projectFile, 'cpfs', cpfResources\);[\s\S]*replaceProjectFileFolderResources\(projectFile, 'plats', platResources\);[\s\S]*replaceProjectFileFolderResources\(projectFile, 'ros', rosResources\);/, 'Overwrite mode should replace CP&F, plat, and ROS project-file folders during export.');
+  assert.match(html, /body:\s*JSON\.stringify\(\{ cpfs: cpfsPayload, overwrite: overwriteEvidenceRecords \}\)/, 'CP&F sync should send overwrite intent to the API.');
+  assert.match(html, /body:\s*JSON\.stringify\(\{ plats: platsPayload, overwrite: overwriteEvidenceRecords \}\)/, 'Plat sync should send overwrite intent to the API.');
+  assert.match(html, /body:\s*JSON\.stringify\(\{ ros: rosPayload, overwrite: overwriteEvidenceRecords \}\)/, 'ROS sync should send overwrite intent to the API.');
+  assert.match(html, /overwriteEvidenceRecords:\s*Boolean\(\$\("overwriteEvidenceRecords"\)\?\.checked\)/, 'PointForge handoff should read overwrite state from the export checkbox.');
+});

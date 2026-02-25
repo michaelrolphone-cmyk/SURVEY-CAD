@@ -68,3 +68,15 @@ test('batchUpsertProjectCpfs preserves existing star state when omitted and appl
   const starredOff = await batchUpsertProjectCpfs(store, 'proj-2', [{ instrument: '2024-99999', starredInFieldBook: false }]);
   assert.equal(starredOff.cpfs[0].starredInFieldBook, false);
 });
+
+
+test('batchUpsertProjectCpfs can overwrite existing project records when requested', async () => {
+  const store = createMockStore();
+
+  await batchUpsertProjectCpfs(store, 'proj-overwrite', [{ instrument: '2024-20000' }]);
+  await batchUpsertProjectCpfs(store, 'proj-overwrite', [{ instrument: '2024-30000' }], { overwriteExisting: true });
+
+  const summaries = await listProjectCpfs(store, 'proj-overwrite');
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].instrument, '2024-30000');
+});
