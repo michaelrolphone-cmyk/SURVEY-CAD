@@ -885,6 +885,12 @@
       return rosId ? `${base}/${encodeURIComponent(rosId)}` : base;
     }
 
+    function buildProjectPlatApiUrl(projectId = '', platId = '') {
+      if (!projectId) return '';
+      const base = `/api/projects/${encodeURIComponent(projectId)}/plats`;
+      return platId ? `${base}/${encodeURIComponent(platId)}` : base;
+    }
+
     function mapApiCpfToResource(cpf = {}) {
       const instrument = String(cpf.instrument || '').trim();
       const cpfId = String(cpf.cpfId || '').trim();
@@ -953,6 +959,44 @@
       const folder = projectContext.projectFile?.folders?.find((entry) => entry.key === 'ros');
       if (!folder) return;
       folder.index = list.map((entry) => mapApiRosToResource(entry));
+      saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
+    }
+
+    function mapApiPlatToResource(plat = {}) {
+      const subdivisionName = String(plat.subdivisionName || '').trim();
+      const platId = String(plat.platId || '').trim();
+      const title = String(plat.title || subdivisionName || 'Subdivision Plat').trim();
+      return {
+        id: platId,
+        folder: 'plats',
+        title,
+        exportFormat: 'pdf',
+        reference: {
+          type: 'external',
+          value: String(plat.platUrl || subdivisionName || '').trim(),
+          resolverHint: 'subdivision-plat',
+          metadata: {
+            source: plat.source || '',
+            subdivisionName,
+            platId,
+            platUrl: String(plat.platUrl || '').trim(),
+            thumbnailUrl: String(plat.thumbnailUrl || '').trim(),
+            starredInFieldBook: Boolean(plat.starredInFieldBook),
+          },
+        },
+      };
+    }
+
+    async function syncProjectPlatsFromApi(projectContext = {}) {
+      if (!projectContext?.activeProjectId || !projectContext?.projectFile) return;
+      const response = await fetch(buildProjectPlatApiUrl(projectContext.activeProjectId));
+      if (!response.ok) throw new Error(`Unable to list project plat records (${response.status}).`);
+      const payload = await response.json();
+      const list = Array.isArray(payload?.plats) ? payload.plats : [];
+
+      const folder = projectContext.projectFile?.folders?.find((entry) => entry.key === 'plats');
+      if (!folder) return;
+      folder.index = list.map((entry) => mapApiPlatToResource(entry));
       saveStoredProjectFile(window.localStorage, projectContext.activeProjectId, projectContext.projectFile);
     }
 
@@ -1934,6 +1978,7 @@
           }
           await syncProjectCpfsFromApi(projectContext);
           await syncProjectRosFromApi(projectContext);
+          await syncProjectPlatsFromApi(projectContext);
         } catch (err) {
           renderError(`Could not delete CP&F from server: ${err.message}`);
           return;
@@ -3779,6 +3824,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
           try {
             await syncProjectCpfsFromApi(projectContext);
             await syncProjectRosFromApi(projectContext);
+            await syncProjectPlatsFromApi(projectContext);
           } catch {}
         }
         renderTree(storedProjectFile, projectContext);
@@ -3813,6 +3859,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
           try {
             await syncProjectCpfsFromApi(projectContext);
             await syncProjectRosFromApi(projectContext);
+            await syncProjectPlatsFromApi(projectContext);
           } catch {}
         }
         renderTree(payload.projectFile, projectContext);
