@@ -1346,6 +1346,8 @@ header {
     let activeProjectId = null;
     let isSavingProjectForm = false;
     const backgroundMapUrlCache = new Map();
+    const backgroundGeocodeCache = new Map();
+    const backgroundGeocodeInFlight = new Map();
     let backgroundRequestToken = 0;
     const projectMetadataSyncInFlight = new Map();
     let resolveLeaveLineSmithChoice = null;
@@ -1581,6 +1583,42 @@ header {
       };
     }
 
+    async function getCachedGeocodeForAddress(address = '') {
+      const normalizedAddress = String(address || '').trim();
+      if (!normalizedAddress) return null;
+
+      const cacheKey = normalizedAddress.toLowerCase();
+      if (backgroundGeocodeCache.has(cacheKey)) {
+        return backgroundGeocodeCache.get(cacheKey);
+      }
+      if (backgroundGeocodeInFlight.has(cacheKey)) {
+        return backgroundGeocodeInFlight.get(cacheKey);
+      }
+
+      const requestPromise = (async () => {
+        const response = await fetch(`/api/geocode?address=${encodeURIComponent(normalizedAddress)}`);
+        if (!response.ok) {
+          throw new Error(`Failed geocode (${response.status})`);
+        }
+
+        const geocode = await response.json();
+        if (!Number.isFinite(geocode?.lat) || !Number.isFinite(geocode?.lon)) {
+          throw new Error('Geocode response missing lat/lon');
+        }
+
+        const normalizedGeocode = { lat: geocode.lat, lon: geocode.lon };
+        backgroundGeocodeCache.set(cacheKey, normalizedGeocode);
+        return normalizedGeocode;
+      })();
+
+      backgroundGeocodeInFlight.set(cacheKey, requestPromise);
+      try {
+        return await requestPromise;
+      } finally {
+        backgroundGeocodeInFlight.delete(cacheKey);
+      }
+    }
+
     async function syncActiveProjectBackground() {
       const activeProject = getActiveProject();
       const address = activeProject?.address?.trim();
@@ -1598,17 +1636,8 @@ header {
       }
 
       try {
-        const response = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
-        if (!response.ok) {
-          throw new Error(`Failed geocode (${response.status})`);
-        }
-
-        const geocode = await response.json();
+        const geocode = await getCachedGeocodeForAddress(address);
         if (requestToken !== backgroundRequestToken) return;
-
-        if (!Number.isFinite(geocode?.lat) || !Number.isFinite(geocode?.lon)) {
-          throw new Error('Geocode response missing lat/lon');
-        }
 
         const mapUrl = buildStaticMapUrl(geocode.lat, geocode.lon, address);
         backgroundMapUrlCache.set(cacheKey, mapUrl);
