@@ -95,3 +95,22 @@ test('createOrUpdateProjectRos stores source metadata in detail and summary view
   assert.equal(summaries.length, 1);
   assert.deepEqual(summaries[0].metadata, metadata);
 });
+
+
+test('createOrUpdateProjectRos persists thumbnailUrl without requiring duplication inside metadata', async () => {
+  const store = createMockStore();
+
+  const created = await createOrUpdateProjectRos(store, {
+    projectId: 'proj-4',
+    rosNumber: '70001',
+    mapImageUrl: 'https://example.test/ros/R7000101.tif',
+    thumbnailUrl: '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fros%2FR7000101.tif',
+    metadata: { rosName: 'SAMPLE ROS' },
+  });
+
+  assert.equal(created.ros.thumbnailUrl, '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fros%2FR7000101.tif');
+
+  const summaries = await listProjectRos(store, 'proj-4');
+  assert.equal(summaries[0].thumbnailUrl, '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fros%2FR7000101.tif');
+  assert.deepEqual(summaries[0].metadata, { rosName: 'SAMPLE ROS' });
+});

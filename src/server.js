@@ -2574,6 +2574,7 @@ export function createSurveyServer({
             title: body.title,
             source: body.source,
             mapImageUrl: body.mapImageUrl,
+            thumbnailUrl: body.thumbnailUrl,
             metadata: body.metadata,
             starredInFieldBook: body.starredInFieldBook,
           });
@@ -2604,6 +2605,7 @@ export function createSurveyServer({
             title: body.title,
             source: body.source,
             mapImageUrl: body.mapImageUrl,
+            thumbnailUrl: body.thumbnailUrl,
             metadata: body.metadata,
             starredInFieldBook: body.starredInFieldBook,
           });
