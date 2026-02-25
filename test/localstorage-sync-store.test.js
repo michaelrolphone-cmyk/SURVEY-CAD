@@ -115,3 +115,44 @@ test('applyDifferentialBatch skips diffs with no valid operations', () => {
   });
   assert.equal(result.status, 'no-op');
 });
+
+
+test('local storage sync store strips ROS unlisted keys from incoming snapshots', () => {
+  const store = new LocalStorageSyncStore();
+  const result = store.syncIncoming({
+    version: 3,
+    snapshot: {
+      'project:ros:project-1771091842263-k8jaf:unlisted-1': 'server-only',
+      surveyfoundryProjectFile: '{"id":"p-1"}',
+    },
+  });
+
+  assert.equal(result.status, 'server-updated');
+  assert.deepEqual(result.state.snapshot, {
+    surveyfoundryProjectFile: '{"id":"p-1"}',
+  });
+});
+
+test('local storage sync store ignores differential operations targeting ROS unlisted keys', () => {
+  const store = new LocalStorageSyncStore({
+    version: 1,
+    snapshot: { surveyfoundryProjectFile: '{"id":"p-1"}' },
+  });
+  const before = store.getState();
+
+  const result = store.applyDifferential({
+    baseChecksum: before.checksum,
+    operations: [
+      { type: 'set', key: 'project:ros:project-1771091842263-k8jaf:unlisted-1', value: 'ignore-me' },
+      { type: 'set', key: 'surveyfoundryProjectFile', value: '{"id":"p-2"}' },
+    ],
+  });
+
+  assert.equal(result.status, 'applied');
+  assert.deepEqual(result.operations, [
+    { type: 'set', key: 'surveyfoundryProjectFile', value: '{"id":"p-2"}' },
+  ]);
+  assert.deepEqual(result.state.snapshot, {
+    surveyfoundryProjectFile: '{"id":"p-2"}',
+  });
+});

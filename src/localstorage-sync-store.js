@@ -5,12 +5,24 @@ const DEFAULT_STATE = Object.freeze({
   updatedAt: null,
 });
 
+const SERVER_ONLY_KEY_PATTERNS = [
+  /^project:ros:project-[^:]+:unlisted-\d+$/,
+];
+
+function shouldPersistSnapshotKey(key) {
+  const normalizedKey = String(key || '');
+  if (!normalizedKey) return false;
+  return !SERVER_ONLY_KEY_PATTERNS.some((pattern) => pattern.test(normalizedKey));
+}
+
 function cloneSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
     return {};
   }
   return Object.fromEntries(
-    Object.entries(snapshot).map(([key, value]) => [String(key), String(value)]),
+    Object.entries(snapshot)
+      .map(([key, value]) => [String(key), String(value)])
+      .filter(([key]) => shouldPersistSnapshotKey(key)),
   );
 }
 
@@ -39,16 +51,20 @@ export function computeSnapshotChecksum(snapshot = {}) {
 function normalizeOperation(operation = {}) {
   const type = operation?.type;
   if (type === 'set') {
+    const key = String(operation.key || '');
+    if (!shouldPersistSnapshotKey(key)) return null;
     return {
       type: 'set',
-      key: String(operation.key || ''),
+      key,
       value: String(operation.value ?? ''),
     };
   }
   if (type === 'remove') {
+    const key = String(operation.key || '');
+    if (!shouldPersistSnapshotKey(key)) return null;
     return {
       type: 'remove',
-      key: String(operation.key || ''),
+      key,
     };
   }
   if (type === 'clear') {
