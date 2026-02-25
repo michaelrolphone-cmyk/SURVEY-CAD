@@ -46,11 +46,14 @@ test('RecordQuarry.html renders nearby subdivision polygons/cards and plat thumb
   assert.match(html, /const\s+nearbyWithPlatData\s*=\s*await\s*attachSubdivisionPlatData\(/, 'lookup should enrich nearby subdivisions with plat metadata');
   assert.match(html, /function\s+drawSubdivisionPolygons\s*\(/, 'lookup should define a subdivision polygon renderer for nearby features');
   assert.match(html, /drawSubdivisionPolygons\(nearbySubdivisionEntries\)/, 'lookup should draw each nearby subdivision polygon on the map');
-  assert.match(html, /SUBDIVISION_PLAT_LIST_URL\s*=\s*'https:\/\/adacountyassessor\.org\/docs\/subdivisionplats\/SubsPageList\.txt'/, 'lookup should source plat index data from Ada County subdivision list');
+  assert.match(html, /SUBDIVISION_PLAT_LIST_URL\s*=\s*'\/api\/recordquarry\/subdivision-plats\/page-list'/, 'lookup should source plat index data from Ada County subdivision list');
   assert.match(html, /\/api\/project-files\/pdf-thumbnail\?\$\{new URLSearchParams\(\{ source: platUrl \}\)\}/, 'subdivision plat cards should resolve PDF thumbnails through the cached thumbnail API');
   assert.match(html, /Open subdivision plat/, 'subdivision cards should include direct plat links');
   assert.match(html, /setSubdivisionSelected\(entry, idx, next\)/, 'subdivision cards should support star-based include/exclude toggles');
+  assert.match(html, /function\s+extractSubdivisionSourceIdentifiers\s*\(/, 'subdivision plat matching should derive identifier hints from subdivision attributes for resilient list matching');
+  assert.match(html, /platDocId,\s*platPage,/, 'subdivision plat parser should capture document id/page metadata from SubsPageList references');
   assert.match(html, /selectedSubdivisionKeys:\s*new\s+Set\(\)/, 'lookup should initialize subdivision selection state for export');
+  assert.match(html, /Place Subdivision, Township, Section, and Utilities above Aliquots/, 'lookup flow should build subdivision cards in the summary card stack before ROS rendering');
 });
 test('RecordQuarry.html keeps ROS scoped to containing section and includes popup PDF links', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
@@ -128,6 +131,7 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   assert.match(html, /folder:\s*'plats'[\s\S]*resolverHint:\s*'subdivision-plat'/, 'PointForge export project file should write starred subdivisions into plats folder');
   assert.match(html, /folder:\s*'ros'[\s\S]*reference:\s*\{[\s\S]*type:\s*'ros-number'/, 'PointForge export project file should add selected ROS references');
   assert.match(html, /const\s+rosName\s*=\s*await\s*resolveRosNameForExport\(attrs,\s*imageMeta\);[\s\S]*const\s+label\s*=\s*rosName\s*\|\|\s*bestRosLabel\(attrs\)/, 'PointForge export should prefer the SurveysPageList ROS name for exported titles before falling back to attribute labels');
+  assert.match(html, /ADA_ROS_SURVEYS_PAGE_LIST_URL\s*=\s*'\/api\/recordquarry\/records-of-survey\/page-list'/, 'ROS title lookup should load SurveysPageList through a same-origin API endpoint to avoid CORS failures');
   assert.match(html, /metadata:\s*\{[\s\S]*title:\s*label,[\s\S]*mapImageUrl,[\s\S]*thumbnailUrl,[\s\S]*\.\.\.metadata,[\s\S]*starredInFieldBook:\s*true[\s\S]*\}/, 'PointForge project-file ROS metadata should flatten export fields and merge only non-duplicated supplemental metadata attributes');
   assert.match(html, /rosPayload\.push\(\{[\s\S]*title:\s*label,[\s\S]*mapImageUrl,[\s\S]*thumbnailUrl,[\s\S]*metadata,[\s\S]*starredInFieldBook:\s*true[\s\S]*\}\);/, 'project ROS sync payload should include resolved titles and thumbnail/map URLs while keeping supplemental metadata in a dedicated object');
   assert.match(html, /function\s+buildRosMetadataForExport\(attributes\s*=\s*\{\},\s*rosNameOverride\s*=\s*null\)\s*\{[\s\S]*return\s*\{[\s\S]*rosName,[\s\S]*rosSourceId,[\s\S]*aliquot,[\s\S]*sourceAttributes:[\s\S]*\};[\s\S]*\}/, 'supplemental ROS metadata helper should only emit non-duplicated metadata fields');
@@ -139,6 +143,8 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   assert.match(html, /const\s+projectFileUpdate\s*=\s*await\s+persistPointForgeExportProjectFile\(\{[\s\S]*notesByCoordinate,[\s\S]*pointCount:\s*uniquePart\.count/, 'PointForge export should save CP&F and point-file references to the project file when a project is active');
   assert.match(html, /fetch\(`\/api\/projects\/\$\{encodeURIComponent\(resolvedProjectContext\.projectId\)\}\/ros`/, 'PointForge export should sync selected ROS references to project ROS API for EvidenceDesk availability');
   assert.match(html, /fetch\(`\/api\/projects\/\$\{encodeURIComponent\(resolvedProjectContext\.projectId\)\}\/plats`/, 'PointForge export should sync starred subdivision plats to project plats API for EvidenceDesk availability');
+  assert.match(html, /function\s+buildSubdivisionMetadataForExport\s*\(/, 'PointForge export should build a subdivision metadata payload from feature, geometry, and list-document references');
+  assert.match(html, /metadata:\s*subdivisionMetadata/, 'starred subdivision plat sync payload should include the full subdivision metadata object');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'ROS should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*'survey-cad:navigate-app'[\s\S]*path,/, 'ROS should notify launcher iframe host to navigate embedded app');
   assert.match(html, /openLinkedApp\(buildPointForgeLaunchPath\(\)\)/, 'ROS should navigate PointForge using launcher-aware helper');

@@ -1352,6 +1352,7 @@ export function createSurveyServer({
   rosThumbnailRenderer = renderRosThumbnailFromBuffer,
   idahoHarvestSupervisor = createIdahoHarvestSupervisor(),
   mapTileObjectStore = null,
+  recordQuarryTextFetcher = fetch,
 } = {}) {
   let rosOcrHandlerPromise = rosOcrHandler ? Promise.resolve(rosOcrHandler) : null;
 
@@ -1445,6 +1446,18 @@ export function createSurveyServer({
       mapTileStorePromise = Promise.resolve().then(() => createIdahoHarvestObjectStoreFromEnv(process.env));
     }
     return mapTileStorePromise;
+  }
+
+  async function fetchRecordQuarryRemoteText(url) {
+    const resp = await recordQuarryTextFetcher(url, {
+      headers: {
+        'User-Agent': 'survey-cad/1.0 recordquarry-text-proxy',
+      },
+    });
+    if (!resp?.ok) {
+      throw createHttpError(502, `Failed to fetch RecordQuarry source text (HTTP ${resp?.status || 'unknown'}).`);
+    }
+    return await resp.text();
   }
 
   async function resolveMapTileDatasets() {
@@ -3593,6 +3606,24 @@ export function createSurveyServer({
           collectionPath: harvestArchiveSettings.plats.collectionPath,
         });
         sendJson(res, 200, { plats });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/recordquarry/subdivision-plats/page-list') {
+        const text = await fetchRecordQuarryRemoteText('https://adacountyassessor.org/docs/subdivisionplats/SubsPageList.txt');
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=1800');
+        res.end(text);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/recordquarry/records-of-survey/page-list') {
+        const text = await fetchRecordQuarryRemoteText('https://adacountyassessor.org/docs/recordsofsurvey/SurveysPageList.txt');
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=1800');
+        res.end(text);
         return;
       }
 

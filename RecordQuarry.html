@@ -605,7 +605,7 @@
   const LAST_LOOKUP_ADDRESS_STORAGE_KEY = "surveyfoundryLastLookupAddress";
   const SUBDIVISION_NEARBY_RADIUS_FT = 666;
   const SUBDIVISION_NEARBY_RADIUS_M = SUBDIVISION_NEARBY_RADIUS_FT * 0.3048;
-  const SUBDIVISION_PLAT_LIST_URL = 'https://adacountyassessor.org/docs/subdivisionplats/SubsPageList.txt';
+  const SUBDIVISION_PLAT_LIST_URL = '/api/recordquarry/subdivision-plats/page-list';
   const SUBDIVISION_PLAT_BASE_URL = 'https://adacountyassessor.org/docs/subdivisionplats/';
 
   // pdf.js worker
@@ -1019,7 +1019,8 @@
       const subdivisionName = String(entry?.name || getSubdivisionNameFromAttrs(attrs) || `Subdivision ${index + 1}`).trim();
       const platUrl = String(entry?.plat?.platUrl || '').trim();
       const thumbnailUrl = String(entry?.plat?.thumbnailUrl || '').trim();
-      const sourceId = String(attrs.OBJECTID ?? attrs.ObjectID ?? attrs.FID ?? `${index + 1}`).trim();
+      const subdivisionMetadata = buildSubdivisionMetadataForExport(entry, index);
+      const sourceId = String(subdivisionMetadata.sourceId || `${index + 1}`).trim();
       const platId = slugify(`${subdivisionName}-${sourceId}`, `subdivision-${index + 1}`);
       addProjectFileResource(projectFile, {
         id: `plat-${platId}`,
@@ -1030,15 +1031,7 @@
           type: 'external',
           value: platUrl || subdivisionName,
           resolverHint: 'subdivision-plat',
-          metadata: {
-            source: 'RecordQuarry',
-            subdivisionName,
-            sourceId,
-            platUrl,
-            thumbnailUrl,
-            starredInFieldBook: true,
-            attributes: attrs,
-          },
+          metadata: subdivisionMetadata,
         },
       });
       platsPayload.push({
@@ -1048,10 +1041,7 @@
         source: 'RecordQuarry',
         platUrl: platUrl || null,
         thumbnailUrl: thumbnailUrl || null,
-        metadata: {
-          sourceId,
-          attributes: attrs,
-        },
+        metadata: subdivisionMetadata,
         starredInFieldBook: true,
       });
     }
@@ -2367,7 +2357,8 @@
     const urlMatch = joined.match(/https?:\/\/[^\s]+/i);
     const fileMatch = joined.match(/[A-Za-z0-9._\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
     const resolvedPath = urlMatch?.[0] || fileMatch?.[0] || '';
-    const titlePart = parts[0] || '';
+    const titleCandidates = parts.filter((part) => part && part !== resolvedPath && !/\.(?:pdf|jpe?g|png|tiff?)$/i.test(part));
+    const titlePart = titleCandidates.sort((a, b) => b.length - a.length)[0] || parts[0] || '';
     if (!resolvedPath || !titlePart) return null;
 
     const normalizedName = sanitizeSubdivisionName(titlePart);
@@ -2376,14 +2367,39 @@
     const platUrl = buildSubdivisionPlatUrl(resolvedPath);
     if (!platUrl) return null;
 
+    const platDocMatch = String(resolvedPath).match(/\b(S\d{4,})(\d{2})?\.(?:pdf|jpe?g|png|tiff?)\b/i);
+    const platDocId = platDocMatch ? String(platDocMatch[1]).toUpperCase() : null;
+    const platPage = platDocMatch?.[2] ? Number.parseInt(platDocMatch[2], 10) : null;
+
     return {
       name: titlePart,
       normalizedName,
+      sourceLine: raw,
+      sourcePath: resolvedPath,
+      platDocId,
+      platPage,
       platUrl,
       thumbnailUrl: /\.pdf($|\?)/i.test(platUrl)
         ? `/api/project-files/pdf-thumbnail?${new URLSearchParams({ source: platUrl })}`
         : platUrl,
     };
+  }
+
+  function extractSubdivisionSourceIdentifiers(attrs = {}) {
+    const keys = [
+      'SUBDIVNO', 'SUBDIVNUM', 'SUBDIVISIONNO', 'SUBDIVISIONNUM',
+      'PLATID', 'PLAT_NO', 'PLATNO', 'BOOKPAGE', 'MAPNUMBER',
+      'SUBDIV', 'SUBDIVNAME', 'SUBDIVISION', 'NAME',
+    ];
+    const out = new Set();
+    for (const key of keys) {
+      const v = String(attrs?.[key] || '').trim();
+      if (!v) continue;
+      out.add(v.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+      const sMatch = v.toUpperCase().match(/\bS\d{4,}\b/);
+      if (sMatch) out.add(sMatch[0]);
+    }
+    return out;
   }
 
   let subdivisionPlatListPromise = null;
@@ -2409,12 +2425,23 @@
     return subdivisionPlatListPromise;
   }
 
-  function matchSubdivisionPlatEntry(subdivisionName, lookupMap) {
+  function matchSubdivisionPlatEntry(subdivisionName, lookupMap, attrs = {}) {
     if (!lookupMap || !lookupMap.size) return null;
     const normalized = sanitizeSubdivisionName(subdivisionName);
+    if (normalized) {
+      const direct = lookupMap.get(normalized);
+      if (direct?.length) return direct[0];
+    }
+
+    const sourceIds = extractSubdivisionSourceIdentifiers(attrs);
+    if (sourceIds.size) {
+      for (const entries of lookupMap.values()) {
+        const byId = entries.find((entry) => sourceIds.has(String(entry?.platDocId || '').toUpperCase()));
+        if (byId) return byId;
+      }
+    }
+
     if (!normalized) return null;
-    const direct = lookupMap.get(normalized);
-    if (direct?.length) return direct[0];
 
     for (const [key, entries] of lookupMap.entries()) {
       if (key.includes(normalized) || normalized.includes(key)) return entries[0];
@@ -2452,8 +2479,9 @@
     }
 
     for (const feature of features) {
-      const name = getSubdivisionNameFromAttrs(feature?.attributes || {});
-      const plat = lookupMap ? matchSubdivisionPlatEntry(name, lookupMap) : null;
+      const attrs = feature?.attributes || {};
+      const name = getSubdivisionNameFromAttrs(attrs);
+      const plat = lookupMap ? matchSubdivisionPlatEntry(name, lookupMap, attrs) : null;
       out.push({ feature, name, plat });
     }
 
@@ -2751,6 +2779,30 @@
     };
   }
 
+  function buildSubdivisionMetadataForExport(entry = {}, index = 0) {
+    const feature = entry?.feature || {};
+    const attrs = feature?.attributes || {};
+    const plat = entry?.plat || {};
+    const sourceId = String(attrs.OBJECTID ?? attrs.ObjectID ?? attrs.FID ?? `${index + 1}`).trim();
+
+    return {
+      source: 'RecordQuarry',
+      sourceId,
+      subdivisionName: String(entry?.name || getSubdivisionNameFromAttrs(attrs) || `Subdivision ${index + 1}`).trim(),
+      plat: {
+        sourcePath: String(plat?.sourcePath || '').trim() || null,
+        sourceLine: String(plat?.sourceLine || '').trim() || null,
+        platDocId: String(plat?.platDocId || '').trim() || null,
+        platPage: Number.isFinite(Number(plat?.platPage)) ? Number(plat.platPage) : null,
+        platUrl: String(plat?.platUrl || '').trim() || null,
+        thumbnailUrl: String(plat?.thumbnailUrl || '').trim() || null,
+      },
+      geometry: feature?.geometry || null,
+      attributes: attrs,
+      starredInFieldBook: true,
+    };
+  }
+
   async function resolveRosNameForExport(attributes = {}, imageMeta = null) {
     const attrs = sanitizeRosAttributesForExport(attributes);
     const attrName = String(attrs.Name || attrs.NAME || attrs.Description || attrs.DESC || attrs.SUB_NAME || attrs.SUBDIVISION || '').trim();
@@ -2982,7 +3034,7 @@
   // -----------------------------
   // Ada County SurveysPageList ROS titles
   // -----------------------------
-  const ADA_ROS_SURVEYS_PAGE_LIST_URL = "https://adacountyassessor.org/docs/recordsofsurvey/SurveysPageList.txt";
+  const ADA_ROS_SURVEYS_PAGE_LIST_URL = '/api/recordquarry/records-of-survey/page-list';
   let _rosSurveyPageListIndexPromise = null;
 
   function extractRosTifNameFromUrl(url) {
@@ -3014,21 +3066,10 @@
   }
 
   async function fetchRosSurveysPageListText() {
-    // Try direct CORS fetch first. If blocked, fall back to same-origin proxy (buildRosPdfProxyUrl) if available.
     try {
       const resp = await fetch(ADA_ROS_SURVEYS_PAGE_LIST_URL, { cache: "force-cache" });
       if (resp.ok) return await resp.text();
     } catch {}
-
-    // Proxy fallback: the server-side proxy can typically fetch arbitrary URLs without CORS.
-    try {
-      if (typeof buildRosPdfProxyUrl === "function") {
-        const proxyUrl = buildRosPdfProxyUrl(ADA_ROS_SURVEYS_PAGE_LIST_URL);
-        const resp = await fetch(proxyUrl, { cache: "force-cache" });
-        if (resp.ok) return await resp.text();
-      }
-    } catch {}
-
     return null;
   }
 
@@ -3978,7 +4019,6 @@
             },
           }
         );
-        c.style.display = 'none';
         cards.push(c);
       });
       if (township) { const c = card("Township", "Containing feature", summarizeAttrs(township.attributes), []); c.style.display = "none"; cards.push(c); }
