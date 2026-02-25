@@ -2672,7 +2672,7 @@
       .map((item) => item.entry);
   }
 
-  async function attachSubdivisionPlatData(features = []) {
+  async function attachSubdivisionPlatData(features = [], parcelFeature = null) {
     const out = [];
     let lookupMap = null;
     try {
@@ -2681,11 +2681,17 @@
       log(`Subdivision plat lookup failed: ${error.message || error}`, 'warn');
     }
 
+    const parcelCentroid = centroidOfPolygon(parcelFeature?.geometry || null);
+
     for (const feature of features) {
       const attrs = feature?.attributes || {};
       const name = getSubdivisionNameFromAttrs(attrs);
       const plat = lookupMap ? matchSubdivisionPlatEntry(name, lookupMap, attrs) : null;
-      out.push({ feature, name, plat });
+      const featureCentroid = centroidOfPolygon(feature?.geometry || null);
+      const distanceMeters = (parcelCentroid && featureCentroid)
+        ? haversineMeters(parcelCentroid.y, parcelCentroid.x, featureCentroid.y, featureCentroid.x)
+        : null;
+      out.push({ feature, name, plat, distanceMeters });
     }
 
     return out;
@@ -2937,15 +2943,36 @@
     return layer;
   }
 
-  function bestRosLabel(a) {
-    const fields = ["RS","ROS","Survey","SurveyNo","SURVEYNO","Book","BOOK","Page","PAGE","Document","DOC","Description","DESC","Name","NAME"];
+  function bestRosLabel(a = {}) {
+    const pick = (fields = []) => {
+      for (const field of fields) {
+        const value = a?.[field];
+        if (value == null) continue;
+        const normalized = String(value).trim();
+        if (normalized) return normalized;
+      }
+      return '';
+    };
+
+    const rosNumber = pick(['ROS', 'RS', 'SurveyNo', 'SURVEYNO', 'Survey', 'SURVEY']);
+    const recorderBook = pick(['RecorderBook', 'RECORDERBOOK', 'Book', 'BOOK', 'BookNo', 'BOOKNO']);
+    const recorderPage = pick(['RecorderPage', 'RECORDERPAGE', 'Page', 'PAGE', 'Pg', 'PG']);
+    const documentNo = pick(['Document', 'DOC', 'DocNo', 'DOCNO', 'InstrumentNo', 'INSTRUMENTNO']);
+    const description = pick(['Description', 'DESC', 'Name', 'NAME']);
+
     const parts = [];
-    for (const f of fields) if (a[f]) parts.push(`${f}:${a[f]}`);
-    if (parts.length) return parts.slice(0,3).join("  ");
-    for (const [k,v] of Object.entries(a||{})) {
-      if (typeof v === "string" && v.trim()) return v.trim();
+    if (rosNumber) parts.push(`ROS ${rosNumber}`);
+    if (recorderBook && recorderPage) parts.push(`Book ${recorderBook} Page ${recorderPage}`);
+    else if (recorderBook) parts.push(`Book ${recorderBook}`);
+    else if (recorderPage) parts.push(`Page ${recorderPage}`);
+    if (documentNo) parts.push(`Doc ${documentNo}`);
+    if (description) parts.push(description);
+
+    if (parts.length) return parts.slice(0, 3).join(' · ');
+    for (const [, value] of Object.entries(a || {})) {
+      if (typeof value === 'string' && value.trim()) return value.trim();
     }
-    return "ROS feature";
+    return 'ROS feature';
   }
 
   function sanitizeRosAttributesForExport(attributes = {}) {
@@ -4041,7 +4068,7 @@
 
       try {
         const nearbySubdivisionFeatures = await findNearbySubdivisions(parcel, 4326);
-        const nearbyWithPlatData = await attachSubdivisionPlatData(nearbySubdivisionFeatures);
+        const nearbyWithPlatData = await attachSubdivisionPlatData(nearbySubdivisionFeatures, parcel);
         state.nearbySubdivisions = dedupeNearbySubdivisionEntries(nearbyWithPlatData, parcel);
         state.nearbySubdivisions = limitNearbySubdivisionEntries(state.nearbySubdivisions, parcel, SUBDIVISION_NEARBY_MAX_RESULTS);
         log(`Subdivisions within ${SUBDIVISION_NEARBY_RADIUS_FT} ft: ${state.nearbySubdivisions.length}`);
@@ -4208,9 +4235,13 @@
         if (plat?.platUrl) {
           links.push(`<a href="${escapeHtml(plat.platUrl)}" target="_blank" rel="noopener">Open subdivision plat</a>`);
         }
+        const distanceMeters = Number(entry?.distanceMeters);
+        const subtitle = Number.isFinite(distanceMeters)
+          ? `${fmtDist(distanceMeters)} from parcel centroid`
+          : `Within ${SUBDIVISION_NEARBY_RADIUS_FT} ft of parcel centroid`;
         const c = card(
-          `Subdivision ${idx + 1}`,
-          `${subdivisionName} · within ${SUBDIVISION_NEARBY_RADIUS_FT} ft of parcel`,
+          subdivisionName,
+          subtitle,
           summarizeAttrs(feature.attributes),
           links,
           {
