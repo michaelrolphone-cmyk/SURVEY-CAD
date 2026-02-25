@@ -4405,68 +4405,10 @@
       parcelCard.style.display = 'none';
       cards.push(parcelCard);
 
-      // Place Subdivision, Township, Section, and Utilities above Aliquots (below Parcel card).
+      // Keep a stable subdivision list for plat cards and selection toggles.
       const subdivisionCards = state.nearbySubdivisions.length
         ? state.nearbySubdivisions
         : (subdiv ? [{ feature: subdiv, name: getSubdivisionNameFromAttrs(subdiv.attributes || {}), plat: null }] : []);
-      subdivisionCards.forEach((entry, idx) => {
-        const feature = entry?.feature || null;
-        if (!feature) return;
-        const subdivisionName = entry?.name || getSubdivisionNameFromAttrs(feature.attributes || {}) || `Subdivision ${idx + 1}`;
-        const plat = entry?.plat || null;
-        const links = [];
-        if (plat?.platUrl) {
-          links.push(`<a href="${escapeHtml(plat.platUrl)}" target="_blank" rel="noopener">Open subdivision plat</a>`);
-        }
-        const distanceMeters = Number(entry?.distanceMeters);
-        const subtitle = Number.isFinite(distanceMeters)
-          ? `${fmtDist(distanceMeters)} from parcel centroid`
-          : `Within ${SUBDIVISION_NEARBY_RADIUS_FT} ft of parcel centroid`;
-        const c = card(
-          subdivisionName,
-          subtitle,
-          summarizeAttrs(feature.attributes),
-          links,
-          {
-            onSelect: () => centerMapOnFeature(feature, layers.subdivision, 'Subdivision'),
-            onRender: (cardEl) => {
-              const chead = cardEl.querySelector('.chead');
-              if (chead) {
-                const starBtn = document.createElement('button');
-                const syncSubdivisionStar = () => {
-                  const selected = isSubdivisionSelected(entry, idx);
-                  starBtn.textContent = selected ? '★' : '☆';
-                  starBtn.title = selected ? 'Exclude subdivision plat from EvidenceDesk export' : 'Include subdivision plat in EvidenceDesk export';
-                  starBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
-                };
-                starBtn.type = 'button';
-                starBtn.className = 'rq-star-btn';
-                starBtn.addEventListener('click', (evt) => {
-                  evt.stopPropagation();
-                  const next = !isSubdivisionSelected(entry, idx);
-                  setSubdivisionSelected(entry, idx, next);
-                  syncSubdivisionStar();
-                  drawSubdivisionPolygons(subdivisionCards);
-                  log(`${next ? 'Included' : 'Excluded'} subdivision ${subdivisionName} in EvidenceDesk export.`);
-                });
-                syncSubdivisionStar();
-                chead.appendChild(starBtn);
-              }
-
-              if (plat?.thumbnailUrl) {
-                const body = cardEl.querySelector('.cbody');
-                if (body) {
-                  const wrap = document.createElement('div');
-                  wrap.style.marginTop = '8px';
-                  wrap.innerHTML = buildSubdivisionThumbnailMarkup(subdivisionName, plat.thumbnailUrl);
-                  body.appendChild(wrap);
-                }
-              }
-            },
-          }
-        );
-        cards.push(c);
-      });
       if (township) { const c = card("Township", "Containing feature", summarizeAttrs(township.attributes), []); c.style.display = "none"; cards.push(c); }
       if (section) { const c = card("Section", "Containing feature", summarizeAttrs(section.attributes), []); c.style.display = "none"; cards.push(c); }
       const utilitiesCard = card(
@@ -4675,6 +4617,66 @@
           cards.push(...farEls);
         }
       }
+
+      // Render subdivision plat cards after aliquot CP&F summaries and before ROS cards.
+      subdivisionCards.forEach((entry, idx) => {
+        const feature = entry?.feature || null;
+        if (!feature) return;
+        const subdivisionName = entry?.name || getSubdivisionNameFromAttrs(feature.attributes || {}) || `Subdivision ${idx + 1}`;
+        const plat = entry?.plat || null;
+        const links = [];
+        if (plat?.platUrl) {
+          links.push(`<a href="${escapeHtml(plat.platUrl)}" target="_blank" rel="noopener">Open subdivision plat</a>`);
+        }
+        const distanceMeters = Number(entry?.distanceMeters);
+        const subtitle = Number.isFinite(distanceMeters)
+          ? `${fmtDist(distanceMeters)} from parcel centroid`
+          : `Within ${SUBDIVISION_NEARBY_RADIUS_FT} ft of parcel centroid`;
+        const c = card(
+          subdivisionName,
+          subtitle,
+          summarizeAttrs(feature.attributes),
+          links,
+          {
+            onSelect: () => centerMapOnFeature(feature, layers.subdivision, 'Subdivision'),
+            onRender: (cardEl) => {
+              const chead = cardEl.querySelector('.chead');
+              if (chead) {
+                const starBtn = document.createElement('button');
+                const syncSubdivisionStar = () => {
+                  const selected = isSubdivisionSelected(entry, idx);
+                  starBtn.textContent = selected ? '★' : '☆';
+                  starBtn.title = selected ? 'Exclude subdivision plat from EvidenceDesk export' : 'Include subdivision plat in EvidenceDesk export';
+                  starBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                };
+                starBtn.type = 'button';
+                starBtn.className = 'rq-star-btn';
+                starBtn.addEventListener('click', (evt) => {
+                  evt.stopPropagation();
+                  const next = !isSubdivisionSelected(entry, idx);
+                  setSubdivisionSelected(entry, idx, next);
+                  syncSubdivisionStar();
+                  drawSubdivisionPolygons(subdivisionCards);
+                  log(`${next ? 'Included' : 'Excluded'} subdivision ${subdivisionName} in EvidenceDesk export.`);
+                });
+                syncSubdivisionStar();
+                chead.appendChild(starBtn);
+              }
+
+              if (plat?.thumbnailUrl) {
+                const body = cardEl.querySelector('.cbody');
+                if (body) {
+                  const wrap = document.createElement('div');
+                  wrap.style.marginTop = '8px';
+                  wrap.innerHTML = buildSubdivisionThumbnailMarkup(subdivisionName, plat.thumbnailUrl);
+                  body.appendChild(wrap);
+                }
+              }
+            },
+          }
+        );
+        cards.push(c);
+      });
 
       if (ros.length) {
         const ROS_COLLAPSE_DIST_M = 500; // metres
