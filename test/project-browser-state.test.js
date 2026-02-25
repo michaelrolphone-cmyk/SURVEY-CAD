@@ -410,6 +410,7 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.doesNotMatch(projectBrowserHtml, /<h2>\$\{index \+ 1\}\./, 'Print preview should not inject heading-only pages between PDFs');
   assert.match(projectBrowserHtml, /onclick="window\.print\(\)"/, 'Print preview should include a direct print button');
   assert.match(projectBrowserHtml, /\.cpf-hover-preview-tooltip\s*\{[\s\S]*position:\s*fixed;/, 'Project Browser should style a fixed CP&F hover preview tooltip container');
+  assert.match(projectBrowserHtml, /\.cpf-hover-preview-tooltip\s*\{[\s\S]*box-sizing:\s*border-box;/, 'Hover preview tooltip sizing should include padding so viewport clamping remains accurate.');
   assert.match(projectBrowserHtml, /\.cpf-hover-preview-image\s*\{[\s\S]*object-fit:\s*contain;/, 'CP&F hover preview image should use object-fit contain so full pages are visible');
   assert.match(projectBrowserHtml, /const\s+maxHeight\s*=\s*Math\.max\(220,\s*Math\.floor\(viewportHeight\s*\*\s*0\.9\)\)/, 'CP&F hover preview height should be capped at 90% of the viewport');
   assert.match(projectBrowserHtml, /const\s+imageAspectRatio\s*=\s*imageNaturalWidth\s*>\s*0\s*\?\s*\(imageNaturalWidth\s*\/\s*safeImageHeight\)\s*:\s*\(8\.5\s*\/\s*11\)/, 'CP&F hover preview should size itself from the source image aspect ratio');
@@ -420,8 +421,19 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /async\s+function\s+attachPointFilePreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded point-file rows should bind hover previews for generated thumbnails.');
   assert.match(projectBrowserHtml, /async\s+function\s+attachDrawingPreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded drawing rows should bind hover previews for generated thumbnails.');
   assert.match(projectBrowserHtml, /function\s+attachImagePreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded image rows should bind hover previews for generated thumbnails.');
+  assert.match(projectBrowserHtml, /\.image-preview-thumb\s*\{[\s\S]*cursor:\s*zoom-in;/, 'Expanded image thumbnails should expose hover affordance for preview tooltips.');
+  assert.doesNotMatch(projectBrowserHtml, /\.image-preview-thumb\s*\{[\s\S]*pointer-events:\s*none;/, 'Expanded image thumbnails should accept pointer events so photo hover previews can open.');
   assert.match(projectBrowserHtml, /async\s+function\s+attachPdfPreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*if \(folder\?\.key === 'cpfs'\) bindCpfHoverPreview\(thumb, entry\);[\s\S]*else bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded PDF rows should show hover previews in all folders, not only CP&F.');
   assert.match(projectBrowserHtml, /bindHoverPreview\(thumbImg, entry, \{[\s\S]*requireLoadedFlag:\s*true[\s\S]*\}\);/, 'Collapsed folder thumbnail strips should continue using hover previews once thumbnails are loaded.');
+});
+
+
+test('Project Browser keeps hover previews in viewport and enables photo hover events', async () => {
+  const projectBrowserHtml = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+
+  assert.match(projectBrowserHtml, /\.cpf-hover-preview-tooltip\s*\{[\s\S]*box-sizing:\s*border-box;/, 'Hover preview tooltip should include padding in its measured width/height so viewport clamps remain accurate.');
+  assert.match(projectBrowserHtml, /\.image-preview-thumb\s*\{[\s\S]*cursor:\s*zoom-in;/, 'Image thumbnails should advertise hover preview behavior with a zoom cursor.');
+  assert.doesNotMatch(projectBrowserHtml, /\.image-preview-thumb\s*\{[\s\S]*pointer-events:\s*none;/, 'Image thumbnails should receive mouse events so hover previews work for photos.');
 });
 
 
