@@ -19,7 +19,7 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /reference:\s*\{[\s\S]*type:\s*'project-point-file'/, 'EvidenceDesk point-file rows should be API-backed resources');
   assert.match(html, /fetch\(buildProjectPointFileApiUrl\([^,]+,\s*pointFileId\),\s*\{ method: 'DELETE' \}\)/, 'EvidenceDesk should delete point files through API endpoint');
   assert.match(html, /pointFileState:\s*\{\s*text,\s*exportFormat:\s*'csv'\s*\}/, 'EvidenceDesk upload should post point file state payloads to API');
-  assert.match(html, /context\.setUploadStatus\(`Uploading point file \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\}…`\)/, 'EvidenceDesk should show per-file progress while point files upload.');
+  assert.match(html, /setStatus\(`Uploading point file \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\}/, 'EvidenceDesk should show per-file progress while point files upload.');
   assert.match(html, /async function\s+renameResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a rename helper for project resources');
   assert.match(html, /async function\s+deleteResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a shared delete helper for project resources');
   assert.match(html, /function\s+moveResourceFromEvidenceDesk\(/, 'EvidenceDesk should include a move helper for drag-and-drop reorganization.');
@@ -55,8 +55,8 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /renderPointFileThumbnailDataUrl\(text,\s*\{\s*width:\s*86,\s*height:\s*50\s*\}\)/, 'EvidenceDesk should render point file thumbnails through the shared client library.');
   assert.match(html, /className\s*=\s*'point-file-preview-thumb'/, 'EvidenceDesk should render point file thumbnail images in file rows.');
   assert.match(html, /querySelector\('\.file-preview-slot'\)\?\.replaceChildren\(thumb\)/, 'EvidenceDesk should place point file thumbnails in the dedicated preview slot before file names.');
-  assert.match(html, /function\s+isImageResource\(entry\)\s*\{[\s\S]*\['png',\s*'jpg',\s*'jpeg',\s*'gif',\s*'webp',\s*'bmp',\s*'svg'\]/, 'EvidenceDesk should detect uploaded image resources by common file extensions.');
-  assert.match(html, /function\s+attachImagePreview\(resource,\s*entry\)\s*\{[\s\S]*reference\?\.metadata\?\.thumbnailUrl\s*\|\|\s*entry\?\.reference\?\.value[\s\S]*className\s*=\s*'image-preview-thumb'/, 'EvidenceDesk should prefer server-generated image thumbnail URLs for uploaded image previews.');
+  assert.match(html, /function\s+isImageResource\(entry\)\s*\{[\s\S]*\['png',\s*'jpg',\s*'jpeg',\s*'gif',\s*'webp',\s*'bmp',\s*'svg',\s*'tif',\s*'tiff'\][\s\S]*return\s+isRosImageResource\(entry\);/, 'EvidenceDesk should detect uploaded image resources by common file extensions and ROS map-image references.');
+  assert.match(html, /function\s+attachImagePreview\(resource,\s*entry\)\s*\{[\s\S]*getRosThumbnailUrl\(entry\)\s*\|\|\s*entry\?\.reference\?\.metadata\?\.thumbnailUrl\s*\|\|\s*entry\?\.reference\?\.value[\s\S]*className\s*=\s*'image-preview-thumb'/, 'EvidenceDesk should prefer ROS thumbnail API URLs, then server-generated thumbnails, then source image URLs for image previews.');
 
   assert.match(html, /function\s+buildDrawingAssociationIndex\(projectFile\s*=\s*\{\}\)\s*\{/, 'EvidenceDesk should compute drawing↔point-file association indexes for nested inserts.');
   assert.match(html, /linkedPointFileId:\s*drawing\.linkedPointFileId\s*\|\|\s*null/, 'EvidenceDesk drawing metadata should preserve linked point-file IDs from API payloads.');
@@ -66,8 +66,11 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /function\s+uploadFileViaXhr\(formData,\s*onProgress\)\s*\{[\s\S]*xhr\.upload\.addEventListener\('progress'/, 'EvidenceDesk should use XHR upload progress events for project file uploads.');
   assert.match(html, /Uploading \$\{currentFileNumber\}\/\$\{totalFiles\}: \$\{file\.name\} \(\$\{progress\}%\)/, 'EvidenceDesk should include percentage progress updates for uploaded files.');
   assert.match(html, /className\s*=\s*'upload-progress'/, 'EvidenceDesk should render a dedicated upload progress bar element.');
-  assert.match(html, /context\.setUploadProgress\(progress\);/, 'EvidenceDesk should drive upload progress updates from XHR progress events.');
+  assert.match(html, /context\.setUploadProgress\((progress|percent)\);/, 'EvidenceDesk should drive upload progress updates from XHR progress events.');
   assert.match(html, /class="ros-number-pill"/, 'EvidenceDesk should display assigned ROS numbers inline on uploaded file rows.');
+  assert.match(html, /exportFormat:\s*mapImageExt\s*\|\|\s*'tif'/, 'EvidenceDesk should classify API ROS records as image resources using map image extension fallback to tif.');
+  assert.match(html, /function\s+getRosThumbnailUrl\(entry\)\s*\{[\s\S]*\/api\/project-files\/ros-thumbnail\?\$\{new URLSearchParams\(\{ source: sourceUrl \}\)\}/, 'EvidenceDesk should request ROS thumbnails through the ros-thumbnail API endpoint when map image URLs are available.');
+  assert.match(html, /const\s+canOpenRosImage\s*=\s*folder\.key\s*===\s*'ros'[\s\S]*window\.open\(getRosImageUrl\(entry\), '_blank', 'noopener,noreferrer'\);/, 'EvidenceDesk should open ROS entries by linking directly to the underlying tif image URL.');
   assert.match(html, /if \(isServerPdf && folder\.key === 'ros'\)/, 'EvidenceDesk should only expose ROS metadata controls inline inside the ROS folder.');
   assert.match(html, /rosInlineInput\.placeholder\s*=\s*'ROS #'/, 'EvidenceDesk should render an inline ROS number input on ROS PDF rows.');
   assert.match(html, /rosButton\.textContent\s*=\s*'Save ROS #'/, 'EvidenceDesk should persist ROS numbers via an inline Save ROS # action.');

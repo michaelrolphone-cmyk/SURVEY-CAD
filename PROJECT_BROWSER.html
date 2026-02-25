@@ -920,11 +920,14 @@
       const rosNumber = String(ros.rosNumber || '').trim();
       const rosId = String(ros.rosId || '').trim();
       const title = String(ros.title || `ROS ${rosNumber}`).trim();
+      const mapImageUrl = String(ros.mapImageUrl || '').trim();
+      const mapImageExtMatch = mapImageUrl.match(/\.([a-z0-9]+)(?:[?#].*)?$/i);
+      const mapImageExt = mapImageExtMatch ? mapImageExtMatch[1].toLowerCase() : '';
       return {
         id: rosId,
         folder: 'ros',
         title,
-        exportFormat: 'pdf',
+        exportFormat: mapImageExt || 'tif',
         reference: {
           type: 'ros-number',
           value: rosNumber,
@@ -933,7 +936,7 @@
             rosNumber,
             rosId,
             source: ros.source || '',
-            mapImageUrl: ros.mapImageUrl || '',
+            mapImageUrl,
             starredInFieldBook: Boolean(ros.starredInFieldBook),
           },
         },
@@ -1641,9 +1644,27 @@
       return '';
     }
 
+    function getRosImageUrl(entry) {
+      if (entry?.reference?.type !== 'ros-number') return '';
+      const mapImageUrl = String(entry?.reference?.metadata?.mapImageUrl || '').trim();
+      if (!mapImageUrl) return '';
+      return mapImageUrl;
+    }
+
+    function isRosImageResource(entry) {
+      return Boolean(getRosImageUrl(entry));
+    }
+
+    function getRosThumbnailUrl(entry) {
+      const sourceUrl = getRosImageUrl(entry);
+      if (!sourceUrl) return '';
+      return `/api/project-files/ros-thumbnail?${new URLSearchParams({ source: sourceUrl })}`;
+    }
+
     function isImageResource(entry) {
       const format = String(entry?.exportFormat || '').toLowerCase();
-      return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(format);
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff'].includes(format)) return true;
+      return isRosImageResource(entry);
     }
 
     function getMimeTypeFromFormat(format) {
@@ -1825,10 +1846,10 @@
     window.addEventListener('resize', () => hideCpfHoverPreviewTooltip());
 
     function attachImagePreview(resource, entry) {
-      if (entry?.reference?.type !== 'server-upload') return;
       if (!isImageResource(entry)) return;
+      if (entry?.reference?.type !== 'server-upload' && entry?.reference?.type !== 'ros-number') return;
 
-      const previewUrl = String(entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
+      const previewUrl = String(getRosThumbnailUrl(entry) || entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
       if (!previewUrl) return;
 
       const slot = resource.querySelector('.file-preview-slot');
@@ -2529,12 +2550,15 @@ function openEntryFromFolder(folder, entry, projectContext) {
       const canOpenLineSmithDrawing = folder.key === 'drawings'
         && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
       const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
+      const canOpenRosImage = folder.key === 'ros' && isRosImageResource(entry);
       if (canLaunchPointForge) {
         launchPointForgeFromResource(entry, projectContext).catch(() => {});
       } else if (canOpenLineSmithDrawing) {
         launchLineSmithFromDrawingResource(entry, projectContext).catch(() => {});
       } else if (canOpenCpfPdf) {
         openCpfPdfFromResource(entry);
+      } else if (canOpenRosImage) {
+        window.open(getRosImageUrl(entry), '_blank', 'noopener,noreferrer');
       } else if (entry?.reference?.type === 'server-upload') {
         const downloadUrl = String(entry.reference.value || '').trim();
         if (entry?.exportFormat === 'pdf') {
@@ -2551,7 +2575,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
         && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'project-point-file');
       const canOpenLineSmithDrawing = folder.key === 'drawings'
         && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
-      const isPdfResource = entry?.exportFormat === 'pdf';
+      const isPdfResource = entry?.exportFormat === 'pdf' && !isRosImageResource(entry);
       if (canLaunchPointForge) {
         const text = await resolvePointFileText(entry);
         if (!text?.trim()) return;
@@ -2575,7 +2599,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
           }
         } catch { /* thumbnail unavailable */ }
       } else if (isImageResource(entry)) {
-        const previewUrl = String(entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
+        const previewUrl = String(getRosThumbnailUrl(entry) || entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
         if (previewUrl) {
           thumbImg.src = previewUrl;
           thumbImg.classList.remove('folder-thumb-icon');
@@ -3117,7 +3141,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
           const canOpenLineSmithDrawing = folder.key === 'drawings'
             && (entry?.reference?.type === 'local-storage' || entry?.reference?.type === 'project-drawing');
           const canOpenCpfPdf = folder.key === 'cpfs' && entry?.exportFormat === 'pdf';
-          const isPdfResource = entry?.exportFormat === 'pdf';
+          const isPdfResource = entry?.exportFormat === 'pdf' && !isRosImageResource(entry);
           const isImageUpload = isImageResource(entry);
           const showThumbnailSlot = canLaunchPointForge || canOpenLineSmithDrawing || isPdfResource || isImageUpload;
           const actualFileName = `${entry.id}.${entry.exportFormat}`;
