@@ -13,6 +13,11 @@ test('RecordQuarry builds subdivision plat doc-id index and caps nearby subdivis
   assert.match(html, /\.replace\(\/\\bS\\d\{4,\}\\d\{0,2\}\\b\/g,\s*' '\)/, 'RecordQuarry should remove inline subdivision plat document-id tokens before name matching.');
   assert.match(html, /function\s+getSubdivisionNameCandidates\s*\(/, 'RecordQuarry should derive multiple subdivision name candidates from feature attributes for plat matching.');
   assert.match(html, /const\s+normalizedCandidates\s*=\s*getSubdivisionNameCandidates\(attrs,\s*subdivisionName\);/, 'RecordQuarry should match subdivision plats from a prioritized set of subdivision name candidates.');
+  assert.match(html, /function\s+buildSubdivisionPlatThumbnailUrl\s*\(/, 'RecordQuarry should normalize subdivision plat thumbnails through a helper.');
+  assert.match(html, /\/api\/project-files\/ros-thumbnail\?\$\{new URLSearchParams\(\{ source: sourceUrl \}\)\}/, 'RecordQuarry should route subdivision TIFF thumbnails through the ros-thumbnail API endpoint.');
+  assert.match(html, /thumbnailUrl:\s*buildSubdivisionPlatThumbnailUrl\(platUrl\)/, 'RecordQuarry should derive subdivision card thumbnails from the normalized plat-thumbnail helper.');
+  assert.match(html, /function\s+subdivisionTokenOverlapScore\s*\(/, 'RecordQuarry should score subdivision-name token overlap to match plat list entries when legal descriptions add extra words.');
+  assert.match(html, /if\s*\(bestEntry\s*&&\s*bestScore\s*>=\s*0\.67\)\s*return\s+bestEntry;/, 'RecordQuarry should accept high-confidence token-overlap subdivision matches to resolve plat thumbnails.');
   assert.match(html, /geometryType:\s*'esriGeometryPoint'[\s\S]*geometry:\s*`\$\{centroid\.x\},\$\{centroid\.y\}`[\s\S]*distance:\s*SUBDIVISION_NEARBY_RADIUS_M/, 'RecordQuarry should query nearby subdivisions from the parcel centroid point with the configured radius.');
   assert.match(html, /state\.nearbySubdivisions\s*=\s*dedupeNearbySubdivisionEntries\(nearbyWithPlatData,\s*parcel\);/, 'RecordQuarry should dedupe nearby subdivision results using subdivision identity, not parcel-lot object IDs.');
   assert.match(html, /state\.nearbySubdivisions\s*=\s*limitNearbySubdivisionEntries\(state\.nearbySubdivisions,\s*parcel,\s*SUBDIVISION_NEARBY_MAX_RESULTS\);/, 'RecordQuarry should trim nearby subdivision entries before rendering cards.');

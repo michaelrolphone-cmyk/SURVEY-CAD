@@ -3752,7 +3752,7 @@ export function createSurveyServer({
       }
 
       if (urlObj.pathname === '/api/recordquarry/subdivision-plats/page-list') {
-        const text = await fetchRecordQuarryRemoteText('https://adacountyassessor.org/docs/subdivisionplats/SubsPageList.txt');
+        const text = await fetchRecordQuarryRemoteText('https://adacountyassessor.org/docs/subdivisionplats/SubPagesList.txt');
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Cache-Control', 'public, max-age=1800');

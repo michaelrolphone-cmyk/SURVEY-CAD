@@ -52,7 +52,7 @@ CP&F PDF scraping now runs as its own paged checkpoint flow, so the worker conti
 - `GET /api/idaho-harvest/records-of-survey/:recordId/pdf`
 - `GET /api/idaho-harvest/subdivision-plats`
 - `GET /api/idaho-harvest/subdivision-plats/:platId/pdf`
-- `GET /api/recordquarry/subdivision-plats/page-list`
+- `GET /api/recordquarry/subdivision-plats/page-list` (reads subdivision plat list text from `SubPagesList.txt`)
 - `GET /api/recordquarry/records-of-survey/page-list`
 
 ### Map tile API endpoints (Leaflet/TileJSON-compatible)

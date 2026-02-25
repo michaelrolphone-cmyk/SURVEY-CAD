@@ -2389,9 +2389,27 @@
     return String(value || '')
       .toUpperCase()
       .replace(/[^A-Z0-9]+/g, ' ')
-      .replace(/\b(UNIT|PHASE|NO|NUMBER|SUBDIVISION|SUBDIV)\b/g, ' ')
+      .replace(/\b(UNIT|PHASE|NO|NUMBER|SUBDIVISION|SUBDIV|LOT|BLOCK|BLK|TRACT|FILED|IN|BOOK|PAGE|PG|MAP|PLAT|RECORDED|RECORDS|AMENDED)\b/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  function tokenizeSubdivisionName(value = '') {
+    return sanitizeSubdivisionName(value)
+      .split(' ')
+      .map((token) => token.trim())
+      .filter((token) => token.length > 1);
+  }
+
+  function subdivisionTokenOverlapScore(a = '', b = '') {
+    const left = new Set(tokenizeSubdivisionName(a));
+    const right = new Set(tokenizeSubdivisionName(b));
+    if (!left.size || !right.size) return 0;
+    let overlap = 0;
+    for (const token of left) {
+      if (right.has(token)) overlap += 1;
+    }
+    return overlap / Math.max(left.size, right.size);
   }
 
   function buildSubdivisionPlatUrl(rawPath = '') {
@@ -2400,6 +2418,21 @@
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
     const noLeadingSlash = trimmed.replace(/^\/+/, '');
     return `${SUBDIVISION_PLAT_BASE_URL}${noLeadingSlash}`;
+  }
+
+  function buildSubdivisionPlatThumbnailUrl(platUrl = '') {
+    const sourceUrl = String(platUrl || '').trim();
+    if (!sourceUrl) return null;
+    if (/\.tiff?($|\?)/i.test(sourceUrl)) {
+      return `/api/project-files/ros-thumbnail?${new URLSearchParams({ source: sourceUrl })}`;
+    }
+    if (/\.pdf($|\?)/i.test(sourceUrl)) {
+      const pdfProxyUrl = (typeof buildRosPdfProxyUrl === 'function')
+        ? buildRosPdfProxyUrl(sourceUrl)
+        : `/api/ros-pdf?${new URLSearchParams({ url: sourceUrl })}`;
+      return `/api/project-files/pdf-thumbnail?${new URLSearchParams({ source: pdfProxyUrl })}`;
+    }
+    return sourceUrl;
   }
 
   function parseSubdivisionPlatListLine(line) {
@@ -2446,9 +2479,7 @@
       platDocId,
       platPage,
       platUrl,
-      thumbnailUrl: /\.pdf($|\?)/i.test(platUrl)
-        ? `/api/project-files/pdf-thumbnail?${new URLSearchParams({ source: platUrl })}`
-        : platUrl,
+      thumbnailUrl: buildSubdivisionPlatThumbnailUrl(platUrl),
     };
   }
 
@@ -2526,6 +2557,23 @@
         if (key.includes(normalized) || normalized.includes(key)) return entries[0];
       }
     }
+
+    let bestEntry = null;
+    let bestScore = 0;
+    for (const normalized of normalizedCandidates) {
+      for (const key of (lookupMap?.byNameKeys || [])) {
+        const score = subdivisionTokenOverlapScore(normalized, key);
+        if (score > bestScore) {
+          const entries = byName.get(key);
+          if (entries?.length) {
+            bestScore = score;
+            bestEntry = entries[0];
+          }
+        }
+      }
+    }
+    if (bestEntry && bestScore >= 0.67) return bestEntry;
+
     return null;
   }
 

@@ -82,7 +82,7 @@ test('idaho harvest archive APIs list subdivision plats and return 404 for unkno
 
 test('recordquarry source text APIs proxy Ada County list documents', async () => {
   const remoteBodies = new Map([
-    ['https://adacountyassessor.org/docs/subdivisionplats/SubsPageList.txt', 'SUB ONE|S0000101.png\n'],
+    ['https://adacountyassessor.org/docs/subdivisionplats/SubPagesList.txt', 'SUB ONE|S0000101.png\n'],
     ['https://adacountyassessor.org/docs/recordsofsurvey/SurveysPageList.txt', 'R0000101.tif 1N1E01 SAMPLE ROS\n'],
   ]);
 
@@ -111,8 +111,29 @@ test('recordquarry source text APIs proxy Ada County list documents', async () =
     assert.match(await rosListResp.text(), /SAMPLE ROS/);
 
     assert.deepEqual(fetchCalls, [
-      'https://adacountyassessor.org/docs/subdivisionplats/SubsPageList.txt',
+      'https://adacountyassessor.org/docs/subdivisionplats/SubPagesList.txt',
       'https://adacountyassessor.org/docs/recordsofsurvey/SurveysPageList.txt',
+    ]);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('recordquarry subdivision page-list endpoint uses SubPagesList source only', async () => {
+  const fetchCalls = [];
+  const harness = await startServer({
+    mapTileObjectStore: createMockHarvestStore(),
+    recordQuarryTextFetcher: async (url) => {
+      fetchCalls.push(String(url));
+      return { ok: false, status: 404, text: async () => '' };
+    },
+  });
+
+  try {
+    const platListResp = await fetch(`${harness.baseUrl}/api/recordquarry/subdivision-plats/page-list`);
+    assert.equal(platListResp.status, 502);
+    assert.deepEqual(fetchCalls, [
+      'https://adacountyassessor.org/docs/subdivisionplats/SubPagesList.txt',
     ]);
   } finally {
     await harness.close();
