@@ -41,11 +41,30 @@ test('project ROS CRUD API supports batch upsert and star metadata', async () =>
     const batchRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ros: [{ rosNumber: '90001', title: 'ROS 90001', starredInFieldBook: true }] }),
+      body: JSON.stringify({
+        ros: [{
+          rosNumber: '90001',
+          title: 'ROS 90001',
+          starredInFieldBook: true,
+          metadata: {
+            rosSourceId: '6673',
+            rosName: 'RS_6673',
+            aliquot: 'NW1/4',
+            sourceAttributes: { OBJECTID: 6673, NAME: 'RS_6673', ALIQUOT: 'NW1/4' },
+          },
+        }],
+      }),
     });
     assert.equal(batchRes.status, 200);
     const batchPayload = await batchRes.json();
     assert.equal(batchPayload.ros.length, 1);
+    assert.equal(batchPayload.ros[0].metadata?.aliquot, 'NW1/4');
+
+    const listAfterBatchRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros`);
+    assert.equal(listAfterBatchRes.status, 200);
+    const listAfterBatch = await listAfterBatchRes.json();
+    const imported = listAfterBatch.ros.find((entry) => entry.rosNumber === '90001');
+    assert.equal(imported?.metadata?.rosSourceId, '6673');
 
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros/${encodeURIComponent(rosId)}`, {
       method: 'DELETE',

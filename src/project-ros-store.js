@@ -41,6 +41,17 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function normalizeRosMetadata(value, fallback = null) {
+  if (value === undefined) return fallback;
+  if (value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) return fallback;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return fallback;
+  }
+}
+
 function slugifyRosNumber(rosNumber = '') {
   return String(rosNumber || '')
     .trim()
@@ -61,6 +72,7 @@ function buildRosSummary(record) {
     title: record.title,
     source: record.source || null,
     mapImageUrl: record.mapImageUrl || null,
+    metadata: normalizeRosMetadata(record.metadata, null),
     starredInFieldBook: Boolean(record.starredInFieldBook),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -106,6 +118,7 @@ export async function createOrUpdateProjectRos(store, {
   title,
   source,
   mapImageUrl,
+  metadata,
   starredInFieldBook,
 } = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
@@ -130,6 +143,7 @@ export async function createOrUpdateProjectRos(store, {
     title: String(title || `ROS ${rosNumber}`).trim(),
     source: source || existing?.source || null,
     mapImageUrl: mapImageUrl || existing?.mapImageUrl || null,
+    metadata: normalizeRosMetadata(metadata, normalizeRosMetadata(existing?.metadata, null)),
     starredInFieldBook: typeof starredInFieldBook === 'boolean' ? starredInFieldBook : Boolean(existing?.starredInFieldBook),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
@@ -178,6 +192,7 @@ export async function batchUpsertProjectRos(store, projectIdRaw, entries = []) {
       title: String(entry?.title || `ROS ${rosNumber}`).trim(),
       source: entry?.source || existing?.source || null,
       mapImageUrl: entry?.mapImageUrl || existing?.mapImageUrl || null,
+      metadata: normalizeRosMetadata(entry?.metadata, normalizeRosMetadata(existing?.metadata, null)),
       starredInFieldBook: typeof entry?.starredInFieldBook === 'boolean'
         ? entry.starredInFieldBook
         : Boolean(existing?.starredInFieldBook),

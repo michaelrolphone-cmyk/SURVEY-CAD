@@ -1005,6 +1005,7 @@
       const label = bestRosLabel(attrs) || `Record of Survey #${index + 1}`;
       const rosNumber = String(attrs.ROS || attrs.RS || attrs.SurveyNo || attrs.SURVEYNO || '').trim() || `UNLISTED-${index + 1}`;
       const imageMeta = deriveRosImageMeta(attrs);
+      const metadata = buildRosMetadataForExport(attrs, imageMeta, index);
       const rosId = slugify(rosNumber, `ros-${index + 1}`);
       addProjectFileResource(projectFile, {
         id: `ros-${rosId}`,
@@ -1021,6 +1022,7 @@
             label,
             source: 'RecordQuarry',
             mapImageUrl: imageMeta?.fullSizeUrl || '',
+            metadata,
             starredInFieldBook: true,
           },
         },
@@ -1031,6 +1033,7 @@
         title: label,
         source: 'RecordQuarry',
         mapImageUrl: imageMeta?.fullSizeUrl || null,
+        metadata,
         starredInFieldBook: true,
       });
     }
@@ -2473,6 +2476,44 @@
       if (typeof v === "string" && v.trim()) return v.trim();
     }
     return "ROS feature";
+  }
+
+  function sanitizeRosAttributesForExport(attributes = {}) {
+    const safe = {};
+    for (const [key, value] of Object.entries(attributes || {})) {
+      if (value == null) continue;
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) safe[key] = trimmed;
+        continue;
+      }
+      if (typeof value === 'number') {
+        if (Number.isFinite(value)) safe[key] = value;
+        continue;
+      }
+      if (typeof value === 'boolean') {
+        safe[key] = value;
+      }
+    }
+    return safe;
+  }
+
+  function buildRosMetadataForExport(attributes = {}, imageMeta = null, index = 0) {
+    const attrs = sanitizeRosAttributesForExport(attributes);
+    const rosNumber = String(attrs.ROS || attrs.RS || attrs.SurveyNo || attrs.SURVEYNO || '').trim() || `UNLISTED-${index + 1}`;
+    const rosName = String(attrs.Name || attrs.NAME || attrs.Description || attrs.DESC || attrs.SUB_NAME || attrs.SUBDIVISION || '').trim() || null;
+    const rosSourceId = String(attrs.OBJECTID ?? attrs.ObjectID ?? attrs.OBJECTID_1 ?? attrs.FID ?? attrs.GlobalID ?? attrs.GLOBALID ?? '').trim() || null;
+    const aliquot = String(attrs.ALIQUOT || attrs.ALIQUOT_LABEL || '').trim() || null;
+
+    return {
+      rosNumber,
+      rosName,
+      rosSourceId,
+      aliquot,
+      mapImageUrl: imageMeta?.fullSizeUrl || null,
+      thumbnailUrl: imageMeta?.thumbnailUrl || null,
+      sourceAttributes: attrs,
+    };
   }
 
   function normalizeRosFeatures(rosItems = []) {

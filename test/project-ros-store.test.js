@@ -68,3 +68,30 @@ test('batchUpsertProjectRos preserves existing star state when omitted and appli
   const starredOff = await batchUpsertProjectRos(store, 'proj-2', [{ rosNumber: '20001', starredInFieldBook: false }]);
   assert.equal(starredOff.ros[0].starredInFieldBook, false);
 });
+
+
+test('createOrUpdateProjectRos stores source metadata in detail and summary views', async () => {
+  const store = createMockStore();
+  const metadata = {
+    rosSourceId: '6673',
+    rosName: 'RS_6673',
+    aliquot: 'NW1/4',
+    sourceAttributes: {
+      OBJECTID: 6673,
+      NAME: 'RS_6673',
+      ALIQUOT: 'NW1/4',
+    },
+  };
+
+  const created = await createOrUpdateProjectRos(store, {
+    projectId: 'proj-3',
+    rosNumber: '6673',
+    metadata,
+  });
+
+  assert.deepEqual(created.ros.metadata, metadata);
+
+  const summaries = await listProjectRos(store, 'proj-3');
+  assert.equal(summaries.length, 1);
+  assert.deepEqual(summaries[0].metadata, metadata);
+});

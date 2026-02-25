@@ -7408,6 +7408,12 @@
             "type": "string",
             "nullable": true,
             "description": "Full-size ROS map image URL when available"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
+            "additionalProperties": true
           }
         },
         "required": [
@@ -7463,6 +7469,12 @@
             "type": "string",
             "nullable": true,
             "description": "Full-size ROS map image URL when available"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
+            "additionalProperties": true
           }
         },
         "required": [
@@ -7501,6 +7513,12 @@
             "type": "string",
             "nullable": true,
             "description": "Full-size ROS map image URL when available"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
+            "additionalProperties": true
           }
         },
         "required": [
