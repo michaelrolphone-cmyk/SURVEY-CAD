@@ -19,6 +19,9 @@ test('server OpenAPI documents project ROS star metadata and endpoints', async (
   assert.equal(mutation?.properties?.starredInFieldBook?.type, 'boolean');
   assert.equal(summary?.properties?.starredInFieldBook?.type, 'boolean');
   assert.equal(detail?.properties?.starredInFieldBook?.type, 'boolean');
+  assert.equal(mutation?.properties?.metadata?.type, 'object');
+  assert.equal(summary?.properties?.metadata?.type, 'object');
+  assert.equal(detail?.properties?.metadata?.type, 'object');
   assert.ok(summary?.required?.includes('starredInFieldBook'));
   assert.ok(detail?.required?.includes('starredInFieldBook'));
 });

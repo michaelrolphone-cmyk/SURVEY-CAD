@@ -2574,6 +2574,7 @@ export function createSurveyServer({
             title: body.title,
             source: body.source,
             mapImageUrl: body.mapImageUrl,
+            metadata: body.metadata,
             starredInFieldBook: body.starredInFieldBook,
           });
           localStorageSyncWsService.broadcast({
@@ -2603,6 +2604,7 @@ export function createSurveyServer({
             title: body.title,
             source: body.source,
             mapImageUrl: body.mapImageUrl,
+            metadata: body.metadata,
             starredInFieldBook: body.starredInFieldBook,
           });
           localStorageSyncWsService.broadcast({
