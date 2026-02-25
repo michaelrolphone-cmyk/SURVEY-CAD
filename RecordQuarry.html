@@ -605,6 +605,7 @@
   const LAST_LOOKUP_ADDRESS_STORAGE_KEY = "surveyfoundryLastLookupAddress";
   const SUBDIVISION_NEARBY_RADIUS_FT = 666;
   const SUBDIVISION_NEARBY_RADIUS_M = SUBDIVISION_NEARBY_RADIUS_FT * 0.3048;
+  const SUBDIVISION_NEARBY_MAX_RESULTS = 60;
   const SUBDIVISION_PLAT_LIST_URL = '/api/recordquarry/subdivision-plats/page-list';
   const SUBDIVISION_PLAT_BASE_URL = 'https://adacountyassessor.org/docs/subdivisionplats/';
 
@@ -2414,14 +2415,21 @@
       const resp = await fetch(SUBDIVISION_PLAT_LIST_URL, { cache: 'no-store' });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const text = await resp.text();
-      const map = new Map();
+      const byName = new Map();
+      const byDocId = new Map();
       for (const line of text.split(/\r?\n/)) {
         const parsed = parseSubdivisionPlatListLine(line);
         if (!parsed) continue;
-        if (!map.has(parsed.normalizedName)) map.set(parsed.normalizedName, []);
-        map.get(parsed.normalizedName).push(parsed);
+        if (!byName.has(parsed.normalizedName)) byName.set(parsed.normalizedName, []);
+        byName.get(parsed.normalizedName).push(parsed);
+        const docIdKey = String(parsed.platDocId || '').trim().toUpperCase();
+        if (docIdKey && !byDocId.has(docIdKey)) byDocId.set(docIdKey, parsed);
       }
-      return map;
+      return {
+        byName,
+        byDocId,
+        byNameKeys: [...byName.keys()],
+      };
     })().catch((error) => {
       subdivisionPlatListPromise = null;
       throw error;
@@ -2430,27 +2438,53 @@
   }
 
   function matchSubdivisionPlatEntry(subdivisionName, lookupMap, attrs = {}) {
-    if (!lookupMap || !lookupMap.size) return null;
+    const byName = lookupMap?.byName;
+    const byDocId = lookupMap?.byDocId;
+    if (!byName || !byName.size) return null;
     const normalized = sanitizeSubdivisionName(subdivisionName);
     if (normalized) {
-      const direct = lookupMap.get(normalized);
+      const direct = byName.get(normalized);
       if (direct?.length) return direct[0];
     }
 
     const sourceIds = extractSubdivisionSourceIdentifiers(attrs);
     if (sourceIds.size) {
-      for (const entries of lookupMap.values()) {
-        const byId = entries.find((entry) => sourceIds.has(String(entry?.platDocId || '').toUpperCase()));
+      for (const sourceId of sourceIds) {
+        const byId = byDocId?.get(String(sourceId || '').trim().toUpperCase());
         if (byId) return byId;
       }
     }
 
     if (!normalized) return null;
 
-    for (const [key, entries] of lookupMap.entries()) {
+    for (const key of (lookupMap?.byNameKeys || [])) {
+      const entries = byName.get(key);
       if (key.includes(normalized) || normalized.includes(key)) return entries[0];
     }
     return null;
+  }
+
+  function limitNearbySubdivisionEntries(entries = [], parcelFeature = null, maxResults = SUBDIVISION_NEARBY_MAX_RESULTS) {
+    const source = Array.isArray(entries) ? entries : [];
+    const maxCount = Number.isFinite(Number(maxResults)) ? Math.max(1, Number(maxResults)) : SUBDIVISION_NEARBY_MAX_RESULTS;
+    if (source.length <= maxCount) return source;
+
+    const centroid = centroidOfPolygon(parcelFeature?.geometry || null);
+    if (!centroid || !Number.isFinite(Number(centroid.x)) || !Number.isFinite(Number(centroid.y))) {
+      return source.slice(0, maxCount);
+    }
+
+    return source
+      .map((entry, index) => {
+        const featureCentroid = centroidOfPolygon(entry?.feature?.geometry || null);
+        const distance = featureCentroid
+          ? haversineMeters(centroid.y, centroid.x, featureCentroid.y, featureCentroid.x)
+          : Number.POSITIVE_INFINITY;
+        return { entry, index, distance };
+      })
+      .sort((a, b) => a.distance - b.distance || a.index - b.index)
+      .slice(0, maxCount)
+      .map((item) => item.entry);
   }
 
   async function findNearbySubdivisions(parcelFeature, outSR = 4326) {
@@ -3852,6 +3886,7 @@
           seenNearby.add(key);
           return true;
         });
+        state.nearbySubdivisions = limitNearbySubdivisionEntries(state.nearbySubdivisions, parcel, SUBDIVISION_NEARBY_MAX_RESULTS);
         log(`Subdivisions within ${SUBDIVISION_NEARBY_RADIUS_FT} ft: ${state.nearbySubdivisions.length}`);
       } catch (e) {
         state.nearbySubdivisions = subdiv ? [{ feature: subdiv, name: getSubdivisionNameFromAttrs(subdiv.attributes || {}), plat: null }] : [];
