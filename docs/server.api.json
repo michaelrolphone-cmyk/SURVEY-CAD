@@ -2013,7 +2013,7 @@
           "CP&F Records"
         ],
         "summary": "Update (upsert) a CP&F record",
-        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectCpf",
         "requestBody": {
           "required": true,
@@ -3862,7 +3862,7 @@
           "ROS Records"
         ],
         "summary": "Update (upsert) a ROS record",
-        "description": "Updates the record identified by `rosId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `rosId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectRos",
         "requestBody": {
           "required": true,
@@ -7414,6 +7414,10 @@
             "nullable": true,
             "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
             "additionalProperties": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -7475,6 +7479,10 @@
             "nullable": true,
             "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
             "additionalProperties": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -7519,6 +7527,10 @@
             "nullable": true,
             "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
             "additionalProperties": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [

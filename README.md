@@ -1330,9 +1330,9 @@ EvidenceDesk CP&F rows now support a persisted `starredInFieldBook` flag so crew
 - `GET /api/projects/{projectId}/cpfs` — returns CP&F summaries including `starredInFieldBook`.
 - `POST /api/projects/{projectId}/cpfs` — accepts single and batch upserts with optional `starredInFieldBook`.
 - `PATCH /api/projects/{projectId}/cpfs/{cpfId}` — updates a CP&F record (including `starredInFieldBook`).
-- `GET /api/projects/{projectId}/ros` — returns Record of Survey summaries including `starredInFieldBook` and optional `metadata` exported from RecordQuarry (ROS source ID/name, aliquot, and source attributes).
-- `POST /api/projects/{projectId}/ros` — accepts single and batch upserts with optional `starredInFieldBook`, `mapImageUrl`, and `metadata` payloads.
-- `PATCH /api/projects/{projectId}/ros/{rosId}` — updates a Record of Survey record (including `starredInFieldBook`, `mapImageUrl`, and `metadata`).
+- `GET /api/projects/{projectId}/ros` — returns Record of Survey summaries including `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and optional supplemental `metadata` exported from RecordQuarry (ROS source ID/name, aliquot, and source attributes).
+- `POST /api/projects/{projectId}/ros` — accepts single and batch upserts with optional `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and `metadata` payloads. RecordQuarry sync payloads keep top-level identifiers/URLs outside `metadata` to avoid duplicated keys.
+- `PATCH /api/projects/{projectId}/ros/{rosId}` — updates a Record of Survey record (including `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and `metadata`).
 
 ### CLI and server commands
 - `npm start`

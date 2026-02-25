@@ -16,11 +16,12 @@ test('project ROS CRUD API supports batch upsert and star metadata', async () =>
     const createRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rosNumber: '12345', title: 'ROS 12345', starredInFieldBook: true }),
+      body: JSON.stringify({ rosNumber: '12345', title: 'ROS 12345', starredInFieldBook: true, thumbnailUrl: '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fr1234501.tif' }),
     });
     assert.equal(createRes.status, 201);
     const created = await createRes.json();
     assert.equal(created.ros.starredInFieldBook, true);
+    assert.equal(created.ros.thumbnailUrl, '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fr1234501.tif');
 
     const listRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros`);
     assert.equal(listRes.status, 200);
@@ -32,11 +33,12 @@ test('project ROS CRUD API supports batch upsert and star metadata', async () =>
     const patchRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros/${encodeURIComponent(rosId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rosNumber: '12345', title: 'ROS 12345 Revised', starredInFieldBook: false }),
+      body: JSON.stringify({ rosNumber: '12345', title: 'ROS 12345 Revised', starredInFieldBook: false, thumbnailUrl: '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fr1234502.tif' }),
     });
     assert.equal(patchRes.status, 200);
     const patched = await patchRes.json();
     assert.equal(patched.ros.starredInFieldBook, false);
+    assert.equal(patched.ros.thumbnailUrl, '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fr1234502.tif');
 
     const batchRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros`, {
       method: 'POST',
@@ -46,6 +48,7 @@ test('project ROS CRUD API supports batch upsert and star metadata', async () =>
           rosNumber: '90001',
           title: 'ROS 90001',
           starredInFieldBook: true,
+          thumbnailUrl: '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fr9000101.tif',
           metadata: {
             rosSourceId: '6673',
             rosName: 'RS_6673',
@@ -59,6 +62,7 @@ test('project ROS CRUD API supports batch upsert and star metadata', async () =>
     const batchPayload = await batchRes.json();
     assert.equal(batchPayload.ros.length, 1);
     assert.equal(batchPayload.ros[0].metadata?.aliquot, 'NW1/4');
+    assert.equal(batchPayload.ros[0].thumbnailUrl, '/api/project-files/ros-thumbnail?source=https%3A%2F%2Fexample.test%2Fr9000101.tif');
 
     const listAfterBatchRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros`);
     assert.equal(listAfterBatchRes.status, 200);
