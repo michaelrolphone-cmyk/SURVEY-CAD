@@ -15,7 +15,7 @@ test('RecordQuarry builds subdivision plat doc-id index and caps nearby subdivis
   assert.match(html, /const\s+normalizedCandidates\s*=\s*getSubdivisionNameCandidates\(attrs,\s*subdivisionName\);/, 'RecordQuarry should match subdivision plats from a prioritized set of subdivision name candidates.');
   assert.match(html, /function\s+buildSubdivisionPlatThumbnailUrl\s*\(/, 'RecordQuarry should normalize subdivision plat thumbnails through a helper.');
   assert.ok(html.includes(".replace(/\\\\+/g, '/')"), 'RecordQuarry should normalize SubPagesList Windows-style backslash plat paths into URL-safe forward slashes.');
-  assert.ok(html.includes("const fileMatch = raw.match(/[A-Za-z0-9._\\\\-/ ]+\\.(?:pdf|jpe?g|png|tiff?)/i);"), 'RecordQuarry should parse local SubPagesList plat paths that use backslash directory separators.');
+  assert.ok(html.includes("const fileMatch = raw.match(/[A-Za-z0-9._\\\\/ -]+\\.(?:pdf|jpe?g|png|tiff?)/i);"), 'RecordQuarry should parse local SubPagesList plat paths that use backslash directory separators.');
   assert.match(html, /\/api\/project-files\/ros-thumbnail\?\$\{new URLSearchParams\(\{ source: sourceUrl \}\)\}/, 'RecordQuarry should route subdivision TIFF thumbnails through the ros-thumbnail API endpoint.');
   assert.match(html, /thumbnailUrl:\s*buildSubdivisionPlatThumbnailUrl\(platUrl\)/, 'RecordQuarry should derive subdivision card thumbnails from the normalized plat-thumbnail helper.');
   assert.match(html, /function\s+subdivisionTokenOverlapScore\s*\(/, 'RecordQuarry should score subdivision-name token overlap to match plat list entries when legal descriptions add extra words.');
