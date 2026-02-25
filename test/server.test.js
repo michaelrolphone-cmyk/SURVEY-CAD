@@ -323,7 +323,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.ok(utilitiesPayload.utilities.every((utility) => utility.provider === 'Idaho Power'));
     assert.deepEqual(
       utilitiesPayload.utilities.map((utility) => utility.code).sort(),
-      ['OH', 'PM', 'UP'],
+      ['OH', 'PP', 'UP'],
     );
 
 
