@@ -255,11 +255,23 @@ test('server exposes survey APIs and static html', async () => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ version: 100, snapshot: { sample: 'value' } }),
+      body: JSON.stringify({
+        version: 100,
+        snapshot: {
+          sample: 'value',
+          'project:ros:project-1771091842263-k8jaf:unlisted-1': 'server-only',
+        },
+      }),
     });
     assert.equal(localStorageUpdateRes.status, 200);
     const localStorageUpdate = await localStorageUpdateRes.json();
     assert.equal(localStorageUpdate.status, 'server-updated');
+    assert.deepEqual(localStorageUpdate.state.snapshot, { sample: 'value' });
+
+    const localStorageAfterUpdateRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`);
+    assert.equal(localStorageAfterUpdateRes.status, 200);
+    const localStorageAfterUpdate = await localStorageAfterUpdateRes.json();
+    assert.deepEqual(localStorageAfterUpdate.snapshot, { sample: 'value' });
 
     const localStorageStaleRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
       method: 'POST',
