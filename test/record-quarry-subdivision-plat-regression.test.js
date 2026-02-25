@@ -8,6 +8,11 @@ test('RecordQuarry builds subdivision plat doc-id index and caps nearby subdivis
   assert.match(html, /const\s+SUBDIVISION_NEARBY_MAX_RESULTS\s*=\s*18\s*;/, 'RecordQuarry should cap nearby subdivision results to avoid rendering freezes.');
   assert.match(html, /const\s+byDocId\s*=\s*new\s+Map\(\);[\s\S]*if\s*\(docIdKey\s*&&\s*!byDocId\.has\(docIdKey\)\)\s+byDocId\.set\(docIdKey,\s*parsed\);/, 'RecordQuarry should index subdivision plats by document id for fast matching.');
   assert.match(html, /for\s*\(const\s+sourceId\s+of\s+sourceIds\)\s*\{[\s\S]*byDocId\?\.get\(/, 'RecordQuarry should match subdivision plats via the indexed source-id map.');
+
+  assert.match(html, /titlePart\s*=\s*titlePart\.replace\(resolvedPath,\s*' '\)/, 'RecordQuarry should parse subdivision plat lines where the file path and subdivision name are in the same whitespace-delimited field.');
+  assert.match(html, /\.replace\(\/\\bS\\d\{4,\}\\d\{0,2\}\\b\/g,\s*' '\)/, 'RecordQuarry should remove inline subdivision plat document-id tokens before name matching.');
+  assert.match(html, /function\s+getSubdivisionNameCandidates\s*\(/, 'RecordQuarry should derive multiple subdivision name candidates from feature attributes for plat matching.');
+  assert.match(html, /const\s+normalizedCandidates\s*=\s*getSubdivisionNameCandidates\(attrs,\s*subdivisionName\);/, 'RecordQuarry should match subdivision plats from a prioritized set of subdivision name candidates.');
   assert.match(html, /geometryType:\s*'esriGeometryPoint'[\s\S]*geometry:\s*`\$\{centroid\.x\},\$\{centroid\.y\}`[\s\S]*distance:\s*SUBDIVISION_NEARBY_RADIUS_M/, 'RecordQuarry should query nearby subdivisions from the parcel centroid point with the configured radius.');
   assert.match(html, /state\.nearbySubdivisions\s*=\s*dedupeNearbySubdivisionEntries\(nearbyWithPlatData,\s*parcel\);/, 'RecordQuarry should dedupe nearby subdivision results using subdivision identity, not parcel-lot object IDs.');
   assert.match(html, /state\.nearbySubdivisions\s*=\s*limitNearbySubdivisionEntries\(state\.nearbySubdivisions,\s*parcel,\s*SUBDIVISION_NEARBY_MAX_RESULTS\);/, 'RecordQuarry should trim nearby subdivision entries before rendering cards.');
