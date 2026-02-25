@@ -1843,14 +1843,31 @@ header {
       if (!project) return;
       if (!window.confirm(`Delete project \"${project.name}\"? This cannot be undone.`)) return;
 
-      projects = projects.filter((entry) => entry.id !== projectId);
-      if (activeProjectId === projectId) {
-        activeProjectId = null;
-        localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
-      }
+      const archiveRequest = fetch(`/api/projects/${encodeURIComponent(projectId)}/archive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ project }),
+      }).catch((error) => ({ ok: false, status: 0, json: async () => ({ error: String(error?.message || error) }) }));
 
-      saveProjects();
-      renderProjects();
+      archiveRequest.then(async (response) => {
+        if (!response?.ok) {
+          const payload = await response?.json?.().catch(() => ({}));
+          const message = payload?.error || `Archive request failed (${response?.status || 'network'}).`;
+          window.alert(`Could not archive project "${project.name}" before delete. ${message}`);
+          return;
+        }
+
+        projects = projects.filter((entry) => entry.id !== projectId);
+        if (activeProjectId === projectId) {
+          activeProjectId = null;
+          localStorage.removeItem(getActiveProjectStorageKey());
+        }
+
+        saveProjects();
+        renderProjects();
+      });
     }
 
     function extractPhoneNumber(value = '') {

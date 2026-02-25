@@ -319,3 +319,12 @@ test('launcher requires a valid crew identity before opening non-CrewManager app
   assert.match(launcherHtml, /function\s+ensureCrewIdentityForApp\(file\)\s*\{[\s\S]*setActiveCrewMemberId\(null\);[\s\S]*openCrewSelectModal\(\);[\s\S]*crewPickerDetail\.textContent\s*=\s*'Choose your crew identity to open apps\.';[\s\S]*return false;/, 'launcher should block app opening and force the crew picker modal when identity is missing');
   assert.match(launcherHtml, /function\s+openApp\(file,\s*\{\s*historyMode\s*=\s*'push'\s*\}\s*=\s*\{\}\)\s*\{[\s\S]*if\s*\(!ensureCrewIdentityForApp\(file\)\)\s*return;/, 'openApp should enforce crew identity gate before showing apps');
 });
+
+
+test('launcher archives project payload on the server before deleting local project metadata', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(launcherHtml, /fetch\(`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/archive`/, 'project delete should POST project archives to server first');
+  assert.match(launcherHtml, /window\.alert\(`Could not archive project/, 'launcher should halt deletion and alert if archive upload fails');
+  assert.match(launcherHtml, /localStorage\.removeItem\(getActiveProjectStorageKey\(\)\);/, 'launcher should clear active-project storage via crew-scoped key helper after delete');
+});
