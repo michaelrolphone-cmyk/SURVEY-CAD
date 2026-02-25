@@ -2358,6 +2358,21 @@
   }
 
   function getSubdivisionNameFromAttrs(attrs = {}) {
+    const pick = (keys = [], regex = null) => {
+      for (const key of keys) {
+        const cleaned = String(attrs?.[key] || '').trim();
+        if (cleaned) return cleaned;
+      }
+      if (regex instanceof RegExp) {
+        for (const [key, value] of Object.entries(attrs || {})) {
+          if (!regex.test(String(key || ''))) continue;
+          const cleaned = String(value || '').trim();
+          if (cleaned) return cleaned;
+        }
+      }
+      return '';
+    };
+
     const candidates = [
       attrs.SUBDIVNAME,
       attrs.SUBDIVISION,
@@ -2371,7 +2386,19 @@
       const cleaned = String(value || '').trim();
       if (cleaned) return cleaned;
     }
-    return '';
+    return pick(
+      [
+        'SubdivisionName',
+        'SUBDIVISIONNAME',
+        'SubDivisionName',
+        'Subdivision',
+        'SUBDIVISION_NAME',
+        'Subdivision_Name',
+        'PlatName',
+        'PLAT_NAME',
+      ],
+      /(subdiv(ision)?|plat).*(name)|name.*(subdiv(ision)?|plat)/i,
+    );
   }
 
   function getSubdivisionNameCandidates(attrs = {}, explicitName = '') {
@@ -2966,8 +2993,19 @@
     };
 
     const rosNumber = pick(['ROS', 'RS', 'SurveyNo', 'SURVEYNO', 'Survey', 'SURVEY']);
-    const recorderBook = pick(['RecorderBook', 'RECORDERBOOK', 'Book', 'BOOK', 'BookNo', 'BOOKNO']);
-    const recorderPage = pick(['RecorderPage', 'RECORDERPAGE', 'Page', 'PAGE', 'Pg', 'PG']);
+    const pickByKeyPattern = (regex) => {
+      for (const [key, value] of Object.entries(a || {})) {
+        if (!regex.test(String(key || ''))) continue;
+        const normalized = String(value == null ? '' : value).trim();
+        if (normalized) return normalized;
+      }
+      return '';
+    };
+
+    const recorderBook = pick(['RecorderBook', 'RECORDERBOOK', 'Book', 'BOOK', 'BookNo', 'BOOKNO', 'Recorder_Book', 'RECORDER_BOOK', 'BookNumber', 'BOOKNUMBER'])
+      || pickByKeyPattern(/record(er)?[_\s-]*book|book[_\s-]*(no|num|number)/i);
+    const recorderPage = pick(['RecorderPage', 'RECORDERPAGE', 'Page', 'PAGE', 'Pg', 'PG', 'Recorder_Page', 'RECORDER_PAGE', 'PageNo', 'PAGENO', 'PageNumber', 'PAGENUMBER'])
+      || pickByKeyPattern(/record(er)?[_\s-]*page|page[_\s-]*(no|num|number)/i);
     const documentNo = pick(['Document', 'DOC', 'DocNo', 'DOCNO', 'InstrumentNo', 'INSTRUMENTNO']);
     const description = pick(['Description', 'DESC', 'Name', 'NAME']);
 
