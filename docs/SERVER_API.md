@@ -903,6 +903,44 @@ Push a full state snapshot to the server (full sync).
 
 ---
 
+### `POST /api/projects/:projectId/archive`
+
+Archive a deleted SurveyFoundry project's synchronized key/value footprint into object storage (MinIO/S3-backed Evidence Desk store).
+
+This endpoint is intended for one-way archival during delete flows. It does **not** provide list/restore semantics.
+
+**Request Body (optional):**
+```json
+{
+  "project": {
+    "id": "demo-project",
+    "name": "Demo Project"
+  }
+}
+```
+
+**Response `201`:**
+```json
+{
+  "archived": true,
+  "projectId": "demo-project",
+  "snapshotEntryCount": 3,
+  "redisEntryCount": 2,
+  "archiveResource": {
+    "folder": "archive",
+    "title": "2026-02-25T17-00-00-000Z-demo-project.json"
+  }
+}
+```
+
+The archived JSON payload includes:
+- filtered LocalStorage sync snapshot entries related to the project,
+- sync metadata (`version`, `checksum`, `updatedAt`),
+- best-effort Redis key/value captures relevant to the project.
+
+
+---
+
 ## LineSmith Drawings (Project-scoped CRUD)
 
 Project-scoped LineSmith drawings are persisted in the shared sync snapshot (Redis-backed when configured) and keep differential version history for offline-friendly reconstruction.

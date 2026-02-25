@@ -259,6 +259,40 @@ function parseProjectRecordQuarryCacheRoute(pathname = '') {
   return { projectId: decodeURIComponent(match[1]) };
 }
 
+function parseProjectArchiveRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/archive\/?$/);
+  if (!match) return null;
+  return { projectId: decodeURIComponent(match[1]) };
+}
+
+function sanitizeArchiveFileName(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'project';
+}
+
+async function scanRedisKeys(redis, pattern, count = 100) {
+  if (!redis || typeof redis.scan !== 'function') {
+    if (redis && typeof redis.keys === 'function') {
+      const keys = await redis.keys(pattern);
+      return Array.isArray(keys) ? keys : [];
+    }
+    return [];
+  }
+  const keys = [];
+  let cursor = '0';
+  do {
+    const reply = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', String(count));
+    const nextCursor = Array.isArray(reply) ? String(reply[0] || '0') : String(reply?.cursor || '0');
+    const batch = Array.isArray(reply) ? reply[1] : reply?.keys;
+    if (Array.isArray(batch)) keys.push(...batch.map((key) => String(key)));
+    cursor = nextCursor;
+  } while (cursor !== '0');
+  return keys;
+}
+
 function buildLineSmithDrawingObjectName(drawingId = '') {
   const normalized = String(drawingId || '')
     .trim()
@@ -1460,6 +1494,102 @@ export function createSurveyServer({
     return await resp.text();
   }
 
+  function isProjectScopedSnapshotEntry(key, value, projectId) {
+    const normalizedProjectId = String(projectId || '').trim();
+    if (!normalizedProjectId) return false;
+    const encodedProjectId = encodeURIComponent(normalizedProjectId);
+    const rawKey = String(key || '');
+    if (rawKey.includes(normalizedProjectId) || rawKey.includes(encodedProjectId)) return true;
+    if (rawKey === 'surveyfoundryProjects') return String(value || '').includes(normalizedProjectId);
+    if (rawKey.startsWith('surveyfoundryActiveProjectId')) return String(value || '').trim() === normalizedProjectId;
+    return false;
+  }
+
+  async function collectProjectArchiveRedisEntries(projectId) {
+    const redis = sharedRedisClient;
+    if (!redis) return [];
+    const normalizedProjectId = String(projectId || '').trim();
+    if (!normalizedProjectId) return [];
+
+    const patterns = [
+      `*${normalizedProjectId}*`,
+      '*survey-cad:localstorage-sync:state*',
+    ];
+    const uniqueKeys = new Set();
+    for (const pattern of patterns) {
+      try {
+        const keys = await scanRedisKeys(redis, pattern);
+        keys.forEach((key) => uniqueKeys.add(String(key)));
+      } catch {
+        // Best effort only; archive should still proceed with snapshot payload.
+      }
+    }
+
+    const entries = [];
+    for (const key of [...uniqueKeys].slice(0, 500)) {
+      let value = null;
+      let error = null;
+      if (typeof redis.get === 'function') {
+        try {
+          value = await redis.get(key);
+        } catch (err) {
+          error = String(err?.message || err);
+        }
+      }
+      entries.push({ key, value, error });
+    }
+
+    return entries;
+  }
+
+  async function archiveProjectDeletion(projectId, payloadProject = null) {
+    const normalizedProjectId = String(projectId || '').trim();
+    if (!normalizedProjectId) {
+      throw createHttpError(400, 'projectId is required for archive requests.');
+    }
+
+    const runtime = await resolveEvidenceDeskStore();
+    const state = await resolveStoreState();
+    const snapshot = state?.snapshot && typeof state.snapshot === 'object' ? state.snapshot : {};
+    const matchedSnapshot = Object.fromEntries(
+      Object.entries(snapshot).filter(([key, value]) => isProjectScopedSnapshotEntry(key, value, normalizedProjectId)),
+    );
+    const redisEntries = await collectProjectArchiveRedisEntries(normalizedProjectId);
+    const archivedAt = new Date().toISOString();
+    const fileName = `${archivedAt.replace(/[:.]/g, '-')}-${sanitizeArchiveFileName(normalizedProjectId)}.json`;
+
+    const archivePayload = {
+      archivedAt,
+      projectId: normalizedProjectId,
+      project: payloadProject && typeof payloadProject === 'object' ? payloadProject : null,
+      localStorageSyncState: {
+        version: state?.version ?? 0,
+        checksum: state?.checksum || '',
+        updatedAt: state?.updatedAt || null,
+      },
+      localStorageSnapshotEntries: matchedSnapshot,
+      redisEntries,
+    };
+
+    const buffer = Buffer.from(JSON.stringify(archivePayload, null, 2), 'utf8');
+    const resource = await runtime.store.createFile({
+      projectId: 'surveyfoundry-archives',
+      folderKey: 'archive',
+      originalFileName: fileName,
+      buffer,
+      extension: 'json',
+      mimeType: 'application/json',
+    });
+
+    return {
+      archived: true,
+      projectId: normalizedProjectId,
+      archiveResource: resource,
+      snapshotEntryCount: Object.keys(matchedSnapshot).length,
+      redisEntryCount: redisEntries.length,
+    };
+  }
+
   async function resolveMapTileDatasets() {
     if (mapTileSettings.datasets.length) return mapTileSettings.datasets;
 
@@ -2025,6 +2155,18 @@ export function createSurveyServer({
           return;
         }
         sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+        return;
+      }
+
+      const projectArchiveRoute = parseProjectArchiveRoute(urlObj.pathname);
+      if (projectArchiveRoute) {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Only POST is supported.' });
+          return;
+        }
+        const body = await readJsonBody(req);
+        const result = await archiveProjectDeletion(projectArchiveRoute.projectId, body?.project);
+        sendJson(res, 201, result);
         return;
       }
 

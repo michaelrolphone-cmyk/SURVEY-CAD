@@ -1876,6 +1876,76 @@
         }
       }
     },
+    "/api/projects/{projectId}/archive": {
+      "post": {
+        "tags": [
+          "Project Archives"
+        ],
+        "summary": "Archive project delete payload to object storage",
+        "operationId": "archiveProjectDelete",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectIdParam"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Optional launcher project metadata snapshot saved with the archive record."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project archive captured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "archived",
+                    "projectId",
+                    "snapshotEntryCount",
+                    "redisEntryCount"
+                  ],
+                  "properties": {
+                    "archived": {
+                      "type": "boolean"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "snapshotEntryCount": {
+                      "type": "integer"
+                    },
+                    "redisEntryCount": {
+                      "type": "integer"
+                    },
+                    "archiveResource": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/cpfs": {
       "parameters": [
         {
