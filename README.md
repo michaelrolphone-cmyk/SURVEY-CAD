@@ -1340,10 +1340,10 @@ EvidenceDesk CP&F rows now support a persisted `starredInFieldBook` flag so crew
 
 ### API endpoints
 - `GET /api/projects/{projectId}/cpfs` — returns CP&F summaries including `starredInFieldBook`.
-- `POST /api/projects/{projectId}/cpfs` — accepts single and batch upserts with optional `starredInFieldBook`.
+- `POST /api/projects/{projectId}/cpfs` — accepts single and batch upserts with optional `starredInFieldBook`; batch requests now support `overwrite=true` (query or body) to replace all existing project CP&F rows with only the submitted selection.
 - `PATCH /api/projects/{projectId}/cpfs/{cpfId}` — updates a CP&F record (including `starredInFieldBook`).
 - `GET /api/projects/{projectId}/ros` — returns Record of Survey summaries including `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and optional supplemental `metadata` exported from RecordQuarry (ROS source ID/name, aliquot, geolocation, and source attributes).
-- `POST /api/projects/{projectId}/ros` — accepts single and batch upserts with optional `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and `metadata` payloads (including `metadata.geolocation` lat/lon derived from ROS geometry). RecordQuarry sync payloads keep top-level identifiers/URLs outside `metadata` to avoid duplicated keys.
+- `POST /api/projects/{projectId}/ros` — accepts single and batch upserts with optional `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and `metadata` payloads (including `metadata.geolocation` lat/lon derived from ROS geometry). Batch requests also support `overwrite=true` (query or body) to replace existing ROS rows with just the submitted selection.
 - `PATCH /api/projects/{projectId}/ros/{rosId}` — updates a Record of Survey record (including `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and `metadata`).
 
 ### CLI and server commands
@@ -1364,18 +1364,18 @@ RecordQuarry now lazy-loads cached 1024px PNG thumbnails for Record of Survey TI
 
 ## API and CLI notes for RecordQuarry starred subdivision plat exports
 
-RecordQuarry now supports starring nearby subdivision cards so selected subdivision plats are included in the project file export written for EvidenceDesk (under the `plats` folder) during PointForge handoff.
+RecordQuarry now supports starring nearby subdivision cards so selected subdivision plats are included in the project file export written for EvidenceDesk (under the `plats` folder) during PointForge handoff. The PointForge export panel also includes an **Overwrite CP&F, Record of Survey, and Subdivision records** checkbox; when enabled, RecordQuarry sends batch upserts with `overwrite=true` so project `cpfs`, `ros`, and `plats` collections are fully replaced by the current selection.
 
 - App route: `GET /RecordQuarry.html`
 - API endpoints used by this flow:
   - `GET /api/lookup`
   - `GET /api/project-files/pdf-thumbnail`
   - `GET /api/projects/:projectId/plats`
-  - `POST /api/projects/:projectId/plats`
+  - `POST /api/projects/:projectId/plats` (supports batch overwrite via `overwrite=true`)
   - `PATCH /api/projects/:projectId/plats/:platId`
   - `DELETE /api/projects/:projectId/plats/:platId`
-  - `POST /api/projects/:projectId/ros`
-  - `POST /api/projects/:projectId/cpfs`
+  - `POST /api/projects/:projectId/ros` (supports batch overwrite via `overwrite=true`)
+  - `POST /api/projects/:projectId/cpfs` (supports batch overwrite via `overwrite=true`)
 - CLI/server commands:
   - `npm start`
   - `npm test`

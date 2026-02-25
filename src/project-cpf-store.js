@@ -150,15 +150,17 @@ export async function createOrUpdateProjectCpf(store, {
   return { cpf: record, sync: result, created: !existing };
 }
 
-export async function batchUpsertProjectCpfs(store, projectIdRaw, entries = []) {
+export async function batchUpsertProjectCpfs(store, projectIdRaw, entries = [], options = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
   if (!projectId) throw new Error('projectId is required.');
-  if (!Array.isArray(entries) || !entries.length) return { cpfs: [], sync: null };
+  const overwriteExisting = Boolean(options?.overwriteExisting);
+  if (!Array.isArray(entries)) return { cpfs: [], sync: null };
 
   const now = nowIso();
   const state = await Promise.resolve(store.getState());
   const snapshot = state?.snapshot || {};
   const index = parseSnapshotJson(snapshot, cpfIndexKey(projectId)) || {};
+  const existingIds = new Set(Object.keys(index));
 
   const operations = [];
   const savedCpfs = [];
@@ -170,6 +172,7 @@ export async function batchUpsertProjectCpfs(store, projectIdRaw, entries = []) 
     const cpfId = normalizeCpfId(entry?.cpfId) || deriveCpfId(instrument);
     if (!cpfId) continue;
 
+    existingIds.delete(cpfId);
     const existing = parseSnapshotJson(snapshot, cpfKey(projectId, cpfId));
     const record = {
       schemaVersion: '1.0.0',
@@ -191,6 +194,13 @@ export async function batchUpsertProjectCpfs(store, projectIdRaw, entries = []) 
     index[cpfId] = buildCpfSummary(record);
     operations.push({ type: 'set', key: cpfKey(projectId, cpfId), value: JSON.stringify(record) });
     savedCpfs.push(record);
+  }
+
+  if (overwriteExisting) {
+    for (const cpfId of existingIds) {
+      delete index[cpfId];
+      operations.push({ type: 'remove', key: cpfKey(projectId, cpfId) });
+    }
   }
 
   if (!operations.length) return { cpfs: [], sync: null };

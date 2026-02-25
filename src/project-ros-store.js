@@ -166,15 +166,17 @@ export async function createOrUpdateProjectRos(store, {
   return { ros: record, sync: result, created: !existing };
 }
 
-export async function batchUpsertProjectRos(store, projectIdRaw, entries = []) {
+export async function batchUpsertProjectRos(store, projectIdRaw, entries = [], options = {}) {
   const projectId = normalizeProjectId(projectIdRaw);
   if (!projectId) throw new Error('projectId is required.');
-  if (!Array.isArray(entries) || !entries.length) return { ros: [], sync: null };
+  const overwriteExisting = Boolean(options?.overwriteExisting);
+  if (!Array.isArray(entries)) return { ros: [], sync: null };
 
   const now = nowIso();
   const state = await Promise.resolve(store.getState());
   const snapshot = state?.snapshot || {};
   const index = parseSnapshotJson(snapshot, rosIndexKey(projectId)) || {};
+  const existingIds = new Set(Object.keys(index));
 
   const operations = [];
   const savedRos = [];
@@ -186,6 +188,7 @@ export async function batchUpsertProjectRos(store, projectIdRaw, entries = []) {
     const rosId = normalizeRosId(entry?.rosId) || deriveRosId(rosNumber);
     if (!rosId) continue;
 
+    existingIds.delete(rosId);
     const existing = parseSnapshotJson(snapshot, rosKey(projectId, rosId));
     const record = {
       schemaVersion: '1.0.0',
@@ -207,6 +210,13 @@ export async function batchUpsertProjectRos(store, projectIdRaw, entries = []) {
     index[rosId] = buildRosSummary(record);
     operations.push({ type: 'set', key: rosKey(projectId, rosId), value: JSON.stringify(record) });
     savedRos.push(record);
+  }
+
+  if (overwriteExisting) {
+    for (const rosId of existingIds) {
+      delete index[rosId];
+      operations.push({ type: 'remove', key: rosKey(projectId, rosId) });
+    }
   }
 
   if (!operations.length) return { ros: [], sync: null };

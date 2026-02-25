@@ -208,6 +208,13 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function parseOverwriteFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
 function parseProjectDrawingRoute(pathname = '') {
   const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/drawings(?:\/([^/]+))?\/?$/);
   if (!match) return null;
@@ -2781,7 +2788,8 @@ export function createSurveyServer({
           const body = await readJsonBody(req);
           // Support batch upsert when body.cpfs is an array
           if (Array.isArray(body?.cpfs)) {
-            const result = await batchUpsertProjectCpfs(localStorageSyncStore, projectId, body.cpfs);
+            const overwrite = parseOverwriteFlag(urlObj.searchParams.get('overwrite')) || parseOverwriteFlag(body?.overwrite);
+            const result = await batchUpsertProjectCpfs(localStorageSyncStore, projectId, body.cpfs, { overwriteExisting: overwrite });
             if (result.sync) {
               localStorageSyncWsService.broadcast({
                 type: 'sync-differential-applied',
@@ -2900,7 +2908,8 @@ export function createSurveyServer({
         if (req.method === 'POST' && !rosId) {
           const body = await readJsonBody(req);
           if (Array.isArray(body?.ros)) {
-            const result = await batchUpsertProjectRos(localStorageSyncStore, projectId, body.ros);
+            const overwrite = parseOverwriteFlag(urlObj.searchParams.get('overwrite')) || parseOverwriteFlag(body?.overwrite);
+            const result = await batchUpsertProjectRos(localStorageSyncStore, projectId, body.ros, { overwriteExisting: overwrite });
             if (result.sync) {
               localStorageSyncWsService.broadcast({
                 type: 'sync-differential-applied',
@@ -3025,7 +3034,8 @@ export function createSurveyServer({
         if (req.method === 'POST' && !platId) {
           const body = await readJsonBody(req);
           if (Array.isArray(body?.plats)) {
-            const result = await batchUpsertProjectPlats(localStorageSyncStore, projectId, body.plats);
+            const overwrite = parseOverwriteFlag(urlObj.searchParams.get('overwrite')) || parseOverwriteFlag(body?.overwrite);
+            const result = await batchUpsertProjectPlats(localStorageSyncStore, projectId, body.plats, { overwriteExisting: overwrite });
             if (result.sync) {
               localStorageSyncWsService.broadcast({
                 type: 'sync-differential-applied',
