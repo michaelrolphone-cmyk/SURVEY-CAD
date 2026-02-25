@@ -4,6 +4,9 @@ const INTERNAL_KEYS = new Set([
   'surveyfoundryLocalStorageSyncMeta',
   'surveyfoundryActiveCrewMemberId',
 ]);
+const SERVER_ONLY_KEY_PATTERNS = [
+  /^project:ros:project-[^:]+:unlisted-\d+$/,
+];
 const PENDING_DIFFS_KEY = 'surveyfoundryLocalStoragePendingDiffs';
 const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
 const INITIAL_RECONNECT_DELAY_MS = 1500;
@@ -16,6 +19,7 @@ const HTTP_FALLBACK_SYNC_INTERVAL_MS = 60000;
 function shouldSyncLocalStorageKey(key) {
   const keyString = String(key || '');
   if (!keyString) return false;
+  if (SERVER_ONLY_KEY_PATTERNS.some((pattern) => pattern.test(keyString))) return false;
   return !INTERNAL_KEYS.has(keyString);
 }
 
@@ -25,7 +29,11 @@ function sortedSnapshot(snapshot = {}) {
 
 function normalizeSnapshot(snapshot = {}) {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return {};
-  return Object.fromEntries(Object.entries(snapshot).map(([key, value]) => [String(key), String(value)]));
+  return Object.fromEntries(
+    Object.entries(snapshot)
+      .map(([key, value]) => [String(key), String(value)])
+      .filter(([key]) => shouldSyncLocalStorageKey(key)),
+  );
 }
 
 
@@ -871,11 +879,15 @@ class LocalStorageSocketSync {
           return;
         }
         if (operation?.type === 'set' && operation.key) {
-          window.localStorage.setItem(String(operation.key), String(operation.value ?? ''));
+          const key = String(operation.key);
+          if (!shouldSyncLocalStorageKey(key)) return;
+          window.localStorage.setItem(key, String(operation.value ?? ''));
           return;
         }
         if (operation?.type === 'remove' && operation.key) {
-          window.localStorage.removeItem(String(operation.key));
+          const key = String(operation.key);
+          if (!shouldSyncLocalStorageKey(key)) return;
+          window.localStorage.removeItem(key);
         }
       });
     } finally {

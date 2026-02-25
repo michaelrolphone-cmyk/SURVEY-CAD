@@ -307,11 +307,29 @@ test('coalesceQueuedOperations keeps only the latest operation per key and prese
 });
 
 
-test('shouldSyncLocalStorageKey excludes only internal sync metadata keys', () => {
+test('shouldSyncLocalStorageKey excludes internal metadata and server-only ROS unlisted keys', () => {
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLocalStoragePendingDiffs'), false);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLocalStorageSyncMeta'), false);
+  assert.equal(shouldSyncLocalStorageKey('project:ros:project-1771091842263-k8jaf:unlisted-42'), false);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryProjectFile:my-project'), true);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLineSmithDrawing:abc'), true);
+});
+
+test('buildDifferentialOperations ignores server-only ROS unlisted keys during queue rebases', () => {
+  const operations = buildDifferentialOperations(
+    {
+      'project:ros:project-1771091842263-k8jaf:unlisted-1': 'server-only',
+      surveyfoundryProjectFile: '{"id":"p-1"}',
+    },
+    {
+      surveyfoundryProjectFile: '{"id":"p-2"}',
+      'project:ros:project-1771091842263-k8jaf:unlisted-9': 'local-temp',
+    },
+  );
+
+  assert.deepEqual(operations, [
+    { type: 'set', key: 'surveyfoundryProjectFile', value: '{"id":"p-2"}' },
+  ]);
 });
 
 test('mergeQueuedDifferentials compacts all unsent differentials into one item', () => {
