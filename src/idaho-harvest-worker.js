@@ -1,12 +1,18 @@
 import SurveyCadClient from './survey-api.js';
 import { createS3FetchClient } from './evidence-desk-file-store.js';
-import { runIdahoHarvestCycle } from './idaho-harvest-worker-core.js';
+import { runIdahoHarvestCycle, runRosScrapeCycle } from './idaho-harvest-worker-core.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_RANDOM_DELAY_MIN_MS = 2 * 60 * 1000;
 const DEFAULT_RANDOM_DELAY_MAX_MS = 10 * 60 * 1000;
 const DEFAULT_IDAHO_HARVEST_PARCEL_LAYER = 23;
 const DEFAULT_IDAHO_HARVEST_CPNF_LAYER = 18;
+
+// Records of Survey scrape (Ada County Assessor directory listing)
+const DEFAULT_ROS_SCRAPE_ENABLED = true;
+const DEFAULT_ROS_SCRAPE_BASE_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
+const DEFAULT_ROS_SCRAPE_PREFIX = 'adacounty/recordsofsurvey';
+const DEFAULT_ROS_SCRAPE_BUCKET = 'records-of-survey';
 
 // Ada County gisprod portal — same source RecordQuarry uses to discover the CP&F layer.
 const DEFAULT_ADA_CPF_PORTAL_BASE = 'https://gisprod.adacounty.id.gov/arcgis';
@@ -255,25 +261,46 @@ export async function runIdahoHarvestWorker({
       env,
     });
 
-    while (!shuttingDown) {
-      const result = await runIdahoHarvestCycle({
-        fetchImpl: client.fetchImpl,
-        objectStore: resolvedStore,
-        adaMapServerBaseUrl: client.config.adaMapServer,
-        batchSize: Number(env.IDAHO_HARVEST_BATCH_SIZE || 100),
-        cpnfPdfBaseUrl: String(env.IDAHO_HARVEST_CPNF_PDF_BASE_URL || ''),
-        datasets,
-        buckets: {
-          default: String(env.IDAHO_HARVEST_MINIO_DEFAULT_BUCKET || 'tile-server'),
-          parcels: String(env.IDAHO_HARVEST_MINIO_PARCELS_BUCKET || 'tile-server'),
-          cpnf: String(env.IDAHO_HARVEST_MINIO_CPNF_BUCKET || 'cpnfs'),
-          tiles: String(env.IDAHO_HARVEST_MINIO_TILE_BUCKET || 'tile-server'),
-          indexes: String(env.IDAHO_HARVEST_MINIO_INDEX_BUCKET || 'tile-server'),
-          checkpoints: String(env.IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET || 'tile-server'),
-        },
-      });
+    const rosEnabled = String(env.ROS_SCRAPE_ENABLED ?? (DEFAULT_ROS_SCRAPE_ENABLED ? '1' : '0')).trim() !== '0';
+    let harvestDone = false;
+    let rosDone = !rosEnabled;
 
-      if (result.done) return;
+    while (!shuttingDown) {
+
+      if (!harvestDone) {
+        const harvestResult = await runIdahoHarvestCycle({
+          fetchImpl: client.fetchImpl,
+          objectStore: resolvedStore,
+          adaMapServerBaseUrl: client.config.adaMapServer,
+          batchSize: Number(env.IDAHO_HARVEST_BATCH_SIZE || 100),
+          cpnfPdfBaseUrl: String(env.IDAHO_HARVEST_CPNF_PDF_BASE_URL || ''),
+          datasets,
+          buckets: {
+            default: String(env.IDAHO_HARVEST_MINIO_DEFAULT_BUCKET || 'tile-server'),
+            parcels: String(env.IDAHO_HARVEST_MINIO_PARCELS_BUCKET || 'tile-server'),
+            cpnf: String(env.IDAHO_HARVEST_MINIO_CPNF_BUCKET || 'cpnfs'),
+            tiles: String(env.IDAHO_HARVEST_MINIO_TILE_BUCKET || 'tile-server'),
+            indexes: String(env.IDAHO_HARVEST_MINIO_INDEX_BUCKET || 'tile-server'),
+            checkpoints: String(env.IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET || 'tile-server'),
+          },
+        });
+        harvestDone = !!harvestResult?.done;
+      }
+
+      if (rosEnabled && !rosDone) {
+        const rosResult = await runRosScrapeCycle({
+          fetchImpl: client.fetchImpl || fetch,
+          objectStore: resolvedStore,
+          baseUrl: String(env.ROS_SCRAPE_BASE_URL || DEFAULT_ROS_SCRAPE_BASE_URL),
+          prefix: String(env.ROS_SCRAPE_PREFIX || DEFAULT_ROS_SCRAPE_PREFIX),
+          bucket: String(env.ROS_SCRAPE_MINIO_BUCKET || DEFAULT_ROS_SCRAPE_BUCKET),
+          batchSize: Number(env.ROS_SCRAPE_BATCH_SIZE || 25),
+          requestDelayMs: Math.max(0, Number(env.ROS_SCRAPE_REQUEST_DELAY_MS || 0)),
+        });
+        rosDone = !!rosResult?.done;
+      }
+
+      if (harvestDone && rosDone) return;
       const delayMs = resolveInterBatchDelayMs(env, randomFn);
       await sleepFn(delayMs);
     }

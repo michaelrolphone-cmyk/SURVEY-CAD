@@ -682,6 +682,312 @@ export async function runIdahoHarvestCycle({
   return { done: allDone && cpnfPdfDone, checkpoint, indexKey };
 }
 
+
+// ---------------------------------------------------------------------------
+// Ada County Assessor — Records of Survey directory crawler
+// Scrapes https://adacountyassessor.org/docs/recordsofsurvey/ (Apache-style listing)
+// and uploads every discovered file to MinIO/S3.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_ROS_BASE_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
+const DEFAULT_ROS_PREFIX = 'adacounty/recordsofsurvey';
+const DEFAULT_ROS_BUCKET = 'records-of-survey';
+
+function normalizeTrailingSlash(url) {
+  const str = String(url || '').trim();
+  if (!str) return str;
+  return str.endsWith('/') ? str : `${str}/`;
+}
+
+function decodeHtmlEntities(input) {
+  return String(input || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+function extractHrefLinksFromHtml(html = '') {
+  const text = String(html || '');
+  const hrefs = [];
+
+  const re1 = /<a\s+[^>]*href\s*=\s*"([^"]+)"/gi;
+  for (let m = re1.exec(text); m; m = re1.exec(text)) hrefs.push(decodeHtmlEntities(m[1]));
+
+  const re2 = /<a\s+[^>]*href\s*=\s*'([^']+)'/gi;
+  for (let m = re2.exec(text); m; m = re2.exec(text)) hrefs.push(decodeHtmlEntities(m[1]));
+
+  return [...new Set(hrefs)].filter(Boolean);
+}
+
+function isParentDirectoryHref(href) {
+  const h = String(href || '').trim();
+  return h === '../' || h === '..' || h.startsWith('?') || h === '#';
+}
+
+function isDirectoryUrl(url) {
+  try {
+    return new URL(url).pathname.endsWith('/');
+  } catch {
+    return false;
+  }
+}
+
+function contentTypeFromUrl(url, fallback = 'application/octet-stream') {
+  const pathname = (() => {
+    try { return new URL(url).pathname || ''; } catch { return ''; }
+  })();
+  const ext = path.extname(pathname).toLowerCase();
+  if (ext === '.pdf') return 'application/pdf';
+  if (ext === '.tif' || ext === '.tiff') return 'image/tiff';
+  if (ext === '.txt') return 'text/plain; charset=utf-8';
+  if (ext === '.htm' || ext === '.html') return 'text/html; charset=utf-8';
+  if (ext === '.json') return 'application/json; charset=utf-8';
+  if (ext === '.xml') return 'application/xml; charset=utf-8';
+  return fallback;
+}
+
+function buildRelativePath(fileUrl, basePathname) {
+  try {
+    const u = new URL(fileUrl);
+    const filePath = decodeURIComponent(u.pathname || '').replace(/^\/+/, '');
+    const basePath = decodeURIComponent(String(basePathname || '')).replace(/^\/+/, '');
+
+    if (basePath && filePath.startsWith(basePath)) {
+      const rel = filePath.slice(basePath.length).replace(/^\/+/, '');
+      return rel || path.basename(filePath);
+    }
+
+    return filePath;
+  } catch {
+    return String(fileUrl || '').replace(/^\/+/, '');
+  }
+}
+
+async function fetchText(fetchImpl, url, { headers = {}, retries = 3 } = {}) {
+  let attempt = 0;
+  let lastErr = null;
+
+  while (attempt <= retries) {
+    try {
+      const resp = await fetchImpl(url, {
+        method: 'GET',
+        headers: { 'user-agent': 'surveyfoundry-ros-scraper/1.0', ...headers },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.text();
+    } catch (err) {
+      lastErr = err;
+      attempt += 1;
+      if (attempt > retries) break;
+      await new Promise((r) => setTimeout(r, 250 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
+async function fetchBinary(fetchImpl, url, { headers = {}, retries = 3 } = {}) {
+  let attempt = 0;
+  let lastErr = null;
+
+  while (attempt <= retries) {
+    try {
+      const resp = await fetchImpl(url, {
+        method: 'GET',
+        headers: { 'user-agent': 'surveyfoundry-ros-scraper/1.0', ...headers },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      return { resp, buf };
+    } catch (err) {
+      lastErr = err;
+      attempt += 1;
+      if (attempt > retries) break;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
+function parseDirectoryListingUrls({ html, directoryUrl }) {
+  const base = normalizeTrailingSlash(directoryUrl);
+  const hrefs = extractHrefLinksFromHtml(html);
+
+  const dirs = [];
+  const files = [];
+
+  for (const href of hrefs) {
+    if (isParentDirectoryHref(href)) continue;
+
+    let abs;
+    try {
+      abs = new URL(href, base).toString();
+    } catch {
+      continue;
+    }
+
+    // Constrain crawl to the same origin + under the current directory path.
+    try {
+      const a = new URL(abs);
+      const b = new URL(base);
+      if (a.origin !== b.origin) continue;
+      if (!a.pathname.startsWith(b.pathname)) continue;
+    } catch {
+      continue;
+    }
+
+    if (isDirectoryUrl(abs)) dirs.push(normalizeTrailingSlash(abs));
+    else files.push(abs);
+  }
+
+  const byPath = (a, b) => {
+    try { return new URL(a).pathname.localeCompare(new URL(b).pathname); } catch { return String(a).localeCompare(String(b)); }
+  };
+
+  return {
+    dirs: [...new Set(dirs)].sort(byPath),
+    files: [...new Set(files)].sort(byPath),
+  };
+}
+
+async function readJsonStateInBucket(store, bucket, key, fallback = null) {
+  try {
+    const payload = await store.getObject(key, { bucket });
+    if (!payload) return fallback;
+    return JSON.parse(Buffer.from(payload).toString('utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeJsonStateInBucket(store, bucket, key, payload) {
+  await store.putObject(key, Buffer.from(JSON.stringify(payload, null, 2)), {
+    contentType: 'application/json; charset=utf-8',
+    bucket,
+  });
+}
+
+export async function runRosScrapeCycle({
+  fetchImpl = fetch,
+  objectStore,
+  baseUrl = DEFAULT_ROS_BASE_URL,
+  prefix = DEFAULT_ROS_PREFIX,
+  bucket = DEFAULT_ROS_BUCKET,
+  batchSize = 25,
+  requestDelayMs = 0,
+} = {}) {
+  if (!objectStore) throw new Error('objectStore is required');
+
+  const normalizedBaseUrl = normalizeTrailingSlash(baseUrl);
+  const basePathname = (() => {
+    try { return normalizeTrailingSlash(new URL(normalizedBaseUrl).pathname); } catch { return '/'; }
+  })();
+
+  const normalizedPrefix = String(prefix || DEFAULT_ROS_PREFIX).replace(/\/+$/, '');
+  const metaKey = `${normalizedPrefix}/_meta/ros-scrape-state.json`;
+
+  const checkpoint = await readJsonStateInBucket(objectStore, bucket, metaKey, {
+    version: 1,
+    baseUrl: normalizedBaseUrl,
+    basePathname,
+    prefix: normalizedPrefix,
+    bucket,
+    queue: [normalizedBaseUrl],
+    seenDirs: { [normalizedBaseUrl]: true },
+    current: null,
+    stats: { filesUploaded: 0, bytesUploaded: 0, lastFileUrl: null, lastObjectKey: null },
+    done: false,
+    updatedAt: new Date().toISOString(),
+  });
+
+  // If config changes, reset traversal but keep cumulative stats.
+  if (String(checkpoint?.baseUrl || '') !== normalizedBaseUrl
+    || String(checkpoint?.prefix || '') !== normalizedPrefix
+    || String(checkpoint?.bucket || '') !== String(bucket || '')) {
+    checkpoint.baseUrl = normalizedBaseUrl;
+    checkpoint.basePathname = basePathname;
+    checkpoint.prefix = normalizedPrefix;
+    checkpoint.bucket = bucket;
+    checkpoint.queue = [normalizedBaseUrl];
+    checkpoint.seenDirs = { [normalizedBaseUrl]: true };
+    checkpoint.current = null;
+    checkpoint.done = false;
+  }
+
+  if (checkpoint.done) return { done: true, checkpointKey: metaKey, stats: checkpoint.stats };
+
+  let remaining = Math.max(1, Number(batchSize) || 25);
+  const delayMs = Math.max(0, Number(requestDelayMs) || 0);
+
+  while (remaining > 0) {
+    if (!checkpoint.current) {
+      const nextDir = Array.isArray(checkpoint.queue) ? checkpoint.queue.shift() : null;
+      if (!nextDir) {
+        checkpoint.done = true;
+        checkpoint.updatedAt = new Date().toISOString();
+        await writeJsonStateInBucket(objectStore, bucket, metaKey, checkpoint);
+        return { done: true, checkpointKey: metaKey, stats: checkpoint.stats };
+      }
+      checkpoint.current = { dirUrl: normalizeTrailingSlash(nextDir), fileIndex: 0, subdirsEnqueued: false };
+    }
+
+    const { dirUrl } = checkpoint.current;
+    const html = await fetchText(fetchImpl, dirUrl);
+    const parsed = parseDirectoryListingUrls({ html, directoryUrl: dirUrl });
+
+    if (!checkpoint.current.subdirsEnqueued) {
+      for (const subdir of parsed.dirs) {
+        if (!checkpoint.seenDirs || typeof checkpoint.seenDirs !== 'object') checkpoint.seenDirs = {};
+        if (checkpoint.seenDirs[subdir]) continue;
+        checkpoint.seenDirs[subdir] = true;
+        checkpoint.queue = Array.isArray(checkpoint.queue) ? checkpoint.queue : [];
+        checkpoint.queue.push(subdir);
+      }
+      checkpoint.current.subdirsEnqueued = true;
+    }
+
+    const files = parsed.files;
+    const startIndex = Math.max(0, Number(checkpoint.current.fileIndex) || 0);
+    if (startIndex >= files.length) {
+      checkpoint.current = null;
+      continue;
+    }
+
+    while (remaining > 0 && checkpoint.current && checkpoint.current.fileIndex < files.length) {
+      const fileUrl = files[checkpoint.current.fileIndex];
+      const rel = buildRelativePath(fileUrl, checkpoint.basePathname);
+      const objectKey = `${normalizedPrefix}/${rel}`.replace(/\/+/, '/');
+
+      const { resp, buf } = await fetchBinary(fetchImpl, fileUrl);
+      const contentType = resp.headers?.get?.('content-type') || contentTypeFromUrl(fileUrl);
+
+      await objectStore.putObject(objectKey, buf, { contentType, bucket });
+
+      checkpoint.stats = checkpoint.stats || {};
+      checkpoint.stats.filesUploaded = Number(checkpoint.stats.filesUploaded || 0) + 1;
+      checkpoint.stats.bytesUploaded = Number(checkpoint.stats.bytesUploaded || 0) + Number(buf.byteLength || buf.length || 0);
+      checkpoint.stats.lastFileUrl = fileUrl;
+      checkpoint.stats.lastObjectKey = objectKey;
+
+      checkpoint.current.fileIndex += 1;
+      checkpoint.updatedAt = new Date().toISOString();
+
+      // Persist after every file so we don't rewind much on restarts.
+      await writeJsonStateInBucket(objectStore, bucket, metaKey, checkpoint);
+
+      remaining -= 1;
+      if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+    }
+
+    if (checkpoint.current && checkpoint.current.fileIndex >= files.length) checkpoint.current = null;
+  }
+
+  checkpoint.updatedAt = new Date().toISOString();
+  await writeJsonStateInBucket(objectStore, bucket, metaKey, checkpoint);
+  return { done: false, checkpointKey: metaKey, stats: checkpoint.stats };
+}
+
 export function createFileObjectStore(rootDir) {
   const root = path.resolve(String(rootDir || '.data/object-store'));
   return {
@@ -712,347 +1018,5 @@ export function createMinioObjectStore({
     async putObject(key, body, { contentType = 'application/octet-stream', bucket = defaultBucket } = {}) {
       await minioClient.putObject(bucket, key, body, Buffer.byteLength(body), { 'Content-Type': contentType });
     },
-  };
-}
-
-// Back-compat / explicit name for the restored implementation.
-export const runIdahoHarvestCycleOriginal = runIdahoHarvestCycle;
-
-// ============================================================
-// Ada County Records of Survey (ROS) crawler — NEW feature
-// ============================================================
-
-const DEFAULT_ROS_ROOT_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
-// Default object-key prefix inside the records-of-survey bucket. Override via worker env.
-const DEFAULT_ROS_PREFIX = 'adacounty/recordsofsurvey';
-
-function normalizeUrlString(value) {
-  try {
-    return new URL(String(value)).toString();
-  } catch {
-    return String(value || '').trim();
-  }
-}
-
-function isDirectoryHref(href = '') {
-  const trimmed = String(href || '').trim();
-  if (!trimmed) return false;
-  if (trimmed.startsWith('#') || trimmed.startsWith('?')) return false;
-  if (trimmed.startsWith('mailto:') || trimmed.startsWith('javascript:')) return false;
-  if (trimmed === '../' || trimmed === '..') return false;
-  return trimmed.endsWith('/');
-}
-
-function isFileHref(href = '') {
-  const trimmed = String(href || '').trim();
-  if (!trimmed) return false;
-  if (trimmed.startsWith('#') || trimmed.startsWith('?')) return false;
-  if (trimmed.startsWith('mailto:') || trimmed.startsWith('javascript:')) return false;
-  if (trimmed === '../' || trimmed === '..') return false;
-  return !trimmed.endsWith('/');
-}
-
-function parseDirectoryListingHrefs(html = '') {
-  const hrefs = [];
-  const re = /<a\s+[^>]*href\s*=\s*(\"([^\"]+)\"|'([^']+)'|([^\s>]+))[^>]*>/gi;
-  let match;
-  while ((match = re.exec(String(html || ''))) !== null) {
-    const href = match[2] || match[3] || match[4] || '';
-    const cleaned = String(href).trim();
-    if (!cleaned) continue;
-    hrefs.push(cleaned);
-  }
-  return [...new Set(hrefs)];
-}
-
-function inferContentTypeFromUrl(url, fallback = 'application/octet-stream') {
-  let pathname = '';
-  try {
-    pathname = new URL(String(url)).pathname || '';
-  } catch {
-    pathname = String(url || '');
-  }
-  const ext = path.extname(pathname).toLowerCase();
-  if (ext === '.pdf') return 'application/pdf';
-  if (ext === '.tif' || ext === '.tiff') return 'image/tiff';
-  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
-  if (ext === '.png') return 'image/png';
-  if (ext === '.txt') return 'text/plain; charset=utf-8';
-  if (ext === '.json') return 'application/json; charset=utf-8';
-  if (ext === '.xml') return 'application/xml; charset=utf-8';
-  if (ext === '.htm' || ext === '.html') return 'text/html; charset=utf-8';
-  return fallback;
-}
-
-function relativeFromRoot(url, rootUrl) {
-  try {
-    const u = new URL(url);
-    const root = new URL(rootUrl);
-    if (u.origin !== root.origin) return null;
-    if (!u.pathname.startsWith(root.pathname)) return null;
-    const rel = u.pathname.slice(root.pathname.length).replace(/^\/+/, '');
-    return decodeURIComponent(rel);
-  } catch {
-    return null;
-  }
-}
-
-function buildRosObjectKey({ prefix, rootUrl, fileUrl }) {
-  const rel = relativeFromRoot(fileUrl, rootUrl);
-  const fallbackName = (() => {
-    try {
-      return path.basename(new URL(fileUrl).pathname) || 'unknown';
-    } catch {
-      return 'unknown';
-    }
-  })();
-  const cleanRel = rel ? rel.replace(/\.{2,}/g, '.').replace(/^\/+/, '') : fallbackName;
-
-  const basePrefix = String(prefix || '').replace(/\/+$/, '').trim();
-  // Preserve the site folder structure under rootUrl, optionally under a caller-defined prefix.
-  return basePrefix ? `${basePrefix}/${cleanRel}` : cleanRel;
-}
-
-async function safeReadJson(store, bucket, key, fallback) {
-  try {
-    const buf = await store.getObject(key, { bucket });
-    if (!buf) return fallback;
-    return JSON.parse(Buffer.from(buf).toString('utf8'));
-  } catch {
-    return fallback;
-  }
-}
-
-async function safeWriteJson(store, bucket, key, value) {
-  await store.putObject(key, Buffer.from(JSON.stringify(value, null, 2)), {
-    bucket,
-    contentType: 'application/json; charset=utf-8',
-  });
-}
-
-async function headMetadata(fetchImpl, url) {
-  try {
-    const resp = await fetchImpl(url, { method: 'HEAD' });
-    if (!resp.ok) return null;
-    const lm = resp.headers?.get?.('last-modified') || null;
-    const len = resp.headers?.get?.('content-length') || null;
-    const etag = resp.headers?.get?.('etag') || null;
-    return {
-      lastModified: lm,
-      contentLength: len ? Number(len) : null,
-      etag,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export async function runRosScrapeCycle({
-  fetchImpl = fetch,
-  objectStore,
-  rootUrl = DEFAULT_ROS_ROOT_URL,
-  bucket = 'records-of-survey',
-  prefix = DEFAULT_ROS_PREFIX,
-  checkpointKey = null,
-  manifestKey = null,
-  maxDownloadsPerCycle = 25,
-  maxDirsPerCycle = 25,
-} = {}) {
-  if (!objectStore) throw new Error('objectStore is required');
-
-  const normalizedRoot = normalizeUrlString(String(rootUrl).endsWith('/') ? rootUrl : `${rootUrl}/`);
-  const basePrefix = String(prefix || '').replace(/\/+$/, '').trim();
-
-  const resolvedCheckpointKey = checkpointKey
-    ? String(checkpointKey)
-    : (basePrefix ? `${basePrefix}/_meta/scrape-state.json` : `_meta/scrape-state.json`);
-
-  const resolvedManifestKey = manifestKey
-    ? String(manifestKey)
-    : (basePrefix ? `${basePrefix}/_meta/manifest.json` : `_meta/manifest.json`);
-
-  const checkpoint = await safeReadJson(objectStore, bucket, resolvedCheckpointKey, {
-    rootUrl: normalizedRoot,
-    pendingDirs: [normalizedRoot],
-    seenDirs: [],
-    pendingFiles: [],
-    done: false,
-    updatedAt: null,
-  });
-
-  const manifest = await safeReadJson(objectStore, bucket, resolvedManifestKey, {
-    rootUrl: normalizedRoot,
-    generatedAt: new Date().toISOString(),
-    files: {},
-  });
-
-  const seenDirs = new Set((checkpoint.seenDirs || []).map((u) => normalizeUrlString(u)));
-  const pendingDirs = (checkpoint.pendingDirs || []).map((u) => normalizeUrlString(u)).filter(Boolean);
-  const pendingFiles = (checkpoint.pendingFiles || []).map((u) => normalizeUrlString(u)).filter(Boolean);
-
-  const fileQueue = new Set(pendingFiles);
-  const dirQueue = [];
-  for (const dir of pendingDirs) {
-    if (!dir) continue;
-    const dirNorm = normalizeUrlString(dir);
-    if (!seenDirs.has(dirNorm)) dirQueue.push(dirNorm.endsWith('/') ? dirNorm : `${dirNorm}/`);
-  }
-
-  let downloads = 0;
-  let dirsProcessed = 0;
-  let changed = false;
-
-  // 1) Download from pending file queue first.
-  while (downloads < maxDownloadsPerCycle && fileQueue.size) {
-    const nextUrl = fileQueue.values().next().value;
-    fileQueue.delete(nextUrl);
-    if (!nextUrl) continue;
-
-    const key = buildRosObjectKey({ prefix: basePrefix, rootUrl: normalizedRoot, fileUrl: nextUrl });
-
-    const head = await headMetadata(fetchImpl, nextUrl);
-    const prior = manifest.files?.[key] || null;
-    const unchanged = prior
-      && head
-      && prior.lastModified === head.lastModified
-      && prior.contentLength === head.contentLength
-      && (prior.etag || null) === (head.etag || null);
-
-    if (unchanged) continue;
-
-    const resp = await fetchImpl(nextUrl);
-    if (!resp.ok) continue;
-
-    const buf = Buffer.from(await resp.arrayBuffer());
-    if (!buf.length) continue;
-
-    const contentType = resp.headers?.get?.('content-type') || inferContentTypeFromUrl(nextUrl);
-    await objectStore.putObject(key, buf, { bucket, contentType });
-
-    manifest.files = manifest.files || {};
-    manifest.files[key] = {
-      sourceUrl: nextUrl,
-      lastModified: head?.lastModified || resp.headers?.get?.('last-modified') || null,
-      contentLength: head?.contentLength ?? (resp.headers?.get?.('content-length') ? Number(resp.headers.get('content-length')) : null),
-      etag: head?.etag || resp.headers?.get?.('etag') || null,
-      contentType,
-      downloadedAt: new Date().toISOString(),
-    };
-
-    downloads += 1;
-    changed = true;
-  }
-
-  // 2) Crawl directories to discover more files (ALL file types, not just PDFs).
-  while (downloads < maxDownloadsPerCycle && dirsProcessed < maxDirsPerCycle && dirQueue.length) {
-    const dirUrl = dirQueue.shift();
-    if (!dirUrl) continue;
-    if (seenDirs.has(dirUrl)) continue;
-
-    const resp = await fetchImpl(dirUrl);
-    if (!resp.ok) {
-      seenDirs.add(dirUrl);
-      dirsProcessed += 1;
-      changed = true;
-      continue;
-    }
-
-    const html = await resp.text();
-    const hrefs = parseDirectoryListingHrefs(html);
-
-    for (const href of hrefs) {
-      if (!href) continue;
-      if (href === '../' || href === '..') continue;
-
-      let absolute;
-      try {
-        absolute = new URL(href, dirUrl).toString();
-      } catch {
-        continue;
-      }
-
-      // Keep crawl scoped to the root directory.
-      const rel = relativeFromRoot(absolute, normalizedRoot);
-      if (rel === null) continue;
-
-      if (isDirectoryHref(href)) {
-        const dirNorm = absolute.endsWith('/') ? absolute : `${absolute}/`;
-        if (!seenDirs.has(dirNorm) && !dirQueue.includes(dirNorm)) dirQueue.push(dirNorm);
-        continue;
-      }
-
-      if (isFileHref(href)) {
-        if (!fileQueue.has(absolute)) fileQueue.add(absolute);
-      }
-    }
-
-    seenDirs.add(dirUrl);
-    dirsProcessed += 1;
-    changed = true;
-
-    // After discovering, try to download immediately if we have budget.
-    while (downloads < maxDownloadsPerCycle && fileQueue.size) {
-      const nextUrl = fileQueue.values().next().value;
-      fileQueue.delete(nextUrl);
-      if (!nextUrl) continue;
-
-      const key = buildRosObjectKey({ prefix: basePrefix, rootUrl: normalizedRoot, fileUrl: nextUrl });
-
-      const head = await headMetadata(fetchImpl, nextUrl);
-      const prior = manifest.files?.[key] || null;
-      const unchanged = prior
-        && head
-        && prior.lastModified === head.lastModified
-        && prior.contentLength === head.contentLength
-        && (prior.etag || null) === (head.etag || null);
-
-      if (unchanged) continue;
-
-      const fileResp = await fetchImpl(nextUrl);
-      if (!fileResp.ok) continue;
-
-      const buf = Buffer.from(await fileResp.arrayBuffer());
-      if (!buf.length) continue;
-
-      const contentType = fileResp.headers?.get?.('content-type') || inferContentTypeFromUrl(nextUrl);
-      await objectStore.putObject(key, buf, { bucket, contentType });
-
-      manifest.files = manifest.files || {};
-      manifest.files[key] = {
-        sourceUrl: nextUrl,
-        lastModified: head?.lastModified || fileResp.headers?.get?.('last-modified') || null,
-        contentLength: head?.contentLength ?? (fileResp.headers?.get?.('content-length') ? Number(fileResp.headers.get('content-length')) : null),
-        etag: head?.etag || fileResp.headers?.get?.('etag') || null,
-        contentType,
-        downloadedAt: new Date().toISOString(),
-      };
-
-      downloads += 1;
-      changed = true;
-    }
-  }
-
-  const done = dirQueue.length === 0 && fileQueue.size === 0;
-
-  checkpoint.rootUrl = normalizedRoot;
-  checkpoint.pendingDirs = dirQueue;
-  checkpoint.pendingFiles = [...fileQueue.values()];
-  checkpoint.seenDirs = [...seenDirs.values()];
-  checkpoint.done = done;
-  checkpoint.updatedAt = new Date().toISOString();
-
-  if (changed) {
-    manifest.rootUrl = normalizedRoot;
-    manifest.generatedAt = new Date().toISOString();
-    await safeWriteJson(objectStore, bucket, resolvedManifestKey, manifest);
-    await safeWriteJson(objectStore, bucket, resolvedCheckpointKey, checkpoint);
-  }
-
-  return {
-    done,
-    downloads,
-    dirsProcessed,
-    checkpointKey: resolvedCheckpointKey,
-    manifestKey: resolvedManifestKey,
   };
 }
