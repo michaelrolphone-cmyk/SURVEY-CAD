@@ -1,20 +1,12 @@
 import SurveyCadClient from './survey-api.js';
 import { createS3FetchClient } from './evidence-desk-file-store.js';
-import { runIdahoHarvestCycle, runRosScrapeCycle } from './idaho-harvest-worker-core.js';
+import { runIdahoHarvestCycle, runRosScrapeCycle, runSubdivisionPlatsScrapeCycle } from './idaho-harvest-worker-core.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_RANDOM_DELAY_MIN_MS = 2 * 60 * 1000;
 const DEFAULT_RANDOM_DELAY_MAX_MS = 10 * 60 * 1000;
 const DEFAULT_IDAHO_HARVEST_PARCEL_LAYER = 23;
 const DEFAULT_IDAHO_HARVEST_CPNF_LAYER = 18;
-
-// Records of Survey scrape (Ada County Assessor directory listing)
-const DEFAULT_ROS_SCRAPE_BASE_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
-const DEFAULT_ROS_SCRAPE_PREFIX = 'adacounty/recordsofsurvey';
-const DEFAULT_ROS_SCRAPE_BUCKET = 'records-of-survey';
-const DEFAULT_ROS_SCRAPE_POLL_INTERVAL_MS = 1000;
-const DEFAULT_ROS_SCRAPE_FAST_LOOP = true;
-
 
 // Ada County gisprod portal — same source RecordQuarry uses to discover the CP&F layer.
 const DEFAULT_ADA_CPF_PORTAL_BASE = 'https://gisprod.adacounty.id.gov/arcgis';
@@ -171,15 +163,6 @@ export async function resolveHarvestDatasets({
   ];
 }
 
-
-function parseBooleanEnv(value, defaultValue = false) {
-  if (value === undefined || value === null || String(value).trim() === '') return defaultValue;
-  const v = String(value).trim().toLowerCase();
-  if (['0', 'false', 'no', 'off', 'disable', 'disabled'].includes(v)) return false;
-  if (['1', 'true', 'yes', 'on', 'enable', 'enabled'].includes(v)) return true;
-  return defaultValue;
-}
-
 function randomIntBetween(minInclusive, maxInclusive, randomFn = Math.random) {
   const min = Math.ceil(Number(minInclusive));
   const max = Math.floor(Number(maxInclusive));
@@ -243,7 +226,13 @@ export function createIdahoHarvestObjectStoreFromEnv(env = process.env, createS3
       return getClient(bucket).getObject(key);
     },
     async putObject(key, body, { contentType = 'application/octet-stream', bucket = 'tile-server' } = {}) {
-      await getClient(bucket).putObject(key, body, { contentType });
+      const res = await getClient(bucket).putObject(key, body, { contentType });
+      if (res && typeof res.ok === 'boolean' && !res.ok) {
+        let detail = '';
+        try { detail = await res.text(); } catch { detail = ''; }
+        throw new Error(`S3 putObject failed: ${res.status}${res.statusText ? ` ${res.statusText}` : ''}${detail ? ` — ${detail.slice(0, 300)}` : ''}`);
+      }
+      return res;
     },
   };
 }
@@ -272,13 +261,22 @@ export async function runIdahoHarvestWorker({
       env,
     });
 
-    while (!shuttingDown) {
-      const rosEnabled = parseBooleanEnv(env.ROS_SCRAPE_ENABLED, true);
-      // Track completion independently so finishing the parcel/CP&F harvest doesn't stop ROS scraping.
-      if (typeof runIdahoHarvestWorker.__harvestDone !== 'boolean') runIdahoHarvestWorker.__harvestDone = false;
-      if (typeof runIdahoHarvestWorker.__rosDone !== 'boolean') runIdahoHarvestWorker.__rosDone = !rosEnabled;
+    const rosEnabled = String(env.ROS_SCRAPE_ENABLED || '1') !== '0';
+    const platsEnabled = String(env.SUBDIVISION_PLATS_SCRAPE_ENABLED || '1') !== '0';
 
-      if (!runIdahoHarvestWorker.__harvestDone) {
+    const dirPollMs = Math.max(0, Number(env.DIR_SCRAPE_POLL_INTERVAL_MS || 1000));
+
+    let harvestDone = false;
+    let rosDone = !rosEnabled;
+    let platsDone = !platsEnabled;
+
+    // Harvest uses the existing random-delay cadence to be polite to ArcGIS sources.
+    let nextHarvestAt = Date.now();
+
+    while (!shuttingDown) {
+      const now = Date.now();
+
+      if (!harvestDone && now >= nextHarvestAt) {
         const result = await runIdahoHarvestCycle({
           fetchImpl: client.fetchImpl,
           objectStore: resolvedStore,
@@ -295,29 +293,42 @@ export async function runIdahoHarvestWorker({
             checkpoints: String(env.IDAHO_HARVEST_MINIO_CHECKPOINT_BUCKET || 'tile-server'),
           },
         });
-        runIdahoHarvestWorker.__harvestDone = !!result?.done;
+
+        harvestDone = !!result?.done;
+        nextHarvestAt = Date.now() + resolveInterBatchDelayMs(env, randomFn);
       }
 
-      if (rosEnabled && !runIdahoHarvestWorker.__rosDone) {
+      if (!rosDone) {
         const rosResult = await runRosScrapeCycle({
           fetchImpl: client.fetchImpl || fetch,
           objectStore: resolvedStore,
-          baseUrl: String(env.ROS_SCRAPE_BASE_URL || DEFAULT_ROS_SCRAPE_BASE_URL),
-          prefix: String(env.ROS_SCRAPE_PREFIX || DEFAULT_ROS_SCRAPE_PREFIX),
-          bucket: String(env.ROS_SCRAPE_MINIO_BUCKET || DEFAULT_ROS_SCRAPE_BUCKET),
+          baseUrl: String(env.ROS_SCRAPE_BASE_URL || 'https://adacountyassessor.org/docs/recordsofsurvey/'),
+          prefix: String(env.ROS_SCRAPE_PREFIX || 'adacounty/recordsofsurvey'),
+          bucket: String(env.ROS_SCRAPE_MINIO_BUCKET || 'records-of-survey'),
           batchSize: Number(env.ROS_SCRAPE_BATCH_SIZE || 50),
-          requestDelayMs: Math.max(0, Number(env.ROS_SCRAPE_REQUEST_DELAY_MS || 0)),
+          requestDelayMs: Number(env.ROS_SCRAPE_REQUEST_DELAY_MS || 0),
         });
-        runIdahoHarvestWorker.__rosDone = !!rosResult?.done;
+        rosDone = !!rosResult?.done;
       }
 
-      if (runIdahoHarvestWorker.__harvestDone && runIdahoHarvestWorker.__rosDone) return;
-
-      let delayMs = resolveInterBatchDelayMs(env, randomFn);
-      if (rosEnabled && !runIdahoHarvestWorker.__rosDone && parseBooleanEnv(env.ROS_SCRAPE_FAST_LOOP, DEFAULT_ROS_SCRAPE_FAST_LOOP)) {
-        delayMs = Math.max(0, Number(env.ROS_SCRAPE_POLL_INTERVAL_MS || DEFAULT_ROS_SCRAPE_POLL_INTERVAL_MS));
+      if (!platsDone) {
+        const platsResult = await runSubdivisionPlatsScrapeCycle({
+          fetchImpl: client.fetchImpl || fetch,
+          objectStore: resolvedStore,
+          baseUrl: String(env.SUBDIVISION_PLATS_SCRAPE_BASE_URL || 'https://adacountyassessor.org/docs/subdivisionplats/'),
+          prefix: String(env.SUBDIVISION_PLATS_SCRAPE_PREFIX || 'adacounty/subdivisionplats'),
+          bucket: String(env.SUBDIVISION_PLATS_MINIO_BUCKET || 'subdivision-plats'),
+          batchSize: Number(env.SUBDIVISION_PLATS_SCRAPE_BATCH_SIZE || 50),
+          requestDelayMs: Number(env.SUBDIVISION_PLATS_SCRAPE_REQUEST_DELAY_MS || 0),
+        });
+        platsDone = !!platsResult?.done;
       }
-      await sleepFn(delayMs);
+
+      if ((harvestDone || String(env.IDAHO_HARVEST_ENABLED || '1') === '0') && rosDone && platsDone) {
+        return;
+      }
+
+      await sleepFn(dirPollMs);
     }
   } finally {
     process.off('SIGTERM', sigtermHandler);
