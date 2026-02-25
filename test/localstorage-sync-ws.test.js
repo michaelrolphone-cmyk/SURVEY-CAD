@@ -72,7 +72,26 @@ function parseServerTextMessage(socket, index = -1) {
 }
 
 test('localstorage sync websocket applies differentials and broadcasts checksums', async () => {
-  const store = new LocalStorageSyncStore({ snapshot: { alpha: '1' } });
+  const store = new LocalStorageSyncStore({ snapshot: {
+    alpha: '1',
+    'project:point-file:project-a:file-1': JSON.stringify({
+      pointFileId: 'file-1',
+      pointFileName: 'Control.csv',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      versions: [{ versionId: 'v-1', baseState: { text: 'P1' } }],
+    }),
+    'project:point-file-index:project-a': JSON.stringify({
+      'file-1': {
+        pointFileId: 'file-1',
+        pointFileName: 'Control.csv',
+        exportFormat: 'csv',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        latestVersionId: 'v-1',
+        versionCount: 1,
+      },
+    }),
+  } });
   const service = createLocalStorageSyncWsService({ store });
 
   const s1 = new FakeSocket();
@@ -84,6 +103,18 @@ test('localstorage sync websocket applies differentials and broadcasts checksums
   await new Promise((resolve) => setImmediate(resolve));
   const welcome1 = parseServerTextMessage(s1, 1);
   assert.equal(welcome1.type, 'sync-welcome');
+  assert.equal(welcome1.state.snapshot['project:point-file:project-a:file-1'], undefined);
+  assert.deepEqual(welcome1.state.pointFileSummary['project-a'], [{
+    pointFileId: 'file-1',
+    pointFileName: 'Control.csv',
+    exportFormat: 'csv',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+    latestVersionId: 'v-1',
+    versionCount: 1,
+    source: null,
+    sourceLabel: null,
+  }]);
 
   await new Promise((resolve) => setImmediate(resolve));
 
@@ -261,4 +292,3 @@ test('localstorage sync websocket ignores non-JSON text frames', async () => {
   assert.equal(socket.writes.length, writesBefore);
   assert.deepEqual(store.getState().snapshot, { alpha: '1' });
 });
-

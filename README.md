@@ -259,7 +259,7 @@ BEW casefile endpoints now retry Redis initialization before returning service-u
 
 ### API endpoints (state sync)
 
-- `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum.
+- `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum, with heavy `project:point-file:*` version-history records omitted from `snapshot` and exposed as project-grouped `pointFileSummary` metadata instead.
 - `POST /api/localstorage-sync` – pushes a client snapshot and resolves stale/conflict state.
 - `GET /ws/localstorage-sync` (websocket upgrade) – real-time differential sync for all connected clients.
 - `POST /api/projects/:projectId/archive` – archives a project's redis-backed sync keys/values into the MinIO/S3 evidence store during delete workflows (no restore/list API).
@@ -1379,3 +1379,15 @@ RecordQuarry now supports starring nearby subdivision cards so selected subdivis
 - CLI/server commands:
   - `npm start`
   - `npm test`
+
+## RecordQuarry address cache payloads
+
+RecordQuarry address-keyed cache entries now persist coordinate-only lookup summaries (lat/lon + geocode display) so localStorage and sync payloads do not retain full parcel/section/subdivision geometry blobs for every searched address.
+
+- API endpoints:
+  - `GET /api/record-quarry-cache?address=<normalized-address>`
+  - `PUT /api/record-quarry-cache?address=<normalized-address>`
+  - `POST /api/record-quarry-cache?address=<normalized-address>`
+- CLI/server commands:
+  - `npm start`
+  - `npm test -- test/record-quarry-cache-store.test.js test/record-quarry-cache-api.test.js`

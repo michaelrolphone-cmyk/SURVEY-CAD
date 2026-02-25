@@ -806,6 +806,47 @@
     };
   }
 
+  function isFiniteCoordinate(value) {
+    return Number.isFinite(Number(value));
+  }
+
+  function summarizeLookupForAddressCache(lookup = null) {
+    if (!lookup || typeof lookup !== 'object') {
+      return { location: null, geocode: null };
+    }
+    const locationLon = isFiniteCoordinate(lookup?.location?.lon)
+      ? Number(lookup.location.lon)
+      : (isFiniteCoordinate(lookup?.geocode?.lon)
+        ? Number(lookup.geocode.lon)
+        : (isFiniteCoordinate(lookup?.addressFeature?.geometry?.x) ? Number(lookup.addressFeature.geometry.x) : null));
+    const locationLat = isFiniteCoordinate(lookup?.location?.lat)
+      ? Number(lookup.location.lat)
+      : (isFiniteCoordinate(lookup?.geocode?.lat)
+        ? Number(lookup.geocode.lat)
+        : (isFiniteCoordinate(lookup?.addressFeature?.geometry?.y) ? Number(lookup.addressFeature.geometry.y) : null));
+
+    const hasCoordinates = Number.isFinite(locationLon) && Number.isFinite(locationLat);
+    const display = typeof lookup?.geocode?.display === 'string' && lookup.geocode.display.trim()
+      ? lookup.geocode.display.trim()
+      : null;
+
+    return {
+      location: hasCoordinates ? { lon: locationLon, lat: locationLat } : null,
+      geocode: hasCoordinates
+        ? {
+          lat: locationLat,
+          lon: locationLon,
+          display,
+        }
+        : null,
+    };
+  }
+
+  function canUseCachedLookupPayload(lookup = null) {
+    if (!lookup || typeof lookup !== 'object') return false;
+    return !!lookup.parcel;
+  }
+
   function applySelectionSnapshot(selection = null) {
     const selectedParcel = selection?.selectedParcel;
     setParcelSelected(selectedParcel == null ? true : Boolean(selectedParcel));
@@ -841,7 +882,7 @@
     const snapshot = {
       savedAt: new Date().toISOString(),
       address: normalizedAddress,
-      lookup: state.lastLookupPayload,
+      lookup: summarizeLookupForAddressCache(state.lastLookupPayload),
       selection: readSelectionSnapshot(),
     };
     await saveAddressLookupSnapshot(normalizedAddress, snapshot);
@@ -4111,7 +4152,10 @@
       const cachedAddressSnapshot = (!options.lookupPayload && !options.disableAddressCache)
         ? await loadAddressLookupSnapshot(rawAddr)
         : null;
-      const lookup = options.lookupPayload || cachedAddressSnapshot?.lookup || await lookupByAddress(rawAddr);
+      const cachedLookup = options.lookupPayload || cachedAddressSnapshot?.lookup || null;
+      const lookup = canUseCachedLookupPayload(cachedLookup)
+        ? cachedLookup
+        : await lookupByAddress(rawAddr);
       state.lastLookupPayload = lookup;
       state.lastLookupAddress = rawAddr;
       if (options.lookupPayload) {
