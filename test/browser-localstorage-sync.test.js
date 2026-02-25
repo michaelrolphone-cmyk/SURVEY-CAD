@@ -307,9 +307,11 @@ test('coalesceQueuedOperations keeps only the latest operation per key and prese
 });
 
 
-test('shouldSyncLocalStorageKey excludes internal metadata and server-only ROS unlisted keys', () => {
+test('shouldSyncLocalStorageKey excludes internal metadata, local-only active project keys, and server-only ROS unlisted keys', () => {
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLocalStoragePendingDiffs'), false);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLocalStorageSyncMeta'), false);
+  assert.equal(shouldSyncLocalStorageKey('surveyfoundryActiveProjectId'), false);
+  assert.equal(shouldSyncLocalStorageKey('surveyfoundryActiveProjectId:crew-123'), false);
   assert.equal(shouldSyncLocalStorageKey('project:ros:project-1771091842263-k8jaf:unlisted-42'), false);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryProjectFile:my-project'), true);
   assert.equal(shouldSyncLocalStorageKey('surveyfoundryLineSmithDrawing:abc'), true);

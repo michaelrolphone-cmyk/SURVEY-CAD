@@ -5,6 +5,7 @@ const INTERNAL_KEYS = new Set([
   'surveyfoundryActiveCrewMemberId',
 ]);
 const SERVER_ONLY_KEY_PATTERNS = [
+  /^surveyfoundryActiveProjectId(?::.+)?$/,
   /^project:ros:project-[^:]+:unlisted-\d+$/,
 ];
 const PENDING_DIFFS_KEY = 'surveyfoundryLocalStoragePendingDiffs';
