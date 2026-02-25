@@ -1379,3 +1379,15 @@ RecordQuarry now supports starring nearby subdivision cards so selected subdivis
 - CLI/server commands:
   - `npm start`
   - `npm test`
+
+## RecordQuarry address cache payloads
+
+RecordQuarry address-keyed cache entries now persist coordinate-only lookup summaries (lat/lon + geocode display) so localStorage and sync payloads do not retain full parcel/section/subdivision geometry blobs for every searched address.
+
+- API endpoints:
+  - `GET /api/record-quarry-cache?address=<normalized-address>`
+  - `PUT /api/record-quarry-cache?address=<normalized-address>`
+  - `POST /api/record-quarry-cache?address=<normalized-address>`
+- CLI/server commands:
+  - `npm start`
+  - `npm test -- test/record-quarry-cache-store.test.js test/record-quarry-cache-api.test.js`

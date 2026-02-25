@@ -38,6 +38,48 @@ function validateCachePayload(payload) {
   }
 }
 
+function toFiniteNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function extractLookupCoordinates(lookup = {}) {
+  const locationLon = toFiniteNumber(lookup?.location?.lon);
+  const locationLat = toFiniteNumber(lookup?.location?.lat);
+  if (locationLon !== null && locationLat !== null) {
+    return { lon: locationLon, lat: locationLat };
+  }
+
+  const geocodeLon = toFiniteNumber(lookup?.geocode?.lon);
+  const geocodeLat = toFiniteNumber(lookup?.geocode?.lat);
+  if (geocodeLon !== null && geocodeLat !== null) {
+    return { lon: geocodeLon, lat: geocodeLat };
+  }
+
+  const addressLon = toFiniteNumber(lookup?.addressFeature?.geometry?.x);
+  const addressLat = toFiniteNumber(lookup?.addressFeature?.geometry?.y);
+  if (addressLon !== null && addressLat !== null) {
+    return { lon: addressLon, lat: addressLat };
+  }
+
+  return null;
+}
+
+function summarizeAddressLookup(lookup = {}) {
+  const coords = extractLookupCoordinates(lookup);
+  if (!coords) return { location: null, geocode: null };
+
+  const display = typeof lookup?.geocode?.display === 'string' ? lookup.geocode.display : '';
+  return {
+    location: coords,
+    geocode: {
+      lat: coords.lat,
+      lon: coords.lon,
+      display: display || null,
+    },
+  };
+}
+
 export async function getProjectRecordQuarryCache(store, projectIdRaw) {
   const projectId = normalizeProjectId(projectIdRaw);
   if (!projectId) throw new Error('projectId is required.');
@@ -109,7 +151,7 @@ export async function saveAddressRecordQuarryCache(store, addressRaw, payload) {
   const record = {
     schemaVersion: '1.0.0',
     address,
-    lookup: payload.lookup,
+    lookup: summarizeAddressLookup(payload.lookup),
     selection: payload.selection || null,
     savedAt: nowIso(),
   };

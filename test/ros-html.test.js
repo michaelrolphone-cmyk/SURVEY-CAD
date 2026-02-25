@@ -222,7 +222,10 @@ test('RecordQuarry.html restores address lookup snapshots and avoids auto-projec
 
   assert.match(html, /function\s+loadAddressLookupSnapshot\(address\)/, 'RecordQuarry should load per-address lookup snapshots');
   assert.match(html, /function\s+saveAddressLookupSnapshot\(address, snapshot\)/, 'RecordQuarry should persist per-address lookup snapshots');
+  assert.match(html, /function\s+summarizeLookupForAddressCache\(lookup\s*=\s*null\)/, 'RecordQuarry should summarize cached address lookup payloads down to coordinate metadata.');
+  assert.match(html, /function\s+canUseCachedLookupPayload\(lookup\s*=\s*null\)/, 'RecordQuarry should gate heavy lookup reuse so coordinate-only cache records do not short-circuit full lookup queries.');
   assert.match(html, /function\s+saveLookupSnapshotsForCurrentState\(address\)/, 'RecordQuarry should centralize lookup snapshot persistence through a single helper.');
+  assert.match(html, /lookup:\s*summarizeLookupForAddressCache\(state\.lastLookupPayload\)/, 'address snapshot persistence should cache only summarized geocode/location lookup fields.');
 
   assert.match(html, /saveLookupSnapshotsForCurrentState\(rawAddr\);[\s\S]*Saved lookup cache for this address\./, 'lookup flow should persist lookup/selection snapshots to address cache only during lookup completion.');
   assert.doesNotMatch(html, /Saved lookup results to project/, 'lookup interactions should not auto-attach fetched results to project-level records.');
@@ -236,6 +239,8 @@ test('RecordQuarry.html restores address lookup snapshots and avoids auto-projec
   assert.match(html, /const\s+launchAddressSnapshot\s*=\s*hasLaunchAddress\s*\?\s*loadAddressLookupSnapshot\(state\.projectContext\.address\)\s*:\s*null;/, 'standalone boot flow should try loading cache for launch-provided address params');
   assert.match(html, /if\s*\(hasLaunchAddress\)\s*\{[\s\S]*if\s*\(state\.projectContext\.autostart\)\s*\{[\s\S]*doLookup\(\{ lookupPayload:\s*launchAddressSnapshot\?\.lookup\s*\|\|\s*null, selectionSnapshot:\s*launchAddressSnapshot\?\.selection\s*\|\|\s*null \}\)/, 'launch autostart should execute lookup for address params and reuse per-address cache when available');
   assert.match(html, /const\s+snapshot\s*=\s*loadMostRecentAddressLookupSnapshot\(\);/, 'standalone boot flow should attempt loading the most recent cached address lookup');
+  assert.match(html, /const\s+cachedLookup\s*=\s*options\.lookupPayload\s*\|\|\s*cachedAddressSnapshot\?\.lookup\s*\|\|\s*null;/, 'lookup execution should branch through a cached lookup variable before deciding whether to reuse or refetch.');
+  assert.match(html, /const\s+lookup\s*=\s*canUseCachedLookupPayload\(cachedLookup\)\s*\?\s*cachedLookup\s*:\s*await\s*lookupByAddress\(rawAddr\);/, 'lookup execution should refetch from API when cached data contains only coordinate summaries.');
 });
 
 

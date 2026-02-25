@@ -2372,7 +2372,7 @@
           "RecordQuarry Cache"
         ],
         "summary": "Get cached RecordQuarry results for an address",
-        "description": "Returns the cached lookup snapshot for the given normalized address. The `address` parameter is lowercased and whitespace-collapsed before lookup.",
+        "description": "Returns the cached lookup snapshot for the given normalized address. Address-keyed cache records store coordinate-only lookup summaries (location + geocode display) instead of full parcel/geometry payloads. The `address` parameter is lowercased and whitespace-collapsed before lookup.",
         "operationId": "getAddressRecordQuarryCache",
         "parameters": [
           {
@@ -2417,7 +2417,7 @@
           "RecordQuarry Cache"
         ],
         "summary": "Save (upsert) RecordQuarry results for an address",
-        "description": "Stores the lookup snapshot keyed by normalized address. The `address` query parameter takes precedence; if omitted the `address` field in the request body is used instead.",
+        "description": "Stores the lookup snapshot keyed by normalized address. Address-keyed saves are normalized to coordinate-only lookup summaries (location + geocode display), preventing large geometry blobs from being persisted per-address. The `address` query parameter takes precedence; if omitted the `address` field in the request body is used instead.",
         "operationId": "saveAddressRecordQuarryCache",
         "parameters": [
           {
@@ -7891,7 +7891,7 @@
       },
       "RecordQuarryCacheInput": {
         "type": "object",
-        "description": "Request body for saving a RecordQuarry lookup snapshot.",
+        "description": "Request body for saving a RecordQuarry lookup snapshot. Address-keyed saves persist only coordinate/geocode summary fields from `lookup`; project-keyed saves retain full lookup payloads.",
         "properties": {
           "address": {
             "type": "string",
@@ -7899,7 +7899,7 @@
           },
           "lookup": {
             "type": "object",
-            "description": "Full RecordQuarry lookup payload returned by lookupByAddress(). Contains geocode, parcel, ROS, sections, township, utilities, etc.",
+            "description": "RecordQuarry lookup payload. For project-keyed cache saves this may include the full lookup payload from lookupByAddress(); for address-keyed cache saves only coordinate/geocode summary fields are persisted.",
             "additionalProperties": true
           },
           "selection": {
@@ -7936,7 +7936,7 @@
       },
       "RecordQuarryCacheRecord": {
         "type": "object",
-        "description": "A persisted RecordQuarry lookup snapshot as returned by the server.",
+        "description": "A persisted RecordQuarry lookup snapshot as returned by the server. Address-keyed records return coordinate/geocode summaries; project-keyed records can retain full lookup payloads.",
         "properties": {
           "schemaVersion": {
             "type": "string",
@@ -7953,7 +7953,7 @@
           },
           "lookup": {
             "type": "object",
-            "description": "Full RecordQuarry lookup payload.",
+            "description": "Persisted lookup payload (full payload for project-keyed cache, coordinate/geocode summary for address-keyed cache).",
             "additionalProperties": true
           },
           "selection": {
