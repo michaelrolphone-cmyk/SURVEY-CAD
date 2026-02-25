@@ -2360,6 +2360,31 @@
     return '';
   }
 
+  function getSubdivisionNameCandidates(attrs = {}, explicitName = '') {
+    const names = [
+      explicitName,
+      getSubdivisionNameFromAttrs(attrs),
+      attrs.SUBDIVNAME,
+      attrs.SUBDIVISION,
+      attrs.SUBDIV,
+      attrs.NAME,
+      attrs.SUB_NAME,
+      attrs.PLATNAME,
+      attrs.LEGALDESC,
+      attrs.LEGAL_DESC,
+      attrs.DESCRIPTION,
+    ];
+    const out = [];
+    const seen = new Set();
+    for (const rawName of names) {
+      const normalized = sanitizeSubdivisionName(rawName);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      out.push(normalized);
+    }
+    return out;
+  }
+
   function sanitizeSubdivisionName(value) {
     return String(value || '')
       .toUpperCase()
@@ -2382,14 +2407,25 @@
     if (!raw || raw.startsWith('#') || raw.startsWith('//')) return null;
 
     const parts = raw.split(/[|	,]+/).map((part) => part.trim()).filter(Boolean);
-    if (!parts.length) return null;
-
-    const joined = parts.join(' ');
-    const urlMatch = joined.match(/https?:\/\/[^\s]+/i);
-    const fileMatch = joined.match(/[A-Za-z0-9._\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
+    const urlMatch = raw.match(/https?:\/\/[^\s]+/i);
+    const fileMatch = raw.match(/[A-Za-z0-9._\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
     const resolvedPath = urlMatch?.[0] || fileMatch?.[0] || '';
-    const titleCandidates = parts.filter((part) => part && part !== resolvedPath && !/\.(?:pdf|jpe?g|png|tiff?)$/i.test(part));
-    const titlePart = titleCandidates.sort((a, b) => b.length - a.length)[0] || parts[0] || '';
+
+    let titlePart = raw;
+    if (resolvedPath) {
+      titlePart = titlePart.replace(resolvedPath, ' ');
+    }
+    titlePart = titlePart
+      .replace(/[|,	]+/g, ' ')
+      .replace(/\bS\d{4,}\d{0,2}\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!titlePart) {
+      const titleCandidates = parts.filter((part) => part && part !== resolvedPath && !/\.(?:pdf|jpe?g|png|tiff?)$/i.test(part));
+      titlePart = titleCandidates.sort((a, b) => b.length - a.length)[0] || parts[0] || '';
+    }
+
     if (!resolvedPath || !titlePart) return null;
 
     const normalizedName = sanitizeSubdivisionName(titlePart);
@@ -2467,8 +2503,9 @@
     const byName = lookupMap?.byName;
     const byDocId = lookupMap?.byDocId;
     if (!byName || !byName.size) return null;
-    const normalized = sanitizeSubdivisionName(subdivisionName);
-    if (normalized) {
+    const normalizedCandidates = getSubdivisionNameCandidates(attrs, subdivisionName);
+
+    for (const normalized of normalizedCandidates) {
       const direct = byName.get(normalized);
       if (direct?.length) return direct[0];
     }
@@ -2481,11 +2518,13 @@
       }
     }
 
-    if (!normalized) return null;
+    if (!normalizedCandidates.length) return null;
 
-    for (const key of (lookupMap?.byNameKeys || [])) {
-      const entries = byName.get(key);
-      if (key.includes(normalized) || normalized.includes(key)) return entries[0];
+    for (const normalized of normalizedCandidates) {
+      for (const key of (lookupMap?.byNameKeys || [])) {
+        const entries = byName.get(key);
+        if (key.includes(normalized) || normalized.includes(key)) return entries[0];
+      }
     }
     return null;
   }
