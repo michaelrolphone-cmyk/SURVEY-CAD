@@ -1059,10 +1059,15 @@
     const rosPayload = [];
     for (const { feature, index } of selectedRos) {
       const attrs = feature?.attributes || {};
-      const label = bestRosLabel(attrs) || `Record of Survey #${index + 1}`;
       const rosNumber = String(attrs.ROS || attrs.RS || attrs.SurveyNo || attrs.SURVEYNO || '').trim() || `UNLISTED-${index + 1}`;
       const imageMeta = deriveRosImageMeta(attrs);
-      const metadata = buildRosMetadataForExport(attrs, imageMeta, index);
+      const rosName = await resolveRosNameForExport(attrs, imageMeta);
+      const label = rosName || bestRosLabel(attrs) || `Record of Survey #${index + 1}`;
+      const mapImageUrl = imageMeta?.fullSizeUrl || null;
+      const thumbnailUrl = mapImageUrl
+        ? `/api/project-files/ros-thumbnail?${new URLSearchParams({ source: mapImageUrl })}`
+        : null;
+      const metadata = buildRosMetadataForExport(attrs, rosName);
       const rosId = slugify(rosNumber, `ros-${index + 1}`);
       addProjectFileResource(projectFile, {
         id: `ros-${rosId}`,
@@ -1076,10 +1081,11 @@
           metadata: {
             rosId,
             rosNumber,
-            label,
+            title: label,
             source: 'RecordQuarry',
-            mapImageUrl: imageMeta?.fullSizeUrl || '',
-            metadata,
+            mapImageUrl,
+            thumbnailUrl,
+            ...metadata,
             starredInFieldBook: true,
           },
         },
@@ -1089,7 +1095,8 @@
         rosNumber,
         title: label,
         source: 'RecordQuarry',
-        mapImageUrl: imageMeta?.fullSizeUrl || null,
+        mapImageUrl,
+        thumbnailUrl,
         metadata,
         starredInFieldBook: true,
       });
@@ -2730,22 +2737,32 @@
     return safe;
   }
 
-  function buildRosMetadataForExport(attributes = {}, imageMeta = null, index = 0) {
+  function buildRosMetadataForExport(attributes = {}, rosNameOverride = null) {
     const attrs = sanitizeRosAttributesForExport(attributes);
-    const rosNumber = String(attrs.ROS || attrs.RS || attrs.SurveyNo || attrs.SURVEYNO || '').trim() || `UNLISTED-${index + 1}`;
-    const rosName = String(attrs.Name || attrs.NAME || attrs.Description || attrs.DESC || attrs.SUB_NAME || attrs.SUBDIVISION || '').trim() || null;
+    const rosName = String(rosNameOverride || attrs.Name || attrs.NAME || attrs.Description || attrs.DESC || attrs.SUB_NAME || attrs.SUBDIVISION || '').trim() || null;
     const rosSourceId = String(attrs.OBJECTID ?? attrs.ObjectID ?? attrs.OBJECTID_1 ?? attrs.FID ?? attrs.GlobalID ?? attrs.GLOBALID ?? '').trim() || null;
     const aliquot = String(attrs.ALIQUOT || attrs.ALIQUOT_LABEL || '').trim() || null;
 
     return {
-      rosNumber,
       rosName,
       rosSourceId,
       aliquot,
-      mapImageUrl: imageMeta?.fullSizeUrl || null,
-      thumbnailUrl: imageMeta?.thumbnailUrl || null,
       sourceAttributes: attrs,
     };
+  }
+
+  async function resolveRosNameForExport(attributes = {}, imageMeta = null) {
+    const attrs = sanitizeRosAttributesForExport(attributes);
+    const attrName = String(attrs.Name || attrs.NAME || attrs.Description || attrs.DESC || attrs.SUB_NAME || attrs.SUBDIVISION || '').trim();
+    if (attrName) return attrName;
+    const tifName = extractRosTifNameFromUrl(imageMeta?.fullSizeUrl || '');
+    if (!tifName) return null;
+    try {
+      const idx = await loadRosSurveyPageListIndex();
+      return String(idx.get(tifName) || '').trim() || null;
+    } catch {
+      return null;
+    }
   }
 
   function normalizeRosFeatures(rosItems = []) {

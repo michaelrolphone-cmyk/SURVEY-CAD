@@ -72,6 +72,7 @@ function buildRosSummary(record) {
     title: record.title,
     source: record.source || null,
     mapImageUrl: record.mapImageUrl || null,
+    thumbnailUrl: record.thumbnailUrl || null,
     metadata: normalizeRosMetadata(record.metadata, null),
     starredInFieldBook: Boolean(record.starredInFieldBook),
     createdAt: record.createdAt,
@@ -118,6 +119,7 @@ export async function createOrUpdateProjectRos(store, {
   title,
   source,
   mapImageUrl,
+  thumbnailUrl,
   metadata,
   starredInFieldBook,
 } = {}) {
@@ -143,6 +145,7 @@ export async function createOrUpdateProjectRos(store, {
     title: String(title || `ROS ${rosNumber}`).trim(),
     source: source || existing?.source || null,
     mapImageUrl: mapImageUrl || existing?.mapImageUrl || null,
+    thumbnailUrl: thumbnailUrl || existing?.thumbnailUrl || null,
     metadata: normalizeRosMetadata(metadata, normalizeRosMetadata(existing?.metadata, null)),
     starredInFieldBook: typeof starredInFieldBook === 'boolean' ? starredInFieldBook : Boolean(existing?.starredInFieldBook),
     createdAt: existing?.createdAt || now,
@@ -192,6 +195,7 @@ export async function batchUpsertProjectRos(store, projectIdRaw, entries = []) {
       title: String(entry?.title || `ROS ${rosNumber}`).trim(),
       source: entry?.source || existing?.source || null,
       mapImageUrl: entry?.mapImageUrl || existing?.mapImageUrl || null,
+      thumbnailUrl: entry?.thumbnailUrl || existing?.thumbnailUrl || null,
       metadata: normalizeRosMetadata(entry?.metadata, normalizeRosMetadata(existing?.metadata, null)),
       starredInFieldBook: typeof entry?.starredInFieldBook === 'boolean'
         ? entry.starredInFieldBook

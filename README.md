@@ -48,6 +48,10 @@ CP&F PDF scraping now runs as its own paged checkpoint flow, so the worker conti
 - `GET /api/idaho-harvest/status`
 - `POST /api/idaho-harvest/start`
 - `POST /api/idaho-harvest/stop`
+- `GET /api/idaho-harvest/records-of-survey`
+- `GET /api/idaho-harvest/records-of-survey/:recordId/pdf`
+- `GET /api/idaho-harvest/subdivision-plats`
+- `GET /api/idaho-harvest/subdivision-plats/:platId/pdf`
 
 ### Map tile API endpoints (Leaflet/TileJSON-compatible)
 
@@ -96,6 +100,10 @@ CP&F PDF scraping now runs as its own paged checkpoint flow, so the worker conti
 - `MAPTILE_DATASETS` (comma-separated list of exposed tile datasets; default: `auto`, which discovers dataset names from the master index)
 - `MAPTILE_INDEX_KEY` (master index object-key used for dataset auto-discovery; default: `surveycad/idaho-harvest/indexes/id-master-index.geojson`)
 - `MAPTILE_MINIO_PREFIX` (MinIO object-key prefix for tile lookup; default: `surveycad/idaho-harvest/tiles/id`)
+- `ROS_SCRAPE_MINIO_BUCKET` (default: `records-of-survey`)
+- `ROS_SCRAPE_PREFIX` (default: `adacounty/recordsofsurvey`)
+- `SUBDIVISION_PLATS_MINIO_BUCKET` (default: `subdivision-plats`)
+- `SUBDIVISION_PLATS_SCRAPE_PREFIX` (default: `adacounty/subdivisionplats`)
 
 ### Commands
 
@@ -1330,9 +1338,9 @@ EvidenceDesk CP&F rows now support a persisted `starredInFieldBook` flag so crew
 - `GET /api/projects/{projectId}/cpfs` — returns CP&F summaries including `starredInFieldBook`.
 - `POST /api/projects/{projectId}/cpfs` — accepts single and batch upserts with optional `starredInFieldBook`.
 - `PATCH /api/projects/{projectId}/cpfs/{cpfId}` — updates a CP&F record (including `starredInFieldBook`).
-- `GET /api/projects/{projectId}/ros` — returns Record of Survey summaries including `starredInFieldBook` and optional `metadata` exported from RecordQuarry (ROS source ID/name, aliquot, and source attributes).
-- `POST /api/projects/{projectId}/ros` — accepts single and batch upserts with optional `starredInFieldBook`, `mapImageUrl`, and `metadata` payloads.
-- `PATCH /api/projects/{projectId}/ros/{rosId}` — updates a Record of Survey record (including `starredInFieldBook`, `mapImageUrl`, and `metadata`).
+- `GET /api/projects/{projectId}/ros` — returns Record of Survey summaries including `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and optional supplemental `metadata` exported from RecordQuarry (ROS source ID/name, aliquot, and source attributes).
+- `POST /api/projects/{projectId}/ros` — accepts single and batch upserts with optional `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and `metadata` payloads. RecordQuarry sync payloads keep top-level identifiers/URLs outside `metadata` to avoid duplicated keys.
+- `PATCH /api/projects/{projectId}/ros/{rosId}` — updates a Record of Survey record (including `starredInFieldBook`, `mapImageUrl`, `thumbnailUrl`, and `metadata`).
 
 ### CLI and server commands
 - `npm start`

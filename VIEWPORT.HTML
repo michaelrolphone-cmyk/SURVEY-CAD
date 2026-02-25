@@ -3010,7 +3010,9 @@
   let pendingMarqueeSelectionSnapshot = null;
   let pendingPrintWindowCapture = false;
   const DOUBLE_RIGHT_CLICK_ZOOM_OUT_MS = 325;
+  const CLUSTER_SINGLE_CLICK_SELECTION_DELAY_MS = 275;
   let lastRightClickAtMs = 0;
+  let pendingClusterPrimaryActionTimer = null;
 
   const mobileInteraction = {
     longPressMs: 450,
@@ -11501,6 +11503,7 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
   });
 
   canvas.addEventListener("dblclick", (e) => {
+    clearPendingClusterPrimaryAction();
     updateMouseFromEvent(e);
     const cluster = pointDisplayVisibility.clustering ? getPointClusterAtScreen(mouse.x, mouse.y) : null;
     if (cluster) {
@@ -11747,8 +11750,23 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     }
   }
 
+  function clearPendingClusterPrimaryAction() {
+    if (pendingClusterPrimaryActionTimer == null) return;
+    window.clearTimeout(pendingClusterPrimaryActionTimer);
+    pendingClusterPrimaryActionTimer = null;
+  }
+
+  function scheduleClusterPrimaryAction({ additive = false, forcedPointId = null } = {}) {
+    clearPendingClusterPrimaryAction();
+    pendingClusterPrimaryActionTimer = window.setTimeout(() => {
+      pendingClusterPrimaryActionTimer = null;
+      handleCanvasPrimaryAction({ additive, forcedPointId });
+    }, CLUSTER_SINGLE_CLICK_SELECTION_DELAY_MS);
+  }
+
   canvas.addEventListener("mousedown", (e) => {
     if (modalIsOpen()) return;
+    clearPendingClusterPrimaryAction();
     updateMouseFromEvent(e);
     mouse.down = true;
     mouse.button = e.button;
@@ -11763,6 +11781,16 @@ Field-to-finish curve segments added: ${curveLinesAdded}`, "ok");
     }
 
     if (e.button !== 0) return;
+    if (tool === "select" && pointDisplayVisibility.clustering) {
+      const cluster = getPointClusterAtScreen(mouse.x, mouse.y);
+      if (cluster && cluster.members?.length > 1) {
+        const closestMember = getClusterMemberClosestToScreen(cluster, mouse.x, mouse.y);
+        if (closestMember?.point?.id != null) {
+          scheduleClusterPrimaryAction({ additive, forcedPointId: closestMember.point.id });
+          return;
+        }
+      }
+    }
     handleCanvasPrimaryAction({ additive });
   });
 
