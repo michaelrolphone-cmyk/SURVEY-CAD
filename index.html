@@ -1846,7 +1846,7 @@ header {
       projects = projects.filter((entry) => entry.id !== projectId);
       if (activeProjectId === projectId) {
         activeProjectId = null;
-        localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
+        localStorage.removeItem(getActiveProjectStorageKey());
       }
 
       saveProjects();

@@ -204,6 +204,7 @@ test('launcher project manager supports shared modal editing and delete actions'
   assert.doesNotMatch(launcherHtml, /window\.prompt\(/, 'project create/edit flow should no longer rely on browser prompts');
   assert.match(launcherHtml, /function\s+deleteProject\(projectId\)/, 'launcher should define a delete project helper');
   assert.match(launcherHtml, /function\s+deleteProject\(projectId\)[\s\S]*window\.confirm\(/, 'delete flow should require confirmation');
+  assert.match(launcherHtml, /function\s+deleteProject\(projectId\)[\s\S]*localStorage\.removeItem\(getActiveProjectStorageKey\(\)\);/, 'delete flow should clear crew-scoped active project key');
   assert.match(launcherHtml, /remove\.textContent\s*=\s*'Delete'/, 'project rows should include delete action');
   assert.match(launcherHtml, /edit\.textContent\s*=\s*'Edit project'/, 'project rows should include edit action that opens the shared modal form');
 });
