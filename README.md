@@ -259,7 +259,7 @@ BEW casefile endpoints now retry Redis initialization before returning service-u
 
 ### API endpoints (state sync)
 
-- `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum.
+- `GET /api/localstorage-sync` – fetches the current shared snapshot/version/checksum, with heavy `project:point-file:*` version-history records omitted from `snapshot` and exposed as project-grouped `pointFileSummary` metadata instead.
 - `POST /api/localstorage-sync` – pushes a client snapshot and resolves stale/conflict state.
 - `GET /ws/localstorage-sync` (websocket upgrade) – real-time differential sync for all connected clients.
 - `POST /api/projects/:projectId/archive` – archives a project's redis-backed sync keys/values into the MinIO/S3 evidence store during delete workflows (no restore/list API).

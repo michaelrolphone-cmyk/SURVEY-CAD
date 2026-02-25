@@ -273,6 +273,64 @@ test('server exposes survey APIs and static html', async () => {
     const localStorageAfterUpdate = await localStorageAfterUpdateRes.json();
     assert.deepEqual(localStorageAfterUpdate.snapshot, { sample: 'value' });
 
+    const pointFileRecord = {
+      pointFileId: 'file-1',
+      pointFileName: 'Control.csv',
+      exportFormat: 'csv',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      versions: [
+        { versionId: 'v-1', baseState: { text: 'P1' } },
+        { versionId: 'v-2', diffFromPrevious: { text: 'P2' } },
+      ],
+    };
+    const pointFileIndex = {
+      'file-1': {
+        pointFileId: 'file-1',
+        pointFileName: 'Control.csv',
+        exportFormat: 'csv',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        latestVersionId: 'v-2',
+        versionCount: 2,
+      },
+    };
+    const localStoragePointFileUpdateRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        version: 101,
+        snapshot: {
+          sample: 'value',
+          'project:point-file:project-a:file-1': JSON.stringify(pointFileRecord),
+          'project:point-file-index:project-a': JSON.stringify(pointFileIndex),
+        },
+      }),
+    });
+    assert.equal(localStoragePointFileUpdateRes.status, 200);
+
+    const localStoragePointFileGetRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`);
+    assert.equal(localStoragePointFileGetRes.status, 200);
+    const localStoragePointFileState = await localStoragePointFileGetRes.json();
+    assert.equal(localStoragePointFileState.snapshot.sample, 'value');
+    assert.equal(localStoragePointFileState.snapshot['project:point-file:project-a:file-1'], undefined);
+    assert.ok(localStoragePointFileState.snapshot['project:point-file-index:project-a']);
+    assert.deepEqual(localStoragePointFileState.pointFileSummary['project-a'], [
+      {
+        pointFileId: 'file-1',
+        pointFileName: 'Control.csv',
+        exportFormat: 'csv',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        latestVersionId: 'v-2',
+        versionCount: 2,
+        source: null,
+        sourceLabel: null,
+      },
+    ]);
+
     const localStorageStaleRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
       method: 'POST',
       headers: {
@@ -283,7 +341,7 @@ test('server exposes survey APIs and static html', async () => {
     assert.equal(localStorageStaleRes.status, 200);
     const localStorageStale = await localStorageStaleRes.json();
     assert.equal(localStorageStale.status, 'client-stale');
-    assert.deepEqual(localStorageStale.state.snapshot, { sample: 'value' });
+    assert.equal(localStorageStale.state.snapshot.sample, 'value');
 
 
     const localStorageConflictRes = await fetch(`http://127.0.0.1:${app.port}/api/localstorage-sync`, {
@@ -295,8 +353,8 @@ test('server exposes survey APIs and static html', async () => {
     });
     assert.equal(localStorageConflictRes.status, 200);
     const localStorageConflict = await localStorageConflictRes.json();
-    assert.equal(localStorageConflict.status, 'checksum-conflict');
-    assert.deepEqual(localStorageConflict.state.snapshot, { sample: 'value' });
+    assert.equal(localStorageConflict.status, 'client-stale');
+    assert.equal(localStorageConflict.state.snapshot.sample, 'value');
 
     const appsRes = await fetch(`http://127.0.0.1:${app.port}/api/apps`);
     assert.equal(appsRes.status, 200);

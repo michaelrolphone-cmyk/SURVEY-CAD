@@ -14,6 +14,7 @@ import { LocalStorageSyncStore } from './localstorage-sync-store.js';
 import { createRedisLocalStorageSyncStore } from './redis-localstorage-sync-store.js';
 import { createLineforgeCollabService } from './lineforge-collab.js';
 import { createLocalStorageSyncWsService } from './localstorage-sync-ws.js';
+import { buildSyncResponseState } from './localstorage-sync-state-response.js';
 import { createCrewPresenceWsService } from './crew-presence-ws.js';
 import { createWorkerSchedulerService } from './worker-task-ws.js';
 import { createIdahoHarvestSupervisor } from './idaho-harvest-supervisor.js';
@@ -1903,6 +1904,7 @@ export function createSurveyServer({
   }
 
   const resolveStoreState = () => Promise.resolve(localStorageSyncStore.getState());
+  const resolveStoreResponseState = async () => buildSyncResponseState(await resolveStoreState());
   const syncIncomingState = (payload) => Promise.resolve(localStorageSyncStore.syncIncoming(payload));
   const resolveFieldToFinishSettings = async () => {
     const existing = await getFieldToFinishSettings(localStorageSyncStore);
@@ -2152,7 +2154,7 @@ export function createSurveyServer({
 
       if (urlObj.pathname === '/api/localstorage-sync') {
         if (req.method === 'GET') {
-          sendJson(res, 200, await resolveStoreState());
+          sendJson(res, 200, await resolveStoreResponseState());
           return;
         }
         if (req.method === 'POST') {
