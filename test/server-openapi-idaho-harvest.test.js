@@ -17,6 +17,8 @@ test('server OpenAPI spec documents Idaho harvest worker endpoints', async () =>
   assert.ok(spec?.paths?.['/api/idaho-harvest/records-of-survey/{recordId}/pdf']?.get);
   assert.ok(spec?.paths?.['/api/idaho-harvest/subdivision-plats']?.get);
   assert.ok(spec?.paths?.['/api/idaho-harvest/subdivision-plats/{platId}/pdf']?.get);
+  assert.ok(spec?.paths?.['/api/recordquarry/subdivision-plats/page-list']?.get);
+  assert.ok(spec?.paths?.['/api/recordquarry/records-of-survey/page-list']?.get);
 
   const schema = spec?.components?.schemas?.IdahoHarvestWorkerStatus;
   assert.ok(schema);

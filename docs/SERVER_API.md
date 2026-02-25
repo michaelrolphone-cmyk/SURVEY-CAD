@@ -1659,6 +1659,25 @@ Read a GeoJSON tile from MinIO/S3-compatible object storage.
 
 ---
 
+
+## RecordQuarry list document proxy
+
+### `GET /api/recordquarry/subdivision-plats/page-list`
+
+Fetches and returns Ada County's `SubsPageList.txt` document as plain text for RecordQuarry subdivision plat matching without browser CORS issues.
+
+**Response `200`:** `text/plain` body mirroring the upstream document.
+
+### `GET /api/recordquarry/records-of-survey/page-list`
+
+Fetches and returns Ada County's `SurveysPageList.txt` document as plain text for RecordQuarry ROS title lookup without browser CORS issues.
+
+**Response `200`:** `text/plain` body mirroring the upstream document.
+
+**Response `502`:** Upstream fetch failed.
+
+---
+
 ## ROS PDF Proxy
 
 ### `GET /api/ros-pdf`

@@ -99,6 +99,10 @@
     {
       "name": "RecordQuarry Cache",
       "description": "Server-side caching of RecordQuarry lookup results, keyed by project ID or normalized address. Avoids re-running the full GIS search on every open."
+    },
+    {
+      "name": "RecordQuarry",
+      "description": "RecordQuarry helper endpoints."
     }
   ],
   "paths": {
@@ -4226,7 +4230,7 @@
           }
         }
       }
-    },                  
+    },
     "/api/idaho-harvest/records-of-survey": {
       "get": {
         "summary": "List harvested records of survey from object storage",
@@ -4347,6 +4351,66 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/api/recordquarry/subdivision-plats/page-list": {
+      "get": {
+        "tags": [
+          "RecordQuarry"
+        ],
+        "summary": "Proxy Ada County subdivision plat page list text",
+        "responses": {
+          "200": {
+            "description": "Raw text document body.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream list fetch failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordquarry/records-of-survey/page-list": {
+      "get": {
+        "tags": [
+          "RecordQuarry"
+        ],
+        "summary": "Proxy Ada County record-of-survey page list text",
+        "responses": {
+          "200": {
+            "description": "Raw text document body.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream list fetch failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
