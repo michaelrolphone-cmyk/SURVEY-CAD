@@ -35,6 +35,23 @@ test('RecordQuarry.html routes ROS PDF links through API server and exports uniq
   assert.match(html, /state\.sectionFeature2243\s*=\s*await\s*fetchSectionGeometry2243FromPoint\(lon, lat\)/, 'export lookup should fetch containing section geometry in export SR');
 });
 
+
+
+test('RecordQuarry.html renders nearby subdivision polygons/cards and plat thumbnails for parcels', async () => {
+  const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
+
+  assert.match(html, /SUBDIVISION_NEARBY_RADIUS_FT\s*=\s*666/, 'nearby subdivision search radius should be 666 feet');
+  assert.match(html, /function\s+findNearbySubdivisions\s*\(/, 'lookup should define a nearby subdivision polygon query helper');
+  assert.match(html, /distance:\s*SUBDIVISION_NEARBY_RADIUS_M/, 'nearby subdivision query should use the configured parcel buffer distance');
+  assert.match(html, /const\s+nearbyWithPlatData\s*=\s*await\s*attachSubdivisionPlatData\(/, 'lookup should enrich nearby subdivisions with plat metadata');
+  assert.match(html, /function\s+drawSubdivisionPolygons\s*\(/, 'lookup should define a subdivision polygon renderer for nearby features');
+  assert.match(html, /drawSubdivisionPolygons\(nearbySubdivisionEntries\)/, 'lookup should draw each nearby subdivision polygon on the map');
+  assert.match(html, /SUBDIVISION_PLAT_LIST_URL\s*=\s*'https:\/\/adacountyassessor\.org\/docs\/subdivisionplats\/SubsPageList\.txt'/, 'lookup should source plat index data from Ada County subdivision list');
+  assert.match(html, /\/api\/project-files\/pdf-thumbnail\?\$\{new URLSearchParams\(\{ source: platUrl \}\)\}/, 'subdivision plat cards should resolve PDF thumbnails through the cached thumbnail API');
+  assert.match(html, /Open subdivision plat/, 'subdivision cards should include direct plat links');
+  assert.match(html, /setSubdivisionSelected\(entry, idx, next\)/, 'subdivision cards should support star-based include/exclude toggles');
+  assert.match(html, /selectedSubdivisionKeys:\s*new\s+Set\(\)/, 'lookup should initialize subdivision selection state for export');
+});
 test('RecordQuarry.html keeps ROS scoped to containing section and includes popup PDF links', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
@@ -107,6 +124,8 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   assert.match(html, /replace\(\/\\s\+\/g, ' '\)\s*\.toUpperCase\(\)/, 'instrument normalization should collapse whitespace and uppercase values to avoid duplicate variants');
   assert.match(html, /referenceType === 'instrument-number'[\s\S]*normalizeCpInstrumentNumber\(item\?\.reference\?\.value\) === referenceValue/, 'project file duplicate check should compare normalized instrument-number references');
   assert.match(html, /folder:\s*'cpfs'[\s\S]*reference:\s*\{[\s\S]*type:\s*'instrument-number'/, 'PointForge export project file should add CP&F instrument references');
+  assert.match(html, /const\s+selectedSubdivisions\s*=\s*getSelectedSubdivisionEntries\(state\.nearbySubdivisions\)/, 'PointForge export project file should collect starred subdivisions');
+  assert.match(html, /folder:\s*'plats'[\s\S]*resolverHint:\s*'subdivision-plat'/, 'PointForge export project file should write starred subdivisions into plats folder');
   assert.match(html, /folder:\s*'ros'[\s\S]*reference:\s*\{[\s\S]*type:\s*'ros-number'/, 'PointForge export project file should add selected ROS references');
   assert.match(html, /const\s+rosName\s*=\s*await\s*resolveRosNameForExport\(attrs,\s*imageMeta\);[\s\S]*const\s+label\s*=\s*rosName\s*\|\|\s*bestRosLabel\(attrs\)/, 'PointForge export should prefer the SurveysPageList ROS name for exported titles before falling back to attribute labels');
   assert.match(html, /metadata:\s*\{[\s\S]*title:\s*label,[\s\S]*mapImageUrl,[\s\S]*thumbnailUrl,[\s\S]*\.\.\.metadata,[\s\S]*starredInFieldBook:\s*true[\s\S]*\}/, 'PointForge project-file ROS metadata should flatten export fields and merge only non-duplicated supplemental metadata attributes');
@@ -119,6 +138,7 @@ test('RecordQuarry.html can export unique boundary points directly to PointForge
   assert.match(html, /const\s+notesByCoordinate\s*=\s*await\s*buildCpfNotesByCoordinate\(plssPoints\);[\s\S]*parcelFeature2243:\s*filterParcelFeatureForExport\(state\.parcelFeature2243,\s*state\.selectedParcel\),[\s\S]*subdivisionFeature2243:\s*null,[\s\S]*includePlssWithoutNotes:\s*false[\s\S]*buildPowerUtilityMarkersForPointForge\(state\.utilityLocations,\s*uniquePart\.nextPoint\)[\s\S]*buildPointMarkerCsvRowsPNEZD\(utilityMarkers,\s*uniquePart\.nextPoint,\s*''\)[\s\S]*const\s+pointForgeCsv\s*=\s*`\$\{uniquePart\.csv\}\$\{utilityRows\.csv\}`[\s\S]*localStorage\.setItem\(POINTFORGE_ROS_IMPORT_STORAGE_KEY,\s*JSON\.stringify\(\{[\s\S]*csv:\s*pointForgeCsv/, 'ROS should prefetch CP&F notes, append Idaho Power utility points, and persist PointForge payload CSV');
   assert.match(html, /const\s+projectFileUpdate\s*=\s*await\s+persistPointForgeExportProjectFile\(\{[\s\S]*notesByCoordinate,[\s\S]*pointCount:\s*uniquePart\.count/, 'PointForge export should save CP&F and point-file references to the project file when a project is active');
   assert.match(html, /fetch\(`\/api\/projects\/\$\{encodeURIComponent\(resolvedProjectContext\.projectId\)\}\/ros`/, 'PointForge export should sync selected ROS references to project ROS API for EvidenceDesk availability');
+  assert.match(html, /fetch\(`\/api\/projects\/\$\{encodeURIComponent\(resolvedProjectContext\.projectId\)\}\/plats`/, 'PointForge export should sync starred subdivision plats to project plats API for EvidenceDesk availability');
   assert.match(html, /function\s+openLinkedApp\s*\(/, 'ROS should define shared cross-app navigation helper');
   assert.match(html, /window\.parent\.postMessage\(\{[\s\S]*type:\s*'survey-cad:navigate-app'[\s\S]*path,/, 'ROS should notify launcher iframe host to navigate embedded app');
   assert.match(html, /openLinkedApp\(buildPointForgeLaunchPath\(\)\)/, 'ROS should navigate PointForge using launcher-aware helper');
@@ -272,7 +292,8 @@ test('RecordQuarry.html hardens CP&F persistence parsing and project-context res
   assert.match(html, /function\s+resolveProjectContextForProjectFile\s*\(/, 'RecordQuarry should define a helper to recover project context before saving handoff artifacts');
   assert.match(html, /const\s+runtimeContext\s*=\s*getProjectContext\(\);/, 'project-context recovery should inspect runtime launch params when state context is missing');
   assert.match(html, /const\s+resolvedProjectContext\s*=\s*resolveProjectContextForProjectFile\(projectContext\);/, 'PointForge export persistence should always use resolved project context');
-  assert.match(html, /if\s*\(!deselectedRosKeys\)\s*\{\s*return;\s*\}/, 'ROS selection restore should keep RoS deselected when no prior selection snapshot is present');
+  assert.match(html, /function\s+applySelectionByMode\s*\(/, 'selection restore should use shared include/exclude snapshot application logic');
+  assert.match(html, /applySelectionByMode\(\s*state\.selectedRosKeys,[\s\S]*false\s*\)/, 'ROS selection restore should keep RoS deselected by default when no prior snapshot is present');
   assert.match(html, /function\s+deriveRosImageMeta\s*\(attrs\s*=\s*\{\}\)\s*\{\s*return\s+buildAdaCountyRosImageMeta\(attrs\);\s*\}/, 'PointForge export persistence should use a defined ROS image metadata helper when creating RoS project file links');
   assert.match(html, /replace\(\/\^CPNFS\?:\\s\*\/i, ''\)/, 'CP&F note parsing should accept both CPNF and CPNFS prefixes');
   assert.match(html, /split\(\/\(\?:\\\.\{3\}\|…\|,\|;\|\\n\)\+\/g\)/, 'CP&F note parsing should tolerate multiple separators to avoid dropping instrument references');

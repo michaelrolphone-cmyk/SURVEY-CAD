@@ -2013,7 +2013,7 @@
           "CP&F Records"
         ],
         "summary": "Update (upsert) a CP&F record",
-        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectCpf",
         "requestBody": {
           "required": true,
@@ -3862,7 +3862,7 @@
           "ROS Records"
         ],
         "summary": "Update (upsert) a ROS record",
-        "description": "Updates the record identified by `rosId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `rosId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectRos",
         "requestBody": {
           "required": true,
@@ -3974,6 +3974,259 @@
         }
       }
     },
+    "/api/projects/{projectId}/plats": {
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "description": "Project identifier.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Plat Records"
+        ],
+        "summary": "List project plat records",
+        "description": "Returns all plat records for the project sorted by updatedAt descending.",
+        "operationId": "listProjectPlats",
+        "responses": {
+          "200": {
+            "description": "Plat record list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPlatListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Plat Records"
+        ],
+        "summary": "Create or batch-upsert plat record(s)",
+        "description": "Accepts either a single record body (`{ subdivisionName, ... }`) or a batch body (`{ plats: [...] }`).",
+        "operationId": "upsertProjectPlats",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ProjectPlatMutationRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ProjectPlatBatchUpsertRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch upsert result or single upsert of existing record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ProjectPlatResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ProjectPlatBatchUpsertResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Single plat record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPlatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/plats/{platId}": {
+      "parameters": [
+        {
+          "name": "projectId",
+          "in": "path",
+          "required": true,
+          "description": "Project ID",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "platId",
+          "in": "path",
+          "required": true,
+          "description": "Plat identifier.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Plat Records"
+        ],
+        "summary": "Get a single plat record",
+        "operationId": "getProjectPlat",
+        "responses": {
+          "200": {
+            "description": "Plat record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPlatResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Plat Records"
+        ],
+        "summary": "Update (upsert) a plat record",
+        "description": "Updates the record identified by `platId`. Acts as upsert \u2014 creates the record if it does not exist.",
+        "operationId": "replaceProjectPlat",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPlatMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plat record updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPlatResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Plat record created via upsert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPlatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Plat Records"
+        ],
+        "summary": "Patch (upsert) a plat record",
+        "description": "Identical behaviour to `PUT`. Updates the record identified by `platId`, or creates it if absent.",
+        "operationId": "updateProjectPlat",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPlatMutationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plat record updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPlatResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Plat record created via upsert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPlatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Plat Records"
+        ],
+        "summary": "Delete a plat record",
+        "operationId": "deleteProjectPlat",
+        "responses": {
+          "200": {
+            "description": "Record deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "deleted"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plat not found"
+          }
+        }
+      }
+    },                  
     "/api/idaho-harvest/records-of-survey": {
       "get": {
         "summary": "List harvested records of survey from object storage",
@@ -4093,7 +4346,7 @@
             }
           },
           "404": {
-            "description": "Plat not found"
+            "$ref": "#/components/responses/Error404"
           }
         }
       }
@@ -7494,6 +7747,204 @@
           "lookup",
           "savedAt"
         ]
+      },
+      "ProjectPlatSummary": {
+        "type": "object",
+        "required": [
+          "platId",
+          "subdivisionName",
+          "title",
+          "starredInFieldBook",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "platId": {
+            "type": "string"
+          },
+          "subdivisionName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "platUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "starredInFieldBook": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectPlat": {
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "projectId",
+          "platId",
+          "subdivisionName",
+          "title",
+          "starredInFieldBook",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "platId": {
+            "type": "string"
+          },
+          "subdivisionName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "platUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "starredInFieldBook": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectPlatMutationRequest": {
+        "type": "object",
+        "required": [
+          "subdivisionName"
+        ],
+        "properties": {
+          "platId": {
+            "type": "string"
+          },
+          "subdivisionName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "platUrl": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "starredInFieldBook": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProjectPlatBatchUpsertRequest": {
+        "type": "object",
+        "required": [
+          "plats"
+        ],
+        "properties": {
+          "plats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectPlatMutationRequest"
+            }
+          }
+        }
+      },
+      "ProjectPlatListResponse": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "plats"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "plats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectPlatSummary"
+            }
+          }
+        }
+      },
+      "ProjectPlatResponse": {
+        "type": "object",
+        "required": [
+          "plat"
+        ],
+        "properties": {
+          "plat": {
+            "$ref": "#/components/schemas/ProjectPlat"
+          }
+        }
+      },
+      "ProjectPlatBatchUpsertResponse": {
+        "type": "object",
+        "required": [
+          "plats"
+        ],
+        "properties": {
+          "plats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectPlat"
+            }
+          }
+        }
       },
       "ProjectRosSummary": {
         "type": "object",

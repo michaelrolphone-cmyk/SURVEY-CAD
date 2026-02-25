@@ -1994,3 +1994,25 @@ List the derived project sources used for Workbench sync.
 Synchronize project-derived evidence into the linked casefile and return sync counts (`created`, `updated`, `deleted`, `totalSources`).
 
 **Request Body (all fields optional):** Same as `POST /api/projects/:projectId/workbench`.
+
+## Project subdivision plat records API
+
+Project subdivision plat records are stored under `/api/projects/:projectId/plats` and support the same CRUD + batch-upsert shape as CP&F/ROS records.
+
+### `GET /api/projects/:projectId/plats`
+Returns `{ projectId, plats }` where `plats` is sorted by `updatedAt` descending.
+
+### `POST /api/projects/:projectId/plats`
+Supports either:
+- single upsert payload: `{ subdivisionName, title?, source?, platUrl?, thumbnailUrl?, metadata?, starredInFieldBook? }`
+- batch upsert payload: `{ plats: [ ...singlePayload ] }`
+
+### `GET /api/projects/:projectId/plats/:platId`
+Returns `{ plat }` for a single plat record.
+
+### `PUT /api/projects/:projectId/plats/:platId`
+### `PATCH /api/projects/:projectId/plats/:platId`
+Upserts a plat at a specific `platId`. Requires `subdivisionName`.
+
+### `DELETE /api/projects/:projectId/plats/:platId`
+Deletes a plat record and returns `{ deleted: true }`.

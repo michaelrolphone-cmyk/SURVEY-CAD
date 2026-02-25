@@ -603,6 +603,10 @@
   const ADDRESS_LOOKUP_STORAGE_PREFIX = "surveyfoundryAddressLookup";
   const PROJECT_FILE_STORAGE_PREFIX = "surveyfoundryProjectFile";
   const LAST_LOOKUP_ADDRESS_STORAGE_KEY = "surveyfoundryLastLookupAddress";
+  const SUBDIVISION_NEARBY_RADIUS_FT = 666;
+  const SUBDIVISION_NEARBY_RADIUS_M = SUBDIVISION_NEARBY_RADIUS_FT * 0.3048;
+  const SUBDIVISION_PLAT_LIST_URL = 'https://adacountyassessor.org/docs/subdivisionplats/SubsPageList.txt';
+  const SUBDIVISION_PLAT_BASE_URL = 'https://adacountyassessor.org/docs/subdivisionplats/';
 
   // pdf.js worker
   if (!window.pdfjsLib) {
@@ -758,6 +762,26 @@
     return loadAddressLookupSnapshot(recentAddress);
   }
 
+  function applySelectionByMode(targetSet, allKeys, selectedKeys, deselectedKeys, defaultSelected = false) {
+    targetSet.clear();
+    if (Array.isArray(selectedKeys) && selectedKeys.length) {
+      for (const key of selectedKeys) {
+        if (allKeys.has(key)) targetSet.add(key);
+      }
+      return;
+    }
+    if (Array.isArray(deselectedKeys)) {
+      const excluded = new Set(deselectedKeys);
+      for (const key of allKeys) {
+        if (!excluded.has(key)) targetSet.add(key);
+      }
+      return;
+    }
+    if (defaultSelected) {
+      for (const key of allKeys) targetSet.add(key);
+    }
+  }
+
   function readSelectionSnapshot() {
     const allAliquotKeys = buildAllSelectedAliquotKeys(state.aliquotFeatures);
     const selectedAliquotKeys = [...state.selectedAliquotKeys];
@@ -765,61 +789,47 @@
     const allRosKeys = buildAllRosSelectionKeys(state.rosFeatures);
     const selectedRosKeys = [...state.selectedRosKeys];
     const deselectedRosKeys = [...allRosKeys].filter((key) => !state.selectedRosKeys.has(key));
+    const allSubdivisionKeys = buildAllSubdivisionSelectionKeys(state.nearbySubdivisions);
+    const selectedSubdivisionKeys = [...state.selectedSubdivisionKeys];
+    const deselectedSubdivisionKeys = [...allSubdivisionKeys].filter((key) => !state.selectedSubdivisionKeys.has(key));
     return {
       selectedParcel: Boolean(state.selectedParcel),
       selectedAliquotKeys,
       deselectedAliquotKeys,
       selectedRosKeys,
       deselectedRosKeys,
+      selectedSubdivisionKeys,
+      deselectedSubdivisionKeys,
     };
   }
 
   function applySelectionSnapshot(selection = null) {
     const selectedParcel = selection?.selectedParcel;
     setParcelSelected(selectedParcel == null ? true : Boolean(selectedParcel));
-    state.selectedAliquotKeys.clear();
-    const allAliquotKeys = buildAllSelectedAliquotKeys(state.aliquotFeatures);
-    const selectedKeys = Array.isArray(selection?.selectedAliquotKeys)
-      ? selection.selectedAliquotKeys
-      : null;
-    const deselectedKeys = Array.isArray(selection?.deselectedAliquotKeys)
-      ? new Set(selection.deselectedAliquotKeys)
-      : null;
-    if (selectedKeys && selectedKeys.length) {
-      for (const key of selectedKeys) {
-        if (allAliquotKeys.has(key)) state.selectedAliquotKeys.add(key);
-      }
-      return;
-    }
-    if (!selectedKeys?.length && deselectedKeys) {
-      for (const key of allAliquotKeys) {
-        if (!deselectedKeys.has(key)) state.selectedAliquotKeys.add(key);
-      }
-    }
 
-    state.selectedRosKeys.clear();
-    const allRosKeys = buildAllRosSelectionKeys(state.rosFeatures);
-    const selectedRosKeys = Array.isArray(selection?.selectedRosKeys)
-      ? selection.selectedRosKeys
-      : null;
-    const deselectedRosKeys = Array.isArray(selection?.deselectedRosKeys)
-      ? new Set(selection.deselectedRosKeys)
-      : null;
+    applySelectionByMode(
+      state.selectedAliquotKeys,
+      buildAllSelectedAliquotKeys(state.aliquotFeatures),
+      selection?.selectedAliquotKeys,
+      selection?.deselectedAliquotKeys,
+      true
+    );
 
-    if (selectedRosKeys && selectedRosKeys.length) {
-      for (const key of selectedRosKeys) {
-        if (allRosKeys.has(key)) state.selectedRosKeys.add(key);
-      }
-      return;
-    }
+    applySelectionByMode(
+      state.selectedRosKeys,
+      buildAllRosSelectionKeys(state.rosFeatures),
+      selection?.selectedRosKeys,
+      selection?.deselectedRosKeys,
+      false
+    );
 
-    if (!deselectedRosKeys) {
-      return;
-    }
-
-    for (const key of allRosKeys) {
-      if (!deselectedRosKeys.has(key)) state.selectedRosKeys.add(key);
-    }
+    applySelectionByMode(
+      state.selectedSubdivisionKeys,
+      buildAllSubdivisionSelectionKeys(state.nearbySubdivisions),
+      selection?.selectedSubdivisionKeys,
+      selection?.deselectedSubdivisionKeys,
+      false
+    );
   }
 
   async function saveLookupSnapshotsForCurrentState(address) {
@@ -983,6 +993,9 @@
     const selectedRos = (state.rosFeatures || [])
       .map((feature, index) => ({ feature, index }))
       .filter(({ feature, index }) => isRosSelected(feature, index));
+    const selectedSubdivisions = getSelectedSubdivisionEntries(state.nearbySubdivisions)
+      .map((entry, index) => ({ entry, index }));
+    const platsPayload = [];
 
     for (const instrument of cpfInstruments) {
       addProjectFileResource(projectFile, {
@@ -996,6 +1009,50 @@
           resolverHint: 'lookup-cpf-pdf',
           metadata: { instrument },
         },
+      });
+    }
+
+    for (const { entry, index } of selectedSubdivisions) {
+      const feature = entry?.feature || null;
+      if (!feature) continue;
+      const attrs = feature.attributes || {};
+      const subdivisionName = String(entry?.name || getSubdivisionNameFromAttrs(attrs) || `Subdivision ${index + 1}`).trim();
+      const platUrl = String(entry?.plat?.platUrl || '').trim();
+      const thumbnailUrl = String(entry?.plat?.thumbnailUrl || '').trim();
+      const sourceId = String(attrs.OBJECTID ?? attrs.ObjectID ?? attrs.FID ?? `${index + 1}`).trim();
+      const platId = slugify(`${subdivisionName}-${sourceId}`, `subdivision-${index + 1}`);
+      addProjectFileResource(projectFile, {
+        id: `plat-${platId}`,
+        folder: 'plats',
+        title: subdivisionName,
+        exportFormat: 'pdf',
+        reference: {
+          type: 'external',
+          value: platUrl || subdivisionName,
+          resolverHint: 'subdivision-plat',
+          metadata: {
+            source: 'RecordQuarry',
+            subdivisionName,
+            sourceId,
+            platUrl,
+            thumbnailUrl,
+            starredInFieldBook: true,
+            attributes: attrs,
+          },
+        },
+      });
+      platsPayload.push({
+        platId,
+        subdivisionName,
+        title: subdivisionName,
+        source: 'RecordQuarry',
+        platUrl: platUrl || null,
+        thumbnailUrl: thumbnailUrl || null,
+        metadata: {
+          sourceId,
+          attributes: attrs,
+        },
+        starredInFieldBook: true,
       });
     }
 
@@ -1084,6 +1141,18 @@
       }
     }
 
+    if (platsPayload.length && resolvedProjectContext.projectId) {
+      try {
+        await fetch(`/api/projects/${encodeURIComponent(resolvedProjectContext.projectId)}/plats`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plats: platsPayload }),
+        });
+      } catch {
+        // Non-fatal: server sync is best-effort; local snapshot was already saved.
+      }
+    }
+
     if (rosPayload.length && resolvedProjectContext.projectId) {
       try {
         await fetch(`/api/projects/${encodeURIComponent(resolvedProjectContext.projectId)}/ros`, {
@@ -1096,7 +1165,7 @@
       }
     }
 
-    return { projectFile, cpfCount: cpfInstruments.length, rosCount: rosPayload.length };
+    return { projectFile, cpfCount: cpfInstruments.length, rosCount: rosPayload.length, subdivisionCount: selectedSubdivisions.length };
   }
 
   // -----------------------------
@@ -1716,6 +1785,29 @@
     });
   }
 
+
+  function drawSubdivisionPolygons(subdivisionEntries = []) {
+    layers.subdivision.clearLayers();
+    for (const [idx, entry] of (subdivisionEntries || []).entries()) {
+      const feature = entry?.feature;
+      if (!feature) continue;
+      const selected = isSubdivisionSelected(entry, idx);
+      drawPolygonFeature(
+        feature,
+        layers.subdivision,
+        {
+          style: () => ({
+            color: selected ? '#9ab0ff' : '#64748b',
+            weight: selected ? 2.5 : 1.5,
+            fillOpacity: selected ? 0.08 : 0.02,
+            dashArray: selected ? '' : '4 6',
+          })
+        },
+        'Subdivision'
+      );
+    }
+  }
+
   function drawAliquots(aliquotFeatures, sectionFeature) {
     layers.aliquots.clearLayers();
     for (const [index, feature] of (aliquotFeatures || []).entries()) {
@@ -1928,6 +2020,7 @@
     parcelFeature2243: null,    // export geometry (outSR 2243)
     subdivisionFeature2243: null,
     subdivisionFeature: null,
+    nearbySubdivisions: [],
     sectionFeature: null,
     sectionFeature2243: null,
     aliquotFeatures2243: [],
@@ -1938,6 +2031,7 @@
     selectedAliquot: null,
     selectedAliquotKeys: new Set(),
     selectedRosKeys: new Set(),
+    selectedSubdivisionKeys: new Set(),
     lastLookupPayload: null,
     lastLookupAddress: '',
     exportGeoJSON: null,
@@ -2226,6 +2320,144 @@
       if (meters < bestDist) { bestDist = meters; nearest = f; }
     }
     return nearest || feats[0];
+  }
+
+  function getSubdivisionNameFromAttrs(attrs = {}) {
+    const candidates = [
+      attrs.SUBDIVNAME,
+      attrs.SUBDIVISION,
+      attrs.SUBDIV,
+      attrs.NAME,
+      attrs.SUB_NAME,
+      attrs.PLATNAME,
+      attrs.SUBDIVISIO,
+    ];
+    for (const value of candidates) {
+      const cleaned = String(value || '').trim();
+      if (cleaned) return cleaned;
+    }
+    return '';
+  }
+
+  function sanitizeSubdivisionName(value) {
+    return String(value || '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, ' ')
+      .replace(/\b(UNIT|PHASE|NO|NUMBER|SUBDIVISION|SUBDIV)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function buildSubdivisionPlatUrl(rawPath = '') {
+    const trimmed = String(rawPath || '').trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    const noLeadingSlash = trimmed.replace(/^\/+/, '');
+    return `${SUBDIVISION_PLAT_BASE_URL}${noLeadingSlash}`;
+  }
+
+  function parseSubdivisionPlatListLine(line) {
+    const raw = String(line || '').trim();
+    if (!raw || raw.startsWith('#') || raw.startsWith('//')) return null;
+
+    const parts = raw.split(/[|	,]+/).map((part) => part.trim()).filter(Boolean);
+    if (!parts.length) return null;
+
+    const joined = parts.join(' ');
+    const urlMatch = joined.match(/https?:\/\/[^\s]+/i);
+    const fileMatch = joined.match(/[A-Za-z0-9._\-/ ]+\.(?:pdf|jpe?g|png|tiff?)/i);
+    const resolvedPath = urlMatch?.[0] || fileMatch?.[0] || '';
+    const titlePart = parts[0] || '';
+    if (!resolvedPath || !titlePart) return null;
+
+    const normalizedName = sanitizeSubdivisionName(titlePart);
+    if (!normalizedName) return null;
+
+    const platUrl = buildSubdivisionPlatUrl(resolvedPath);
+    if (!platUrl) return null;
+
+    return {
+      name: titlePart,
+      normalizedName,
+      platUrl,
+      thumbnailUrl: /\.pdf($|\?)/i.test(platUrl)
+        ? `/api/project-files/pdf-thumbnail?${new URLSearchParams({ source: platUrl })}`
+        : platUrl,
+    };
+  }
+
+  let subdivisionPlatListPromise = null;
+
+  async function loadSubdivisionPlatLookup() {
+    if (subdivisionPlatListPromise) return subdivisionPlatListPromise;
+    subdivisionPlatListPromise = (async () => {
+      const resp = await fetch(SUBDIVISION_PLAT_LIST_URL, { cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const text = await resp.text();
+      const map = new Map();
+      for (const line of text.split(/\r?\n/)) {
+        const parsed = parseSubdivisionPlatListLine(line);
+        if (!parsed) continue;
+        if (!map.has(parsed.normalizedName)) map.set(parsed.normalizedName, []);
+        map.get(parsed.normalizedName).push(parsed);
+      }
+      return map;
+    })().catch((error) => {
+      subdivisionPlatListPromise = null;
+      throw error;
+    });
+    return subdivisionPlatListPromise;
+  }
+
+  function matchSubdivisionPlatEntry(subdivisionName, lookupMap) {
+    if (!lookupMap || !lookupMap.size) return null;
+    const normalized = sanitizeSubdivisionName(subdivisionName);
+    if (!normalized) return null;
+    const direct = lookupMap.get(normalized);
+    if (direct?.length) return direct[0];
+
+    for (const [key, entries] of lookupMap.entries()) {
+      if (key.includes(normalized) || normalized.includes(key)) return entries[0];
+    }
+    return null;
+  }
+
+  async function findNearbySubdivisions(parcelFeature, outSR = 4326) {
+    const geom = parcelFeature?.geometry;
+    if (!geom?.rings?.length) return [];
+
+    const resp = await arcQuery(LAYERS.subdivisions, {
+      where: '1=1',
+      outFields: '*',
+      returnGeometry: true,
+      outSR,
+      inSR: 4326,
+      geometryType: 'esriGeometryPolygon',
+      geometry: JSON.stringify(geom),
+      spatialRel: 'esriSpatialRelIntersects',
+      distance: SUBDIVISION_NEARBY_RADIUS_M,
+      units: 'esriSRUnit_Meter',
+    });
+
+    return resp?.features || [];
+  }
+
+  async function attachSubdivisionPlatData(features = []) {
+    const out = [];
+    let lookupMap = null;
+    try {
+      lookupMap = await loadSubdivisionPlatLookup();
+    } catch (error) {
+      log(`Subdivision plat lookup failed: ${error.message || error}`, 'warn');
+    }
+
+    for (const feature of features) {
+      const name = getSubdivisionNameFromAttrs(feature?.attributes || {});
+      const plat = lookupMap ? matchSubdivisionPlatEntry(name, lookupMap) : null;
+      out.push({ feature, name, plat });
+    }
+
+    return out;
   }
 
   async function findRosNearPoint(lon, lat, searchMeters=1600) {
@@ -2537,6 +2769,38 @@
     return rosItems
       .map((item) => (item?.feature?.geometry ? item.feature : item))
       .filter((f) => f?.geometry);
+  }
+
+  function buildSubdivisionSelectionKey(entry, index = 0) {
+    const feature = entry?.feature || entry;
+    const attrs = feature?.attributes || {};
+    const objectId = String(attrs.OBJECTID ?? attrs.ObjectID ?? attrs.FID ?? '').trim();
+    if (objectId) return `subdivision:oid:${objectId}`;
+    const byName = sanitizeSubdivisionName(entry?.name || getSubdivisionNameFromAttrs(attrs));
+    if (byName) return `subdivision:name:${byName}`;
+    return `subdivision:index:${Number(index)}`;
+  }
+
+  function buildAllSubdivisionSelectionKeys(subdivisionEntries = []) {
+    const keys = new Set();
+    (subdivisionEntries || []).forEach((entry, index) => {
+      keys.add(buildSubdivisionSelectionKey(entry, index));
+    });
+    return keys;
+  }
+
+  function isSubdivisionSelected(entry, index = 0) {
+    return state.selectedSubdivisionKeys.has(buildSubdivisionSelectionKey(entry, index));
+  }
+
+  function setSubdivisionSelected(entry, index, selected) {
+    const key = buildSubdivisionSelectionKey(entry, index);
+    if (selected) state.selectedSubdivisionKeys.add(key);
+    else state.selectedSubdivisionKeys.delete(key);
+  }
+
+  function getSelectedSubdivisionEntries(entries = state.nearbySubdivisions || []) {
+    return (entries || []).filter((entry, index) => isSubdivisionSelected(entry, index));
   }
 
   function buildRosSelectionKey(feature, index = 0) {
@@ -3404,6 +3668,8 @@
     state.exportGeoJSON = null;
     state.parcelFeature2243 = null;
     state.subdivisionFeature2243 = null;
+    state.subdivisionFeature = null;
+    state.nearbySubdivisions = [];
     state.aliquotFeatures = [];
     state.sectionFeature2243 = null;
     state.aliquotFeatures2243 = [];
@@ -3411,6 +3677,7 @@
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
     state.selectedRosKeys.clear();
+    state.selectedSubdivisionKeys.clear();
     setSummaryCards([]);
     clearMapLayers();
     resetUtilitiesRadiusUiAndState();
@@ -3489,6 +3756,25 @@
       state.subdivisionFeature = subdiv;
       state.sectionFeature = section;
       state.townshipFeature = township;
+      state.nearbySubdivisions = [];
+
+      try {
+        const nearbySubdivisionFeatures = await findNearbySubdivisions(parcel, 4326);
+        const nearbyWithPlatData = await attachSubdivisionPlatData(nearbySubdivisionFeatures);
+        const seenNearby = new Set();
+        state.nearbySubdivisions = nearbyWithPlatData.filter((entry) => {
+          const id = Number(entry?.feature?.attributes?.OBJECTID);
+          const nameKey = sanitizeSubdivisionName(entry?.name || getSubdivisionNameFromAttrs(entry?.feature?.attributes || {}));
+          const key = Number.isFinite(id) ? `oid:${id}` : `name:${nameKey}`;
+          if (!key || seenNearby.has(key)) return false;
+          seenNearby.add(key);
+          return true;
+        });
+        log(`Subdivisions within ${SUBDIVISION_NEARBY_RADIUS_FT} ft: ${state.nearbySubdivisions.length}`);
+      } catch (e) {
+        state.nearbySubdivisions = subdiv ? [{ feature: subdiv, name: getSubdivisionNameFromAttrs(subdiv.attributes || {}), plat: null }] : [];
+        log(`Nearby subdivision lookup failed: ${e.message || e}`, 'warn');
+      }
 
       try {
         state.aliquotFeatures = await fetchAliquotsAtPoint(lon, lat, 4326);
@@ -3503,7 +3789,10 @@
         log(`Aliquot lookup failed: ${e.message || e}`, "warn");
       }
 
-      if (subdiv) drawPolygonFeature(subdiv, layers.subdivision, { style: () => ({ color:"#9ab0ff", weight:2, fillOpacity:0.04 }) }, "Subdivision");
+      const nearbySubdivisionEntries = state.nearbySubdivisions.length
+        ? state.nearbySubdivisions
+        : (subdiv ? [{ feature: subdiv, name: getSubdivisionNameFromAttrs(subdiv.attributes || {}), plat: null }] : []);
+      drawSubdivisionPolygons(nearbySubdivisionEntries);
       if (section) drawPolygonFeature(section, layers.section, { style: () => ({ color:"#ffcc66", weight:2, fillOpacity:0.03, dashArray:"6 6" }) }, "Section");
       if (township) drawPolygonFeature(township, layers.township, { interactive: false, style: () => ({ color:"#ff5a7a", weight:2, fillOpacity:0.02, dashArray:"3 8" }) }, "Township");
 
@@ -3524,7 +3813,12 @@
       state.rosFeatures = ros;
       state.selectedRosKeys = new Set();
       const selectionSnapshot = options.selectionSnapshot || cachedAddressSnapshot?.selection || null;
-      if (Array.isArray(selectionSnapshot?.selectedRosKeys) || Array.isArray(selectionSnapshot?.deselectedRosKeys)) {
+      if (
+        Array.isArray(selectionSnapshot?.selectedRosKeys)
+        || Array.isArray(selectionSnapshot?.deselectedRosKeys)
+        || Array.isArray(selectionSnapshot?.selectedSubdivisionKeys)
+        || Array.isArray(selectionSnapshot?.deselectedSubdivisionKeys)
+      ) {
         applySelectionSnapshot(selectionSnapshot);
       }
       log(`ROS in containing section: ${ros.length} (from ${rosFromLookup.length} nearby ROS)`);
@@ -3628,7 +3922,65 @@
       cards.push(parcelCard);
 
       // Place Subdivision, Township, Section, and Utilities above Aliquots (below Parcel card).
-      if (subdiv) { const c = card("Subdivision", "Containing feature", summarizeAttrs(subdiv.attributes), []); c.style.display = "none"; cards.push(c); }
+      const subdivisionCards = state.nearbySubdivisions.length
+        ? state.nearbySubdivisions
+        : (subdiv ? [{ feature: subdiv, name: getSubdivisionNameFromAttrs(subdiv.attributes || {}), plat: null }] : []);
+      subdivisionCards.forEach((entry, idx) => {
+        const feature = entry?.feature || null;
+        if (!feature) return;
+        const subdivisionName = entry?.name || getSubdivisionNameFromAttrs(feature.attributes || {}) || `Subdivision ${idx + 1}`;
+        const plat = entry?.plat || null;
+        const links = [];
+        if (plat?.platUrl) {
+          links.push(`<a href="${escapeHtml(plat.platUrl)}" target="_blank" rel="noopener">Open subdivision plat</a>`);
+        }
+        const c = card(
+          `Subdivision ${idx + 1}`,
+          `${subdivisionName} · within ${SUBDIVISION_NEARBY_RADIUS_FT} ft of parcel`,
+          summarizeAttrs(feature.attributes),
+          links,
+          {
+            onSelect: () => centerMapOnFeature(feature, layers.subdivision, 'Subdivision'),
+            onRender: (cardEl) => {
+              const chead = cardEl.querySelector('.chead');
+              if (chead) {
+                const starBtn = document.createElement('button');
+                const syncSubdivisionStar = () => {
+                  const selected = isSubdivisionSelected(entry, idx);
+                  starBtn.textContent = selected ? '★' : '☆';
+                  starBtn.title = selected ? 'Exclude subdivision plat from EvidenceDesk export' : 'Include subdivision plat in EvidenceDesk export';
+                  starBtn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                };
+                starBtn.type = 'button';
+                starBtn.className = 'rq-star-btn';
+                starBtn.addEventListener('click', (evt) => {
+                  evt.stopPropagation();
+                  const next = !isSubdivisionSelected(entry, idx);
+                  setSubdivisionSelected(entry, idx, next);
+                  syncSubdivisionStar();
+                  drawSubdivisionPolygons(subdivisionCards);
+                  saveLookupSnapshotsForCurrentState($("addr").value || state.lastLookupAddress || '').catch(() => {});
+                  log(`${next ? 'Included' : 'Excluded'} subdivision ${subdivisionName} in EvidenceDesk export.`);
+                });
+                syncSubdivisionStar();
+                chead.appendChild(starBtn);
+              }
+
+              if (plat?.thumbnailUrl) {
+                const body = cardEl.querySelector('.cbody');
+                if (body) {
+                  const wrap = document.createElement('div');
+                  wrap.style.marginTop = '8px';
+                  wrap.innerHTML = `<img class="ros-scan-thumb" loading="lazy" alt="${escapeHtml(subdivisionName)} plat thumbnail" src="${escapeHtml(plat.thumbnailUrl)}"/>`;
+                  body.appendChild(wrap);
+                }
+              }
+            },
+          }
+        );
+        c.style.display = 'none';
+        cards.push(c);
+      });
       if (township) { const c = card("Township", "Containing feature", summarizeAttrs(township.attributes), []); c.style.display = "none"; cards.push(c); }
       if (section) { const c = card("Section", "Containing feature", summarizeAttrs(section.attributes), []); c.style.display = "none"; cards.push(c); }
       if (state.utilityLocations.length) {
@@ -4022,6 +4374,8 @@
     state.parcelFeature = null;
     state.parcelFeature2243 = null;
     state.subdivisionFeature2243 = null;
+    state.subdivisionFeature = null;
+    state.nearbySubdivisions = [];
     state.aliquotFeatures = [];
     state.sectionFeature2243 = null;
     state.aliquotFeatures2243 = [];
@@ -4029,6 +4383,7 @@
     state.selectedAliquot = null;
     state.selectedAliquotKeys.clear();
     state.selectedRosKeys.clear();
+    state.selectedSubdivisionKeys.clear();
     state.lastLonLat = null;
     state.utilityLocations = [];
     $("pdfFindings").style.display = "none";
@@ -4128,7 +4483,7 @@
         pointCount: uniquePart.count + utilityRows.count,
       });
       if (projectFileUpdate) {
-        log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references, ${projectFileUpdate.rosCount || 0} ROS references).`);
+        log(`Saved PointForge export to project file (${projectFileUpdate.cpfCount} CP&F references, ${projectFileUpdate.rosCount || 0} ROS references, ${projectFileUpdate.subdivisionCount || 0} subdivision plat references).`);
       }
       openLinkedApp(buildPointForgeLaunchPath());
       log(`Sent ${uniquePart.count + utilityRows.count} points to PointForge (${utilityRows.count} utility point(s)).`);

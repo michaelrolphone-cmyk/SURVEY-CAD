@@ -1357,3 +1357,21 @@ RecordQuarry now lazy-loads cached 1024px PNG thumbnails for Record of Survey TI
 - Commands:
   - `npm start`
   - `npm test -- test/server-ros-thumbnail.test.js`
+
+## API and CLI notes for RecordQuarry starred subdivision plat exports
+
+RecordQuarry now supports starring nearby subdivision cards so selected subdivision plats are included in the project file export written for EvidenceDesk (under the `plats` folder) during PointForge handoff.
+
+- App route: `GET /RecordQuarry.html`
+- API endpoints used by this flow:
+  - `GET /api/lookup`
+  - `GET /api/project-files/pdf-thumbnail`
+  - `GET /api/projects/:projectId/plats`
+  - `POST /api/projects/:projectId/plats`
+  - `PATCH /api/projects/:projectId/plats/:platId`
+  - `DELETE /api/projects/:projectId/plats/:platId`
+  - `POST /api/projects/:projectId/ros`
+  - `POST /api/projects/:projectId/cpfs`
+- CLI/server commands:
+  - `npm start`
+  - `npm test`

@@ -49,6 +49,13 @@ import {
   deleteProjectRos,
 } from './project-ros-store.js';
 import {
+  listProjectPlats,
+  getProjectPlat,
+  createOrUpdateProjectPlat,
+  batchUpsertProjectPlats,
+  deleteProjectPlat,
+} from './project-plat-store.js';
+import {
   getProjectRecordQuarryCache,
   saveProjectRecordQuarryCache,
   deleteProjectRecordQuarryCache,
@@ -234,6 +241,15 @@ function parseProjectRosRoute(pathname = '') {
   return {
     projectId: decodeURIComponent(match[1]),
     rosId: match[2] ? decodeURIComponent(match[2]) : '',
+  };
+}
+
+function parseProjectPlatRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/plats(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
+  return {
+    projectId: decodeURIComponent(match[1]),
+    platId: match[2] ? decodeURIComponent(match[2]) : '',
   };
 }
 
@@ -2829,6 +2845,134 @@ export function createSurveyServer({
         return;
       }
 
+
+
+      const platRoute = parseProjectPlatRoute(urlObj.pathname);
+      if (platRoute) {
+        const { projectId, platId } = platRoute;
+
+        if (req.method === 'GET' && !platId) {
+          const plats = await listProjectPlats(localStorageSyncStore, projectId);
+          sendJson(res, 200, { projectId, plats });
+          return;
+        }
+
+        if (req.method === 'GET' && platId) {
+          const plat = await getProjectPlat(localStorageSyncStore, projectId, platId);
+          if (!plat) {
+            sendJson(res, 404, { error: 'Plat record not found.' });
+            return;
+          }
+          sendJson(res, 200, { plat });
+          return;
+        }
+
+        if (req.method === 'POST' && !platId) {
+          const body = await readJsonBody(req);
+          if (Array.isArray(body?.plats)) {
+            const result = await batchUpsertProjectPlats(localStorageSyncStore, projectId, body.plats);
+            if (result.sync) {
+              localStorageSyncWsService.broadcast({
+                type: 'sync-differential-applied',
+                operations: result.sync?.allOperations || [],
+                state: {
+                  version: result.sync?.state?.version,
+                  checksum: result.sync?.state?.checksum,
+                },
+                originClientId: null,
+                requestId: null,
+              });
+            }
+            sendJson(res, 200, { plats: result.plats });
+            return;
+          }
+
+          if (!body?.subdivisionName) {
+            sendJson(res, 400, { error: 'subdivisionName is required.' });
+            return;
+          }
+
+          const result = await createOrUpdateProjectPlat(localStorageSyncStore, {
+            projectId,
+            subdivisionName: body.subdivisionName,
+            title: body.title,
+            source: body.source,
+            platUrl: body.platUrl,
+            thumbnailUrl: body.thumbnailUrl,
+            metadata: body.metadata,
+            starredInFieldBook: body.starredInFieldBook,
+          });
+
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { plat: result.plat });
+          return;
+        }
+
+        if ((req.method === 'PUT' || req.method === 'PATCH') && platId) {
+          const body = await readJsonBody(req);
+          if (!body?.subdivisionName) {
+            sendJson(res, 400, { error: 'subdivisionName is required.' });
+            return;
+          }
+
+          const result = await createOrUpdateProjectPlat(localStorageSyncStore, {
+            projectId,
+            platId,
+            subdivisionName: body.subdivisionName,
+            title: body.title,
+            source: body.source,
+            platUrl: body.platUrl,
+            thumbnailUrl: body.thumbnailUrl,
+            metadata: body.metadata,
+            starredInFieldBook: body.starredInFieldBook,
+          });
+
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result?.sync?.allOperations || [],
+            state: {
+              version: result?.sync?.state?.version,
+              checksum: result?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, result.created ? 201 : 200, { plat: result.plat });
+          return;
+        }
+
+        if (req.method === 'DELETE' && platId) {
+          const deletedResult = await deleteProjectPlat(localStorageSyncStore, projectId, platId);
+          if (!deletedResult) {
+            sendJson(res, 404, { error: 'Plat record not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: deletedResult?.sync?.allOperations || [],
+            state: {
+              version: deletedResult?.sync?.state?.version,
+              checksum: deletedResult?.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
+        return;
+      }
       if (urlObj.pathname === '/api/crew' || urlObj.pathname === '/api/crew/') {
         if (req.method === 'POST') {
           const body = await readJsonBody(req);
