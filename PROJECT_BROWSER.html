@@ -3678,8 +3678,45 @@ function openEntryFromFolder(folder, entry, projectContext) {
             }
           })();
         } else {
-          for (const entry of folder.index) {
-            fileListContainer.appendChild(buildOneFileRow(entry));
+          const folderEntries = Array.isArray(folder.index) ? folder.index : [];
+          const shouldPaginatePlats = folder.key === 'plats' && folderEntries.length > 200;
+          const batchSize = shouldPaginatePlats ? 200 : folderEntries.length;
+          let renderedCount = 0;
+
+          const showMoreButton = document.createElement('button');
+          showMoreButton.type = 'button';
+          showMoreButton.className = 'launch-btn';
+          showMoreButton.textContent = 'Load more plats';
+          showMoreButton.style.marginTop = '8px';
+
+          const renderCountStatus = document.createElement('div');
+          renderCountStatus.className = 'empty';
+
+          const updatePlatPaginationUi = () => {
+            if (!shouldPaginatePlats) return;
+            const remaining = Math.max(0, folderEntries.length - renderedCount);
+            renderCountStatus.textContent = remaining > 0
+              ? `Showing ${renderedCount.toLocaleString()} of ${folderEntries.length.toLocaleString()} plats.`
+              : `Showing all ${folderEntries.length.toLocaleString()} plats.`;
+            showMoreButton.hidden = remaining <= 0;
+          };
+
+          const renderNextBatch = () => {
+            const limit = Math.min(folderEntries.length, renderedCount + batchSize);
+            for (; renderedCount < limit; renderedCount += 1) {
+              fileListContainer.appendChild(buildOneFileRow(folderEntries[renderedCount]));
+            }
+            updatePlatPaginationUi();
+          };
+
+          renderNextBatch();
+
+          if (shouldPaginatePlats) {
+            showMoreButton.addEventListener('click', () => {
+              renderNextBatch();
+            });
+            fileListContainer.appendChild(renderCountStatus);
+            fileListContainer.appendChild(showMoreButton);
           }
         }
         } // end else
@@ -3811,24 +3848,27 @@ function openEntryFromFolder(folder, entry, projectContext) {
         },
       };
 
-      const storedProjectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
-        if (storedProjectFile) {
-        projectContext.projectFile = storedProjectFile;
-        projectContext.uploadStatus = uploadStatus;
-        if (activeProjectId) {
-          try {
-            await syncProjectDrawingsFromApi(projectContext);
-          } catch {}
-          try {
-            await syncProjectPointFilesFromApi(projectContext);
-          } catch {}
-          try {
+      const syncProjectApiFoldersInBackground = async () => {
+        if (!activeProjectId) return;
+        await Promise.allSettled([
+          syncProjectDrawingsFromApi(projectContext),
+          syncProjectPointFilesFromApi(projectContext),
+          (async () => {
             await syncProjectCpfsFromApi(projectContext);
             await syncProjectRosFromApi(projectContext);
             await syncProjectPlatsFromApi(projectContext);
-          } catch {}
-        }
+          })(),
+        ]);
+      };
+
+      const storedProjectFile = loadStoredProjectFile(window.localStorage, activeProjectId);
+      if (storedProjectFile) {
+        projectContext.projectFile = storedProjectFile;
+        projectContext.uploadStatus = uploadStatus;
         renderTree(storedProjectFile, projectContext);
+        syncProjectApiFoldersInBackground().then(() => {
+          renderTree(projectContext.projectFile, projectContext);
+        }).catch(() => {});
         return;
       }
 
@@ -3850,20 +3890,10 @@ function openEntryFromFolder(folder, entry, projectContext) {
 
         projectContext.projectFile = payload.projectFile;
         projectContext.uploadStatus = uploadStatus;
-        if (activeProjectId) {
-          try {
-            await syncProjectDrawingsFromApi(projectContext);
-          } catch {}
-          try {
-            await syncProjectPointFilesFromApi(projectContext);
-          } catch {}
-          try {
-            await syncProjectCpfsFromApi(projectContext);
-            await syncProjectRosFromApi(projectContext);
-            await syncProjectPlatsFromApi(projectContext);
-          } catch {}
-        }
         renderTree(payload.projectFile, projectContext);
+        syncProjectApiFoldersInBackground().then(() => {
+          renderTree(projectContext.projectFile, projectContext);
+        }).catch(() => {});
       } catch (err) {
         renderError(`Project browser failed to load: ${err.message}`);
       }
