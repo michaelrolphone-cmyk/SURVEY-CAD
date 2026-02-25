@@ -1219,6 +1219,8 @@
   // -----------------------------
   let cpfLayerInfo = null;
   let cpfLayerInfoPromise = null;
+  const cpfCornerRecordsCache = new Map();
+  const cpfCornerRecordsInFlight = new Map();
 
   function canonicalizeUrl(url) {
     try {
@@ -1336,10 +1338,12 @@
   }
 
   async function queryCpfRecordsNearCorner(north, east, maxMeters = 250, inSR = 4326) {
-    const { layerUrl, layerMeta } = await ensureCpfLayerInfo();
-    const radii = [5, 10, 25, 50, 100, 150, maxMeters];
+    const key = [inSR, Number(north).toFixed(7), Number(east).toFixed(7), Number(maxMeters)].join('|');
+    if (cpfCornerRecordsCache.has(key)) return cpfCornerRecordsCache.get(key);
+    if (cpfCornerRecordsInFlight.has(key)) return cpfCornerRecordsInFlight.get(key);
 
-    for (const radius of radii) {
+    const lookupPromise = (async () => {
+      const { layerUrl, layerMeta } = await ensureCpfLayerInfo();
       const payload = await arcJsonp(`${layerUrl.replace(/\/+$/, '')}/query`, {
         f: 'pjson',
         where: '1=1',
@@ -1347,15 +1351,18 @@
         geometryType: 'esriGeometryPoint',
         inSR,
         spatialRel: 'esriSpatialRelIntersects',
-        distance: radius,
+        distance: maxMeters,
         units: 'esriSRUnit_Meter',
         outFields: '*',
         returnGeometry: true,
         outSR: 4326,
-      }, 25000).catch(() => null);
+      }, 25000);
 
       const features = payload?.features || [];
-      if (!features.length) continue;
+      if (!features.length) {
+        cpfCornerRecordsCache.set(key, []);
+        return [];
+      }
 
       const instrumentKey = pickField(features[0]?.attributes || {}, layerMeta, [/^instrument$/i, /instr/i, /instrument_?no/i, /inst_?no/i]);
       const pdfUrlKey = pickField(features[0]?.attributes || {}, layerMeta, [/pdf/i, /doc/i, /document/i, /hyperlink/i, /url/i, /link/i]);
@@ -1396,12 +1403,18 @@
           indexNumber,
           links: buildCpfPdfLinks(instrument, pdfUrl, pdfName),
         };
-      }).filter((record) => record.links.length && (record.distanceMeters == null || record.distanceMeters <= (radius + 0.5)));
+      }).filter((record) => record.links.length && (record.distanceMeters == null || record.distanceMeters <= (maxMeters + 0.5)));
 
-      if (records.length) return records;
+      cpfCornerRecordsCache.set(key, records);
+      return records;
+    })();
+
+    cpfCornerRecordsInFlight.set(key, lookupPromise);
+    try {
+      return await lookupPromise;
+    } finally {
+      cpfCornerRecordsInFlight.delete(key);
     }
-
-    return [];
   }
 
   function extractInstrumentFromCpfIdentifier(rawValue) {
