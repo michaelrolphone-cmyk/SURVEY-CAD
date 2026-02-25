@@ -79,6 +79,14 @@ test('EvidenceDesk uses project point file API endpoints for point-file list and
   assert.match(html, /const\s+canLaunchPointForge\s*=\s*folder\.key\s*===\s*'point-files'[\s\S]*isPointFileFormat/, 'EvidenceDesk should gate PointForge launch behavior behind point-file format checks.');
 });
 
+test('EvidenceDesk schedules thumbnail rendering work asynchronously to avoid UI stalls', async () => {
+  const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
+  assert.match(html, /const\s+THUMBNAIL_TASK_MAX_CONCURRENCY\s*=\s*4;/, 'EvidenceDesk should define bounded thumbnail task concurrency so large folders do not saturate the main thread.');
+  assert.match(html, /function\s+enqueueThumbnailTask\(task\)\s*\{[\s\S]*thumbnailTaskQueue\.push\(\{ run: task, resolve, reject \}\);/, 'EvidenceDesk should enqueue thumbnail jobs instead of running all thumbnail work synchronously.');
+  assert.match(html, /async function\s+attachThumbStripItemPreview\(thumbImg,\s*folder,\s*entry\)\s*\{\s*return\s+enqueueThumbnailTask\(async\s*\(\)\s*=>\s*\{/, 'EvidenceDesk folder strip thumbnails should render through the async thumbnail queue.');
+  assert.match(html, /const\s+done\s*=\s*await\s+enqueueThumbnailTask\(applyThumbnail\);/, 'EvidenceDesk PDF previews should use the async thumbnail queue before replacing placeholder icons.');
+});
+
 test('EvidenceDesk uses project drawing CRUD API endpoints for drawing list and launch hydration', async () => {
   const html = await readFile(new URL('../PROJECT_BROWSER.html', import.meta.url), 'utf8');
   assert.match(html, /async function\s+syncProjectDrawingsFromApi\(/, 'EvidenceDesk should sync drawings from API');
