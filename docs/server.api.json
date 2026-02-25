@@ -7987,7 +7987,7 @@
           "metadata": {
             "type": "object",
             "nullable": true,
-            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
+            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, geolocation, and source attributes).",
             "additionalProperties": true
           },
           "thumbnailUrl": {
@@ -8052,7 +8052,7 @@
           "metadata": {
             "type": "object",
             "nullable": true,
-            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
+            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, geolocation, and source attributes).",
             "additionalProperties": true
           },
           "thumbnailUrl": {
@@ -8100,7 +8100,7 @@
           "metadata": {
             "type": "object",
             "nullable": true,
-            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, and source attributes).",
+            "description": "Source-specific ROS metadata exported by RecordQuarry (e.g., source IDs, name, aliquot, geolocation, and source attributes).",
             "additionalProperties": true
           },
           "thumbnailUrl": {

@@ -1068,6 +1068,8 @@
         ? `/api/project-files/ros-thumbnail?${new URLSearchParams({ source: mapImageUrl })}`
         : null;
       const metadata = buildRosMetadataForExport(attrs, rosName);
+      const geolocation = deriveRosGeolocationForExport(feature);
+      if (geolocation) metadata.geolocation = geolocation;
       const rosId = slugify(rosNumber, `ros-${index + 1}`);
       addProjectFileResource(projectFile, {
         id: `ros-${rosId}`,
@@ -1085,6 +1087,7 @@
             source: 'RecordQuarry',
             mapImageUrl,
             thumbnailUrl,
+            geolocation,
             ...metadata,
             starredInFieldBook: true,
           },
@@ -1098,6 +1101,7 @@
         mapImageUrl,
         thumbnailUrl,
         metadata,
+        geolocation,
         starredInFieldBook: true,
       });
     }
@@ -2749,6 +2753,43 @@
       aliquot,
       sourceAttributes: attrs,
     };
+  }
+
+  function deriveRosGeolocationForExport(feature = {}) {
+    const geometry = feature?.geometry || null;
+    if (!geometry) return null;
+
+    if (Number.isFinite(Number(geometry.x)) && Number.isFinite(Number(geometry.y))) {
+      return {
+        lat: Number(geometry.y),
+        lon: Number(geometry.x),
+        source: 'point',
+      };
+    }
+
+    if (Array.isArray(geometry.rings) && geometry.rings.length) {
+      const center = centroidOfPolygon(geometry);
+      if (center && Number.isFinite(Number(center.y)) && Number.isFinite(Number(center.x))) {
+        return {
+          lat: Number(center.y),
+          lon: Number(center.x),
+          source: 'polygon-centroid',
+        };
+      }
+    }
+
+    if (Array.isArray(geometry.paths) && geometry.paths.length && Array.isArray(geometry.paths[0]) && geometry.paths[0].length) {
+      const [lonRaw, latRaw] = geometry.paths[0][0] || [];
+      if (Number.isFinite(Number(latRaw)) && Number.isFinite(Number(lonRaw))) {
+        return {
+          lat: Number(latRaw),
+          lon: Number(lonRaw),
+          source: 'line-first-vertex',
+        };
+      }
+    }
+
+    return null;
   }
 
   async function resolveRosNameForExport(attributes = {}, imageMeta = null) {
