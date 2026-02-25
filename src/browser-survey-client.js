@@ -8,10 +8,31 @@ function buildUrl(path, query = {}) {
 }
 
 export async function requestJson(path, query = {}, options = {}) {
-  const res = await fetch(buildUrl(path, query), {
+  const timeoutMs = Number(options.timeoutMs);
+  const hasTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0;
+  const controller = hasTimeout ? new AbortController() : null;
+  const timer = hasTimeout
+    ? setTimeout(() => controller.abort(new Error('Request timed out.')), timeoutMs)
+    : null;
+
+  const fetchOptions = {
     headers: { Accept: 'application/json', ...(options.headers || {}) },
     ...options,
-  });
+  };
+  delete fetchOptions.timeoutMs;
+  if (controller) fetchOptions.signal = controller.signal;
+
+  let res;
+  try {
+    res = await fetch(buildUrl(path, query), fetchOptions);
+  } catch (error) {
+    if (controller?.signal.aborted) {
+      throw new Error('Request timed out.');
+    }
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -51,6 +72,8 @@ export async function loadUtilitiesByAddress(address, outSROrOptions = 2243) {
     address,
     outSR: options.outSR ?? 2243,
     sources: Array.isArray(options.sources) ? options.sources.join(',') : options.sources,
+  }, {
+    timeoutMs: options.timeoutMs,
   });
   return payload.utilities || [];
 }
