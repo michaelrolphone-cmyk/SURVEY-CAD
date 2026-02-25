@@ -2081,6 +2081,7 @@
   };
 
   const SUMMARY_RENDER_BATCH_SIZE = 24;
+  const UTILITY_LOOKUP_TIMEOUT_MS = 4500;
 
   function yieldToBrowserFrame() {
     return new Promise((resolve) => {
@@ -4209,18 +4210,18 @@
 
       drawCornerMarkers(buildCornerMarkerEntries());
 
+      const utilityLookupPromise = loadUtilitiesByAddress(rawAddr, {
+        outSR: EXPORT_OUT_SR,
+        sources: ['power'],
+        timeoutMs: UTILITY_LOOKUP_TIMEOUT_MS,
+      })
+        .then((utilityLocations) => ({ utilityLocations, error: null }))
+        .catch((error) => ({ utilityLocations: [], error }));
+
       const rosFromLookup = normalizeRosFeatures(lookup.ros || []);
       const ros = filterRosFeaturesForSection(rosFromLookup, section);
-      let utilityLocations = [];
-      try {
-        utilityLocations = await loadUtilitiesByAddress(rawAddr, { outSR: EXPORT_OUT_SR, sources: ['power'] });
-      } catch (utilityError) {
-        log(`Utility lookup failed: ${utilityError.message || utilityError}`, 'warn');
-      }
-      state.utilityLocations = utilityLocations;
+      state.utilityLocations = [];
       drawUtilityLocations(state.utilityLocations);
-      afterUtilitiesLoadedOrUpdated();
-      log(`Utility locations found: ${state.utilityLocations.length}`);
       state.rosFeatures = ros;
       state.selectedRosKeys = new Set();
       const selectionSnapshot = options.selectionSnapshot || cachedAddressSnapshot?.selection || null;
@@ -4396,29 +4397,37 @@
       });
       if (township) { const c = card("Township", "Containing feature", summarizeAttrs(township.attributes), []); c.style.display = "none"; cards.push(c); }
       if (section) { const c = card("Section", "Containing feature", summarizeAttrs(section.attributes), []); c.style.display = "none"; cards.push(c); }
-      if (state.utilityLocations.length) {
-        const utilitiesCard = card(
-          "Utilities",
-          "Idaho Power residential utility locations",
-          [["Count", String(state.utilityLocations.length)]],
-          [],
-          {
-            onRender: (cardEl) => {
-              const body = cardEl.querySelector('.cbody');
-              if (!body) return;
-              const sliderWrap = document.createElement('div');
-              sliderWrap.innerHTML = `
-                <div class="hr" style="margin:8px 0"></div>
-                <div class="small" id="utilRadiusHelp">Export radius: <b><span id="utilRadiusVal">${UTIL_RADIUS_DEFAULT_FT}</span> ft</b> from parcel corners — <b><span id="utilRadiusCount">0</span></b> of ${state.utilityLocations.length} selected.</div>
-                <input id="utilRadius" type="range" min="0" max="${UTIL_RADIUS_MAX_FT}" step="1" value="${UTIL_RADIUS_DEFAULT_FT}" disabled style="margin-top:8px;width:100%"/>
-                <div class="small" id="utilRadiusHint" style="margin-top:4px;color:var(--muted)">Highlighted on map · included in PointForge export</div>
-              `;
-              body.appendChild(sliderWrap);
-            },
-          }
-        );
-        cards.push(utilitiesCard);
-      }
+      const utilitiesCard = card(
+        "Utilities",
+        "Idaho Power residential utility locations",
+        [["Count", "Loading…"]],
+        [["Status", `Loading in background (max ${Math.round(UTILITY_LOOKUP_TIMEOUT_MS / 1000)}s)`]],
+        {
+          onRender: (cardEl) => {
+            const rows = cardEl.querySelectorAll('.kvs .kv');
+            if (rows[0]) {
+              const value = rows[0].querySelector('.v');
+              if (value) value.id = 'utilCountValue';
+            }
+            if (rows[1]) {
+              const value = rows[1].querySelector('.v');
+              if (value) value.id = 'utilStatusValue';
+            }
+
+            const body = cardEl.querySelector('.cbody');
+            if (!body) return;
+            const sliderWrap = document.createElement('div');
+            sliderWrap.innerHTML = `
+              <div class="hr" style="margin:8px 0"></div>
+              <div class="small" id="utilRadiusHelp">Export radius: <b><span id="utilRadiusVal">${UTIL_RADIUS_DEFAULT_FT}</span> ft</b> from parcel corners — <b><span id="utilRadiusCount">0</span></b> of 0 selected.</div>
+              <input id="utilRadius" type="range" min="0" max="${UTIL_RADIUS_MAX_FT}" step="1" value="${UTIL_RADIUS_DEFAULT_FT}" disabled style="margin-top:8px;width:100%"/>
+              <div class="small" id="utilRadiusHint" style="margin-top:4px;color:var(--muted)">Highlighted on map · included in PointForge export</div>
+            `;
+            body.appendChild(sliderWrap);
+          },
+        }
+      );
+      cards.push(utilitiesCard);
 
 
 
@@ -4725,12 +4734,29 @@
       }
 
       await setSummaryCards(cards);
-      // Re-init utility radius slider now that its card is in the DOM.
-      if (state.utilityLocations.length) afterUtilitiesLoadedOrUpdated();
       if (aliquotSummaryCpfTargets.length) {
         lazyLoadAliquotSummaryCpfLinks(aliquotSummaryCpfTargets);
       }
       lazyLoadRosScanThumbnails();
+
+      utilityLookupPromise.then(({ utilityLocations, error }) => {
+        if (error) {
+          log(`Utility lookup failed: ${error.message || error}`, 'warn');
+        }
+        state.utilityLocations = utilityLocations;
+        drawUtilityLocations(state.utilityLocations);
+        afterUtilitiesLoadedOrUpdated();
+        log(`Utility locations found: ${state.utilityLocations.length}`);
+
+        const utilCountEl = document.getElementById('utilCountValue');
+        if (utilCountEl) utilCountEl.textContent = String(state.utilityLocations.length);
+        const utilStatusEl = document.getElementById('utilStatusValue');
+        if (utilStatusEl) {
+          utilStatusEl.textContent = error
+            ? 'Lookup timed out or failed; continuing without utility points.'
+            : 'Loaded';
+        }
+      });
 
       state.exportGeoJSON = buildExportGeoJSON();
 
