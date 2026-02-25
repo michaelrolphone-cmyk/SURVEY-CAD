@@ -2080,14 +2080,41 @@
     projectContext: initialProjectContext
   };
 
-  function setSummaryCards(cards) {
+  const SUMMARY_RENDER_BATCH_SIZE = 24;
+
+  function yieldToBrowserFrame() {
+    return new Promise((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+      setTimeout(resolve, 0);
+    });
+  }
+
+  async function setSummaryCards(cards) {
     const root = $("summary");
     root.innerHTML = "";
     if (!cards.length) {
       root.innerHTML = `<div class="small">No results yet.</div>`;
       return;
     }
-    for (const c of cards) root.appendChild(c);
+
+    const fragment = document.createDocumentFragment();
+    const shouldChunk = cards.length > SUMMARY_RENDER_BATCH_SIZE;
+
+    for (let i = 0; i < cards.length; i++) {
+      fragment.appendChild(cards[i]);
+      const reachedBatchEnd = (i + 1) % SUMMARY_RENDER_BATCH_SIZE === 0;
+      const atTail = i === cards.length - 1;
+
+      if (!atTail && shouldChunk && reachedBatchEnd) {
+        root.appendChild(fragment);
+        await yieldToBrowserFrame();
+      }
+    }
+
+    root.appendChild(fragment);
   }
 
   // Collapse distance-threshold cards as a group under a single "See More" control.
@@ -3417,6 +3444,10 @@
     }).catch(() => {});
   }
 
+  const ROS_THUMBNAIL_MAX_CONCURRENCY = 4;
+  const rosThumbnailLoadQueue = [];
+  let rosThumbnailLoadsActive = 0;
+
   async function loadRosThumbnailWithRetry(imgEl, thumbnailUrl, maxAttempts = 9) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
@@ -3426,7 +3457,12 @@
         const resp = await fetch(thumbnailUrl);
         if (resp.ok && resp.headers.get('content-type')?.startsWith('image/')) {
           const blob = await resp.blob();
-          imgEl.src = URL.createObjectURL(blob);
+          if (imgEl.dataset.thumbObjectUrl) {
+            try { URL.revokeObjectURL(imgEl.dataset.thumbObjectUrl); } catch {}
+          }
+          const objectUrl = URL.createObjectURL(blob);
+          imgEl.dataset.thumbObjectUrl = objectUrl;
+          imgEl.src = objectUrl;
           imgEl.style.display = '';
           bindRqHoverPreview(imgEl, imgEl.alt || 'ROS preview');
           return true;
@@ -3440,15 +3476,38 @@
     return false;
   }
 
+  function drainRosThumbnailLoadQueue() {
+    while (rosThumbnailLoadsActive < ROS_THUMBNAIL_MAX_CONCURRENCY && rosThumbnailLoadQueue.length) {
+      const { imgEl, thumbnailUrl, resolve } = rosThumbnailLoadQueue.shift();
+      rosThumbnailLoadsActive += 1;
+      loadRosThumbnailWithRetry(imgEl, thumbnailUrl)
+        .then((ok) => resolve(ok))
+        .catch(() => resolve(false))
+        .finally(() => {
+          rosThumbnailLoadsActive = Math.max(0, rosThumbnailLoadsActive - 1);
+          drainRosThumbnailLoadQueue();
+        });
+    }
+  }
+
+  function enqueueRosThumbnailLoad(imgEl, thumbnailUrl) {
+    return new Promise((resolve) => {
+      rosThumbnailLoadQueue.push({ imgEl, thumbnailUrl, resolve });
+      drainRosThumbnailLoadQueue();
+    });
+  }
+
   function lazyLoadRosScanThumbnails() {
     const thumbs = Array.from(document.querySelectorAll('img.ros-scan-thumb[data-ros-thumbnail]'));
     if (!thumbs.length) return;
     const loadThumb = async (img) => {
-      if (!img || img.dataset.thumbLoaded === '1') return;
+      if (!img || img.dataset.thumbLoaded === '1' || img.dataset.thumbLoading === '1') return;
       const thumbnailUrl = img.getAttribute('data-ros-thumbnail');
       if (!thumbnailUrl) return;
+      img.dataset.thumbLoading = '1';
+      const ok = await enqueueRosThumbnailLoad(img, thumbnailUrl);
+      delete img.dataset.thumbLoading;
       img.dataset.thumbLoaded = '1';
-      const ok = await loadRosThumbnailWithRetry(img, thumbnailUrl);
       if (!ok && img.dataset.keepPlaceholder !== '1') img.style.display = 'none';
     };
 
@@ -3474,13 +3533,15 @@
     const thumbs = Array.from(container.querySelectorAll('img.ros-scan-thumb[data-ros-thumbnail]'));
     if (!thumbs.length) return;
     for (const img of thumbs) {
-      if (!img || img.dataset.thumbLoaded === '1') continue;
+      if (!img || img.dataset.thumbLoaded === '1' || img.dataset.thumbLoading === '1') continue;
       const thumbnailUrl = img.getAttribute('data-ros-thumbnail');
       if (!thumbnailUrl) continue;
-      img.dataset.thumbLoaded = '1';
+      img.dataset.thumbLoading = '1';
       // Keep hidden until we have a real src to avoid broken-image glyphs in Leaflet UI.
       if (img.dataset.keepPlaceholder !== '1') img.style.display = 'none';
-      loadRosThumbnailWithRetry(img, thumbnailUrl).then((ok) => {
+      enqueueRosThumbnailLoad(img, thumbnailUrl).then((ok) => {
+        delete img.dataset.thumbLoading;
+        img.dataset.thumbLoaded = '1';
         if (!ok && img.dataset.keepPlaceholder !== '1') img.style.display = 'none';
       });
     }
@@ -4663,7 +4724,7 @@
         cards.push(card("Record of Survey", "None within 1600m of parcel centroid", [["Note","Increase search distance in code if needed."]], []));
       }
 
-      setSummaryCards(cards);
+      await setSummaryCards(cards);
       // Re-init utility radius slider now that its card is in the DOM.
       if (state.utilityLocations.length) afterUtilitiesLoadedOrUpdated();
       if (aliquotSummaryCpfTargets.length) {
