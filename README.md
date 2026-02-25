@@ -48,6 +48,10 @@ CP&F PDF scraping now runs as its own paged checkpoint flow, so the worker conti
 - `GET /api/idaho-harvest/status`
 - `POST /api/idaho-harvest/start`
 - `POST /api/idaho-harvest/stop`
+- `GET /api/idaho-harvest/records-of-survey`
+- `GET /api/idaho-harvest/records-of-survey/:recordId/pdf`
+- `GET /api/idaho-harvest/subdivision-plats`
+- `GET /api/idaho-harvest/subdivision-plats/:platId/pdf`
 
 ### Map tile API endpoints (Leaflet/TileJSON-compatible)
 
@@ -96,6 +100,10 @@ CP&F PDF scraping now runs as its own paged checkpoint flow, so the worker conti
 - `MAPTILE_DATASETS` (comma-separated list of exposed tile datasets; default: `auto`, which discovers dataset names from the master index)
 - `MAPTILE_INDEX_KEY` (master index object-key used for dataset auto-discovery; default: `surveycad/idaho-harvest/indexes/id-master-index.geojson`)
 - `MAPTILE_MINIO_PREFIX` (MinIO object-key prefix for tile lookup; default: `surveycad/idaho-harvest/tiles/id`)
+- `ROS_SCRAPE_MINIO_BUCKET` (default: `records-of-survey`)
+- `ROS_SCRAPE_PREFIX` (default: `adacounty/recordsofsurvey`)
+- `SUBDIVISION_PLATS_MINIO_BUCKET` (default: `subdivision-plats`)
+- `SUBDIVISION_PLATS_SCRAPE_PREFIX` (default: `adacounty/subdivisionplats`)
 
 ### Commands
 
