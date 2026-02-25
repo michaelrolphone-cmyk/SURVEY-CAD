@@ -1062,6 +1062,7 @@ Base URL (local): `http://localhost:3000`
 
 - `GET /api/lookup?address=...`
 - `GET /api/geocode?address=...`
+  - Server process now memoizes geocode responses in memory by normalized address and reuses cached coordinates/display values for repeat requests.
 - `GET /api/utilities?address=...&outSR=2243&sources=power`
   - `sources` accepts a comma-separated list (for example `power,water`) so utility providers can be added incrementally. Current implementation returns Idaho Power records for `power`.
 - `GET /api/glo-records?address=...`

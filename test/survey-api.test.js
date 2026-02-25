@@ -400,6 +400,26 @@ test('geocodeAddress sends configured nominatim user agent', async () => {
   }
 });
 
+test('geocodeAddress reuses cached geocode results for normalized duplicate addresses', async () => {
+  const { server, port, requests } = await createMockServer();
+  const base = `http://127.0.0.1:${port}`;
+  const client = new SurveyCadClient({
+    adaMapServer: `${base}/arcgis/rest/services/External/ExternalMap/MapServer`,
+    nominatimUrl: `${base}/geocode`,
+  });
+
+  try {
+    const first = await client.geocodeAddress('3616 Cabarton Ln');
+    const second = await client.geocodeAddress('  3616   cabarton  ln  ');
+    assert.deepEqual(second, first);
+
+    const geocodeRequests = requests.filter((requestPath) => requestPath.startsWith('/geocode?'));
+    assert.equal(geocodeRequests.length, 1);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 
 
 

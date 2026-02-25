@@ -184,7 +184,7 @@
           "GIS"
         ],
         "summary": "Geocode an address",
-        "description": "Tries Nominatim first, falls back to ArcGIS.",
+        "description": "Tries Nominatim first, falls back to ArcGIS, and memoizes successful results in server memory by normalized address for repeat requests.",
         "operationId": "geocodeAddress",
         "parameters": [
           {
@@ -2087,7 +2087,7 @@
           "CP&F Records"
         ],
         "summary": "Update (upsert) a CP&F record",
-        "description": "Updates the record identified by `cpfId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectCpf",
         "requestBody": {
           "required": true,
@@ -3936,7 +3936,7 @@
           "ROS Records"
         ],
         "summary": "Update (upsert) a ROS record",
-        "description": "Updates the record identified by `rosId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `rosId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectRos",
         "requestBody": {
           "required": true,
@@ -4189,7 +4189,7 @@
           "Plat Records"
         ],
         "summary": "Update (upsert) a plat record",
-        "description": "Updates the record identified by `platId`. Acts as upsert \u2014 creates the record if it does not exist.",
+        "description": "Updates the record identified by `platId`. Acts as upsert — creates the record if it does not exist.",
         "operationId": "replaceProjectPlat",
         "requestBody": {
           "required": true,

@@ -348,6 +348,10 @@ function normalizeSpaces(s) {
   return (s || "").trim().replace(/\s+/g, " ");
 }
 
+function normalizeGeocodeCacheKey(address) {
+  return normalizeSpaces(address).toLowerCase();
+}
+
 export function parseAddress(rawAddress) {
   const raw = normalizeSpaces(rawAddress);
   const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
@@ -502,6 +506,8 @@ export class SurveyCadClient {
       ...options,
       layers: { ...DEFAULTS.layers, ...(options.layers || {}) },
     };
+    this.geocodeAddressCache = new Map();
+    this.geocodeAddressInFlight = new Map();
   }
 
   async fetchJson(url, opts = {}) {
@@ -535,10 +541,34 @@ export class SurveyCadClient {
   }
 
   async geocodeAddress(address) {
+    const cacheKey = normalizeGeocodeCacheKey(address);
+    if (!cacheKey) throw new Error('Address is required for geocoding.');
+
+    if (this.geocodeAddressCache.has(cacheKey)) {
+      return this.geocodeAddressCache.get(cacheKey);
+    }
+
+    if (this.geocodeAddressInFlight.has(cacheKey)) {
+      return this.geocodeAddressInFlight.get(cacheKey);
+    }
+
+    const request = (async () => {
+      try {
+        const geocode = await this.geocodeAddressNominatim(address);
+        this.geocodeAddressCache.set(cacheKey, geocode);
+        return geocode;
+      } catch {
+        const geocode = await this.geocodeAddressArcGis(address);
+        this.geocodeAddressCache.set(cacheKey, geocode);
+        return geocode;
+      }
+    })();
+
+    this.geocodeAddressInFlight.set(cacheKey, request);
     try {
-      return await this.geocodeAddressNominatim(address);
-    } catch {
-      return this.geocodeAddressArcGis(address);
+      return await request;
+    } finally {
+      this.geocodeAddressInFlight.delete(cacheKey);
     }
   }
 
