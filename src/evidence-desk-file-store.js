@@ -127,9 +127,23 @@ function parseEnvUrl(urlRaw = '') {
 
 function resolveS3ConfigFromEnv(env = process.env) {
   const stackheroMinioHost = String(env.STACKHERO_MINIO_HOST || '').trim();
-  const stackheroMinioEndpoint = stackheroMinioHost
-    ? `${stackheroMinioHost.startsWith('http://') || stackheroMinioHost.startsWith('https://') ? '' : 'https://'}${stackheroMinioHost}`
-    : '';
+  const stackheroMinioUseSslRaw = String(env.STACKHERO_MINIO_USE_SSL || '').trim().toLowerCase();
+  const stackheroMinioUseSsl = stackheroMinioUseSslRaw
+    ? !['0', 'false', 'no', 'off'].includes(stackheroMinioUseSslRaw)
+    : true;
+  const stackheroMinioPortRaw = String(env.STACKHERO_MINIO_PORT || '').trim();
+  const stackheroMinioPort = /^\d+$/.test(stackheroMinioPortRaw) ? stackheroMinioPortRaw : '';
+  const stackheroMinioEndpoint = (() => {
+    if (!stackheroMinioHost) return '';
+    if (stackheroMinioHost.startsWith('http://') || stackheroMinioHost.startsWith('https://')) {
+      return stackheroMinioHost;
+    }
+
+    const protocol = stackheroMinioUseSsl ? 'https://' : 'http://';
+    const defaultPort = stackheroMinioUseSsl ? '443' : '80';
+    const suffix = stackheroMinioPort && stackheroMinioPort !== defaultPort ? `:${stackheroMinioPort}` : '';
+    return `${protocol}${stackheroMinioHost}${suffix}`;
+  })();
   const stackheroUrl = env.EVIDENCE_DESK_S3_URL
     || env.AH_S3_OBJECT_STORAGE_STACKHERO_URL
     || env.AH_S3_OBJECT_STORAGE_STACKHERO
