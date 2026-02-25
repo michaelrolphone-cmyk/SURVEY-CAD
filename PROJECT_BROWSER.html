@@ -1151,6 +1151,8 @@
       thumb.className = 'point-file-preview-thumb';
       thumb.src = previewUrl;
       thumb.alt = `${entry?.title || entry?.id || 'Point file'} preview`;
+      thumb.tabIndex = 0;
+      bindHoverPreview(thumb, entry, { requireLoadedFlag: false });
       resource.querySelector('.file-preview-slot')?.replaceChildren(thumb);
     }
 
@@ -1188,6 +1190,8 @@
       thumb.className = 'drawing-preview-thumb';
       thumb.src = previewUrl;
       thumb.alt = `${entry?.title || entry?.id || 'Drawing'} preview`;
+      thumb.tabIndex = 0;
+      bindHoverPreview(thumb, entry, { requireLoadedFlag: false });
       resource.querySelector('.file-preview-slot')?.replaceChildren(thumb);
     }
 
@@ -1787,30 +1791,33 @@
     }
 
     function bindCpfHoverPreview(thumb, entry) {
+      bindHoverPreview(thumb, entry, {
+        requireLoadedFlag: false,
+        altText: `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+      });
+    }
+
+    function bindHoverPreview(thumb, entry, {
+      requireLoadedFlag = false,
+      altText = `${entry?.title || entry?.id || 'File'} enlarged preview`,
+    } = {}) {
       if (!thumb) return;
-      thumb.addEventListener('mouseenter', () => {
+      const showPreview = () => {
+        if (requireLoadedFlag && thumb.dataset.thumbLoaded !== 'true') return;
+        if (!thumb.src) return;
         showCpfHoverPreviewTooltip(
           thumb,
           thumb.src,
-          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
+          altText,
           {
             width: thumb.naturalWidth,
             height: thumb.naturalHeight,
           },
         );
-      });
+      };
+      thumb.addEventListener('mouseenter', showPreview);
       thumb.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
-      thumb.addEventListener('focus', () => {
-        showCpfHoverPreviewTooltip(
-          thumb,
-          thumb.src,
-          `${entry?.title || entry?.id || 'CP&F'} enlarged preview`,
-          {
-            width: thumb.naturalWidth,
-            height: thumb.naturalHeight,
-          },
-        );
-      });
+      thumb.addEventListener('focus', showPreview);
       thumb.addEventListener('blur', () => hideCpfHoverPreviewTooltip());
     }
 
@@ -1834,6 +1841,8 @@
       thumb.title = `${entry?.title || entry?.id || 'Image'} preview`;
       thumb.decoding = 'async';
       thumb.loading = 'lazy';
+      thumb.tabIndex = 0;
+      bindHoverPreview(thumb, entry, { requireLoadedFlag: false });
       slot.replaceChildren(thumb);
     }
 
@@ -1862,10 +1871,9 @@
         thumb.title = `${entry?.title || entry?.id || 'PDF'} preview`;
         thumb.decoding = 'async';
         thumb.loading = 'lazy';
-        if (folder?.key === 'cpfs') {
-          thumb.tabIndex = 0;
-          bindCpfHoverPreview(thumb, entry);
-        }
+        thumb.tabIndex = 0;
+        if (folder?.key === 'cpfs') bindCpfHoverPreview(thumb, entry);
+        else bindHoverPreview(thumb, entry, { requireLoadedFlag: false });
         slot.replaceChildren(thumb);
         return true;
       };
@@ -2612,16 +2620,10 @@ function openEntryFromFolder(folder, entry, projectContext) {
           setImgToDownloadIcon(thumbImg, entry?.exportFormat);
 
           attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
-          thumbImg.addEventListener('mouseenter', () => {
-            if (thumbImg.dataset.thumbLoaded !== 'true') return;
-            showCpfHoverPreviewTooltip(
-              thumbImg,
-              thumbImg.src,
-              entry?.title || entry?.id || 'File preview',
-              { width: thumbImg.naturalWidth, height: thumbImg.naturalHeight },
-            );
+          bindHoverPreview(thumbImg, entry, {
+            requireLoadedFlag: true,
+            altText: entry?.title || entry?.id || 'File preview',
           });
-          thumbImg.addEventListener('mouseleave', () => hideCpfHoverPreviewTooltip());
 
           item.appendChild(thumbImg);
 

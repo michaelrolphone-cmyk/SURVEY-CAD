@@ -416,6 +416,12 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /const\s+shouldPlaceRight\s*=\s*availableRight\s*>=\s*previewWidth\s*\|\|\s*availableRight\s*>=\s*availableLeft;/, 'CP&F hover preview should choose left or right placement based on available horizontal space');
   assert.match(projectBrowserHtml, /tooltip\.style\.width\s*=\s*`\$\{Math\.round\(previewWidth\)\}px`;/, 'CP&F hover preview width should use the fitted image width rather than full viewport width');
   assert.match(projectBrowserHtml, /thumb\.tabIndex\s*=\s*0;[\s\S]*bindCpfHoverPreview\(thumb, entry\);/, 'CP&F thumbnails should be keyboard-focusable and wired to the hover preview behavior');
+  assert.match(projectBrowserHtml, /function\s+bindHoverPreview\s*\(thumb,\s*entry,\s*\{[\s\S]*requireLoadedFlag\s*=\s*false[\s\S]*\}\s*=\s*\{\}\)\s*\{/, 'Project Browser should define a reusable hover-preview binder for thumbnail images.');
+  assert.match(projectBrowserHtml, /async\s+function\s+attachPointFilePreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded point-file rows should bind hover previews for generated thumbnails.');
+  assert.match(projectBrowserHtml, /async\s+function\s+attachDrawingPreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded drawing rows should bind hover previews for generated thumbnails.');
+  assert.match(projectBrowserHtml, /function\s+attachImagePreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded image rows should bind hover previews for generated thumbnails.');
+  assert.match(projectBrowserHtml, /async\s+function\s+attachPdfPreview\s*\([\s\S]*thumb\.tabIndex\s*=\s*0;[\s\S]*if \(folder\?\.key === 'cpfs'\) bindCpfHoverPreview\(thumb, entry\);[\s\S]*else bindHoverPreview\(thumb, entry, \{ requireLoadedFlag: false \}\);/, 'Expanded PDF rows should show hover previews in all folders, not only CP&F.');
+  assert.match(projectBrowserHtml, /bindHoverPreview\(thumbImg, entry, \{[\s\S]*requireLoadedFlag:\s*true[\s\S]*\}\);/, 'Collapsed folder thumbnail strips should continue using hover previews once thumbnails are loaded.');
 });
 
 
