@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { lineforgeCollabInternals } from './lineforge-collab.js';
+import { buildSyncResponseState } from './localstorage-sync-state-response.js';
 
 const { decodeNextFrame, encodeTextFrame, createWebSocketAccept } = lineforgeCollabInternals;
 
@@ -8,6 +9,10 @@ export function createLocalStorageSyncWsService({ store }) {
 
   async function resolveState() {
     return Promise.resolve(store.getState());
+  }
+
+  async function resolveResponseState() {
+    return buildSyncResponseState(await resolveState());
   }
 
   function send(client, payload) {
@@ -62,7 +67,7 @@ export function createLocalStorageSyncWsService({ store }) {
       '\r\n',
     ].join('\r\n'));
 
-    Promise.resolve(resolveState())
+    Promise.resolve(resolveResponseState())
       .then((state) => send(client, { type: 'sync-welcome', clientId, state }))
       .catch(() => {
         socket.end();
@@ -95,14 +100,18 @@ export function createLocalStorageSyncWsService({ store }) {
         if (message?.type === 'sync-differential-batch') {
           const diffs = Array.isArray(message.diffs) ? message.diffs : [];
           if (!diffs.length) {
-            send(client, { type: 'sync-ack', requestId: message.requestId || null, state: await resolveState() });
+            send(client, { type: 'sync-ack', requestId: message.requestId || null, state: await resolveResponseState() });
             return;
           }
 
           const result = await Promise.resolve(store.applyDifferentialBatch({ diffs }));
 
           if (result.status === 'no-op') {
-            send(client, { type: 'sync-ack', requestId: message.requestId || null, state: result.state });
+            send(client, {
+              type: 'sync-ack',
+              requestId: message.requestId || null,
+              state: buildSyncResponseState(result.state),
+            });
             return;
           }
 
@@ -127,12 +136,20 @@ export function createLocalStorageSyncWsService({ store }) {
         }));
 
         if (result.status === 'checksum-mismatch') {
-          send(client, { type: 'sync-checksum-mismatch', state: result.state, requestId: message.requestId || null });
+          send(client, {
+            type: 'sync-checksum-mismatch',
+            state: buildSyncResponseState(result.state),
+            requestId: message.requestId || null,
+          });
           return;
         }
 
         if (result.status === 'no-op') {
-          send(client, { type: 'sync-ack', requestId: message.requestId || null, state: result.state });
+          send(client, {
+            type: 'sync-ack',
+            requestId: message.requestId || null,
+            state: buildSyncResponseState(result.state),
+          });
           return;
         }
 

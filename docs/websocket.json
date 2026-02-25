@@ -1060,9 +1060,48 @@
             "type": "string"
           },
           "updatedAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
+          },
+          "pointFileSummary": {
+            "type": "object",
+            "description": "Project-grouped point-file summaries returned in place of full point-file version-history snapshot records.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ProjectPointFileSummary"
+              }
+            }
           }
+        },
+        "additionalProperties": false
+      },
+      "ProjectPointFileSummary": {
+        "type": "object",
+        "required": [
+          "pointFileId",
+          "pointFileName",
+          "exportFormat",
+          "createdAt",
+          "updatedAt",
+          "latestVersionId",
+          "versionCount",
+          "source",
+          "sourceLabel"
+        ],
+        "properties": {
+          "pointFileId": { "type": "string" },
+          "pointFileName": { "type": "string" },
+          "exportFormat": { "type": "string" },
+          "createdAt": { "type": ["string", "null"], "format": "date-time" },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" },
+          "latestVersionId": { "type": ["string", "null"] },
+          "versionCount": { "type": "integer", "minimum": 0 },
+          "source": { "type": ["string", "null"] },
+          "sourceLabel": { "type": ["string", "null"] }
         },
         "additionalProperties": false
       },
