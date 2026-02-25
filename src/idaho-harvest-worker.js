@@ -234,6 +234,9 @@ export function createIdahoHarvestObjectStoreFromEnv(env = process.env, createS3
       }
       return res;
     },
+    async listObjects(prefix = '', { bucket = 'tile-server' } = {}) {
+      return getClient(bucket).listObjects(prefix);
+    },
   };
 }
 

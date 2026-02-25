@@ -13,6 +13,11 @@ test('server OpenAPI spec documents Idaho harvest worker endpoints', async () =>
   assert.ok(spec?.paths?.['/api/idaho-harvest/start']?.post?.responses?.['403']);
   assert.ok(spec?.paths?.['/api/idaho-harvest/stop']?.post);
 
+  assert.ok(spec?.paths?.['/api/idaho-harvest/records-of-survey']?.get);
+  assert.ok(spec?.paths?.['/api/idaho-harvest/records-of-survey/{recordId}/pdf']?.get);
+  assert.ok(spec?.paths?.['/api/idaho-harvest/subdivision-plats']?.get);
+  assert.ok(spec?.paths?.['/api/idaho-harvest/subdivision-plats/{platId}/pdf']?.get);
+
   const schema = spec?.components?.schemas?.IdahoHarvestWorkerStatus;
   assert.ok(schema);
   assert.equal(schema?.properties?.restartCount?.type, 'integer');

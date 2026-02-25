@@ -572,6 +572,168 @@ function parseLonLat(urlObj) {
   return { lon, lat };
 }
 
+function parseHarvestPdfRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/idaho-harvest\/(records-of-survey|subdivision-plats)\/([^/]+)\/pdf\/?$/);
+  if (!match) return null;
+  return { collection: match[1], id: decodeURIComponent(match[2]) };
+}
+
+function normalizeHarvestId(raw = '') {
+  return String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+}
+
+function parseHarvestPageInfoFromKey(objectKey = '') {
+  const key = String(objectKey || '').trim();
+  if (!key) return null;
+  const fileName = path.basename(key);
+  const ext = path.extname(fileName).toLowerCase();
+  if (!['.pdf', '.tif', '.tiff', '.png', '.jpg', '.jpeg'].includes(ext)) return null;
+  const stem = fileName.slice(0, -ext.length);
+  const match = stem.match(/^(.*?)(\d{2})$/);
+  const idPart = (match ? match[1] : stem).trim();
+  if (!idPart) return null;
+  return {
+    id: normalizeHarvestId(idPart),
+    page: match ? Number(match[2]) : 1,
+    fileName,
+    ext,
+    objectKey: key,
+  };
+}
+
+async function listHarvestDocuments({ objectStore, bucket, prefix, collectionPath }) {
+  if (typeof objectStore?.listObjects !== 'function') {
+    throw createHttpError(501, 'Configured Idaho harvest object store does not support listObjects.');
+  }
+
+  const keys = await objectStore.listObjects(prefix, { bucket });
+  const grouped = new Map();
+  for (const key of (Array.isArray(keys) ? keys : [])) {
+    const parsed = parseHarvestPageInfoFromKey(key);
+    if (!parsed) continue;
+    if (!grouped.has(parsed.id)) grouped.set(parsed.id, []);
+    grouped.get(parsed.id).push(parsed);
+  }
+
+  const documents = [...grouped.entries()]
+    .map(([id, pages]) => ({
+      id,
+      pages: pages
+        .sort((a, b) => (a.page - b.page) || a.fileName.localeCompare(b.fileName))
+        .map((entry) => ({
+          page: entry.page,
+          fileName: entry.fileName,
+          objectKey: entry.objectKey,
+        })),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((doc) => ({
+      id: doc.id,
+      pageCount: doc.pages.length,
+      pages: doc.pages,
+      pdfUrl: `/api/idaho-harvest/${collectionPath}/${encodeURIComponent(doc.id)}/pdf`,
+    }));
+
+  return documents;
+}
+
+async function convertHarvestAssetToJpegPages(fileBuffer, extension = '.png') {
+  const ext = String(extension || '').toLowerCase();
+  const sharp = (await import('sharp')).default;
+
+  if (ext === '.pdf') {
+    throw createHttpError(415, 'PDF page sources are not supported for merged archive generation.');
+  }
+
+  if (ext === '.tif' || ext === '.tiff') {
+    const metadata = await sharp(fileBuffer, { animated: true }).metadata();
+    const pageCount = Math.max(1, Number(metadata.pages) || 1);
+    const pages = [];
+    for (let i = 0; i < pageCount; i += 1) {
+      const jpeg = await sharp(fileBuffer, { page: i }).jpeg({ quality: 90 }).toBuffer();
+      const dims = await sharp(jpeg).metadata();
+      pages.push({ jpeg, width: Number(dims.width) || 1, height: Number(dims.height) || 1 });
+    }
+    return pages;
+  }
+
+  const jpeg = await sharp(fileBuffer).jpeg({ quality: 90 }).toBuffer();
+  const dims = await sharp(jpeg).metadata();
+  return [{ jpeg, width: Number(dims.width) || 1, height: Number(dims.height) || 1 }];
+}
+
+function buildPdfFromJpegPages(pages = []) {
+  const objects = [];
+  const addObject = (bodyBuffer) => {
+    objects.push(Buffer.isBuffer(bodyBuffer) ? bodyBuffer : Buffer.from(String(bodyBuffer), 'binary'));
+    return objects.length;
+  };
+
+  const catalogObject = addObject('');
+  const pagesObject = addObject('');
+  const pageObjectNumbers = [];
+
+  for (let i = 0; i < pages.length; i += 1) {
+    const page = pages[i];
+    const imageName = `/Im${i + 1}`;
+    const imageObject = addObject(Buffer.concat([
+      Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.jpeg.length} >>\nstream\n`, 'binary'),
+      page.jpeg,
+      Buffer.from('\nendstream', 'binary'),
+    ]));
+
+    const contents = `q\n${page.width} 0 0 ${page.height} 0 0 cm\n${imageName} Do\nQ\n`;
+    const contentsObject = addObject(Buffer.from(`<< /Length ${Buffer.byteLength(contents, 'binary')} >>\nstream\n${contents}endstream`, 'binary'));
+
+    const pageObject = addObject(Buffer.from(
+      `<< /Type /Page /Parent ${pagesObject} 0 R /MediaBox [0 0 ${page.width} ${page.height}] /Resources << /XObject << ${imageName} ${imageObject} 0 R >> >> /Contents ${contentsObject} 0 R >>`,
+      'binary',
+    ));
+    pageObjectNumbers.push(pageObject);
+  }
+
+  objects[catalogObject - 1] = Buffer.from(`<< /Type /Catalog /Pages ${pagesObject} 0 R >>`, 'binary');
+  objects[pagesObject - 1] = Buffer.from(`<< /Type /Pages /Count ${pageObjectNumbers.length} /Kids [${pageObjectNumbers.map((n) => `${n} 0 R`).join(' ')}] >>`, 'binary');
+
+  const chunks = [Buffer.from('%PDF-1.4\n%ÿÿÿÿ\n', 'binary')];
+  const offsets = [0];
+  let runningLength = chunks[0].length;
+  for (let i = 0; i < objects.length; i += 1) {
+    offsets.push(runningLength);
+    const header = Buffer.from(`${i + 1} 0 obj\n`, 'binary');
+    const footer = Buffer.from('\nendobj\n', 'binary');
+    chunks.push(header, objects[i], footer);
+    runningLength += header.length + objects[i].length + footer.length;
+  }
+
+  const xrefOffset = runningLength;
+  const xref = ['xref', `0 ${objects.length + 1}`, '0000000000 65535 f '];
+  for (let i = 1; i < offsets.length; i += 1) {
+    xref.push(`${String(offsets[i]).padStart(10, '0')} 00000 n `);
+  }
+  const xrefBuffer = Buffer.from(`${xref.join('\n')}\n`, 'binary');
+  const trailerBuffer = Buffer.from(`trailer\n<< /Size ${objects.length + 1} /Root ${catalogObject} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`, 'binary');
+  chunks.push(xrefBuffer, trailerBuffer);
+  return Buffer.concat(chunks);
+}
+
+async function buildCombinedHarvestPdf({ objectStore, bucket, pages = [] }) {
+  const jpegPages = [];
+
+  for (const entry of pages) {
+    const ext = path.extname(entry.fileName || '').toLowerCase();
+    const body = await objectStore.getObject(entry.objectKey, { bucket });
+    if (!body?.length) continue;
+    jpegPages.push(...await convertHarvestAssetToJpegPages(body, ext));
+  }
+
+  if (!jpegPages.length) {
+    throw createHttpError(404, 'No printable pages were found for this record.');
+  }
+
+  return buildPdfFromJpegPages(jpegPages);
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -1219,6 +1381,19 @@ export function createSurveyServer({
       : [],
   };
 
+  const harvestArchiveSettings = {
+    ros: {
+      bucket: String(process.env.ROS_SCRAPE_MINIO_BUCKET || 'records-of-survey'),
+      prefix: String(process.env.ROS_SCRAPE_PREFIX || 'adacounty/recordsofsurvey').replace(/\/+$/, ''),
+      collectionPath: 'records-of-survey',
+    },
+    plats: {
+      bucket: String(process.env.SUBDIVISION_PLATS_MINIO_BUCKET || 'subdivision-plats'),
+      prefix: String(process.env.SUBDIVISION_PLATS_SCRAPE_PREFIX || 'adacounty/subdivisionplats').replace(/\/+$/, ''),
+      collectionPath: 'subdivision-plats',
+    },
+  };
+
   async function getProjectFolderKeys(projectId) {
     const state = await Promise.resolve(localStorageSyncStore?.getState?.());
     const snapshot = state?.snapshot && typeof state.snapshot === 'object' ? state.snapshot : {};
@@ -1248,6 +1423,13 @@ export function createSurveyServer({
     return mapTileStorePromise;
   }
 
+
+  async function resolveIdahoHarvestObjectStore() {
+    if (!mapTileStorePromise) {
+      mapTileStorePromise = Promise.resolve().then(() => createIdahoHarvestObjectStoreFromEnv(process.env));
+    }
+    return mapTileStorePromise;
+  }
 
   async function resolveMapTileDatasets() {
     if (mapTileSettings.datasets.length) return mapTileSettings.datasets;
@@ -3243,6 +3425,60 @@ export function createSurveyServer({
 
       if (req.method !== 'GET') {
         sendJson(res, 405, { error: 'Only GET is supported.' });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/idaho-harvest/records-of-survey') {
+        const objectStore = await resolveIdahoHarvestObjectStore();
+        const records = await listHarvestDocuments({
+          objectStore,
+          bucket: harvestArchiveSettings.ros.bucket,
+          prefix: harvestArchiveSettings.ros.prefix,
+          collectionPath: harvestArchiveSettings.ros.collectionPath,
+        });
+        sendJson(res, 200, { records });
+        return;
+      }
+
+      if (urlObj.pathname === '/api/idaho-harvest/subdivision-plats') {
+        const objectStore = await resolveIdahoHarvestObjectStore();
+        const plats = await listHarvestDocuments({
+          objectStore,
+          bucket: harvestArchiveSettings.plats.bucket,
+          prefix: harvestArchiveSettings.plats.prefix,
+          collectionPath: harvestArchiveSettings.plats.collectionPath,
+        });
+        sendJson(res, 200, { plats });
+        return;
+      }
+
+      const harvestPdfRoute = parseHarvestPdfRoute(urlObj.pathname);
+      if (harvestPdfRoute) {
+        const target = harvestPdfRoute.collection === 'records-of-survey'
+          ? harvestArchiveSettings.ros
+          : harvestArchiveSettings.plats;
+        const objectStore = await resolveIdahoHarvestObjectStore();
+        const docs = await listHarvestDocuments({
+          objectStore,
+          bucket: target.bucket,
+          prefix: target.prefix,
+          collectionPath: target.collectionPath,
+        });
+        const requestedId = normalizeHarvestId(harvestPdfRoute.id);
+        const match = docs.find((entry) => entry.id === requestedId);
+        if (!match) throw createHttpError(404, 'Record not found.');
+
+        const pdfBuffer = Buffer.from(await buildCombinedHarvestPdf({
+          objectStore,
+          bucket: target.bucket,
+          pages: match.pages,
+        }));
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${sanitizeFileName(`${requestedId}.pdf`)}"`);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.end(pdfBuffer);
         return;
       }
 

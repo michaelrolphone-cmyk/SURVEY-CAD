@@ -2013,7 +2013,7 @@
           "CP&F Records"
         ],
         "summary": "Update (upsert) a CP&F record",
-        "description": "Updates the record identified by `cpfId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `cpfId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectCpf",
         "requestBody": {
           "required": true,
@@ -3862,7 +3862,7 @@
           "ROS Records"
         ],
         "summary": "Update (upsert) a ROS record",
-        "description": "Updates the record identified by `rosId`. Acts as upsert \u2014 creates the record if it does not exist. Returns `200` for update, `201` for create.",
+        "description": "Updates the record identified by `rosId`. Acts as upsert — creates the record if it does not exist. Returns `200` for update, `201` for create.",
         "operationId": "updateProjectRos",
         "requestBody": {
           "required": true,
@@ -3970,6 +3970,130 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/api/idaho-harvest/records-of-survey": {
+      "get": {
+        "summary": "List harvested records of survey from object storage",
+        "tags": [
+          "Idaho Harvest"
+        ],
+        "responses": {
+          "200": {
+            "description": "Records of survey listing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HarvestArchiveDocument"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/idaho-harvest/records-of-survey/{recordId}/pdf": {
+      "get": {
+        "summary": "Generate a combined PDF for a harvested record of survey",
+        "tags": [
+          "Idaho Harvest"
+        ],
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Combined ROS PDF",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found"
+          }
+        }
+      }
+    },
+    "/api/idaho-harvest/subdivision-plats": {
+      "get": {
+        "summary": "List harvested subdivision plats from object storage",
+        "tags": [
+          "Idaho Harvest"
+        ],
+        "responses": {
+          "200": {
+            "description": "Subdivision plat listing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plats": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HarvestArchiveDocument"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/idaho-harvest/subdivision-plats/{platId}/pdf": {
+      "get": {
+        "summary": "Generate a combined PDF for a harvested subdivision plat",
+        "tags": [
+          "Idaho Harvest"
+        ],
+        "parameters": [
+          {
+            "name": "platId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Combined subdivision plat PDF",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plat not found"
           }
         }
       }
@@ -7597,6 +7721,51 @@
         "required": [
           "ros"
         ]
+      },
+      "HarvestArchivePage": {
+        "type": "object",
+        "required": [
+          "page",
+          "fileName",
+          "objectKey"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": "string"
+          }
+        }
+      },
+      "HarvestArchiveDocument": {
+        "type": "object",
+        "required": [
+          "id",
+          "pageCount",
+          "pages",
+          "pdfUrl"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "pageCount": {
+            "type": "integer"
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarvestArchivePage"
+            }
+          },
+          "pdfUrl": {
+            "type": "string"
+          }
+        }
       }
     }
   }
