@@ -332,5 +332,9 @@ test('launcher archives project payload on the server before deleting local proj
 
   assert.match(launcherHtml, /fetch\(`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/archive`/, 'project delete should POST project archives to server first');
   assert.match(launcherHtml, /window\.alert\(`Could not archive project/, 'launcher should halt deletion and alert if archive upload fails');
+  assert.match(launcherHtml, /const\s+PROJECT_DELETE_TOMBSTONE_STORAGE_KEY\s*=\s*'surveyfoundryDeletedProjects';/, 'launcher should define a tombstone key for deleted project ids');
+  assert.match(launcherHtml, /function\s+markProjectDeleted\(projectId\)/, 'launcher should define helper to mark deleted project ids in tombstone storage');
+  assert.match(launcherHtml, /markProjectDeleted\(projectId\);/, 'delete flow should tombstone deleted project ids to prevent stale sync reappearance');
+  assert.match(launcherHtml, /const\s+tombstones\s*=\s*loadDeletedProjectTombstones\(\);[\s\S]*parsed\.filter\(\(project\)\s*=>\s*!tombstones\[String\(project\?\.id\s*\|\|\s*''\)\]\)/, 'loading projects should ignore tombstoned ids received from localStorage sync');
   assert.match(launcherHtml, /localStorage\.removeItem\(getActiveProjectStorageKey\(\)\);/, 'launcher should clear active-project storage via crew-scoped key helper after delete');
 });
