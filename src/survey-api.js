@@ -173,10 +173,23 @@ function extractUtilitiesFromNearPointPayload(payload = {}) {
 
 function utilityCodePrefixForServiceType(serviceTypeId) {
   const normalized = Number(serviceTypeId);
-  if (normalized === 1) return 'PM';
+  if (normalized === 1) return 'PP';
   if (normalized === 2) return 'UP';
   if (normalized === 3) return 'OH';
   return 'PWR';
+}
+
+function normalizeUtilityCode(code, serviceTypeId) {
+  const fallbackCode = utilityCodePrefixForServiceType(serviceTypeId);
+  const normalizedCode = String(code || '').trim().toUpperCase();
+
+  if (Number(serviceTypeId) === 1) {
+    if (!normalizedCode || normalizedCode === 'PM' || normalizedCode === 'PWR' || normalizedCode === 'UTILITY LOCATION' || /METER/.test(normalizedCode)) {
+      return 'PP';
+    }
+  }
+
+  return normalizedCode || fallbackCode;
 }
 
 function extractUtilitiesFromEstimatePayload(payload = {}, options = {}) {
@@ -649,12 +662,17 @@ export class SurveyCadClient {
       ? webMercatorToLonLat(lon, lat)
       : { lon, lat };
 
+    const serviceTypeId = Number(entry.serviceTypeId ?? attrs.serviceTypeId ?? attrs.SERVICE_TYPE_ID ?? attrs.serviceEstimateServiceTypeId);
+
     return {
       id: String(attrs.id || attrs.ID || attrs.OBJECTID || attrs.objectid || entry.id || `${lon},${lat}`),
       name: String(attrs.name || attrs.NAME || entry.name || entry.utilityName || 'Utility location'),
-      code: String(attrs.code || attrs.CODE || entry.code || entry.name || entry.utilityName || 'Utility location'),
+      code: normalizeUtilityCode(
+        attrs.code || attrs.CODE || entry.code || entry.name || entry.utilityName || 'Utility location',
+        serviceTypeId,
+      ),
       provider: String(attrs.provider || attrs.PROVIDER || entry.provider || 'Idaho Power'),
-      serviceTypeId: Number(entry.serviceTypeId ?? attrs.serviceTypeId ?? attrs.SERVICE_TYPE_ID ?? attrs.serviceEstimateServiceTypeId),
+      serviceTypeId,
       geometry: {
         x: lon,
         y: lat,

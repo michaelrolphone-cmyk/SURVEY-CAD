@@ -581,7 +581,7 @@ test('lookupUtilitiesByAddress uses Idaho Power NearPoint PrimaryPoints API and 
     assert.ok(utilities.every((utility) => utility.provider === 'Idaho Power'));
     assert.deepEqual(
       utilities.map((utility) => utility.code).sort(),
-      ['OH', 'PM', 'UP'],
+      ['OH', 'PP', 'UP'],
     );
 
     assert.match(headers.nearPointPath || '', /\/serviceEstimator\/api\/NearPoint\/Residential\/PrimaryPoints\//);
@@ -617,7 +617,7 @@ test('lookupUtilityRecordsByAddress returns power utilities for supported source
   }
 });
 
-test('lookupUtilitiesByAddress labels NearPoint utility points using PM/OH/UP service rules', async () => {
+test('lookupUtilitiesByAddress labels NearPoint utility points using PP/OH/UP service rules', async () => {
   const { server, port } = await createMockServer();
   const base = `http://127.0.0.1:${port}`;
 
@@ -631,7 +631,7 @@ test('lookupUtilitiesByAddress labels NearPoint utility points using PM/OH/UP se
   try {
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     const codes = new Set(utilities.map((utility) => utility.code));
-    assert.deepEqual(codes, new Set(['PM', 'UP', 'OH']));
+    assert.deepEqual(codes, new Set(['PP', 'UP', 'OH']));
     assert.ok(utilities.every((utility) => !String(utility.code).includes('Idaho Power Service Estimate')));
   } finally {
     await new Promise((resolve) => server.close(resolve));
@@ -654,7 +654,7 @@ test('lookupUtilitiesByAddress only returns the three NearPoint service points w
     const codes = new Set(utilities.map((utility) => utility.code));
 
     assert.equal(utilities.length, 3);
-    assert.deepEqual(codes, new Set(['PM', 'UP', 'OH']));
+    assert.deepEqual(codes, new Set(['PP', 'UP', 'OH']));
     assert.ok(utilities.every((utility) => Number.isFinite(utility?.projected?.east) && Number.isFinite(utility?.projected?.north)));
     assert.ok(requests.some((requestPath) => requestPath.includes('/geometry/project?')));
   } finally {
@@ -692,7 +692,7 @@ test('lookupUtilitiesByAddress supports NearPoint responses wrapped in object pa
   try {
     const utilities = await client.lookupUtilitiesByAddress('100 Main St, Boise', 2243);
     assert.equal(utilities.length, 3);
-    assert.deepEqual(new Set(utilities.map((utility) => utility.code)), new Set(['PM', 'UP', 'OH']));
+    assert.deepEqual(new Set(utilities.map((utility) => utility.code)), new Set(['PP', 'UP', 'OH']));
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
