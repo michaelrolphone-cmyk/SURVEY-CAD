@@ -609,6 +609,7 @@
   const SUBDIVISION_DRAW_MAX_VERTICES = 1200;
   const SUBDIVISION_PLAT_LIST_URL = '/api/recordquarry/subdivision-plats/page-list';
   const SUBDIVISION_PLAT_BASE_URL = 'https://adacountyassessor.org/docs/subdivisionplats/';
+  const SUBDIVISION_THUMB_PLACEHOLDER_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160" viewBox="0 0 240 160"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f2e48"/><stop offset="1" stop-color="#121923"/></linearGradient></defs><rect width="240" height="160" rx="12" fill="url(#g)"/><rect x="12" y="12" width="216" height="136" rx="8" fill="none" stroke="#5b6a81" stroke-width="1.5"/><g fill="#d8e0ee" opacity="0.94"><path d="M56 114h128v10H56z"/><path d="M56 98h96v8H56z"/><path d="M56 50h128v40H56z" fill="none" stroke="#d8e0ee" stroke-width="2"/><path d="M66 82l22-18 18 14 22-20 46 36z"/></g><text x="120" y="138" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#d8e0ee">Generating plat thumbnail…</text></svg>')}`;
 
   // pdf.js worker
   if (!window.pdfjsLib) {
@@ -2451,6 +2452,16 @@
     return sourceUrl;
   }
 
+  function buildSubdivisionThumbnailMarkup(subdivisionName = '', thumbnailUrl = '') {
+    const safeName = escapeHtml(String(subdivisionName || 'Subdivision plat'));
+    const normalized = String(thumbnailUrl || '').trim();
+    if (!normalized) return '';
+    if (isDeferredApiThumbnailUrl(normalized)) {
+      return `<img class="ros-scan-thumb subdivision-plat-thumb" loading="lazy" src="${escapeHtml(SUBDIVISION_THUMB_PLACEHOLDER_DATA_URL)}" alt="${safeName} plat thumbnail" data-ros-thumbnail="${escapeHtml(normalized)}" data-keep-placeholder="1"/>`;
+    }
+    return `<img class="ros-scan-thumb subdivision-plat-thumb" loading="lazy" src="${escapeHtml(normalized)}" alt="${safeName} plat thumbnail"/>`;
+  }
+
   function isDeferredApiThumbnailUrl(url = '') {
     const value = String(url || '').trim();
     return value.startsWith('/api/project-files/ros-thumbnail?') || value.startsWith('/api/project-files/pdf-thumbnail?');
@@ -3400,7 +3411,7 @@
       if (!thumbnailUrl) return;
       img.dataset.thumbLoaded = '1';
       const ok = await loadRosThumbnailWithRetry(img, thumbnailUrl);
-      if (!ok) img.style.display = 'none';
+      if (!ok && img.dataset.keepPlaceholder !== '1') img.style.display = 'none';
     };
 
     if (!('IntersectionObserver' in window)) {
@@ -3430,9 +3441,9 @@
       if (!thumbnailUrl) continue;
       img.dataset.thumbLoaded = '1';
       // Keep hidden until we have a real src to avoid broken-image glyphs in Leaflet UI.
-      img.style.display = 'none';
+      if (img.dataset.keepPlaceholder !== '1') img.style.display = 'none';
       loadRosThumbnailWithRetry(img, thumbnailUrl).then((ok) => {
-        if (!ok) img.style.display = 'none';
+        if (!ok && img.dataset.keepPlaceholder !== '1') img.style.display = 'none';
       });
     }
   }
@@ -4275,13 +4286,7 @@
                 if (body) {
                   const wrap = document.createElement('div');
                   wrap.style.marginTop = '8px';
-                  const thumbUrl = String(plat.thumbnailUrl || '').trim();
-                  if (thumbUrl) {
-                    const deferredThumbAttr = isDeferredApiThumbnailUrl(thumbUrl)
-                      ? ` data-ros-thumbnail="${escapeHtml(thumbUrl)}"`
-                      : ` src="${escapeHtml(thumbUrl)}"`;
-                    wrap.innerHTML = `<img class="ros-scan-thumb" loading="lazy" alt="${escapeHtml(subdivisionName)} plat thumbnail"${deferredThumbAttr}/>`;
-                  }
+                  wrap.innerHTML = buildSubdivisionThumbnailMarkup(subdivisionName, plat.thumbnailUrl);
                   body.appendChild(wrap);
                 }
               }
