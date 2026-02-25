@@ -714,3 +714,345 @@ export function createMinioObjectStore({
     },
   };
 }
+
+// Back-compat / explicit name for the restored implementation.
+export const runIdahoHarvestCycleOriginal = runIdahoHarvestCycle;
+
+// ============================================================
+// Ada County Records of Survey (ROS) crawler — NEW feature
+// ============================================================
+
+const DEFAULT_ROS_ROOT_URL = 'https://adacountyassessor.org/docs/recordsofsurvey/';
+// Default object-key prefix inside the records-of-survey bucket. Override via worker env.
+const DEFAULT_ROS_PREFIX = 'adacounty/recordsofsurvey';
+
+function normalizeUrlString(value) {
+  try {
+    return new URL(String(value)).toString();
+  } catch {
+    return String(value || '').trim();
+  }
+}
+
+function isDirectoryHref(href = '') {
+  const trimmed = String(href || '').trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith('#') || trimmed.startsWith('?')) return false;
+  if (trimmed.startsWith('mailto:') || trimmed.startsWith('javascript:')) return false;
+  if (trimmed === '../' || trimmed === '..') return false;
+  return trimmed.endsWith('/');
+}
+
+function isFileHref(href = '') {
+  const trimmed = String(href || '').trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith('#') || trimmed.startsWith('?')) return false;
+  if (trimmed.startsWith('mailto:') || trimmed.startsWith('javascript:')) return false;
+  if (trimmed === '../' || trimmed === '..') return false;
+  return !trimmed.endsWith('/');
+}
+
+function parseDirectoryListingHrefs(html = '') {
+  const hrefs = [];
+  const re = /<a\s+[^>]*href\s*=\s*(\"([^\"]+)\"|'([^']+)'|([^\s>]+))[^>]*>/gi;
+  let match;
+  while ((match = re.exec(String(html || ''))) !== null) {
+    const href = match[2] || match[3] || match[4] || '';
+    const cleaned = String(href).trim();
+    if (!cleaned) continue;
+    hrefs.push(cleaned);
+  }
+  return [...new Set(hrefs)];
+}
+
+function inferContentTypeFromUrl(url, fallback = 'application/octet-stream') {
+  let pathname = '';
+  try {
+    pathname = new URL(String(url)).pathname || '';
+  } catch {
+    pathname = String(url || '');
+  }
+  const ext = path.extname(pathname).toLowerCase();
+  if (ext === '.pdf') return 'application/pdf';
+  if (ext === '.tif' || ext === '.tiff') return 'image/tiff';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.png') return 'image/png';
+  if (ext === '.txt') return 'text/plain; charset=utf-8';
+  if (ext === '.json') return 'application/json; charset=utf-8';
+  if (ext === '.xml') return 'application/xml; charset=utf-8';
+  if (ext === '.htm' || ext === '.html') return 'text/html; charset=utf-8';
+  return fallback;
+}
+
+function relativeFromRoot(url, rootUrl) {
+  try {
+    const u = new URL(url);
+    const root = new URL(rootUrl);
+    if (u.origin !== root.origin) return null;
+    if (!u.pathname.startsWith(root.pathname)) return null;
+    const rel = u.pathname.slice(root.pathname.length).replace(/^\/+/, '');
+    return decodeURIComponent(rel);
+  } catch {
+    return null;
+  }
+}
+
+function buildRosObjectKey({ prefix, rootUrl, fileUrl }) {
+  const rel = relativeFromRoot(fileUrl, rootUrl);
+  const fallbackName = (() => {
+    try {
+      return path.basename(new URL(fileUrl).pathname) || 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  })();
+  const cleanRel = rel ? rel.replace(/\.{2,}/g, '.').replace(/^\/+/, '') : fallbackName;
+
+  const basePrefix = String(prefix || '').replace(/\/+$/, '').trim();
+  // Preserve the site folder structure under rootUrl, optionally under a caller-defined prefix.
+  return basePrefix ? `${basePrefix}/${cleanRel}` : cleanRel;
+}
+
+async function safeReadJson(store, bucket, key, fallback) {
+  try {
+    const buf = await store.getObject(key, { bucket });
+    if (!buf) return fallback;
+    return JSON.parse(Buffer.from(buf).toString('utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+async function safeWriteJson(store, bucket, key, value) {
+  await store.putObject(key, Buffer.from(JSON.stringify(value, null, 2)), {
+    bucket,
+    contentType: 'application/json; charset=utf-8',
+  });
+}
+
+async function headMetadata(fetchImpl, url) {
+  try {
+    const resp = await fetchImpl(url, { method: 'HEAD' });
+    if (!resp.ok) return null;
+    const lm = resp.headers?.get?.('last-modified') || null;
+    const len = resp.headers?.get?.('content-length') || null;
+    const etag = resp.headers?.get?.('etag') || null;
+    return {
+      lastModified: lm,
+      contentLength: len ? Number(len) : null,
+      etag,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function runRosScrapeCycle({
+  fetchImpl = fetch,
+  objectStore,
+  rootUrl = DEFAULT_ROS_ROOT_URL,
+  bucket = 'records-of-survey',
+  prefix = DEFAULT_ROS_PREFIX,
+  checkpointKey = null,
+  manifestKey = null,
+  maxDownloadsPerCycle = 25,
+  maxDirsPerCycle = 25,
+} = {}) {
+  if (!objectStore) throw new Error('objectStore is required');
+
+  const normalizedRoot = normalizeUrlString(String(rootUrl).endsWith('/') ? rootUrl : `${rootUrl}/`);
+  const basePrefix = String(prefix || '').replace(/\/+$/, '').trim();
+
+  const resolvedCheckpointKey = checkpointKey
+    ? String(checkpointKey)
+    : (basePrefix ? `${basePrefix}/_meta/scrape-state.json` : `_meta/scrape-state.json`);
+
+  const resolvedManifestKey = manifestKey
+    ? String(manifestKey)
+    : (basePrefix ? `${basePrefix}/_meta/manifest.json` : `_meta/manifest.json`);
+
+  const checkpoint = await safeReadJson(objectStore, bucket, resolvedCheckpointKey, {
+    rootUrl: normalizedRoot,
+    pendingDirs: [normalizedRoot],
+    seenDirs: [],
+    pendingFiles: [],
+    done: false,
+    updatedAt: null,
+  });
+
+  const manifest = await safeReadJson(objectStore, bucket, resolvedManifestKey, {
+    rootUrl: normalizedRoot,
+    generatedAt: new Date().toISOString(),
+    files: {},
+  });
+
+  const seenDirs = new Set((checkpoint.seenDirs || []).map((u) => normalizeUrlString(u)));
+  const pendingDirs = (checkpoint.pendingDirs || []).map((u) => normalizeUrlString(u)).filter(Boolean);
+  const pendingFiles = (checkpoint.pendingFiles || []).map((u) => normalizeUrlString(u)).filter(Boolean);
+
+  const fileQueue = new Set(pendingFiles);
+  const dirQueue = [];
+  for (const dir of pendingDirs) {
+    if (!dir) continue;
+    const dirNorm = normalizeUrlString(dir);
+    if (!seenDirs.has(dirNorm)) dirQueue.push(dirNorm.endsWith('/') ? dirNorm : `${dirNorm}/`);
+  }
+
+  let downloads = 0;
+  let dirsProcessed = 0;
+  let changed = false;
+
+  // 1) Download from pending file queue first.
+  while (downloads < maxDownloadsPerCycle && fileQueue.size) {
+    const nextUrl = fileQueue.values().next().value;
+    fileQueue.delete(nextUrl);
+    if (!nextUrl) continue;
+
+    const key = buildRosObjectKey({ prefix: basePrefix, rootUrl: normalizedRoot, fileUrl: nextUrl });
+
+    const head = await headMetadata(fetchImpl, nextUrl);
+    const prior = manifest.files?.[key] || null;
+    const unchanged = prior
+      && head
+      && prior.lastModified === head.lastModified
+      && prior.contentLength === head.contentLength
+      && (prior.etag || null) === (head.etag || null);
+
+    if (unchanged) continue;
+
+    const resp = await fetchImpl(nextUrl);
+    if (!resp.ok) continue;
+
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (!buf.length) continue;
+
+    const contentType = resp.headers?.get?.('content-type') || inferContentTypeFromUrl(nextUrl);
+    await objectStore.putObject(key, buf, { bucket, contentType });
+
+    manifest.files = manifest.files || {};
+    manifest.files[key] = {
+      sourceUrl: nextUrl,
+      lastModified: head?.lastModified || resp.headers?.get?.('last-modified') || null,
+      contentLength: head?.contentLength ?? (resp.headers?.get?.('content-length') ? Number(resp.headers.get('content-length')) : null),
+      etag: head?.etag || resp.headers?.get?.('etag') || null,
+      contentType,
+      downloadedAt: new Date().toISOString(),
+    };
+
+    downloads += 1;
+    changed = true;
+  }
+
+  // 2) Crawl directories to discover more files (ALL file types, not just PDFs).
+  while (downloads < maxDownloadsPerCycle && dirsProcessed < maxDirsPerCycle && dirQueue.length) {
+    const dirUrl = dirQueue.shift();
+    if (!dirUrl) continue;
+    if (seenDirs.has(dirUrl)) continue;
+
+    const resp = await fetchImpl(dirUrl);
+    if (!resp.ok) {
+      seenDirs.add(dirUrl);
+      dirsProcessed += 1;
+      changed = true;
+      continue;
+    }
+
+    const html = await resp.text();
+    const hrefs = parseDirectoryListingHrefs(html);
+
+    for (const href of hrefs) {
+      if (!href) continue;
+      if (href === '../' || href === '..') continue;
+
+      let absolute;
+      try {
+        absolute = new URL(href, dirUrl).toString();
+      } catch {
+        continue;
+      }
+
+      // Keep crawl scoped to the root directory.
+      const rel = relativeFromRoot(absolute, normalizedRoot);
+      if (rel === null) continue;
+
+      if (isDirectoryHref(href)) {
+        const dirNorm = absolute.endsWith('/') ? absolute : `${absolute}/`;
+        if (!seenDirs.has(dirNorm) && !dirQueue.includes(dirNorm)) dirQueue.push(dirNorm);
+        continue;
+      }
+
+      if (isFileHref(href)) {
+        if (!fileQueue.has(absolute)) fileQueue.add(absolute);
+      }
+    }
+
+    seenDirs.add(dirUrl);
+    dirsProcessed += 1;
+    changed = true;
+
+    // After discovering, try to download immediately if we have budget.
+    while (downloads < maxDownloadsPerCycle && fileQueue.size) {
+      const nextUrl = fileQueue.values().next().value;
+      fileQueue.delete(nextUrl);
+      if (!nextUrl) continue;
+
+      const key = buildRosObjectKey({ prefix: basePrefix, rootUrl: normalizedRoot, fileUrl: nextUrl });
+
+      const head = await headMetadata(fetchImpl, nextUrl);
+      const prior = manifest.files?.[key] || null;
+      const unchanged = prior
+        && head
+        && prior.lastModified === head.lastModified
+        && prior.contentLength === head.contentLength
+        && (prior.etag || null) === (head.etag || null);
+
+      if (unchanged) continue;
+
+      const fileResp = await fetchImpl(nextUrl);
+      if (!fileResp.ok) continue;
+
+      const buf = Buffer.from(await fileResp.arrayBuffer());
+      if (!buf.length) continue;
+
+      const contentType = fileResp.headers?.get?.('content-type') || inferContentTypeFromUrl(nextUrl);
+      await objectStore.putObject(key, buf, { bucket, contentType });
+
+      manifest.files = manifest.files || {};
+      manifest.files[key] = {
+        sourceUrl: nextUrl,
+        lastModified: head?.lastModified || fileResp.headers?.get?.('last-modified') || null,
+        contentLength: head?.contentLength ?? (fileResp.headers?.get?.('content-length') ? Number(fileResp.headers.get('content-length')) : null),
+        etag: head?.etag || fileResp.headers?.get?.('etag') || null,
+        contentType,
+        downloadedAt: new Date().toISOString(),
+      };
+
+      downloads += 1;
+      changed = true;
+    }
+  }
+
+  const done = dirQueue.length === 0 && fileQueue.size === 0;
+
+  checkpoint.rootUrl = normalizedRoot;
+  checkpoint.pendingDirs = dirQueue;
+  checkpoint.pendingFiles = [...fileQueue.values()];
+  checkpoint.seenDirs = [...seenDirs.values()];
+  checkpoint.done = done;
+  checkpoint.updatedAt = new Date().toISOString();
+
+  if (changed) {
+    manifest.rootUrl = normalizedRoot;
+    manifest.generatedAt = new Date().toISOString();
+    await safeWriteJson(objectStore, bucket, resolvedManifestKey, manifest);
+    await safeWriteJson(objectStore, bucket, resolvedCheckpointKey, checkpoint);
+  }
+
+  return {
+    done,
+    downloads,
+    dirsProcessed,
+    checkpointKey: resolvedCheckpointKey,
+    manifestKey: resolvedManifestKey,
+  };
+}
