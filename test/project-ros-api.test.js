@@ -53,6 +53,7 @@ test('project ROS CRUD API supports batch upsert and star metadata', async () =>
             rosSourceId: '6673',
             rosName: 'RS_6673',
             aliquot: 'NW1/4',
+            geolocation: { lat: 43.611, lon: -116.205, source: 'polygon-centroid' },
             sourceAttributes: { OBJECTID: 6673, NAME: 'RS_6673', ALIQUOT: 'NW1/4' },
           },
         }],
@@ -69,6 +70,8 @@ test('project ROS CRUD API supports batch upsert and star metadata', async () =>
     const listAfterBatch = await listAfterBatchRes.json();
     const imported = listAfterBatch.ros.find((entry) => entry.rosNumber === '90001');
     assert.equal(imported?.metadata?.rosSourceId, '6673');
+    assert.equal(imported?.metadata?.geolocation?.lat, 43.611);
+    assert.equal(imported?.metadata?.geolocation?.lon, -116.205);
 
     const deleteRes = await fetch(`http://127.0.0.1:${app.port}/api/projects/demo-project/ros/${encodeURIComponent(rosId)}`, {
       method: 'DELETE',
