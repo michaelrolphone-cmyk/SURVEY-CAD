@@ -127,14 +127,17 @@ export async function createOrUpdateProjectPlat(store, {
   if (!projectId) throw new Error('projectId is required.');
   if (!subdivisionName) throw new Error('subdivisionName is required.');
 
-  const platId = normalizePlatId(platIdRaw) || derivePlatId(subdivisionName);
-  if (!platId) throw new Error('platId could not be derived.');
-
   const now = nowIso();
   const state = await Promise.resolve(store.getState());
   const snapshot = state?.snapshot || {};
-  const existing = parseSnapshotJson(snapshot, platKey(projectId, platId));
   const index = parseSnapshotJson(snapshot, platIndexKey(projectId)) || {};
+  const normalizedPlatId = normalizePlatId(platIdRaw);
+  const matchedPlatId = Object.values(index)
+    .find((entry) => normalizeSubdivisionName(entry?.subdivisionName) === subdivisionName)?.platId;
+  const platId = normalizePlatId(matchedPlatId || normalizedPlatId) || derivePlatId(subdivisionName);
+  if (!platId) throw new Error('platId could not be derived.');
+
+  const existing = parseSnapshotJson(snapshot, platKey(projectId, platId));
 
   const record = {
     schemaVersion: '1.0.0',

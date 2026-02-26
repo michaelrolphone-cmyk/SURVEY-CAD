@@ -126,3 +126,26 @@ test('batchUpsertProjectRos can overwrite existing project records when requeste
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0].rosNumber, '40001');
 });
+
+test('createOrUpdateProjectRos matches existing records by rosNumber when rosId differs', async () => {
+  const store = createMockStore();
+
+  const created = await createOrUpdateProjectRos(store, {
+    projectId: 'proj-match',
+    rosNumber: '88-01',
+    starredInFieldBook: true,
+  });
+
+  const updated = await createOrUpdateProjectRos(store, {
+    projectId: 'proj-match',
+    rosId: 'legacy-local-id',
+    rosNumber: '88-01',
+    starredInFieldBook: false,
+  });
+
+  assert.equal(updated.ros.rosId, created.ros.rosId);
+  const summaries = await listProjectRos(store, 'proj-match');
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].starredInFieldBook, false);
+});
+
