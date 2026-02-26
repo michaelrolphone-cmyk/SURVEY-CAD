@@ -1423,6 +1423,22 @@
     if (cpfCornerRecordsInFlight.has(key)) return cpfCornerRecordsInFlight.get(key);
 
     const lookupPromise = (async () => {
+      if (Number(inSR) === 4326) {
+        try {
+          const nearby = await requestJson(`/api/recordquarry/cpf/nearby?${new URLSearchParams({
+            lon: String(east),
+            lat: String(north),
+            maxMeters: String(maxMeters),
+            inSR: String(inSR),
+          }).toString()}`);
+          const records = (nearby?.records || []).filter((record) => Array.isArray(record?.links) && record.links.length);
+          cpfCornerRecordsCache.set(key, records);
+          return records;
+        } catch (apiError) {
+          // Fall back to browser JSONP layer discovery for environments without API support.
+        }
+      }
+
       const { layerUrl, layerMeta } = await ensureCpfLayerInfo();
       const payload = await arcJsonp(`${layerUrl.replace(/\/+$/, '')}/query`, {
         f: 'pjson',

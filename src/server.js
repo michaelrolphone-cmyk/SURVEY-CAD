@@ -130,6 +130,46 @@ const PDF_THUMBNAIL_FAILURE_COOLDOWN_MS = 30 * 1000;
 const IMAGE_THUMBNAIL_TARGET_WIDTH = 512;
 const IMAGE_THUMBNAIL_MAX_HEIGHT = 512;
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+const DEFAULT_ADA_CPF_PORTAL_BASE = 'https://gisprod.adacounty.id.gov/arcgis';
+const DEFAULT_ADA_CPF_WEBMAP_ITEM_ID = '019521c7932442f0b4b581f641cbf236';
+
+function pickCpfField(attributes = {}, fields = [], preferredPatterns = []) {
+  const names = Object.keys(attributes || {});
+  for (const pattern of preferredPatterns) {
+    const directMatch = names.find((name) => pattern.test(name));
+    if (directMatch) return directMatch;
+    const aliasMatch = (fields || []).find((field) => pattern.test(String(field?.alias || '')) && names.includes(field?.name));
+    if (aliasMatch?.name) return aliasMatch.name;
+  }
+  return null;
+}
+
+function buildCpfPdfLinks(instrument, pdfUrl, pdfName) {
+  const basePdf = 'https://gisprod.adacounty.id.gov/apps/acdscpf/CpfPdfs/';
+  const links = [];
+  const add = (url) => {
+    const trimmed = String(url || '').trim();
+    if (!trimmed || links.includes(trimmed)) return;
+    links.push(trimmed);
+  };
+  const appendCandidate = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+    if (/^https?:\/\//i.test(text)) {
+      add(text);
+      return;
+    }
+    if (/\.pdf$/i.test(text)) {
+      add(basePdf + text.replace(/^\/+/, ''));
+    }
+  };
+  appendCandidate(pdfUrl);
+  appendCandidate(pdfName);
+  if (!links.length && instrument) {
+    add(basePdf + encodeURIComponent(String(instrument).trim()) + '.pdf');
+  }
+  return links;
+}
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -1381,6 +1421,52 @@ function sendBewError(res, err) {
   sendJson(res, statusCode, payload);
 }
 
+async function discoverAdaCpfLayer(fetchImpl = fetch, env = process.env) {
+  const portalBase = String(env.ADA_CPF_PORTAL_BASE || DEFAULT_ADA_CPF_PORTAL_BASE).replace(/\/+$/, '');
+  const webmapItemId = String(env.ADA_CPF_WEBMAP_ITEM_ID || DEFAULT_ADA_CPF_WEBMAP_ITEM_ID).trim();
+  const webmapUrl = `${portalBase}/sharing/rest/content/items/${webmapItemId}/data?f=json`;
+
+  const webmapResp = await fetchImpl(webmapUrl);
+  if (!webmapResp.ok) throw new Error(`Unable to load Ada CP&F webmap metadata (${webmapResp.status}).`);
+  const webmap = await webmapResp.json();
+
+  const candidates = [];
+  const walk = (entries) => {
+    for (const entry of (entries || [])) {
+      if (entry?.url) candidates.push(String(entry.url).replace(/[?#].*$/, '').replace(/\/+$/, ''));
+      if (entry?.layers) walk(entry.layers);
+    }
+  };
+  walk(webmap?.operationalLayers);
+
+  const hasInstrumentField = (fields = []) => (fields || []).some(
+    (field) => /instr|instrument/i.test(field?.name || '') || /instr|instrument/i.test(field?.alias || ''),
+  );
+
+  for (const serviceUrl of candidates) {
+    const serviceResp = await fetchImpl(`${serviceUrl}?f=json`).catch(() => null);
+    if (!serviceResp?.ok) continue;
+    const serviceMeta = await serviceResp.json().catch(() => null);
+    if (!serviceMeta) continue;
+
+    if (/esriGeometryPoint/i.test(serviceMeta.geometryType || '') && hasInstrumentField(serviceMeta.fields || [])) {
+      return { layerUrl: serviceUrl, layerMeta: serviceMeta };
+    }
+
+    for (const layer of (serviceMeta.layers || [])) {
+      const layerUrl = `${serviceUrl}/${layer.id}`;
+      const layerResp = await fetchImpl(`${layerUrl}?f=json`).catch(() => null);
+      if (!layerResp?.ok) continue;
+      const layerMeta = await layerResp.json().catch(() => null);
+      if (/esriGeometryPoint/i.test(layerMeta?.geometryType || '') && hasInstrumentField(layerMeta?.fields || [])) {
+        return { layerUrl, layerMeta };
+      }
+    }
+  }
+
+  throw new Error('Could not identify Ada CP&F point layer with instrument fields.');
+}
+
 /* ------------------------------ server ------------------------------ */
 
 export function createSurveyServer({
@@ -1417,6 +1503,8 @@ export function createSurveyServer({
   const pdfThumbnailFailures = new Map();
   const inFlightRosThumbnailGenerations = new Map();
   const rosThumbnailFailures = new Map();
+  let adaCpfLayerInfo = null;
+  let adaCpfLayerInfoPromise = null;
   const sharedRedisClient = (() => {
     if (typeof localStorageSyncStore?.getRedisClient === 'function') {
       return localStorageSyncStore.getRedisClient();
@@ -1500,6 +1588,87 @@ export function createSurveyServer({
       throw createHttpError(502, `Failed to fetch RecordQuarry source text (HTTP ${resp?.status || 'unknown'}).`);
     }
     return await resp.text();
+  }
+
+  async function ensureAdaCpfLayerInfo() {
+    if (adaCpfLayerInfo) return adaCpfLayerInfo;
+    if (!adaCpfLayerInfoPromise) {
+      adaCpfLayerInfoPromise = discoverAdaCpfLayer(recordQuarryTextFetcher, process.env)
+        .then((value) => {
+          adaCpfLayerInfo = value;
+          return value;
+        })
+        .finally(() => {
+          adaCpfLayerInfoPromise = null;
+        });
+    }
+    return adaCpfLayerInfoPromise;
+  }
+
+  async function queryAdaCpfRecordsNearPoint({ lon, lat, maxMeters = 250, outSR = 4326 }) {
+    const x = Number(lon);
+    const y = Number(lat);
+    const distance = Number(maxMeters);
+    const spatialReference = Number(outSR);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw createHttpError(400, 'lon and lat query parameters are required.');
+    }
+
+    const layerInfo = await ensureAdaCpfLayerInfo();
+    const queryUrl = `${String(layerInfo.layerUrl).replace(/\/+$/, '')}/query?${new URLSearchParams({
+      f: 'json',
+      where: '1=1',
+      geometry: JSON.stringify({ x, y, spatialReference: { wkid: spatialReference } }),
+      geometryType: 'esriGeometryPoint',
+      inSR: String(spatialReference),
+      spatialRel: 'esriSpatialRelIntersects',
+      distance: String(Number.isFinite(distance) ? distance : 250),
+      units: 'esriSRUnit_Meter',
+      outFields: '*',
+      returnGeometry: 'true',
+      outSR: '4326',
+    }).toString()}`;
+
+    const queryResp = await recordQuarryTextFetcher(queryUrl);
+    if (!queryResp?.ok) {
+      throw createHttpError(502, `Ada CP&F query failed (HTTP ${queryResp?.status || 'unknown'}).`);
+    }
+
+    const payload = await queryResp.json();
+    const features = Array.isArray(payload?.features) ? payload.features : [];
+    if (!features.length) return [];
+
+    const sampleAttributes = features[0]?.attributes || {};
+    const fields = layerInfo?.layerMeta?.fields || [];
+    const instrumentField = pickCpfField(sampleAttributes, fields, [/^instrument$/i, /instr/i, /instrument_?no/i, /inst_?no/i]);
+    const pdfUrlField = pickCpfField(sampleAttributes, fields, [/pdf/i, /doc/i, /document/i, /hyperlink/i, /url/i, /link/i]);
+    const pdfNameField = pickCpfField(sampleAttributes, fields, [/file/i, /filename/i, /pdfname/i]);
+    const monsetField = pickCpfField(sampleAttributes, fields, [/^monset$/i, /monument.*set/i]);
+    const surveyorField = pickCpfField(sampleAttributes, fields, [/^surveyor$/i]);
+    const townshipField = pickCpfField(sampleAttributes, fields, [/^township$/i]);
+    const rangeField = pickCpfField(sampleAttributes, fields, [/^range$/i]);
+    const sectionField = pickCpfField(sampleAttributes, fields, [/^section$/i]);
+    const indexNumberField = pickCpfField(sampleAttributes, fields, [/^index_?number$/i, /^index$/i]);
+
+    return features.map((feature) => {
+      const attributes = feature?.attributes || {};
+      const instrument = instrumentField ? attributes[instrumentField] : null;
+      const pdfUrl = pdfUrlField ? attributes[pdfUrlField] : null;
+      const pdfName = pdfNameField ? attributes[pdfNameField] : null;
+      const links = buildCpfPdfLinks(instrument, pdfUrl, pdfName);
+      return {
+        instrument,
+        pdfUrl,
+        pdfName,
+        monset: monsetField ? attributes[monsetField] : null,
+        surveyor: surveyorField ? attributes[surveyorField] : null,
+        township: townshipField ? attributes[townshipField] : null,
+        range: rangeField ? attributes[rangeField] : null,
+        section: sectionField ? attributes[sectionField] : null,
+        indexNumber: indexNumberField ? attributes[indexNumberField] : null,
+        links,
+      };
+    }).filter((record) => record.links.length);
   }
 
   function isProjectScopedSnapshotEntry(key, value, projectId) {
@@ -3778,6 +3947,24 @@ export function createSurveyServer({
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Cache-Control', 'public, max-age=1800');
         res.end(text);
+        return;
+      }
+
+      if (urlObj.pathname === '/api/recordquarry/cpf/nearby') {
+        const lon = Number(urlObj.searchParams.get('lon'));
+        const lat = Number(urlObj.searchParams.get('lat'));
+        const maxMeters = Number(urlObj.searchParams.get('maxMeters') || 250);
+        const inSR = Number(urlObj.searchParams.get('inSR') || 4326);
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+          sendJson(res, 400, { error: 'lon and lat query parameters are required.' });
+          return;
+        }
+        try {
+          const records = await queryAdaCpfRecordsNearPoint({ lon, lat, maxMeters, outSR: inSR });
+          sendJson(res, 200, { records });
+        } catch (error) {
+          sendJson(res, Number(error?.status) || 502, { error: String(error?.message || error) });
+        }
         return;
       }
 

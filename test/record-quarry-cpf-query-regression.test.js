@@ -9,6 +9,8 @@ test('RecordQuarry deduplicates CP&F corner lookups and uses one max-radius quer
   assert.match(html, /const\s+cpfCornerRecordsInFlight\s*=\s*new\s+Map\(\)\s*;/, 'RecordQuarry should dedupe in-flight CP&F corner record queries.');
   assert.match(html, /if\s*\(cpfCornerRecordsCache\.has\(key\)\)\s*return\s+cpfCornerRecordsCache\.get\(key\);/, 'RecordQuarry should reuse cached CP&F corner query results.');
   assert.match(html, /if\s*\(cpfCornerRecordsInFlight\.has\(key\)\)\s*return\s+cpfCornerRecordsInFlight\.get\(key\);/, 'RecordQuarry should join an existing in-flight CP&F corner query.');
+  assert.match(html, /requestJson\(`\/api\/recordquarry\/cpf\/nearby\?\$\{new URLSearchParams\(/, 'RecordQuarry should query server-side CP&F nearby endpoint for fresh address lookups.');
+  assert.match(html, /Fall back to browser JSONP layer discovery for environments without API support\./, 'RecordQuarry should keep JSONP fallback when server-side CP&F lookup is unavailable.');
   assert.match(html, /distance:\s*maxMeters,/, 'RecordQuarry should query the CP&F layer once with the final requested distance.');
   assert.doesNotMatch(html, /const\s+radii\s*=\s*\[\s*5\s*,\s*10\s*,\s*25\s*,\s*50\s*,\s*100\s*,\s*150\s*,\s*maxMeters\s*\]/, 'RecordQuarry should not issue escalating-radius query loops per corner lookup.');
 });
