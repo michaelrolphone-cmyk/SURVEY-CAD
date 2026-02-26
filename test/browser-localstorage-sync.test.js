@@ -13,6 +13,7 @@ import {
   shouldRebaseQueueFromServerOnWelcome,
   shouldSyncLocalStorageKey,
   shouldReplayInFlightOnSocketClose,
+  resolveEnqueueBaseChecksum,
   shouldEnterDormantReconnect,
   shouldRunHttpFallbackSync,
   buildSocketEndpointCandidates,
@@ -286,6 +287,56 @@ test('shouldReplayInFlightOnSocketClose only resets in-flight request when queue
     inFlightRequestId: '',
     queueHeadRequestId: 'sync-a',
   }), false);
+});
+
+test('resolveEnqueueBaseChecksum prefers known server checksum and avoids snapshot hashing while queueing', () => {
+  let computeCalls = 0;
+  const computeSnapshotChecksum = () => {
+    computeCalls += 1;
+    return 'fnv1a-computed';
+  };
+
+  assert.equal(resolveEnqueueBaseChecksum({
+    pendingBatchExists: false,
+    queueLength: 0,
+    inFlightRequestId: '',
+    serverChecksum: 'fnv1a-server',
+    computeSnapshotChecksum,
+  }), 'fnv1a-server');
+  assert.equal(computeCalls, 0);
+
+  assert.equal(resolveEnqueueBaseChecksum({
+    pendingBatchExists: true,
+    queueLength: 0,
+    inFlightRequestId: '',
+    serverChecksum: 'fnv1a-server',
+    computeSnapshotChecksum,
+  }), '');
+
+  assert.equal(resolveEnqueueBaseChecksum({
+    pendingBatchExists: false,
+    queueLength: 2,
+    inFlightRequestId: '',
+    serverChecksum: 'fnv1a-server',
+    computeSnapshotChecksum,
+  }), '');
+
+  assert.equal(resolveEnqueueBaseChecksum({
+    pendingBatchExists: false,
+    queueLength: 0,
+    inFlightRequestId: 'sync-flight',
+    serverChecksum: 'fnv1a-server',
+    computeSnapshotChecksum,
+  }), '');
+
+  assert.equal(resolveEnqueueBaseChecksum({
+    pendingBatchExists: false,
+    queueLength: 0,
+    inFlightRequestId: '',
+    serverChecksum: '',
+    computeSnapshotChecksum,
+  }), 'fnv1a-computed');
+  assert.equal(computeCalls, 1);
 });
 
 

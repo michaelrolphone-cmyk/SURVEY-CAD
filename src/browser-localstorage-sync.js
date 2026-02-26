@@ -294,6 +294,23 @@ function shouldReplayInFlightOnSocketClose({
   return String(inFlightRequestId) === String(queueHeadRequestId);
 }
 
+export function resolveEnqueueBaseChecksum({
+  pendingBatchExists = false,
+  queueLength = 0,
+  inFlightRequestId = '',
+  serverChecksum = '',
+  computeSnapshotChecksum = null,
+} = {}) {
+  if (pendingBatchExists) return '';
+  if (queueLength > 0) return '';
+  if (inFlightRequestId) return '';
+  if (serverChecksum) return String(serverChecksum);
+  if (typeof computeSnapshotChecksum === 'function') {
+    return String(computeSnapshotChecksum() || '');
+  }
+  return '';
+}
+
 function shrinkQueuedDifferentialsForStorage(queue = []) {
   const normalizedQueue = Array.isArray(queue) ? queue.filter((entry) => entry && typeof entry === 'object') : [];
   if (!normalizedQueue.length) return [];
@@ -661,7 +678,15 @@ class LocalStorageSocketSync {
       // Compute the pre-write checksum only when starting a new batch. Subsequent writes
       // within an open batch coalesce into it and don't need their own baseChecksum, which
       // avoids an O(N) snapshot read + full hash on every localStorage.setItem call.
-      const baseChecksum = (willEnqueue && !sync.pendingBatch) ? checksumSnapshot(buildSnapshot()) : '';
+      const baseChecksum = willEnqueue
+        ? resolveEnqueueBaseChecksum({
+          pendingBatchExists: Boolean(sync.pendingBatch),
+          queueLength: sync.queue.length,
+          inFlightRequestId: sync.inFlight,
+          serverChecksum: sync.serverChecksum,
+          computeSnapshotChecksum: () => checksumSnapshot(buildSnapshot()),
+        })
+        : '';
       originalSetItem.call(this, keyString, valueString);
       if (willEnqueue) {
         sync.enqueue([{ type: 'set', key: keyString, value: valueString }], { baseChecksum });
@@ -672,7 +697,15 @@ class LocalStorageSocketSync {
       const keyString = String(key);
       const had = this.getItem(keyString) !== null;
       const willEnqueue = !sync.suppress && shouldSyncLocalStorageKey(keyString) && had;
-      const baseChecksum = (willEnqueue && !sync.pendingBatch) ? checksumSnapshot(buildSnapshot()) : '';
+      const baseChecksum = willEnqueue
+        ? resolveEnqueueBaseChecksum({
+          pendingBatchExists: Boolean(sync.pendingBatch),
+          queueLength: sync.queue.length,
+          inFlightRequestId: sync.inFlight,
+          serverChecksum: sync.serverChecksum,
+          computeSnapshotChecksum: () => checksumSnapshot(buildSnapshot()),
+        })
+        : '';
       originalRemoveItem.call(this, keyString);
       if (willEnqueue) {
         sync.enqueue([{ type: 'remove', key: keyString }], { baseChecksum });
@@ -686,7 +719,15 @@ class LocalStorageSocketSync {
         if (shouldSyncLocalStorageKey(key)) keys.push(key);
       }
       const willEnqueue = !sync.suppress && keys.length > 0;
-      const baseChecksum = (willEnqueue && !sync.pendingBatch) ? checksumSnapshot(buildSnapshot()) : '';
+      const baseChecksum = willEnqueue
+        ? resolveEnqueueBaseChecksum({
+          pendingBatchExists: Boolean(sync.pendingBatch),
+          queueLength: sync.queue.length,
+          inFlightRequestId: sync.inFlight,
+          serverChecksum: sync.serverChecksum,
+          computeSnapshotChecksum: () => checksumSnapshot(buildSnapshot()),
+        })
+        : '';
       originalClear.call(this);
       if (willEnqueue) {
         sync.enqueue([{ type: 'clear' }], { baseChecksum });
