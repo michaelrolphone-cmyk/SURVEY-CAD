@@ -2191,7 +2191,7 @@
     function getFieldBookPrintUrl(folderKey = '', entry = {}) {
       if (folderKey === 'cpfs') return getCpfPdfUrl(entry);
       if (folderKey === 'plats') {
-        return String(getPdfPreviewUrl({ key: 'plats' }, entry) || getExternalResourceUrl(entry)).trim();
+        return String(getPdfPreviewUrl({ key: 'plats' }, entry) || getImagePreviewUrl(entry) || getExternalResourceUrl(entry)).trim();
       }
       if (folderKey === 'ros') {
         return String(getPdfPreviewUrl({ key: 'ros' }, entry) || getImagePreviewUrl(entry) || getRosImageUrl(entry)).trim();
