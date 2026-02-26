@@ -432,6 +432,8 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
 
   assert.match(projectBrowserHtml, /if \(folder\.key === 'cpfs' \|\| folder\.key === 'ros' \|\| folder\.key === 'plats'\)/, 'Print starred action should be available in CP&F, ROS, and plats folders');
   assert.match(projectBrowserHtml, /openFieldBookPrintPreview\(folder\.key, folder\.index\)/, 'Print starred action should pass the current folder key so previews use the proper resolver');
+  assert.match(projectBrowserHtml, /function\s+syncPrintStarredButtonState\s*\(printAllButton,\s*folder\s*=\s*\{\}\)\s*\{[\s\S]*getFieldBookPrintUrl\(folder\?\.key, entry\)/, 'Print starred button state should be computed from starred resources with resolvable print URLs across folder types');
+  assert.match(projectBrowserHtml, /syncPrintStarredButtonState\(printAllButton, folder\);/, 'Print starred button should refresh via shared helper after field-book star changes.');
   assert.match(projectBrowserHtml, /async\s+function\s+fetchImageDataUrl\s*\(/, 'Project Browser should define an image fetch helper for ROS and plat print jobs');
   assert.match(projectBrowserHtml, /<img src="\$\{escapeHtml\(thumbnailDataUrl\)\}" alt="\$\{escapeHtml\(fieldBookLabel\)\} thumbnail \$\{index \+ 1\}"/, 'Print preview should render field-book thumbnail images instead of PDF iframes');
   assert.match(projectBrowserHtml, /\.page-block \{ margin: 0 0 1rem; display: flex; justify-content: center; background: #fff; \}/, 'Print preview should center thumbnail pages on-screen with a white background');
