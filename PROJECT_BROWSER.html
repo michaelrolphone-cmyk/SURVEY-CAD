@@ -2188,17 +2188,56 @@
       return setCpfFieldBookStar(resource, starred, projectContext);
     }
 
-    async function openCpfPrintPreview(resources = []) {
+    function getFieldBookPrintUrl(folderKey = '', entry = {}) {
+      if (folderKey === 'cpfs') return getCpfPdfUrl(entry);
+      if (folderKey === 'plats') {
+        return String(getPdfPreviewUrl({ key: 'plats' }, entry) || getExternalResourceUrl(entry)).trim();
+      }
+      if (folderKey === 'ros') {
+        return String(getPdfPreviewUrl({ key: 'ros' }, entry) || getImagePreviewUrl(entry) || getRosImageUrl(entry)).trim();
+      }
+      return '';
+    }
+
+    function isFieldBookPrintPdf(folderKey = '', entry = {}, resolvedUrl = '') {
+      if (folderKey === 'cpfs') return true;
+      if (String(entry?.exportFormat || '').toLowerCase() === 'pdf') return true;
+      return /\.pdf(?:[?#].*)?$/i.test(String(resolvedUrl || '').trim());
+    }
+
+    async function fetchImageDataUrl(imageUrl = '') {
+      if (!imageUrl) return '';
+      const response = await fetch(imageUrl, { method: 'GET' });
+      if (!response.ok) {
+        throw new Error(`image request failed (${response.status})`);
+      }
+      const blob = await response.blob();
+      if (typeof blob.arrayBuffer !== 'function') return '';
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let index = 0; index < bytes.length; index += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+      }
+      return `data:${blob.type || 'image/png'};base64,${btoa(binary)}`;
+    }
+
+    async function openFieldBookPrintPreview(folderKey = '', resources = []) {
+      const fieldBookLabel = getFolderFieldBookLabel(folderKey);
       const printableResources = resources
-        .filter((entry) => isCpfStarredForFieldBook(entry))
-        .map((entry) => ({
-          entry,
-          url: getCpfPdfUrl(entry),
-        }))
+        .filter((entry) => isResourceStarredForFieldBook(entry))
+        .map((entry) => {
+          const url = getFieldBookPrintUrl(folderKey, entry);
+          return {
+            entry,
+            url,
+            isPdf: isFieldBookPrintPdf(folderKey, entry, url),
+          };
+        })
         .filter((item) => item.url);
 
       if (!printableResources.length) {
-        renderError('No starred CP&F PDF records were found for this project. Star CP&Fs for your field book and try again.');
+        renderError(`No starred ${fieldBookLabel} files were found for this project. Star ${fieldBookLabel} records for your field book and try again.`);
         return;
       }
 
@@ -2211,13 +2250,13 @@
         return;
       }
 
-      const thumbnailPages = await Promise.all(printableResources.map(async ({ url, entry }, index) => {
+      const thumbnailPages = await Promise.all(printableResources.map(async ({ url, entry, isPdf }, index) => {
         try {
-          const thumbnailDataUrl = await fetchPdfThumbnailDataUrl(url);
+          const thumbnailDataUrl = isPdf ? await fetchPdfThumbnailDataUrl(url) : await fetchImageDataUrl(url);
           if (!thumbnailDataUrl) return '';
           return `
         <section class="page-block">
-          <img src="${escapeHtml(thumbnailDataUrl)}" alt="CP&amp;F thumbnail ${index + 1}" title="${escapeHtml(entry?.title || `CP&F ${index + 1}`)}" class="cpf-print-thumbnail" />
+          <img src="${escapeHtml(thumbnailDataUrl)}" alt="${escapeHtml(fieldBookLabel)} thumbnail ${index + 1}" title="${escapeHtml(entry?.title || `${fieldBookLabel} ${index + 1}`)}" class="cpf-print-thumbnail" />
         </section>
       `;
         } catch {
@@ -2226,7 +2265,7 @@
       }));
       const pagesMarkup = thumbnailPages.filter(Boolean).join('');
       if (!pagesMarkup) {
-        renderError('No starred CP&F thumbnails could be generated right now. Try again in a moment.');
+        renderError(`No starred ${fieldBookLabel} thumbnails could be generated right now. Try again in a moment.`);
         printWindow.close();
         return;
       }
@@ -2235,7 +2274,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>CP&amp;F Print Preview</title>
+  <title>${escapeHtml(fieldBookLabel)} Print Preview</title>
   <style>
     :root { color-scheme: light; }
     body { font-family: Inter, system-ui, sans-serif; margin: 1rem; color: #0f172a; background: #fff; }
@@ -2255,7 +2294,7 @@
 </head>
 <body>
   <div class="toolbar">
-    <button type="button" class="print-button" onclick="window.print()">Print all CP&amp;F thumbnails</button>
+    <button type="button" class="print-button" onclick="window.print()">Print all ${escapeHtml(fieldBookLabel)} thumbnails</button>
   </div>
   ${pagesMarkup}
 </body>
@@ -3279,14 +3318,14 @@ function openEntryFromFolder(folder, entry, projectContext) {
         });
 
         let printAllButton = null;
-        if (folder.key === 'cpfs') {
+        if (folder.key === 'cpfs' || folder.key === 'ros' || folder.key === 'plats') {
           printAllButton = document.createElement('button');
           printAllButton.type = 'button';
           printAllButton.className = 'launch-btn';
           printAllButton.textContent = 'Print starred';
-          printAllButton.title = 'Builds a single print preview containing starred CP&F PDFs for your field book';
-          printAllButton.addEventListener('click', () => openCpfPrintPreview(folder.index));
-          printAllButton.disabled = !folder.index.some((entry) => entry?.exportFormat === 'pdf' && isCpfStarredForFieldBook(entry));
+          printAllButton.title = `Builds a single print preview containing starred ${getFolderFieldBookLabel(folder.key)} files for your field book`;
+          printAllButton.addEventListener('click', () => openFieldBookPrintPreview(folder.key, folder.index));
+          printAllButton.disabled = !folder.index.some((entry) => isResourceStarredForFieldBook(entry) && getFieldBookPrintUrl(folder.key, entry));
           folderRow.appendChild(printAllButton);
         }
 
