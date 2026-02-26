@@ -967,20 +967,25 @@
       const subdivisionName = String(plat.subdivisionName || '').trim();
       const platId = String(plat.platId || '').trim();
       const title = String(plat.title || subdivisionName || 'Subdivision Plat').trim();
+      const platUrl = String(plat.platUrl || '').trim();
+      const platExtMatch = platUrl.match(/\.([a-z0-9]+)(?:[?#].*)?$/i);
+      const platExt = platExtMatch ? platExtMatch[1].toLowerCase() : '';
+      const exportFormat = platExt || 'pdf';
       return {
         id: platId,
         folder: 'plats',
         title,
-        exportFormat: 'pdf',
+        exportFormat,
         reference: {
           type: 'external',
-          value: String(plat.platUrl || subdivisionName || '').trim(),
+          value: platUrl || subdivisionName || '',
           resolverHint: 'subdivision-plat',
           metadata: {
             source: plat.source || '',
             subdivisionName,
             platId,
-            platUrl: String(plat.platUrl || '').trim(),
+            platUrl,
+            platPdfUrl: String(plat.platPdfUrl || plat.pdfUrl || '').trim(),
             thumbnailUrl: String(plat.thumbnailUrl || '').trim(),
             starredInFieldBook: Boolean(plat.starredInFieldBook),
           },
@@ -1683,10 +1688,17 @@
       if (folder?.key === 'cpfs') {
         return getCpfPdfUrl(entry);
       }
+      if (folder?.key === 'plats') {
+        return String(entry?.reference?.metadata?.platPdfUrl || '').trim();
+      }
       if (entry?.reference?.type === 'server-upload') {
         return String(entry.reference.value || '').trim();
       }
       return '';
+    }
+
+    function getExternalResourceUrl(entry) {
+      return String(entry?.reference?.metadata?.platUrl || entry?.reference?.value || '').trim();
     }
 
     function getRosImageUrl(entry) {
@@ -1710,6 +1722,13 @@
       const format = String(entry?.exportFormat || '').toLowerCase();
       if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff'].includes(format)) return true;
       return isRosImageResource(entry);
+    }
+
+    function getImagePreviewUrl(entry) {
+      if (entry?.reference?.type === 'external') {
+        return String(entry?.reference?.metadata?.thumbnailUrl || getExternalResourceUrl(entry)).trim();
+      }
+      return String(getRosThumbnailUrl(entry) || entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
     }
 
     function getMimeTypeFromFormat(format) {
@@ -1930,9 +1949,9 @@
 
     function attachImagePreview(resource, entry) {
       if (!isImageResource(entry)) return;
-      if (entry?.reference?.type !== 'server-upload' && entry?.reference?.type !== 'ros-number') return;
+      if (entry?.reference?.type !== 'server-upload' && entry?.reference?.type !== 'ros-number' && entry?.reference?.type !== 'external') return;
 
-      const previewUrl = String(getRosThumbnailUrl(entry) || entry?.reference?.metadata?.thumbnailUrl || entry?.reference?.value || '').trim();
+      const previewUrl = getImagePreviewUrl(entry);
       if (!previewUrl) return;
 
       const slot = resource.querySelector('.file-preview-slot');
@@ -2649,6 +2668,14 @@ function openEntryFromFolder(folder, entry, projectContext) {
         openCpfPdfFromResource(entry);
       } else if (canOpenRosImage) {
         window.open(getRosImageUrl(entry), '_blank', 'noopener,noreferrer');
+      } else if (entry?.reference?.type === 'external') {
+        const downloadUrl = getExternalResourceUrl(entry);
+        if (!downloadUrl) return;
+        if (entry?.exportFormat === 'pdf') {
+          openPdfInNewWindow(downloadUrl);
+        } else {
+          window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+        }
       } else if (entry?.reference?.type === 'server-upload') {
         const downloadUrl = String(entry.reference.value || '').trim();
         if (entry?.exportFormat === 'pdf') {
@@ -3538,10 +3565,12 @@ function openEntryFromFolder(folder, entry, projectContext) {
             resource.appendChild(renameButton);
           }
 
-          const isServerUpload = entry?.reference?.type === 'server-upload' && !canLaunchPointForge;
-          if (isServerUpload) {
-            const downloadUrl = entry.reference.value;
+          const isLinkedFile = (entry?.reference?.type === 'server-upload' || entry?.reference?.type === 'external') && !canLaunchPointForge;
+          if (isLinkedFile) {
+            const isExternal = entry?.reference?.type === 'external';
+            const downloadUrl = isExternal ? getExternalResourceUrl(entry) : String(entry.reference.value || '').trim();
             const isServerPdf = entry?.exportFormat === 'pdf';
+            if (!downloadUrl) continue;
             resource.classList.add('pointforge-openable');
             resource.setAttribute('role', 'button');
             resource.setAttribute('tabindex', '0');
