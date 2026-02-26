@@ -4517,6 +4517,66 @@
           }
         }
       }
+    },
+    "/api/recordquarry/cpf/nearby": {
+      "get": {
+        "summary": "Lookup nearby Ada County CP&F records for a map point.",
+        "description": "Resolves CP&F records near the provided point coordinates using server-side layer discovery so new address lookups include aliquot CP&F records without requiring prior browser-side cache warmup.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lon",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lat",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxMeters",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 250
+            }
+          },
+          {
+            "in": "query",
+            "name": "inSR",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 4326
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nearby CP&F records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordQuarryCpfNearbyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing coordinate query parameters."
+          },
+          "502": {
+            "description": "Ada CP&F lookup failed."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5980,17 +6040,6 @@
       },
       "ProjectPointFileSummary": {
         "type": "object",
-        "required": [
-          "pointFileId",
-          "pointFileName",
-          "exportFormat",
-          "createdAt",
-          "updatedAt",
-          "latestVersionId",
-          "versionCount",
-          "source",
-          "sourceLabel"
-        ],
         "properties": {
           "pointFileId": {
             "type": "string"
@@ -6002,17 +6051,11 @@
             "type": "string"
           },
           "createdAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "format": "date-time"
           },
           "updatedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "format": "date-time"
           },
           "latestVersionId": {
@@ -6022,8 +6065,7 @@
             ]
           },
           "versionCount": {
-            "type": "integer",
-            "minimum": 0
+            "type": "integer"
           },
           "source": {
             "type": [
@@ -6038,7 +6080,10 @@
             ]
           }
         },
-        "additionalProperties": false
+        "required": [
+          "pointFileId",
+          "pointFileName"
+        ]
       },
       "SyncStatePushRequest": {
         "type": "object",
@@ -6931,53 +6976,6 @@
           "pointFileId",
           "pointFileName",
           "versions"
-        ]
-      },
-      "ProjectPointFileSummary": {
-        "type": "object",
-        "properties": {
-          "pointFileId": {
-            "type": "string"
-          },
-          "pointFileName": {
-            "type": "string"
-          },
-          "exportFormat": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "latestVersionId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "versionCount": {
-            "type": "integer"
-          },
-          "source": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sourceLabel": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "pointFileId",
-          "pointFileName"
         ]
       },
       "ProjectPointFileMutationRequest": {
@@ -8468,6 +8466,88 @@
             "type": "string"
           }
         }
+      },
+      "RecordQuarryCpfNearbyRecord": {
+        "type": "object",
+        "properties": {
+          "instrument": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pdfUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pdfName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "monset": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "surveyor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "township": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "range": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "indexNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "links"
+        ]
+      },
+      "RecordQuarryCpfNearbyResponse": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordQuarryCpfNearbyRecord"
+            }
+          }
+        },
+        "required": [
+          "records"
+        ]
       }
     }
   }
