@@ -263,7 +263,8 @@
 
     /* Prevent star button from overlapping distance badge in card headers */
     .card.aliquot-card > .chead,
-    .card.ros-card > .chead{
+    .card.ros-card > .chead,
+    .card.subdivision-card > .chead{
       padding-right:44px;
     }
     .card .cbody{padding:10px;}
@@ -369,6 +370,10 @@
       float:left;
       padding:10px 0 10px 10px;
     }
+    .subdivision-thumb-float{
+      float:left;
+      padding:10px 0 10px 10px;
+    }
     
     /* Address card: parcel geometry thumbnail (aligned right) */
     .card.address-card > .chead,
@@ -403,6 +408,11 @@
       vector-effect:non-scaling-stroke;
     }
 .ros-thumb-float > .ros-scan-thumb{
+      float:none;
+      display:block;
+      margin:0;
+    }
+.subdivision-thumb-float > .subdivision-plat-thumb{
       float:none;
       display:block;
       margin:0;
@@ -4675,6 +4685,17 @@
             },
           }
         );
+        c.classList.add('subdivision-card');
+
+        // Subdivision card layout: move thumbnail outside of chead/cbody so it can float left of the header/content.
+        const subdivisionThumb = c.querySelector('img.subdivision-plat-thumb');
+        if (subdivisionThumb) {
+          const wrap = document.createElement('div');
+          wrap.className = 'subdivision-thumb-float';
+          wrap.appendChild(subdivisionThumb);
+          c.insertBefore(wrap, c.firstChild);
+        }
+
         cards.push(c);
       });
 
