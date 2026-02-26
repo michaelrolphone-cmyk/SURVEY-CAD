@@ -284,13 +284,13 @@ test('RecordQuarry.html omits internal service/layer label pills beneath the add
 });
 
 
-test('RecordQuarry.html creates project-file folders with Drawings before RoS', async () => {
+test('RecordQuarry.html creates project-file folders with Plats before RoS', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
 
   assert.match(
     html,
-    /folders:\s*\[[\s\S]*createProjectFileFolder\('drawings',\s*'Drawings'[\s\S]*createProjectFileFolder\('ros',\s*'RoS'/,
-    'Drawings should be listed before RoS in project-file folder defaults',
+    /folders:\s*\[[\s\S]*createProjectFileFolder\('drawings',\s*'Drawings'[\s\S]*createProjectFileFolder\('plats',\s*'Plats'[\s\S]*createProjectFileFolder\('ros',\s*'RoS'/,
+    'Plats should be listed before RoS in project-file folder defaults',
   );
 });
 

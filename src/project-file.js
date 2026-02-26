@@ -8,6 +8,12 @@ export const DEFAULT_PROJECT_FILE_FOLDERS = [
     defaultFormat: 'dxf',
   },
   {
+    key: 'plats',
+    label: 'Plats',
+    description: 'Subdivision plats and plat-related exhibits.',
+    defaultFormat: 'pdf',
+  },
+  {
     key: 'ros',
     label: 'RoS',
     description: 'Record of Survey source files and exports.',
@@ -29,12 +35,6 @@ export const DEFAULT_PROJECT_FILE_FOLDERS = [
     key: 'deeds',
     label: 'Deeds',
     description: 'Deed references and exported documents.',
-    defaultFormat: 'pdf',
-  },
-  {
-    key: 'plats',
-    label: 'Plats',
-    description: 'Subdivision plats and plat-related exhibits.',
     defaultFormat: 'pdf',
   },
   {
