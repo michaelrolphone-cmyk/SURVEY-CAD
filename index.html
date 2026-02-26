@@ -640,12 +640,17 @@ header {
       box-shadow: 0 14px 28px rgb(0 0 0), 0 0 0 1px rgba(255, 214, 155, 0.28) !important;
     }
 
+    .app-card:hover .app-icon {
+      filter: drop-shadow(2px 20px 15px #000);
+    }
+
     .app-icon {
       width: auto;
       height: var(--app-icon-height, 140px);
       max-width: 140px;
       object-fit: contain;
       flex: none;
+      filter: drop-shadow(2px 15px 10px #000);
     }
 
     .app-meta {
