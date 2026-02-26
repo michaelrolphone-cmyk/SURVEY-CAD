@@ -2303,6 +2303,12 @@
       printWindow.focus();
     }
 
+    function syncPrintStarredButtonState(printAllButton, folder = {}) {
+      if (!printAllButton) return;
+      const entries = Array.isArray(folder?.index) ? folder.index : [];
+      printAllButton.disabled = !entries.some((entry) => isResourceStarredForFieldBook(entry) && getFieldBookPrintUrl(folder?.key, entry));
+    }
+
     function loadActiveProjectContext(activeProjectId) {
       try {
         const projects = JSON.parse(localStorage.getItem('surveyfoundryProjects') || '[]');
@@ -3325,7 +3331,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
           printAllButton.textContent = 'Print starred';
           printAllButton.title = `Builds a single print preview containing starred ${getFolderFieldBookLabel(folder.key)} files for your field book`;
           printAllButton.addEventListener('click', () => openFieldBookPrintPreview(folder.key, folder.index));
-          printAllButton.disabled = !folder.index.some((entry) => isResourceStarredForFieldBook(entry) && getFieldBookPrintUrl(folder.key, entry));
+          syncPrintStarredButtonState(printAllButton, folder);
           folderRow.appendChild(printAllButton);
         }
 
@@ -3669,7 +3675,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
                 const folderLabel = getFolderFieldBookLabel(folder?.key);
                 projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || folderLabel} for field book print jobs.`);
                 saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isResourceStarredForFieldBook(e));
+                syncPrintStarredButtonState(printAllButton, folder);
               } catch (error) {
                 syncStarButton(false);
                 const folderLabel = getFolderFieldBookLabel(folder?.key);
@@ -3768,7 +3774,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
                 const folderLabel = getFolderFieldBookLabel(folder?.key);
                 projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || folderLabel} for field book print jobs.`);
                 saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isResourceStarredForFieldBook(e));
+                syncPrintStarredButtonState(printAllButton, folder);
               } catch (error) {
                 syncStarButton(false);
                 const folderLabel = getFolderFieldBookLabel(folder?.key);
@@ -3876,7 +3882,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
                 const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
                 projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
                 saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isCpfStarredForFieldBook(e));
+                syncPrintStarredButtonState(printAllButton, folder);
               } catch (error) {
                 syncStarButton(false);
                 renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
