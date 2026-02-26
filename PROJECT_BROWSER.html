@@ -2636,7 +2636,21 @@
 
     function getDownloadIconUrl(ext) {
       const safeExt = safeFileExt(ext);
-      return `assets/icons/download/Download-${safeExt}.png`;
+      const iconAliases = {
+        tif: 'file',
+        tiff: 'file',
+      };
+      const canonicalExt = iconAliases[safeExt] || safeExt;
+      const iconPathByExt = {
+        csv: 'assets/icons/download/Download-csv.png',
+        pdf: 'assets/icons/download/Download-pdf.png',
+        txt: 'assets/icons/download/Download-TXT.png',
+        json: 'assets/icons/download/Download-JSON.png',
+        dwg: 'assets/icons/download/Download-DWG.png',
+        fld: 'assets/icons/download/Download-FLD.png',
+        file: 'assets/icons/download/Download-file.png',
+      };
+      return iconPathByExt[canonicalExt] || iconPathByExt.file;
     }
 
     function setImgToDownloadIcon(imgEl, ext) {
@@ -3382,6 +3396,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
           const actionButtons = document.createElement('div');
           actionButtons.className = 'file-actions';
           resource.appendChild(actionButtons);
+          const isServerUpload = entry?.reference?.type === 'server-upload';
 
           if (canLaunchPointForge) {
             attachPointFilePreview(resource, entry).catch(() => {});
