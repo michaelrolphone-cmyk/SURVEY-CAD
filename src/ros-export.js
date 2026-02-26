@@ -379,14 +379,32 @@ export function buildRosBoundaryCsvRowsPNEZD({
 
   const lines = [];
   let pointNumber = startPoint;
+  const emittedPoints = [];
 
   for (const [key, point] of points.entries()) {
+    emittedPoints.push({ key, point });
+  }
+
+  const parcelPointIndices = emittedPoints
+    .map(({ point }, index) => (point.sources.has('parcel') ? index : -1))
+    .filter((index) => index >= 0);
+  const firstParcelPointIndex = parcelPointIndices.length ? parcelPointIndices[0] : -1;
+  const lastParcelPointIndex = parcelPointIndices.length ? parcelPointIndices[parcelPointIndices.length - 1] : -1;
+
+  for (let pointIndex = 0; pointIndex < emittedPoints.length; pointIndex++) {
+    const { key, point } = emittedPoints[pointIndex];
     const isPlssOnlyPoint = !point.sources.has('parcel') && !point.sources.has('subdivision');
     let code = 'COR';
     if (point.sources.has('parcel')) code = 'COR';
     else if (point.sources.has('subdivision')) code = 'SUB';
     else if (point.sources.has('aliquot') || point.sources.has('section')) {
       code = classifyPlssCode(point.east, point.north, sectionFeature2243);
+    }
+
+    if (point.sources.has('parcel') && pointIndex === firstParcelPointIndex) {
+      code = 'COR BEG';
+    } else if (point.sources.has('parcel') && pointIndex === lastParcelPointIndex) {
+      code = 'COR CLO';
     }
 
     const note = notesByCoordinate.get(key) || '';
