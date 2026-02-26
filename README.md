@@ -1392,3 +1392,17 @@ RecordQuarry address-keyed cache entries now persist coordinate-only lookup summ
 - CLI/server commands:
   - `npm start`
   - `npm test -- test/record-quarry-cache-store.test.js test/record-quarry-cache-api.test.js`
+
+## API and CLI notes for subdivision plat multipage EvidenceDesk handling
+
+EvidenceDesk subdivision plat records now prefer the generated multipage PDF route when available, so opening/printing plats uses the assembled document instead of a single source page.
+
+### API endpoints
+
+- `GET /api/idaho-harvest/subdivision-plats/:platId/pdf` – generated multipage subdivision plat PDF used by EvidenceDesk plat open + print flows.
+
+### Commands
+
+- `npm start` – run the API server and EvidenceDesk UI that uses the subdivision plat PDF route.
+- `node --test test/project-browser-plats-tiff-regression.test.js test/record-quarry-subdivision-plat-regression.test.js` – verify subdivision plat PDF preference and metadata wiring.
+
