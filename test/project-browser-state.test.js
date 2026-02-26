@@ -56,6 +56,29 @@ test('loadStoredProjectFile returns persisted project file snapshots by project 
   assert.deepEqual(loaded, storedProject);
 });
 
+test('loadStoredProjectFile enforces built-in folder ordering for legacy snapshots', () => {
+  const projectId = 'project-legacy-order';
+  const storedProject = {
+    schemaVersion: '1.0.0',
+    folders: [
+      { key: 'drawings', index: [] },
+      { key: 'ros', index: [] },
+      { key: 'plats', index: [] },
+      { key: 'custom-folder', custom: true, index: [] },
+      { key: 'cpfs', index: [] },
+    ],
+  };
+  const storage = makeStorage({
+    [`${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`]: JSON.stringify(storedProject),
+  });
+
+  const loaded = loadStoredProjectFile(storage, projectId);
+
+  assert.deepEqual(
+    loaded.folders.map((folder) => folder.key),
+    ['drawings', 'plats', 'ros', 'cpfs', 'custom-folder'],
+  );
+});
 test('loadStoredProjectFile ignores malformed project-file snapshots', () => {
   const projectId = 'project-abc';
   const storage = makeStorage({

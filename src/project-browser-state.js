@@ -1,5 +1,9 @@
+import { DEFAULT_PROJECT_FILE_FOLDERS } from './project-file.js';
+
 export const PROJECT_FILE_STORAGE_PREFIX = 'surveyfoundryProjectFile';
 export const PROJECT_POINT_FILE_STORAGE_PREFIX = 'surveyfoundryPointFile';
+
+const BUILT_IN_FOLDER_ORDER = DEFAULT_PROJECT_FILE_FOLDERS.map((folder) => folder.key);
 
 function projectFileStorageKey(projectId) {
   return `${PROJECT_FILE_STORAGE_PREFIX}:${projectId}`;
@@ -22,6 +26,13 @@ export function loadStoredProjectFile(storage, projectId) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.folders)) return null;
+    const orderedBuiltInFolders = [];
+    for (const folderKey of BUILT_IN_FOLDER_ORDER) {
+      const matchingFolder = parsed.folders.find((folder) => folder?.key === folderKey);
+      if (matchingFolder) orderedBuiltInFolders.push(matchingFolder);
+    }
+    const remainingFolders = parsed.folders.filter((folder) => !BUILT_IN_FOLDER_ORDER.includes(folder?.key));
+    parsed.folders = [...orderedBuiltInFolders, ...remainingFolders];
     return parsed;
   } catch {
     return null;
