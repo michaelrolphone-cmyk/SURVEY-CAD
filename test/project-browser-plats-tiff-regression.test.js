@@ -12,13 +12,18 @@ test('PROJECT_BROWSER maps plat export format from plat URLs and keeps optional 
   );
   assert.match(
     html,
-    /const\s+exportFormat\s*=\s*platExt\s*\|\|\s*'pdf';/,
-    'Project Browser should only fall back to PDF export format when no plat URL extension is available.',
+    /const\s+exportFormat\s*=\s*platPdfUrl\s*\?\s*'pdf'\s*:\s*\(platExt\s*\|\|\s*'pdf'\);/,
+    'Project Browser should force PDF export format whenever a generated plat PDF URL is available.',
   );
   assert.match(
     html,
-    /platPdfUrl:\s*String\(plat\.platPdfUrl\s*\|\|\s*plat\.pdfUrl\s*\|\|\s*''\)\.trim\(\)/,
-    'Project Browser should preserve optional API-provided plat PDF generator URLs for preferred PDF rendering paths.',
+    /const\s+platPdfUrl\s*=\s*String\(plat\.platPdfUrl\s*\|\|\s*plat\.pdfUrl\s*\|\|\s*plat\?\.metadata\?\.plat\?\.platPdfUrl\s*\|\|\s*generatedPlatPdfUrl\s*\|\|\s*''\)\.trim\(\);/,
+    'Project Browser should preserve API-provided plat PDF URLs and derive one from subdivision doc IDs when available.',
+  );
+  assert.match(
+    html,
+    /const\s+resolvedPlatValue\s*=\s*platPdfUrl\s*\|\|\s*platUrl\s*\|\|\s*subdivisionName\s*\|\|\s*'';/,
+    'Project Browser should prioritize generated plat PDFs when users open EvidenceDesk subdivision plat files.',
   );
 });
 
