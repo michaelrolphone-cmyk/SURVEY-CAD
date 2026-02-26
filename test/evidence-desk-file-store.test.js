@@ -323,6 +323,51 @@ test('createEvidenceDeskFileStore uses path-style requests for Stackhero MinIO h
   }
 });
 
+test('createEvidenceDeskFileStore respects Stackhero MinIO port and SSL env keys', async () => {
+  const originalEnv = { ...process.env };
+  const originalFetch = global.fetch;
+  const requests = [];
+
+  process.env.STACKHERO_MINIO_HOST = 'minio.stackhero.network';
+  process.env.STACKHERO_MINIO_ACCESS_KEY = 'access-key';
+  process.env.STACKHERO_MINIO_SECRET_KEY = 'secret-key';
+  process.env.STACKHERO_MINIO_BUCKET = 'survey-foundry';
+  process.env.STACKHERO_MINIO_PORT = '9000';
+  process.env.STACKHERO_MINIO_USE_SSL = 'false';
+  delete process.env.EVIDENCE_DESK_S3_URL;
+  delete process.env.AH_S3_OBJECT_STORAGE_STACKHERO_URL;
+  delete process.env.AH_S3_OBJECT_STORAGE_STACKHERO;
+
+  global.fetch = async (url) => {
+    requests.push(String(url));
+    return {
+      status: 200,
+      arrayBuffer: async () => new Uint8Array().buffer,
+    };
+  };
+
+  try {
+    const result = await createEvidenceDeskFileStore({ redisClient: null, s3Client: null });
+    assert.equal(result.type, 's3');
+
+    await result.store.createFile({
+      projectId: 'proj-stackhero-port',
+      folderKey: 'photos',
+      originalFileName: 'stackhero-port-test.txt',
+      buffer: Buffer.from('hello stackhero port', 'utf8'),
+      extension: 'txt',
+      mimeType: 'text/plain',
+    });
+
+    assert.ok(requests.length > 0, 'expected at least one signed S3 request');
+    const uploadRequest = requests.find((entry) => entry.includes('stackhero-port-test.txt')) || requests[0];
+    assert.match(uploadRequest, /^http:\/\/minio\.stackhero\.network:9000\/survey-foundry\//, 'Stackhero MinIO port + SSL env keys should shape endpoint protocol and port');
+  } finally {
+    global.fetch = originalFetch;
+    process.env = originalEnv;
+  }
+});
+
 test('createEvidenceDeskFileStore falls back to in-memory when redis connect stalls', async () => {
   let quitCalled = false;
   const neverConnectingClient = {
