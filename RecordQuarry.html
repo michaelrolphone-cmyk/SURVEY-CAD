@@ -2255,6 +2255,20 @@
     return el;
   }
 
+  function createResultCategoryHeader(label, detail = '') {
+    const el = document.createElement('div');
+    el.className = 'card rq-result-category';
+    el.innerHTML = `
+      <div class="chead" style="align-items:center">
+        <div style="min-width:0">
+          <div class="rq-distance-group-title">${escapeHtml(label)}</div>
+          <div class="rq-distance-group-sub">${escapeHtml(detail || '')}</div>
+        </div>
+      </div>
+    `;
+    return el;
+  }
+
   function fmtDist(m) {
     const mi = m / 1609.344;
     const decimals = mi < 0.1 ? 3 : 2;
@@ -4629,6 +4643,9 @@
       }
 
       // Render subdivision plat cards after aliquot CP&F summaries and before ROS cards.
+      if (subdivisionCards.length) {
+        cards.push(createResultCategoryHeader('Subdivisions', 'Subdivision plats'));
+      }
       subdivisionCards.forEach((entry, idx) => {
         const feature = entry?.feature || null;
         if (!feature) return;
@@ -4700,6 +4717,7 @@
       });
 
       if (ros.length) {
+        cards.push(createResultCategoryHeader('Records of Survey', 'Record of Survey sections'));
         const ROS_COLLAPSE_DIST_M = 500; // metres
 
         function rosFeatureCentroid(feature) {
