@@ -18,6 +18,8 @@ import {
   buildSocketEndpointCandidates,
   buildApiEndpointCandidates,
   shrinkQueuedDifferentialsForStorage,
+  mergeObjectStorageValues,
+  resolveIncomingStorageValue,
 } from '../src/browser-localstorage-sync.js';
 import { computeSnapshotChecksum } from '../src/localstorage-sync-store.js';
 
@@ -481,4 +483,42 @@ test('shouldRebaseQueueFromWelcomeSnapshotImmediately uses welcome snapshot when
     hasPendingBatch: false,
     serverSnapshot: null,
   }), false);
+});
+
+
+test('mergeObjectStorageValues preserves local project tombstones while accepting newer remote timestamps', () => {
+  const existing = JSON.stringify({
+    alpha: '2026-01-01T00:00:00.000Z',
+    beta: '2026-01-02T00:00:00.000Z',
+  });
+  const incoming = JSON.stringify({
+    alpha: '2025-12-30T00:00:00.000Z',
+    gamma: '2026-01-03T00:00:00.000Z',
+  });
+
+  const merged = JSON.parse(mergeObjectStorageValues(existing, incoming));
+
+  assert.deepEqual(merged, {
+    alpha: '2026-01-01T00:00:00.000Z',
+    beta: '2026-01-02T00:00:00.000Z',
+    gamma: '2026-01-03T00:00:00.000Z',
+  });
+});
+
+test('resolveIncomingStorageValue merges surveyfoundryDeletedProjects without clobbering local tombstones', () => {
+  const localTombstones = JSON.stringify({
+    projectA: '2026-01-05T12:30:00.000Z',
+  });
+  const remoteTombstones = JSON.stringify({
+    projectA: '2026-01-01T00:00:00.000Z',
+    projectB: '2026-01-06T08:00:00.000Z',
+  });
+
+  const resolved = JSON.parse(resolveIncomingStorageValue('surveyfoundryDeletedProjects', remoteTombstones, localTombstones));
+
+  assert.deepEqual(resolved, {
+    projectA: '2026-01-05T12:30:00.000Z',
+    projectB: '2026-01-06T08:00:00.000Z',
+  });
+  assert.equal(resolveIncomingStorageValue('surveyfoundryProjects', '[1]', '[2]'), '[1]');
 });
