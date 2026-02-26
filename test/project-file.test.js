@@ -146,6 +146,12 @@ test('createProjectFile places Drawings first and sorts drawing resources by lat
   assert.deepEqual(drawingsFolder.index.map((entry) => entry.id), ['drawing-newer', 'drawing-older']);
 });
 
+test('default project folders list Plats before RoS for EvidenceDesk navigation', () => {
+  const keys = DEFAULT_PROJECT_FILE_FOLDERS.map((folder) => folder.key);
+  assert.ok(keys.indexOf('plats') !== -1, 'default folders should include plats');
+  assert.ok(keys.indexOf('ros') !== -1, 'default folders should include ros');
+  assert.ok(keys.indexOf('plats') < keys.indexOf('ros'), 'Plats should appear above RoS in default folder order');
+});
 test('DEFAULT_PROJECT_FILE_FOLDERS exports the same built-in folder list as PROJECT_FILE_FOLDERS', () => {
   assert.ok(Array.isArray(DEFAULT_PROJECT_FILE_FOLDERS), 'DEFAULT_PROJECT_FILE_FOLDERS should be an array');
   assert.ok(DEFAULT_PROJECT_FILE_FOLDERS.length > 0, 'DEFAULT_PROJECT_FILE_FOLDERS should not be empty');
