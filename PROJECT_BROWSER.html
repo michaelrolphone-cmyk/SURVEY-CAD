@@ -1731,9 +1731,8 @@
 
     const CPH_TOOLTIP_MARGIN = 16;
     const CPH_GAP = 14;
-    const THUMBNAIL_STRIP_INITIAL_BATCH = 40;
-    const THUMBNAIL_STRIP_BATCH_SIZE = 40;
-    const THUMBNAIL_STRIP_LARGE_FOLDER_THRESHOLD = 120;
+    const THUMBNAIL_STRIP_MIN_VISIBLE_ITEMS = 1;
+    const THUMBNAIL_STRIP_FALLBACK_ITEM_WIDTH = 74;
     let cpfHoverPreviewTooltip = null;
     const THUMBNAIL_TASK_MAX_CONCURRENCY = 4;
     const thumbnailTaskQueue = [];
@@ -2749,21 +2748,35 @@ function openEntryFromFolder(folder, entry, projectContext) {
           return;
         }
 
-        const shouldPaginateStrip = toRender.length > THUMBNAIL_STRIP_LARGE_FOLDER_THRESHOLD;
-        const status = document.createElement('span');
-        status.className = 'folder-thumb-empty';
-        status.style.marginRight = '8px';
-        const showMoreButton = document.createElement('button');
-        showMoreButton.type = 'button';
-        showMoreButton.className = 'launch-btn';
-        showMoreButton.textContent = 'Load more previews';
-        showMoreButton.style.marginLeft = '8px';
-        let renderedCount = 0;
-
-        const updateStripControls = () => {
-          if (!shouldPaginateStrip) return;
-          status.textContent = `Showing ${renderedCount.toLocaleString()} of ${toRender.length.toLocaleString()} thumbnails.`;
-          showMoreButton.hidden = renderedCount >= toRender.length;
+        const getVisibleStripCount = () => {
+          const stripRect = strip.getBoundingClientRect();
+          const stripWidth = Number.isFinite(stripRect.width) && stripRect.width > 0
+            ? stripRect.width
+            : strip.clientWidth;
+          if (!stripWidth || stripWidth <= 0) {
+            return Math.min(toRender.length, THUMBNAIL_STRIP_MIN_VISIBLE_ITEMS);
+          }
+          const gap = Number.parseFloat(window.getComputedStyle(strip).columnGap || window.getComputedStyle(strip).gap || '0') || 0;
+          const sampleItem = document.createElement('div');
+          sampleItem.className = 'folder-thumb-item';
+          sampleItem.style.visibility = 'hidden';
+          sampleItem.style.pointerEvents = 'none';
+          sampleItem.style.position = 'absolute';
+          sampleItem.style.left = '-99999px';
+          const sampleThumb = document.createElement('img');
+          sampleThumb.className = 'folder-thumb-img folder-thumb-icon';
+          sampleThumb.alt = '';
+          sampleItem.appendChild(sampleThumb);
+          const sampleLabel = document.createElement('div');
+          sampleLabel.className = 'folder-thumb-label';
+          sampleLabel.textContent = 'W';
+          sampleItem.appendChild(sampleLabel);
+          strip.appendChild(sampleItem);
+          const measuredWidth = sampleItem.getBoundingClientRect().width;
+          sampleItem.remove();
+          const itemWidth = measuredWidth > 0 ? measuredWidth : THUMBNAIL_STRIP_FALLBACK_ITEM_WIDTH;
+          const fitCount = Math.floor((stripWidth + gap) / Math.max(1, itemWidth + gap));
+          return Math.max(THUMBNAIL_STRIP_MIN_VISIBLE_ITEMS, Math.min(toRender.length, fitCount));
         };
 
         const observeOrAttachPreview = (item, thumbImg, entry) => {
@@ -2775,48 +2788,46 @@ function openEntryFromFolder(folder, entry, projectContext) {
           attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
         };
 
-        const renderBatch = () => {
-          const batchLimit = shouldPaginateStrip
-            ? Math.min(toRender.length, renderedCount + (renderedCount ? THUMBNAIL_STRIP_BATCH_SIZE : THUMBNAIL_STRIP_INITIAL_BATCH))
-            : toRender.length;
-          for (; renderedCount < batchLimit; renderedCount += 1) {
-            const entry = toRender[renderedCount];
-          const item = document.createElement('div');
-          item.className = 'folder-thumb-item';
-          item.title = entry?.title || entry?.id || 'File';
+        const renderVisibleStripItems = () => {
+          strip.replaceChildren();
+          const visibleCount = getVisibleStripCount();
+          for (let index = 0; index < visibleCount; index += 1) {
+            const entry = toRender[index];
+            const item = document.createElement('div');
+            item.className = 'folder-thumb-item';
+            item.title = entry?.title || entry?.id || 'File';
 
-          // Always show an icon immediately; if a real thumbnail is generated, it will replace this.
-          const thumbImg = document.createElement('img');
-          thumbImg.className = 'folder-thumb-img folder-thumb-icon';
-          thumbImg.alt = entry?.title || entry?.id || 'File';
-          thumbImg.decoding = 'async';
-          setImgToDownloadIcon(thumbImg, entry?.exportFormat);
+            // Always show an icon immediately; if a real thumbnail is generated, it will replace this.
+            const thumbImg = document.createElement('img');
+            thumbImg.className = 'folder-thumb-img folder-thumb-icon';
+            thumbImg.alt = entry?.title || entry?.id || 'File';
+            thumbImg.decoding = 'async';
+            setImgToDownloadIcon(thumbImg, entry?.exportFormat);
 
-          observeOrAttachPreview(item, thumbImg, entry);
-          bindHoverPreview(thumbImg, entry, {
-            requireLoadedFlag: true,
-            altText: entry?.title || entry?.id || 'File preview',
-          });
+            observeOrAttachPreview(item, thumbImg, entry);
+            bindHoverPreview(thumbImg, entry, {
+              requireLoadedFlag: true,
+              altText: entry?.title || entry?.id || 'File preview',
+            });
 
-          item.appendChild(thumbImg);
+            item.appendChild(thumbImg);
 
-          const label = document.createElement('div');
-          label.className = 'folder-thumb-label';
-          label.textContent = entry?.title || entry?.id || 'File';
-          item.appendChild(label);
+            const label = document.createElement('div');
+            label.className = 'folder-thumb-label';
+            label.textContent = entry?.title || entry?.id || 'File';
+            item.appendChild(label);
 
-          item.addEventListener('click', () => openEntryFromFolder(folder, entry, projectContext));
-          strip.appendChild(item);
-        }
-          updateStripControls();
+            item.addEventListener('click', () => openEntryFromFolder(folder, entry, projectContext));
+            strip.appendChild(item);
+          }
         };
 
-        if (shouldPaginateStrip) {
-          strip.append(status, showMoreButton);
-          showMoreButton.addEventListener('click', () => renderBatch());
-          renderBatch();
+        renderVisibleStripItems();
+        if (typeof window.ResizeObserver === 'function') {
+          const resizeObserver = new ResizeObserver(() => renderVisibleStripItems());
+          resizeObserver.observe(strip);
         } else {
-          renderBatch();
+          window.addEventListener('resize', renderVisibleStripItems);
         }
       };
 
