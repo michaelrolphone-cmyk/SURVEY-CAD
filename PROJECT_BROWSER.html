@@ -1731,6 +1731,9 @@
 
     const CPH_TOOLTIP_MARGIN = 16;
     const CPH_GAP = 14;
+    const THUMBNAIL_STRIP_INITIAL_BATCH = 40;
+    const THUMBNAIL_STRIP_BATCH_SIZE = 40;
+    const THUMBNAIL_STRIP_LARGE_FOLDER_THRESHOLD = 120;
     let cpfHoverPreviewTooltip = null;
     const THUMBNAIL_TASK_MAX_CONCURRENCY = 4;
     const thumbnailTaskQueue = [];
@@ -2701,6 +2704,31 @@ function openEntryFromFolder(folder, entry, projectContext) {
       const strip = document.createElement('div');
       strip.className = 'folder-thumbnail-strip';
       const allEntries = Array.isArray(folder.index) ? folder.index : [];
+      const stripPreviewObserver = typeof window.IntersectionObserver === 'function'
+        ? new IntersectionObserver((entries) => {
+            for (const observedEntry of entries) {
+              if (!observedEntry.isIntersecting) continue;
+              const target = observedEntry.target;
+              stripPreviewObserver.unobserve(target);
+              const thumbImg = target.querySelector('.folder-thumb-img');
+              if (!thumbImg) continue;
+              const rawResource = target.dataset.resource;
+              if (!rawResource) continue;
+              let resourceEntry = null;
+              try {
+                resourceEntry = JSON.parse(rawResource);
+              } catch {
+                continue;
+              }
+              if (!resourceEntry) continue;
+              attachThumbStripItemPreview(thumbImg, folder, resourceEntry).catch(() => {});
+            }
+          }, {
+            root: null,
+            rootMargin: '160px 0px',
+            threshold: 0.05,
+          })
+        : null;
 
       if (!allEntries.length) {
         const emptyMsg = document.createElement('span');
@@ -2721,7 +2749,38 @@ function openEntryFromFolder(folder, entry, projectContext) {
           return;
         }
 
-        for (const entry of toRender) {
+        const shouldPaginateStrip = toRender.length > THUMBNAIL_STRIP_LARGE_FOLDER_THRESHOLD;
+        const status = document.createElement('span');
+        status.className = 'folder-thumb-empty';
+        status.style.marginRight = '8px';
+        const showMoreButton = document.createElement('button');
+        showMoreButton.type = 'button';
+        showMoreButton.className = 'launch-btn';
+        showMoreButton.textContent = 'Load more previews';
+        showMoreButton.style.marginLeft = '8px';
+        let renderedCount = 0;
+
+        const updateStripControls = () => {
+          if (!shouldPaginateStrip) return;
+          status.textContent = `Showing ${renderedCount.toLocaleString()} of ${toRender.length.toLocaleString()} thumbnails.`;
+          showMoreButton.hidden = renderedCount >= toRender.length;
+        };
+
+        const observeOrAttachPreview = (item, thumbImg, entry) => {
+          if (stripPreviewObserver) {
+            item.dataset.resource = JSON.stringify(entry || null);
+            stripPreviewObserver.observe(item);
+            return;
+          }
+          attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
+        };
+
+        const renderBatch = () => {
+          const batchLimit = shouldPaginateStrip
+            ? Math.min(toRender.length, renderedCount + (renderedCount ? THUMBNAIL_STRIP_BATCH_SIZE : THUMBNAIL_STRIP_INITIAL_BATCH))
+            : toRender.length;
+          for (; renderedCount < batchLimit; renderedCount += 1) {
+            const entry = toRender[renderedCount];
           const item = document.createElement('div');
           item.className = 'folder-thumb-item';
           item.title = entry?.title || entry?.id || 'File';
@@ -2733,7 +2792,7 @@ function openEntryFromFolder(folder, entry, projectContext) {
           thumbImg.decoding = 'async';
           setImgToDownloadIcon(thumbImg, entry?.exportFormat);
 
-          attachThumbStripItemPreview(thumbImg, folder, entry).catch(() => {});
+          observeOrAttachPreview(item, thumbImg, entry);
           bindHoverPreview(thumbImg, entry, {
             requireLoadedFlag: true,
             altText: entry?.title || entry?.id || 'File preview',
@@ -2748,6 +2807,16 @@ function openEntryFromFolder(folder, entry, projectContext) {
 
           item.addEventListener('click', () => openEntryFromFolder(folder, entry, projectContext));
           strip.appendChild(item);
+        }
+          updateStripControls();
+        };
+
+        if (shouldPaginateStrip) {
+          strip.append(status, showMoreButton);
+          showMoreButton.addEventListener('click', () => renderBatch());
+          renderBatch();
+        } else {
+          renderBatch();
         }
       };
 

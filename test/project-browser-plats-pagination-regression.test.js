@@ -20,4 +20,20 @@ test('PROJECT_BROWSER paginates large plats folders to avoid EvidenceDesk render
     /Showing\s+\$\{renderedCount\.toLocaleString\(\)\}\s+of\s+\$\{folderEntries\.length\.toLocaleString\(\)\}\s+plats\./,
     'Project Browser should display rendered plat counts to keep the UI responsive while browsing large lists.',
   );
+
+  assert.match(
+    html,
+    /showMoreButton\.textContent\s*=\s*'Load more previews';/,
+    'Project Browser should paginate collapsed thumbnail strips so large record sets do not enqueue every preview at once.',
+  );
+  assert.match(
+    html,
+    /const\s+stripPreviewObserver\s*=\s*typeof\s+window\.IntersectionObserver\s*===\s*'function'/,
+    'Project Browser should defer thumbnail work with intersection observation for collapsed folder strips.',
+  );
+  assert.match(
+    html,
+    /stripPreviewObserver\.observe\(item\);/,
+    'Project Browser should enqueue thumbnail rendering only for strip items approaching the viewport.',
+  );
 });
