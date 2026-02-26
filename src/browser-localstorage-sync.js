@@ -8,6 +8,9 @@ const SERVER_ONLY_KEY_PATTERNS = [
   /^surveyfoundryActiveProjectId(?::.+)?$/,
   /^project:ros:project-[^:]+:unlisted-\d+$/,
 ];
+const MERGED_OBJECT_KEYS = new Set([
+  'surveyfoundryDeletedProjects',
+]);
 const PENDING_DIFFS_KEY = 'surveyfoundryLocalStoragePendingDiffs';
 const SYNC_META_KEY = 'surveyfoundryLocalStorageSyncMeta';
 const INITIAL_RECONNECT_DELAY_MS = 1500;
@@ -35,6 +38,44 @@ function normalizeSnapshot(snapshot = {}) {
       .map(([key, value]) => [String(key), String(value)])
       .filter(([key]) => shouldSyncLocalStorageKey(key)),
   );
+}
+
+function parseMergedObjectValue(value) {
+  try {
+    const parsed = JSON.parse(String(value ?? '{}'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, entryValue]) => [String(key), String(entryValue)]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function mergeObjectStorageValues(existingValue = '{}', incomingValue = '{}') {
+  const existingEntries = parseMergedObjectValue(existingValue);
+  const incomingEntries = parseMergedObjectValue(incomingValue);
+
+  const merged = { ...existingEntries };
+  Object.entries(incomingEntries).forEach(([entryKey, incomingEntryValue]) => {
+    const existingEntryValue = merged[entryKey];
+    const existingTime = Date.parse(String(existingEntryValue || ''));
+    const incomingTime = Date.parse(String(incomingEntryValue || ''));
+    if (!Number.isNaN(incomingTime) && !Number.isNaN(existingTime)) {
+      merged[entryKey] = incomingTime >= existingTime ? incomingEntryValue : existingEntryValue;
+      return;
+    }
+    if (Number.isNaN(existingTime)) {
+      merged[entryKey] = incomingEntryValue;
+    }
+  });
+
+  return JSON.stringify(merged);
+}
+
+function resolveIncomingStorageValue(key, incomingValue, existingValue = null) {
+  if (!MERGED_OBJECT_KEYS.has(String(key || ''))) return String(incomingValue ?? '');
+  return mergeObjectStorageValues(existingValue ?? '{}', incomingValue ?? '{}');
 }
 
 
@@ -882,7 +923,12 @@ class LocalStorageSocketSync {
         if (operation?.type === 'set' && operation.key) {
           const key = String(operation.key);
           if (!shouldSyncLocalStorageKey(key)) return;
-          window.localStorage.setItem(key, String(operation.value ?? ''));
+          const value = resolveIncomingStorageValue(
+            key,
+            String(operation.value ?? ''),
+            window.localStorage.getItem(key),
+          );
+          window.localStorage.setItem(key, value);
           return;
         }
         if (operation?.type === 'remove' && operation.key) {
@@ -920,6 +966,11 @@ class LocalStorageSocketSync {
 
   #applyServerSnapshot(snapshot = {}, { checksum = '', version = 0 } = {}) {
     const normalizedSnapshot = normalizeSnapshot(snapshot || {});
+    MERGED_OBJECT_KEYS.forEach((key) => {
+      const existingValue = window.localStorage.getItem(key);
+      if (existingValue === null && !(key in normalizedSnapshot)) return;
+      normalizedSnapshot[key] = resolveIncomingStorageValue(key, normalizedSnapshot[key], existingValue);
+    });
 
     this.suppress = true;
     try {
@@ -935,7 +986,8 @@ class LocalStorageSocketSync {
       });
       Object.entries(normalizedSnapshot).forEach(([key, value]) => {
         if (shouldSyncLocalStorageKey(key)) {
-          window.localStorage.setItem(key, String(value));
+          const nextValue = resolveIncomingStorageValue(key, String(value ?? ''), window.localStorage.getItem(key));
+          window.localStorage.setItem(key, nextValue);
         }
       });
     } finally {
@@ -1116,4 +1168,6 @@ export {
   buildSocketEndpointCandidates,
   buildApiEndpointCandidates,
   shrinkQueuedDifferentialsForStorage,
+  mergeObjectStorageValues,
+  resolveIncomingStorageValue,
 };
