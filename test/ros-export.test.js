@@ -172,12 +172,29 @@ test('buildRosBoundaryCsvRowsPNEZD applies simplified codes and optional CP&F no
 
   const lines = csv.trim().split('\n');
   assert.equal(count, lines.length);
-  assert.match(lines[0], /,COR,$/);
+  assert.match(lines[0], /,COR BEG,$/);
   assert.ok(lines.some((line) => /,SUB,$/.test(line)), 'should include subdivision code');
   assert.ok(lines.some((line) => /,16COR,$/.test(line)), 'should classify aliquot corners as 16th corners');
   assert.ok(lines.some((line) => /,CSECOR,CPNFS: 1234567\.\.\.321111\.\.\.65456$/.test(line)), 'should include CP&F notes for PLSS points');
 });
 
+
+
+test('buildRosBoundaryCsvRowsPNEZD marks first and last parcel points as COR BEG/COR CLO', () => {
+  const parcel = {
+    geometry: { rings: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] },
+  };
+
+  const { csv } = buildRosBoundaryCsvRowsPNEZD({
+    parcelFeature2243: parcel,
+    startPoint: 1,
+  });
+
+  const lines = csv.trim().split('\n');
+  assert.match(lines[0], /,COR BEG,$/);
+  assert.match(lines[lines.length - 1], /,COR CLO,$/);
+  assert.ok(lines.slice(1, -1).every((line) => /,COR,$/.test(line)), 'interior parcel points should remain COR');
+});
 test('buildRosBoundaryCsvRowsPNEZD preserves COR/SUB labels when parcel and subdivision features are swapped', () => {
   const parcelShape = {
     attributes: { PARCEL: 'R12345' },
@@ -201,7 +218,7 @@ test('buildRosBoundaryCsvRowsPNEZD preserves COR/SUB labels when parcel and subd
 
   assert.ok(parcelLines.length > 0, 'should include parcel geometry rows');
   assert.ok(subdivisionLines.length > 0, 'should include subdivision geometry rows');
-  assert.ok(parcelLines.every((line) => /,COR,$/.test(line)), 'parcel points should still be labeled COR');
+  assert.ok(parcelLines.every((line) => /,COR(?: BEG| CLO)?,$/.test(line)), 'parcel points should still be labeled COR variants');
   assert.ok(subdivisionLines.every((line) => /,SUB,$/.test(line)), 'subdivision points should still be labeled SUB');
 });
 
@@ -229,7 +246,7 @@ test('buildRosBoundaryCsvRowsPNEZD does not flip COR/SUB labels when attributes 
 
   assert.ok(parcelLines.length > 0, 'should include parcel geometry rows');
   assert.ok(subdivisionLines.length > 0, 'should include subdivision geometry rows');
-  assert.ok(parcelLines.every((line) => /,COR,$/.test(line)), 'parcel points should remain COR');
+  assert.ok(parcelLines.every((line) => /,COR(?: BEG| CLO)?,$/.test(line)), 'parcel points should remain COR variants');
   assert.ok(subdivisionLines.every((line) => /,SUB,$/.test(line)), 'subdivision points should remain SUB');
 });
 
@@ -250,7 +267,7 @@ test('buildRosBoundaryCsvRowsPNEZD does not emit section-only corners when no al
   const lines = csv.trim().split('\n');
   assert.equal(count, 4);
   assert.equal(lines.length, 4);
-  assert.ok(lines.every((line) => /,COR,$/.test(line)), 'should only include parcel corners');
+  assert.ok(lines.every((line) => /,COR(?: BEG| CLO)?,$/.test(line)), 'should only include parcel corners with begin/close variants');
 });
 
 
@@ -286,7 +303,7 @@ test('buildRosBoundaryCsvRowsPNEZD can omit PLSS-only points without CP&F notes'
   const lines = csv.trim().split('\n');
   assert.equal(count, 5);
   assert.equal(lines.length, 5);
-  assert.ok(lines.some((line) => /,COR,$/.test(line)), 'should still include parcel points');
+  assert.ok(lines.some((line) => /,COR(?: BEG| CLO)?,$/.test(line)), 'should still include parcel points');
   assert.ok(lines.some((line) => /,CSECOR,CPNFS: 1234567$/.test(line)), 'should include CP&F-backed PLSS point');
   assert.ok(lines.every((line) => !/,16COR,$/.test(line)), 'should exclude unbacked PLSS points');
 });
@@ -327,7 +344,7 @@ test('buildRosBoundaryCsvRowsPNEZD keeps parcel points while excluding subdivisi
   const lines = csv.trim().split('\n');
   assert.equal(count, 5);
   assert.equal(lines.length, 5);
-  assert.ok(lines.some((line) => /,COR,$/.test(line)), 'parcel points should remain in export');
+  assert.ok(lines.some((line) => /,COR(?: BEG| CLO)?,$/.test(line)), 'parcel points should remain in export');
   assert.ok(lines.some((line) => /,CSECOR,CPNFS: 7654321$/.test(line)), 'CP&F-backed aliquot corner should remain in export');
   assert.ok(lines.every((line) => !/,SUB,/.test(line)), 'subdivision polygon points should not be emitted');
 
@@ -394,6 +411,6 @@ test('buildRosBoundaryCsvRowsPNEZD corrects swapped parcel/subdivision slots whe
 
   assert.ok(parcelLines.length > 0, 'should include parcel geometry rows');
   assert.ok(subdivisionLines.length > 0, 'should include subdivision geometry rows');
-  assert.ok(parcelLines.every((line) => /,COR,$/.test(line)), 'parcel points should be labeled COR');
+  assert.ok(parcelLines.every((line) => /,COR(?: BEG| CLO)?,$/.test(line)), 'parcel points should be labeled COR variants');
   assert.ok(subdivisionLines.every((line) => /,SUB,$/.test(line)), 'subdivision points should be labeled SUB');
 });
