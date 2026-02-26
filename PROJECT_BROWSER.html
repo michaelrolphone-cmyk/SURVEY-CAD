@@ -3570,44 +3570,45 @@ function openEntryFromFolder(folder, entry, projectContext) {
             const isExternal = entry?.reference?.type === 'external';
             const downloadUrl = isExternal ? getExternalResourceUrl(entry) : String(entry.reference.value || '').trim();
             const isServerPdf = entry?.exportFormat === 'pdf';
-            if (!downloadUrl) continue;
-            resource.classList.add('pointforge-openable');
-            resource.setAttribute('role', 'button');
-            resource.setAttribute('tabindex', '0');
-            resource.title = 'Click to open this file';
-            resource.addEventListener('click', () => {
-              if (isServerPdf) {
-                openPdfInNewWindow(downloadUrl);
-                return;
-              }
-              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-            });
-            resource.addEventListener('keydown', (event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              if (isServerPdf) {
-                openPdfInNewWindow(downloadUrl);
-                return;
-              }
-              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-            });
+            if (downloadUrl) {
+              resource.classList.add('pointforge-openable');
+              resource.setAttribute('role', 'button');
+              resource.setAttribute('tabindex', '0');
+              resource.title = 'Click to open this file';
+              resource.addEventListener('click', () => {
+                if (isServerPdf) {
+                  openPdfInNewWindow(downloadUrl);
+                  return;
+                }
+                window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+              });
+              resource.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                if (isServerPdf) {
+                  openPdfInNewWindow(downloadUrl);
+                  return;
+                }
+                window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+              });
 
-            const openButton = document.createElement('button');
-            openButton.type = 'button';
-            openButton.className = 'launch-btn';
-            openButton.textContent = 'Open';
-            openButton.title = isServerPdf
-              ? 'Opens this PDF in a new browser window'
-              : 'Opens this file in a new tab';
-            openButton.addEventListener('click', (event) => {
-              event.stopPropagation();
-              if (isServerPdf) {
-                openPdfInNewWindow(downloadUrl);
-                return;
-              }
-              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-            });
-            actionButtons.appendChild(openButton);
+              const openButton = document.createElement('button');
+              openButton.type = 'button';
+              openButton.className = 'launch-btn';
+              openButton.textContent = 'Open';
+              openButton.title = isServerPdf
+                ? 'Opens this PDF in a new browser window'
+                : 'Opens this file in a new tab';
+              openButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (isServerPdf) {
+                  openPdfInNewWindow(downloadUrl);
+                  return;
+                }
+                window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+              });
+              actionButtons.appendChild(openButton);
+            }
 
             const starButton = document.createElement('button');
             const syncStarButton = (isBusy = false) => {
