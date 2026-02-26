@@ -4,6 +4,16 @@ import { readFile } from 'node:fs/promises';
 
 const indexHtmlPath = new URL('../index.html', import.meta.url);
 
+test('launcher references root favicon asset', async () => {
+  const launcherHtml = await readFile(indexHtmlPath, 'utf8');
+
+  assert.match(
+    launcherHtml,
+    /<link\s+rel="icon"\s+type="image\/x-icon"\s+href="\/favicon\.ico"\s*\/>/i,
+    'launcher should explicitly use the repository root favicon asset',
+  );
+});
+
 test('launcher cards show 2.5x icons, centered names, and descriptions via tooltip', async () => {
   const launcherHtml = await readFile(indexHtmlPath, 'utf8');
 
