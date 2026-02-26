@@ -2563,6 +2563,51 @@
     return out;
   }
 
+  function findPreferredSubdivisionEntryIndex(entries = [], parcelFeature = null) {
+    const source = Array.isArray(entries) ? entries : [];
+    if (!source.length) return -1;
+
+    const parcelAttrs = parcelFeature?.attributes || {};
+    const parcelCandidates = getSubdivisionNameCandidates(parcelAttrs);
+    if (!parcelCandidates.length) return -1;
+
+    let bestIndex = -1;
+    let bestScore = 0;
+
+    for (const [index, entry] of source.entries()) {
+      const entryAttrs = entry?.feature?.attributes || {};
+      const entryCandidates = getSubdivisionNameCandidates(entryAttrs, entry?.name || '');
+      if (!entryCandidates.length) continue;
+
+      for (const parcelName of parcelCandidates) {
+        for (const entryName of entryCandidates) {
+          const score = parcelName === entryName ? 1 : subdivisionTokenOverlapScore(parcelName, entryName);
+          if (score > bestScore) {
+            bestScore = score;
+            bestIndex = index;
+          }
+        }
+      }
+    }
+
+    if (bestScore < 0.67) return -1;
+    return bestIndex;
+  }
+
+  function prioritizeParcelSubdivisionEntry(entries = [], parcelFeature = null) {
+    const source = Array.isArray(entries) ? entries : [];
+    if (source.length <= 1) return source;
+
+    const preferredIndex = findPreferredSubdivisionEntryIndex(source, parcelFeature);
+    if (preferredIndex <= 0) return source;
+
+    return [
+      source[preferredIndex],
+      ...source.slice(0, preferredIndex),
+      ...source.slice(preferredIndex + 1),
+    ];
+  }
+
   function sanitizeSubdivisionName(value) {
     return String(value || '')
       .toUpperCase()
@@ -4294,6 +4339,7 @@
         const nearbyWithPlatData = await attachSubdivisionPlatData(nearbySubdivisionFeatures, parcel);
         state.nearbySubdivisions = dedupeNearbySubdivisionEntries(nearbyWithPlatData, parcel);
         state.nearbySubdivisions = limitNearbySubdivisionEntries(state.nearbySubdivisions, parcel, SUBDIVISION_NEARBY_MAX_RESULTS);
+        state.nearbySubdivisions = prioritizeParcelSubdivisionEntry(state.nearbySubdivisions, parcel);
         log(`Subdivisions within ${SUBDIVISION_NEARBY_RADIUS_FT} ft: ${state.nearbySubdivisions.length}`);
       } catch (e) {
         state.nearbySubdivisions = subdiv ? [{ feature: subdiv, name: getSubdivisionNameFromAttrs(subdiv.attributes || {}), plat: null }] : [];
@@ -4449,6 +4495,7 @@
       const subdivisionCards = state.nearbySubdivisions.length
         ? state.nearbySubdivisions
         : (subdiv ? [{ feature: subdiv, name: getSubdivisionNameFromAttrs(subdiv.attributes || {}), plat: null }] : []);
+      const prioritizedSubdivisionCards = prioritizeParcelSubdivisionEntry(subdivisionCards, parcel);
       if (township) { const c = card("Township", "Containing feature", summarizeAttrs(township.attributes), []); c.style.display = "none"; cards.push(c); }
       if (section) { const c = card("Section", "Containing feature", summarizeAttrs(section.attributes), []); c.style.display = "none"; cards.push(c); }
       const utilitiesCard = card(
@@ -4662,7 +4709,7 @@
       if (subdivisionCards.length) {
         cards.push(createResultCategoryHeader('Subdivisions', 'Subdivision plats'));
       }
-      subdivisionCards.forEach((entry, idx) => {
+      prioritizedSubdivisionCards.forEach((entry, idx) => {
         const feature = entry?.feature || null;
         if (!feature) return;
         const subdivisionName = entry?.name || getSubdivisionNameFromAttrs(feature.attributes || {}) || `Subdivision ${idx + 1}`;
@@ -4699,7 +4746,7 @@
                   const next = !isSubdivisionSelected(entry, idx);
                   setSubdivisionSelected(entry, idx, next);
                   syncSubdivisionStar();
-                  drawSubdivisionPolygons(subdivisionCards);
+                  drawSubdivisionPolygons(prioritizedSubdivisionCards);
                   log(`${next ? 'Included' : 'Excluded'} subdivision ${subdivisionName} in EvidenceDesk export.`);
                 });
                 syncSubdivisionStar();
