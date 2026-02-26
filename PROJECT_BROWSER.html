@@ -2078,6 +2078,10 @@
       return Boolean(resource?.reference?.metadata?.starredInFieldBook);
     }
 
+    function isResourceStarredForFieldBook(resource = {}) {
+      return Boolean(resource?.reference?.metadata?.starredInFieldBook);
+    }
+
     async function setCpfFieldBookStar(resource = {}, starred = false, projectContext = {}) {
       const projectId = String(projectContext?.activeProjectId || '').trim();
       const cpfId = String(resource?.reference?.metadata?.cpfId || resource?.id || '').trim();
@@ -2107,6 +2111,81 @@
       if (!resource.reference.metadata || typeof resource.reference.metadata !== 'object') resource.reference.metadata = {};
       resource.reference.metadata.starredInFieldBook = nextValue;
       return nextValue;
+    }
+
+    async function setRosFieldBookStar(resource = {}, starred = false, projectContext = {}) {
+      const projectId = String(projectContext?.activeProjectId || '').trim();
+      const rosId = String(resource?.reference?.metadata?.rosId || resource?.id || '').trim();
+      const rosNumber = String(resource?.reference?.metadata?.rosNumber || resource?.reference?.value || '').trim();
+      if (!projectId || !rosId || !rosNumber) {
+        throw new Error('Missing project, ROS record, or ROS number metadata.');
+      }
+
+      const response = await fetch(buildProjectRosApiUrl(projectId, rosId), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          rosNumber,
+          title: resource?.title,
+          source: resource?.reference?.metadata?.source || '',
+          mapImageUrl: resource?.reference?.metadata?.mapImageUrl || '',
+          starredInFieldBook: Boolean(starred),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const nextValue = Boolean(payload?.ros?.starredInFieldBook);
+      if (!resource.reference) resource.reference = {};
+      if (!resource.reference.metadata || typeof resource.reference.metadata !== 'object') resource.reference.metadata = {};
+      resource.reference.metadata.starredInFieldBook = nextValue;
+      return nextValue;
+    }
+
+    async function setPlatFieldBookStar(resource = {}, starred = false, projectContext = {}) {
+      const projectId = String(projectContext?.activeProjectId || '').trim();
+      const platId = String(resource?.reference?.metadata?.platId || resource?.id || '').trim();
+      const subdivisionName = String(resource?.reference?.metadata?.subdivisionName || resource?.reference?.value || '').trim();
+      if (!projectId || !platId || !subdivisionName) {
+        throw new Error('Missing project, plat record, or subdivision metadata.');
+      }
+
+      const response = await fetch(buildProjectPlatApiUrl(projectId, platId), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          subdivisionName,
+          title: resource?.title,
+          source: resource?.reference?.metadata?.source || '',
+          platUrl: resource?.reference?.metadata?.platUrl || '',
+          thumbnailUrl: resource?.reference?.metadata?.thumbnailUrl || '',
+          starredInFieldBook: Boolean(starred),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const nextValue = Boolean(payload?.plat?.starredInFieldBook);
+      if (!resource.reference) resource.reference = {};
+      if (!resource.reference.metadata || typeof resource.reference.metadata !== 'object') resource.reference.metadata = {};
+      resource.reference.metadata.starredInFieldBook = nextValue;
+      return nextValue;
+    }
+
+    function getFolderFieldBookLabel(folderKey = '') {
+      if (folderKey === 'ros') return 'ROS';
+      if (folderKey === 'plats') return 'plat';
+      return 'CP&F';
+    }
+
+    async function setFieldBookStarForResource(folder = {}, resource = {}, starred = false, projectContext = {}) {
+      if (folder?.key === 'ros') return setRosFieldBookStar(resource, starred, projectContext);
+      if (folder?.key === 'plats') return setPlatFieldBookStar(resource, starred, projectContext);
+      return setCpfFieldBookStar(resource, starred, projectContext);
     }
 
     async function openCpfPrintPreview(resources = []) {
@@ -3531,9 +3610,10 @@ function openEntryFromFolder(folder, entry, projectContext) {
 
             const starButton = document.createElement('button');
             const syncStarButton = (isBusy = false) => {
-              const starred = isCpfStarredForFieldBook(entry);
+              const starred = isResourceStarredForFieldBook(entry);
               starButton.textContent = starred ? '★' : '☆';
-              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
+              const folderLabel = getFolderFieldBookLabel(folder?.key);
+              starButton.title = starred ? `Unstar this ${folderLabel} from the field-book print list` : `Star this ${folderLabel} for field-book print jobs`;
               starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
               starButton.disabled = Boolean(isBusy);
             };
@@ -3544,15 +3624,17 @@ function openEntryFromFolder(folder, entry, projectContext) {
               event.stopPropagation();
               syncStarButton(true);
               try {
-                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
+                const nextStarred = await setFieldBookStarForResource(folder, entry, !isResourceStarredForFieldBook(entry), projectContext);
                 syncStarButton(false);
                 const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
-                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
+                const folderLabel = getFolderFieldBookLabel(folder?.key);
+                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || folderLabel} for field book print jobs.`);
                 saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isCpfStarredForFieldBook(e));
+                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isResourceStarredForFieldBook(e));
               } catch (error) {
                 syncStarButton(false);
-                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
+                const folderLabel = getFolderFieldBookLabel(folder?.key);
+                renderError(`Could not update field-book star for ${entry?.title || entry?.id || folderLabel}: ${error.message}`);
               }
             });
             resource.appendChild(starButton);
@@ -3627,9 +3709,10 @@ function openEntryFromFolder(folder, entry, projectContext) {
 
             const starButton = document.createElement('button');
             const syncStarButton = (isBusy = false) => {
-              const starred = isCpfStarredForFieldBook(entry);
+              const starred = isResourceStarredForFieldBook(entry);
               starButton.textContent = starred ? '★' : '☆';
-              starButton.title = starred ? 'Unstar this CP&F from the field-book print list' : 'Star this CP&F for field-book print jobs';
+              const folderLabel = getFolderFieldBookLabel(folder?.key);
+              starButton.title = starred ? `Unstar this ${folderLabel} from the field-book print list` : `Star this ${folderLabel} for field-book print jobs`;
               starButton.setAttribute('aria-pressed', starred ? 'true' : 'false');
               starButton.disabled = Boolean(isBusy);
             };
@@ -3640,15 +3723,17 @@ function openEntryFromFolder(folder, entry, projectContext) {
               event.stopPropagation();
               syncStarButton(true);
               try {
-                const nextStarred = await setCpfFieldBookStar(entry, !isCpfStarredForFieldBook(entry), projectContext);
+                const nextStarred = await setFieldBookStarForResource(folder, entry, !isResourceStarredForFieldBook(entry), projectContext);
                 syncStarButton(false);
                 const actionLabel = nextStarred ? 'Starred' : 'Unstarred';
-                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || 'CP&F'} for field book print jobs.`);
+                const folderLabel = getFolderFieldBookLabel(folder?.key);
+                projectContext.setUploadStatus(`${actionLabel} ${entry?.title || entry?.id || folderLabel} for field book print jobs.`);
                 saveStoredProjectFile(window.localStorage, projectContext?.activeProjectId, projectContext?.projectFile);
-                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isCpfStarredForFieldBook(e));
+                if (printAllButton) printAllButton.disabled = !folder.index.some((e) => e?.exportFormat === 'pdf' && isResourceStarredForFieldBook(e));
               } catch (error) {
                 syncStarButton(false);
-                renderError(`Could not update field-book star for ${entry?.title || entry?.id || 'CP&F'}: ${error.message}`);
+                const folderLabel = getFolderFieldBookLabel(folder?.key);
+                renderError(`Could not update field-book star for ${entry?.title || entry?.id || folderLabel}: ${error.message}`);
               }
             });
             resource.appendChild(starButton);

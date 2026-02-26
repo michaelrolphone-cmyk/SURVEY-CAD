@@ -16,3 +16,9 @@ test('download icon helper maps tif/tiff to fallback file icon without missing-f
   assert.match(html, /tiff:\s*'file'/);
   assert.match(html, /return iconPathByExt\[canonicalExt\] \|\| iconPathByExt\.file;/);
 });
+
+test('field-book star toggle routes ROS and plats updates to their own project APIs', () => {
+  assert.match(html, /function\s+setRosFieldBookStar\(resource = \{\}, starred = false, projectContext = \{\}\)\s*\{[\s\S]*fetch\(buildProjectRosApiUrl\(projectId, rosId\),\s*\{/);
+  assert.match(html, /function\s+setPlatFieldBookStar\(resource = \{\}, starred = false, projectContext = \{\}\)\s*\{[\s\S]*fetch\(buildProjectPlatApiUrl\(projectId, platId\),\s*\{/);
+  assert.match(html, /function\s+setFieldBookStarForResource\(folder = \{\}, resource = \{\}, starred = false, projectContext = \{\}\)\s*\{[\s\S]*folder\?\.key === 'ros'[\s\S]*folder\?\.key === 'plats'/);
+});
