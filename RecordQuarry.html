@@ -2600,6 +2600,12 @@
     return sourceUrl;
   }
 
+  function buildSubdivisionPlatPdfUrl(platDocId = '') {
+    const normalizedDocId = String(platDocId || '').trim().toUpperCase();
+    if (!/^S\d{4,}$/.test(normalizedDocId)) return null;
+    return `/api/idaho-harvest/subdivision-plats/${encodeURIComponent(normalizedDocId)}/pdf`;
+  }
+
   function buildSubdivisionThumbnailMarkup(subdivisionName = '', thumbnailUrl = '') {
     const safeName = escapeHtml(String(subdivisionName || 'Subdivision plat'));
     const normalized = String(thumbnailUrl || '').trim();
@@ -2659,6 +2665,7 @@
       platDocId,
       platPage,
       platUrl,
+      platPdfUrl: buildSubdivisionPlatPdfUrl(platDocId),
       thumbnailUrl: buildSubdivisionPlatThumbnailUrl(platUrl),
     };
   }
@@ -3195,6 +3202,7 @@
         platDocId: String(plat?.platDocId || '').trim() || null,
         platPage: Number.isFinite(Number(plat?.platPage)) ? Number(plat.platPage) : null,
         platUrl: String(plat?.platUrl || '').trim() || null,
+        platPdfUrl: String(plat?.platPdfUrl || '').trim() || null,
         thumbnailUrl: String(plat?.thumbnailUrl || '').trim() || null,
       },
       geometry: feature?.geometry || null,
