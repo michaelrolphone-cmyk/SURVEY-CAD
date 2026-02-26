@@ -2303,6 +2303,103 @@
       printWindow.focus();
     }
 
+    function getMasterFieldBookBundleResources(projectFile = {}) {
+      const targetFolderKeys = ['plats', 'ros', 'cpfs'];
+      const bundleEntries = [];
+      for (const folderKey of targetFolderKeys) {
+        const folder = (projectFile?.folders || []).find((candidate) => candidate?.key === folderKey);
+        const resources = Array.isArray(folder?.index) ? folder.index : [];
+        for (const entry of resources) {
+          bundleEntries.push({ folderKey, entry });
+        }
+      }
+      return bundleEntries;
+    }
+
+    function syncMasterPrintStarredButtonState(button, projectFile = {}) {
+      if (!button) return;
+      const bundleResources = getMasterFieldBookBundleResources(projectFile);
+      button.disabled = !bundleResources.some(({ folderKey, entry }) => isResourceStarredForFieldBook(entry) && getFieldBookPrintUrl(folderKey, entry));
+    }
+
+    async function openMasterFieldBookPrintPreview(projectFile = {}) {
+      const fieldBookLabel = 'Field Book';
+      const printableResources = getMasterFieldBookBundleResources(projectFile)
+        .filter(({ entry }) => isResourceStarredForFieldBook(entry))
+        .map(({ folderKey, entry }) => {
+          const url = getFieldBookPrintUrl(folderKey, entry);
+          return {
+            entry,
+            url,
+            isPdf: isFieldBookPrintPdf(folderKey, entry, url),
+          };
+        })
+        .filter((item) => item.url);
+
+      if (!printableResources.length) {
+        renderError('No starred Plats, ROS, or CP&F files were found for this project. Star records for your field book and try again.');
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        renderError('Your browser blocked the print-preview window. Please allow pop-ups and try again.');
+        return;
+      }
+
+      const thumbnailPages = await Promise.all(printableResources.map(async ({ url, entry, isPdf }, index) => {
+        try {
+          const thumbnailDataUrl = isPdf ? await fetchPdfThumbnailDataUrl(url) : await fetchImageDataUrl(url);
+          if (!thumbnailDataUrl) return '';
+          return `
+        <section class="page-block">
+          <img src="${escapeHtml(thumbnailDataUrl)}" alt="${escapeHtml(fieldBookLabel)} thumbnail ${index + 1}" title="${escapeHtml(entry?.title || `Field Book ${index + 1}`)}" class="cpf-print-thumbnail" />
+        </section>
+      `;
+        } catch {
+          return '';
+        }
+      }));
+      const pagesMarkup = thumbnailPages.filter(Boolean).join('');
+      if (!pagesMarkup) {
+        renderError('No starred Plats, ROS, or CP&F thumbnails could be generated right now. Try again in a moment.');
+        printWindow.close();
+        return;
+      }
+
+      printWindow.document.write(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${escapeHtml(fieldBookLabel)} Print Preview</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: Inter, system-ui, sans-serif; margin: 1rem; color: #0f172a; background: #fff; }
+    .toolbar { position: sticky; top: 0; background: #fff; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; }
+    .print-button { font: inherit; padding: 0.45rem 0.8rem; border-radius: 6px; border: 1px solid #334155; background: #fff; cursor: pointer; }
+    .page-block { margin: 0 0 1rem; display: flex; justify-content: center; background: #fff; }
+    .cpf-print-thumbnail { width: min(100%, 8.5in); max-height: calc(100vh - 5rem); object-fit: contain; border: 1px solid #94a3b8; border-radius: 8px; display: block; margin: 0 auto; background: #fff; }
+    @media print {
+      @page { margin: 0; }
+      .toolbar { display: none; }
+      body { margin: 0; background: #fff; }
+      .page-block { margin: 0; break-after: page; break-inside: avoid; page-break-after: always; page-break-inside: avoid; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #fff; }
+      .page-block:last-of-type { break-after: auto; page-break-after: auto; }
+      .cpf-print-thumbnail { width: 100%; max-height: 100vh; border: none; border-radius: 0; background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" class="print-button" onclick="window.print()">Print all starred Plats, ROS, and CP&amp;Fs</button>
+  </div>
+  ${pagesMarkup}
+</body>
+</html>`);
+      printWindow.document.close();
+      printWindow.focus();
+    }
+
     function syncPrintStarredButtonState(printAllButton, folder = {}) {
       if (!printAllButton) return;
       const entries = Array.isArray(folder?.index) ? folder.index : [];
@@ -3220,6 +3317,16 @@ function openEntryFromFolder(folder, entry, projectContext) {
       const treeHeaderRow = document.createElement('div');
       treeHeaderRow.className = 'tree-header-row';
       treeHeaderRow.appendChild(root);
+
+      const printStarredBundleButton = document.createElement('button');
+      printStarredBundleButton.type = 'button';
+      printStarredBundleButton.className = 'launch-btn';
+      printStarredBundleButton.textContent = 'Print all starred';
+      printStarredBundleButton.title = 'Build a single print preview of all starred Plats, ROS, and CP&Fs';
+      printStarredBundleButton.addEventListener('click', () => openMasterFieldBookPrintPreview(projectContext.projectFile));
+      syncMasterPrintStarredButtonState(printStarredBundleButton, projectContext.projectFile);
+      treeHeaderRow.appendChild(printStarredBundleButton);
+
       treeHeaderRow.appendChild(addRootFolderIconBtn);
       treeContainer.appendChild(treeHeaderRow);
 
