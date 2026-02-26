@@ -56,12 +56,16 @@ test('RecordQuarry.html renders nearby subdivision polygons/cards and plat thumb
   assert.match(html, /\/api\/project-files\/ros-thumbnail\?\$\{new URLSearchParams\(\{ source: sourceUrl \}\)\}/, 'subdivision TIFF plat thumbnails should flow through the ros-thumbnail API endpoint.');
   assert.match(html, /buildRosPdfProxyUrl\(sourceUrl\)/, 'subdivision PDF plat thumbnails should still proxy remote PDFs through the API before thumbnail rendering.');
   assert.match(html, /data-ros-thumbnail=/, 'subdivision plat cards should use deferred thumbnail loading for API-generated ROS/PDF thumbnails.');
+
+  assert.match(html, /function\s+createResultCategoryHeader\s*\(/, 'results panel should define a reusable category header helper for grouped card sections.');
+  assert.match(html, /cards\.push\(createResultCategoryHeader\('Subdivisions',\s*'Subdivision plats'\)\);/, 'subdivision plat cards should be preceded by a Subdivisions category header card.');
+  assert.match(html, /cards\.push\(createResultCategoryHeader\('Records of Survey',\s*'Record of Survey sections'\)\);/, 'record-of-survey cards should be preceded by a Records of Survey category header card.');
   assert.match(html, /Open subdivision plat/, 'subdivision cards should include direct plat links');
   assert.match(html, /setSubdivisionSelected\(entry, idx, next\)/, 'subdivision cards should support star-based include/exclude toggles');
   assert.match(html, /function\s+extractSubdivisionSourceIdentifiers\s*\(/, 'subdivision plat matching should derive identifier hints from subdivision attributes for resilient list matching');
   assert.match(html, /platDocId,\s*platPage,/, 'subdivision plat parser should capture document id/page metadata from SubsPageList references');
   assert.match(html, /selectedSubdivisionKeys:\s*new\s+Set\(\)/, 'lookup should initialize subdivision selection state for export');
-  assert.match(html, /Place Subdivision, Township, Section, and Utilities above Aliquots/, 'lookup flow should build subdivision cards in the summary card stack before ROS rendering');
+  assert.match(html, /Render subdivision plat cards after aliquot CP&F summaries and before ROS cards\./, 'lookup flow should build subdivision cards in the summary card stack before ROS rendering');
 });
 test('RecordQuarry.html keeps ROS scoped to containing section and includes popup PDF links', async () => {
   const html = await readFile(new URL('../RecordQuarry.html', import.meta.url), 'utf8');
