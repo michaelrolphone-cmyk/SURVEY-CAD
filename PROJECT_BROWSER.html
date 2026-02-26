@@ -967,9 +967,15 @@
       const platId = String(plat.platId || '').trim();
       const title = String(plat.title || subdivisionName || 'Subdivision Plat').trim();
       const platUrl = String(plat.platUrl || '').trim();
+      const metadataPlatDocId = String(plat?.metadata?.plat?.platDocId || plat?.metadata?.platDocId || '').trim().toUpperCase();
+      const generatedPlatPdfUrl = /^S\d{4,}$/.test(metadataPlatDocId)
+        ? `/api/idaho-harvest/subdivision-plats/${encodeURIComponent(metadataPlatDocId)}/pdf`
+        : '';
+      const platPdfUrl = String(plat.platPdfUrl || plat.pdfUrl || plat?.metadata?.plat?.platPdfUrl || generatedPlatPdfUrl || '').trim();
+      const resolvedPlatValue = platPdfUrl || platUrl || subdivisionName || '';
       const platExtMatch = platUrl.match(/\.([a-z0-9]+)(?:[?#].*)?$/i);
       const platExt = platExtMatch ? platExtMatch[1].toLowerCase() : '';
-      const exportFormat = platExt || 'pdf';
+      const exportFormat = platPdfUrl ? 'pdf' : (platExt || 'pdf');
       return {
         id: platId,
         folder: 'plats',
@@ -977,14 +983,14 @@
         exportFormat,
         reference: {
           type: 'external',
-          value: platUrl || subdivisionName || '',
+          value: resolvedPlatValue,
           resolverHint: 'subdivision-plat',
           metadata: {
             source: plat.source || '',
             subdivisionName,
             platId,
             platUrl,
-            platPdfUrl: String(plat.platPdfUrl || plat.pdfUrl || '').trim(),
+            platPdfUrl,
             thumbnailUrl: String(plat.thumbnailUrl || '').trim(),
             starredInFieldBook: Boolean(plat.starredInFieldBook),
           },
@@ -1697,7 +1703,7 @@
     }
 
     function getExternalResourceUrl(entry) {
-      return String(entry?.reference?.metadata?.platUrl || entry?.reference?.value || '').trim();
+      return String(entry?.reference?.metadata?.platPdfUrl || entry?.reference?.metadata?.platUrl || entry?.reference?.value || '').trim();
     }
 
     function getRosImageUrl(entry) {
