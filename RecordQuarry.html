@@ -860,7 +860,7 @@
       buildAllSelectedAliquotKeys(state.aliquotFeatures),
       selection?.selectedAliquotKeys,
       selection?.deselectedAliquotKeys,
-      true
+      false
     );
 
     applySelectionByMode(
@@ -4496,7 +4496,7 @@
             const indexLabel = loc.index || a.ALIQUOT || a.ALIQUOT_LABEL || `Aliquot #${idx + 1}`;
             const token = `aliquot-${idx + 1}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const selectionKey = buildAliquotSelectionKey(f, idx);
-            const isFar = distMeters > COLLAPSE_DIST_M && !isAliquotSelected(f, idx);
+            const isFar = distMeters > COLLAPSE_DIST_M;
 
             aliquotSummaryCpfTargets.push({ token, feature: f, label: indexLabel });
 
