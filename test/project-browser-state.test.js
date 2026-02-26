@@ -395,18 +395,22 @@ test('Project Browser can open CP&F rows as PDF links in a new tab', async () =>
   assert.match(projectBrowserHtml, /window\.confirm\(`This CP&F is linked to/, 'CP&F delete flow should ask for confirmation when linked points exist');
   assert.match(projectBrowserHtml, /function\s+isCpfStarredForFieldBook\s*\(/, 'Project Browser should define a field-book star helper for CP&F records');
   assert.match(projectBrowserHtml, /async\s+function\s+setCpfFieldBookStar\s*\(/, 'Project Browser should define an API-backed CP&F star toggle helper');
-  assert.match(projectBrowserHtml, /async\s+function\s+openCpfPrintPreview\s*\(/, 'Project Browser should define an async bulk CP&F print-preview builder');
+  assert.match(projectBrowserHtml, /async\s+function\s+openFieldBookPrintPreview\s*\(/, 'Project Browser should define an async bulk field-book print-preview builder');
   assert.match(projectBrowserHtml, /const\s+entries\s*=\s*Array\.isArray\(group\.entries\)\s*\?\s*group\.entries\s*:\s*\[\]/, 'Project Browser should normalize grouped CP&F entry arrays before rendering rows');
   assert.match(projectBrowserHtml, /groupDiv\.appendChild\(buildOneFileRow\(entries\[0\]\)\)/, 'Project Browser should keep CP&F groups collapsed to the first entry by default');
   assert.match(projectBrowserHtml, /const\s+moreDetails\s*=\s*document\.createElement\('details'\)/, 'Project Browser should render expandable details wrappers for additional grouped CP&Fs');
   assert.match(projectBrowserHtml, /for\s*\(const\s+entry\s+of\s+entries\.slice\(1\)\)/, 'Project Browser should place additional grouped CP&Fs inside the expandable section');
   assert.match(projectBrowserHtml, /window\.open\('', '_blank'\)/, 'Print preview should open a writable popup window for inline HTML content');
-  assert.match(projectBrowserHtml, /\.filter\(\(entry\) => isCpfStarredForFieldBook\(entry\)\)/, 'Print preview should include only starred CP&F records');
+  assert.match(projectBrowserHtml, /\.filter\(\(entry\) => isResourceStarredForFieldBook\(entry\)\)/, 'Print preview should include only starred field-book records');
   assert.match(projectBrowserHtml, /printAllButton\.textContent\s*=\s*'Print starred'/, 'CP&F folder should render a Print starred action for field-book CP&Fs');
-  assert.match(projectBrowserHtml, /printAllButton\.addEventListener\('click',\s*\(\)\s*=>\s*openCpfPrintPreview\(folder\.index\)\)/, 'Print starred action should open a combined CP&F print preview');
+  assert.match(projectBrowserHtml, /printAllButton\.addEventListener\('click',\s*\(\)\s*=>\s*openFieldBookPrintPreview\(folder\.key, folder\.index\)\)/, 'Print starred action should open a combined field-book print preview');
   assert.match(projectBrowserHtml, /async\s+function\s+fetchPdfThumbnailDataUrl\s*\(/, 'Project Browser should define a reusable PDF thumbnail fetcher for previews and print jobs');
   assert.match(projectBrowserHtml, /thumbnail generation timed out/, 'Thumbnail fetch helper should fail with a timeout when generation never completes');
-  assert.match(projectBrowserHtml, /<img src="\$\{escapeHtml\(thumbnailDataUrl\)\}" alt="CP&amp;F thumbnail \$\{index \+ 1\}"/, 'Print preview should render CP&F thumbnail images instead of PDF iframes');
+
+  assert.match(projectBrowserHtml, /if \(folder\.key === 'cpfs' \|\| folder\.key === 'ros' \|\| folder\.key === 'plats'\)/, 'Print starred action should be available in CP&F, ROS, and plats folders');
+  assert.match(projectBrowserHtml, /openFieldBookPrintPreview\(folder\.key, folder\.index\)/, 'Print starred action should pass the current folder key so previews use the proper resolver');
+  assert.match(projectBrowserHtml, /async\s+function\s+fetchImageDataUrl\s*\(/, 'Project Browser should define an image fetch helper for ROS and plat print jobs');
+  assert.match(projectBrowserHtml, /<img src="\$\{escapeHtml\(thumbnailDataUrl\)\}" alt="\$\{escapeHtml\(fieldBookLabel\)\} thumbnail \$\{index \+ 1\}"/, 'Print preview should render field-book thumbnail images instead of PDF iframes');
   assert.match(projectBrowserHtml, /\.page-block \{ margin: 0 0 1rem; display: flex; justify-content: center; background: #fff; \}/, 'Print preview should center thumbnail pages on-screen with a white background');
   assert.match(projectBrowserHtml, /\.cpf-print-thumbnail \{ width: min\(100%, 8\.5in\);[\s\S]*object-fit: contain;[\s\S]*background: #fff; \}/, 'Print preview should constrain each thumbnail and preserve full-page aspect ratio');
   assert.doesNotMatch(projectBrowserHtml, /<h2>\$\{index \+ 1\}\./, 'Print preview should not inject heading-only pages between PDFs');
