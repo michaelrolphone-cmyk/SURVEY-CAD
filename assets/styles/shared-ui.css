@@ -14,6 +14,10 @@
   --ui-danger-border: #dc2626;
 }
 
+* {
+  transition: all 0.5s ease-out;
+}
+
 .sf-ui-controls label {
   font-size: 0.8rem;
   color: var(--ui-muted);
