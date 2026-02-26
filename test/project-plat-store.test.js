@@ -80,3 +80,26 @@ test('batchUpsertProjectPlats can overwrite existing project records when reques
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0].subdivisionName, 'PINE RIDGE');
 });
+
+test('createOrUpdateProjectPlat matches existing records by subdivisionName when platId differs', async () => {
+  const store = createMockStore();
+
+  const created = await createOrUpdateProjectPlat(store, {
+    projectId: 'proj-match',
+    subdivisionName: 'PINE VALLEY',
+    starredInFieldBook: true,
+  });
+
+  const updated = await createOrUpdateProjectPlat(store, {
+    projectId: 'proj-match',
+    platId: 'legacy-local-id',
+    subdivisionName: 'Pine Valley',
+    starredInFieldBook: false,
+  });
+
+  assert.equal(updated.plat.platId, created.plat.platId);
+  const summaries = await listProjectPlats(store, 'proj-match');
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].starredInFieldBook, false);
+});
+

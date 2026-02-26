@@ -128,14 +128,17 @@ export async function createOrUpdateProjectRos(store, {
   if (!projectId) throw new Error('projectId is required.');
   if (!rosNumber) throw new Error('rosNumber is required.');
 
-  const rosId = normalizeRosId(rosIdRaw) || deriveRosId(rosNumber);
-  if (!rosId) throw new Error('rosId could not be derived.');
-
   const now = nowIso();
   const state = await Promise.resolve(store.getState());
   const snapshot = state?.snapshot || {};
-  const existing = parseSnapshotJson(snapshot, rosKey(projectId, rosId));
   const index = parseSnapshotJson(snapshot, rosIndexKey(projectId)) || {};
+  const normalizedRosId = normalizeRosId(rosIdRaw);
+  const matchedRosId = Object.values(index)
+    .find((entry) => normalizeRosNumber(entry?.rosNumber) === rosNumber)?.rosId;
+  const rosId = normalizeRosId(matchedRosId || normalizedRosId) || deriveRosId(rosNumber);
+  if (!rosId) throw new Error('rosId could not be derived.');
+
+  const existing = parseSnapshotJson(snapshot, rosKey(projectId, rosId));
 
   const record = {
     schemaVersion: '1.0.0',
