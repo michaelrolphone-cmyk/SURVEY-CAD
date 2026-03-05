@@ -1,15 +1,3 @@
-/*
-  Name Ideas:
-    - PointFold
-    - PlotSheet
-    - ThreadLine
-    - GeoFabric
-    - FoldPoint
-    - VectorPoint
-    - TileScribe
-    - WayPoint
-    - SiteScribe
-*/
 export const APP_CATALOG = [
   {
     id: 'launcher',
@@ -19,7 +7,7 @@ export const APP_CATALOG = [
     iconPath: '/assets/icons/SurveyFoundry.png',
     color: '#355C7D',
     accent: '#F8B195',
-    glyph: 'SC',
+    glyph: 'SF',
   },
   {
     id: 'project-browser',
@@ -29,7 +17,7 @@ export const APP_CATALOG = [
     iconPath: '/assets/icons/EvidenceDesk.png',
     color: '#64748B',
     accent: '#E2E8F0',
-    glyph: 'PB',
+    glyph: 'ED',
     section: 'Research',
   },
   {
@@ -40,7 +28,7 @@ export const APP_CATALOG = [
     iconPath: '/assets/icons/RecordQuarry.png',
     color: '#2A9D8F',
     accent: '#E9F5DB',
-    glyph: 'ROS',
+    glyph: 'RQ',
     section: 'Research',
   },
   {
@@ -51,7 +39,7 @@ export const APP_CATALOG = [
     iconPath: '/assets/icons/GLO.png',
     color: '#854D0E',
     accent: '#FEF9C3',
-    glyph: 'GLO',
+    glyph: 'GL',
     section: 'Research',
     experimental: true,
   },
@@ -65,7 +53,6 @@ export const APP_CATALOG = [
     accent: '#DBEAFE',
     glyph: 'UP',
     section: 'Research',
-    experimental: false,
   },
   {
     id: 'maptile-browser',
@@ -77,6 +64,30 @@ export const APP_CATALOG = [
     accent: '#DBEAFE',
     glyph: 'MT',
     section: 'Research',
+  },
+  {
+    id: 'ros-ocr',
+    name: 'ROS Basis Extractor',
+    description: 'Upload a Record of Survey PDF and extract ranked basis-of-bearing candidates using OCR.',
+    entryHtml: 'ROS_OCR.html',
+    iconPath: '/assets/icons/ros-ocr.svg',
+    color: '#6A4C93',
+    accent: '#F2E9FF',
+    glyph: 'OC',
+    section: 'Research',
+    experimental: true,
+  },
+  {
+    id: 'cpnf-corners',
+    name: 'PLSS + CP&F Explorer',
+    description: 'Map tool for PLSS aliquots, corner geometry labels, and nearby Ada County CP&F records.',
+    entryHtml: 'CPNF.HTML',
+    iconPath: '/assets/icons/cpnf-corners.svg',
+    color: '#BC4749',
+    accent: '#FFE8D6',
+    glyph: 'CP',
+    section: 'Research',
+    experimental: true,
   },
   {
     id: 'boundary-lab',
@@ -97,7 +108,7 @@ export const APP_CATALOG = [
     iconPath: '/assets/icons/SetPoint.png',
     color: '#3A5A40',
     accent: '#D8F3DC',
-    glyph: 'PT',
+    glyph: 'PF',
     section: 'Drafting',
   },
   {
@@ -108,10 +119,21 @@ export const APP_CATALOG = [
     iconPath: '/assets/icons/LineSmith.png',
     color: '#0D3B66',
     accent: '#FAF0CA',
-    glyph: 'PB',
+    glyph: 'LS',
     section: 'Drafting',
   },
-  
+  {
+    id: 'workbench',
+    name: 'Workbench',
+    description: 'A standalone, offline boundary casefile app that ingests survey records, extracts calls with traceability, forces evidence-weighted corner decisions with required justification, runs traverse computations, and prints a defensible audit-ready package.',
+    entryHtml: 'WORKBENCH.html',
+    iconPath: '/assets/icons/Workbench.png',
+    color: '#0F766E',
+    accent: '#CCFBF1',
+    glyph: 'WB',
+    section: 'Drafting',
+    experimental: true,
+  },
   {
     id: 'surface-loom',
     name: 'SurfaceLoom',
@@ -120,11 +142,10 @@ export const APP_CATALOG = [
     iconPath: '/assets/icons/SurfaceLoom.png',
     color: '#0F766E',
     accent: '#BFDBFE',
-    glyph: 'BL',
+    glyph: 'SL',
     section: 'TOPO',
     experimental: true,
   },
-  
   {
     id: 'equipment-log',
     name: 'EquipmentLog',
@@ -159,17 +180,6 @@ export const APP_CATALOG = [
     section: 'Field Tools',
   },
   {
-    id: 'marks-llm',
-    name: 'MarksAI',
-    description: 'An AI surveyor.',
-    entryHtml: 'MarksLLM.html',
-    iconPath: '/assets/icons/MarksAI.png',
-    color: '#0F766E',
-    accent: '#CCFBF1',
-    glyph: 'AI',
-    experimental: true,
-  },
-  {
     id: 'arrowhead-ar',
     name: 'ArrowHead',
     description: 'Mobile AR viewer that overlays LineSmith points and linework on the live camera feed.',
@@ -178,49 +188,23 @@ export const APP_CATALOG = [
     color: '#0F766E',
     accent: '#CCFBF1',
     glyph: 'AR',
+    section: 'Field Tools',
     experimental: true,
   },
   {
-    id: 'workbench',
-    name: 'Workbench',
-    description: 'A standalone, offline “boundary casefile” web app that ingests survey records, extracts calls with traceability, forces evidence-weighted corner decisions with required justification, runs traverse computations, and prints a defensible audit-ready package..',
-    entryHtml: 'WORKBENCH.html',
-    iconPath: '/assets/icons/Workbench.png',
+    id: 'marks-llm',
+    name: 'MarksAI',
+    description: 'An AI surveyor.',
+    entryHtml: 'MarksLLM.html',
+    iconPath: '/assets/icons/MarksAI.png',
     color: '#0F766E',
     accent: '#CCFBF1',
-    glyph: 'WB',
+    glyph: 'AI',
+    section: 'AI',
     experimental: true,
   },
-
-
-  {
-    id: 'cpnf-corners',
-    name: 'PLSS + CP&F Explorer',
-    description: 'Map tool for PLSS aliquots, corner geometry labels, and nearby Ada County CP&F records.',
-    entryHtml: 'CPNF.HTML',
-    iconPath: '/assets/icons/cpnf-corners.svg',
-    color: '#BC4749',
-    accent: '#FFE8D6',
-    glyph: 'CP',
-    experimental: true,
-  },
-  {
-    id: 'ros-ocr',
-    name: 'ROS Basis Extractor',
-    description: 'Upload a Record of Survey PDF and extract ranked basis-of-bearing candidates using OCR.',
-    entryHtml: 'ROS_OCR.html',
-    iconPath: '/assets/icons/ros-ocr.svg',
-    color: '#6A4C93',
-    accent: '#F2E9FF',
-    glyph: 'OCR',
-    experimental: true,
-  },
-
 ];
 
 export function listApps() {
-  return APP_CATALOG.map(({ color, accent, glyph, section, ...publicApp }) => ({
-    ...publicApp,
-    ...(section ? { section } : {}),
-  }));
+  return APP_CATALOG.map(({ color, accent, glyph, ...publicApp }) => publicApp);
 }

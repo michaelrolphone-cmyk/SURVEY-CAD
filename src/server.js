@@ -97,7 +97,16 @@ import {
   saveEquipmentItem,
   deleteEquipmentItem,
   saveEquipmentLog,
+  deleteCrewMember,
+  deleteEquipmentLog,
 } from './crew-equipment-api.js';
+import {
+  listProjects,
+  getProject,
+  createProject,
+  updateProject,
+  deleteProject as deleteProjectFromStore,
+} from './project-store.js';
 
 /* ------------------------------ BEW integration ------------------------------ */
 /* IMPORTANT: namespace imports so missing named exports do not crash on Heroku */
@@ -305,6 +314,12 @@ function parseProjectRecordQuarryCacheRoute(pathname = '') {
   const match = String(pathname || '').match(/^\/api\/projects\/([^/]+)\/record-quarry-cache\/?$/);
   if (!match) return null;
   return { projectId: decodeURIComponent(match[1]) };
+}
+
+function parseProjectRoute(pathname = '') {
+  const match = String(pathname || '').match(/^\/api\/projects(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
+  return { projectId: match[1] ? decodeURIComponent(match[1]) : '' };
 }
 
 function parseProjectArchiveRoute(pathname = '') {
@@ -2277,7 +2292,48 @@ export function createSurveyServer({
           sendJson(res, 200, { exports });
           return;
         }
-        sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+        if (req.method === 'PUT' || req.method === 'PATCH') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id query parameter is required for updates.' });
+            return;
+          }
+          const existing = pointforgeExportStore.get(id);
+          if (!existing) {
+            sendJson(res, 404, { error: 'Export not found.' });
+            return;
+          }
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') {
+            sendJson(res, 400, { error: 'Request body must be a JSON object.' });
+            return;
+          }
+          const updated = {
+            ...existing,
+            ...body,
+            id, // prevent id override
+            updatedAt: new Date().toISOString(),
+          };
+          pointforgeExportStore.set(id, updated);
+          sendJson(res, 200, { export: updated });
+          return;
+        }
+        if (req.method === 'DELETE') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id query parameter is required.' });
+            return;
+          }
+          const existing = pointforgeExportStore.get(id);
+          if (!existing) {
+            sendJson(res, 404, { error: 'Export not found.' });
+            return;
+          }
+          pointforgeExportStore.delete(id);
+          sendJson(res, 200, { deleted: true, id });
+          return;
+        }
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
         return;
       }
 
@@ -2333,6 +2389,101 @@ export function createSurveyServer({
           return;
         }
         sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+        return;
+      }
+
+      // --- Projects CRUD ---
+      const projectRoute = parseProjectRoute(urlObj.pathname);
+      if (projectRoute && !urlObj.pathname.includes('/archive') && !urlObj.pathname.includes('/drawings') && !urlObj.pathname.includes('/point-files') && !urlObj.pathname.includes('/cpf') && !urlObj.pathname.includes('/ros') && !urlObj.pathname.includes('/plats') && !urlObj.pathname.includes('/record-quarry-cache') && !urlObj.pathname.includes('/workbench')) {
+        const { projectId } = projectRoute;
+
+        if (req.method === 'GET' && !projectId) {
+          const projectList = await listProjects(localStorageSyncStore);
+          sendJson(res, 200, { projects: projectList });
+          return;
+        }
+
+        if (req.method === 'GET' && projectId) {
+          const project = await getProject(localStorageSyncStore, projectId);
+          if (!project) {
+            sendJson(res, 404, { error: 'Project not found.' });
+            return;
+          }
+          sendJson(res, 200, { project });
+          return;
+        }
+
+        if (req.method === 'POST' && !projectId) {
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') {
+            sendJson(res, 400, { error: 'Request body must be a JSON object.' });
+            return;
+          }
+          try {
+            const result = await createProject(localStorageSyncStore, body);
+            localStorageSyncWsService.broadcast({
+              type: 'sync-differential-applied',
+              operations: result.sync?.operations || result.sync?.allOperations || [],
+              state: {
+                version: result.sync?.state?.version,
+                checksum: result.sync?.state?.checksum,
+              },
+              originClientId: null,
+              requestId: null,
+            });
+            sendJson(res, 201, { project: result.project });
+          } catch (err) {
+            sendJson(res, 400, { error: err.message });
+          }
+          return;
+        }
+
+        if ((req.method === 'PUT' || req.method === 'PATCH') && projectId) {
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') {
+            sendJson(res, 400, { error: 'Request body must be a JSON object.' });
+            return;
+          }
+          const result = await updateProject(localStorageSyncStore, projectId, body);
+          if (!result) {
+            sendJson(res, 404, { error: 'Project not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.sync?.operations || result.sync?.allOperations || [],
+            state: {
+              version: result.sync?.state?.version,
+              checksum: result.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { project: result.project });
+          return;
+        }
+
+        if (req.method === 'DELETE' && projectId) {
+          const result = await deleteProjectFromStore(localStorageSyncStore, projectId);
+          if (!result) {
+            sendJson(res, 404, { error: 'Project not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.sync?.operations || result.sync?.allOperations || [],
+            state: {
+              version: result.sync?.state?.version,
+              checksum: result.sync?.state?.checksum,
+            },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true, project: result.project });
+          return;
+        }
+
+        sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
         return;
       }
 
@@ -3352,8 +3503,63 @@ export function createSurveyServer({
           sendJson(res, 201, { member });
           return;
         }
+        if (req.method === 'PUT' || req.method === 'PATCH') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id query parameter is required for updates.' });
+            return;
+          }
+          const state = await resolveStoreState();
+          const existing = findCrewMemberById(state.snapshot, id);
+          if (!existing) {
+            sendJson(res, 404, { error: 'Crew member not found.' });
+            return;
+          }
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') {
+            sendJson(res, 400, { error: 'Request body must be a JSON object.' });
+            return;
+          }
+          const member = {
+            ...existing,
+            ...body,
+            id, // prevent id override
+            updatedAt: new Date().toISOString(),
+          };
+          const result = await saveCrewMember(localStorageSyncStore, member);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { member });
+          return;
+        }
+        if (req.method === 'DELETE') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id query parameter is required.' });
+            return;
+          }
+          const result = await deleteCrewMember(localStorageSyncStore, id);
+          if (!result) {
+            sendJson(res, 404, { error: 'Crew member not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true, id });
+          return;
+        }
         if (req.method !== 'GET') {
-          sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+          sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
           return;
         }
         const state = await resolveStoreState();
@@ -3425,8 +3631,42 @@ export function createSurveyServer({
           sendJson(res, 200, { deleted: true, id });
           return;
         }
+        if (req.method === 'PUT' || req.method === 'PATCH') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id query parameter is required for updates.' });
+            return;
+          }
+          const state = await resolveStoreState();
+          const existing = findEquipmentById(state.snapshot, id);
+          if (!existing) {
+            sendJson(res, 404, { error: 'Equipment not found.' });
+            return;
+          }
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') {
+            sendJson(res, 400, { error: 'Request body must be a JSON object.' });
+            return;
+          }
+          const item = {
+            ...existing,
+            ...body,
+            id, // prevent id override
+            updatedAt: new Date().toISOString(),
+          };
+          const result = await saveEquipmentItem(localStorageSyncStore, item);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { equipment: item });
+          return;
+        }
         if (req.method !== 'GET') {
-          sendJson(res, 405, { error: 'Only GET, POST, and DELETE are supported.' });
+          sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
           return;
         }
         const state = await resolveStoreState();
@@ -3475,8 +3715,63 @@ export function createSurveyServer({
           sendJson(res, 201, { log });
           return;
         }
+        if (req.method === 'PUT' || req.method === 'PATCH') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id query parameter is required for updates.' });
+            return;
+          }
+          const state = await resolveStoreState();
+          const existing = findEquipmentLogById(state.snapshot, id);
+          if (!existing) {
+            sendJson(res, 404, { error: 'Equipment log not found.' });
+            return;
+          }
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') {
+            sendJson(res, 400, { error: 'Request body must be a JSON object.' });
+            return;
+          }
+          const log = {
+            ...existing,
+            ...body,
+            id, // prevent id override
+            updatedAt: new Date().toISOString(),
+          };
+          const result = await saveEquipmentLog(localStorageSyncStore, log);
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { log });
+          return;
+        }
+        if (req.method === 'DELETE') {
+          const id = urlObj.searchParams.get('id');
+          if (!id) {
+            sendJson(res, 400, { error: 'id query parameter is required.' });
+            return;
+          }
+          const result = await deleteEquipmentLog(localStorageSyncStore, id);
+          if (!result) {
+            sendJson(res, 404, { error: 'Equipment log not found.' });
+            return;
+          }
+          localStorageSyncWsService.broadcast({
+            type: 'sync-differential-applied',
+            operations: result.operations,
+            state: { version: result.state.version, checksum: result.state.checksum },
+            originClientId: null,
+            requestId: null,
+          });
+          sendJson(res, 200, { deleted: true, id });
+          return;
+        }
         if (req.method !== 'GET') {
-          sendJson(res, 405, { error: 'Only GET and POST are supported.' });
+          sendJson(res, 405, { error: 'Supported methods: GET, POST, PUT, PATCH, DELETE.' });
           return;
         }
         const state = await resolveStoreState();

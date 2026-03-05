@@ -98,4 +98,24 @@ export async function saveEquipmentLog(store, log) {
   });
 }
 
+export async function deleteCrewMember(store, id) {
+  const state = await store.getState();
+  const { removed, value } = removeFromCollection(state.snapshot, CREW_KEY, id);
+  if (!removed) return null;
+  return await store.applyDifferential({
+    operations: [{ type: 'set', key: CREW_KEY, value }],
+    baseChecksum: state.checksum,
+  });
+}
+
+export async function deleteEquipmentLog(store, id) {
+  const state = await store.getState();
+  const { removed, value } = removeFromCollection(state.snapshot, EQUIPMENT_LOGS_KEY, id);
+  if (!removed) return null;
+  return await store.applyDifferential({
+    operations: [{ type: 'set', key: EQUIPMENT_LOGS_KEY, value }],
+    baseChecksum: state.checksum,
+  });
+}
+
 export { CREW_KEY, EQUIPMENT_KEY, EQUIPMENT_LOGS_KEY };
