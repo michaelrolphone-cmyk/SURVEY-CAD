@@ -103,6 +103,10 @@
     {
       "name": "RecordQuarry",
       "description": "RecordQuarry helper endpoints."
+    },
+    {
+      "name": "Projects",
+      "description": "Project CRUD with tombstone-based soft deletes and status workflow"
     }
   ],
   "paths": {
@@ -681,6 +685,195 @@
         }
       }
     },
+    "/api/projects": {
+      "get": {
+        "tags": ["Projects"],
+        "summary": "List all projects",
+        "operationId": "listProjects",
+        "responses": {
+          "200": {
+            "description": "Project summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Projects"],
+        "summary": "Create a new project",
+        "description": "Creates a project and broadcasts the change to all connected LocalStorage Sync WebSocket clients. Requires name and address.",
+        "operationId": "createProject",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}": {
+      "get": {
+        "tags": ["Projects"],
+        "summary": "Get a single project by ID",
+        "operationId": "getProject",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Projects"],
+        "summary": "Replace a project (full update)",
+        "operationId": "replaceProject",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Projects"],
+        "summary": "Partially update a project",
+        "operationId": "patchProject",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Projects"],
+        "summary": "Delete a project (tombstone-based soft delete)",
+        "description": "Removes the project from the active list and adds a tombstone entry. Tombstones are retained for 30 days. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "deleteProject",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["deleted", "project"],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
+                    "project": {
+                      "$ref": "#/components/schemas/Project"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
     "/api/crew": {
       "get": {
         "tags": [
@@ -749,6 +942,135 @@
           },
           "400": {
             "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Crew"],
+        "summary": "Replace a crew member (full update)",
+        "description": "Updates an existing crew member by ID. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "replaceCrewMember",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Crew member ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrewMemberUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated crew member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewMemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Crew"],
+        "summary": "Partially update a crew member",
+        "description": "Merges the provided fields into the existing crew member. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "patchCrewMember",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Crew member ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrewMemberUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated crew member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewMemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Crew"],
+        "summary": "Delete a crew member by ID",
+        "description": "Removes a crew member from the store. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "deleteCrewMember",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Crew member ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted crew member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["deleted", "id"],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       }
@@ -841,6 +1163,92 @@
           },
           "400": {
             "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Equipment"],
+        "summary": "Replace an equipment item (full update)",
+        "description": "Updates an existing equipment item by ID. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "replaceEquipment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Equipment item ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EquipmentUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated equipment item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Equipment"],
+        "summary": "Partially update an equipment item",
+        "description": "Merges the provided fields into the existing equipment item. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "patchEquipment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Equipment item ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EquipmentUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated equipment item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       },
@@ -966,6 +1374,135 @@
           }
         },
         "description": "Stores equipment log metadata and optional point-file linkage fields (pointFileId, pointFileName, pointFileProjectId)."
+      },
+      "put": {
+        "tags": ["Equipment Logs"],
+        "summary": "Replace an equipment log entry (full update)",
+        "description": "Updates an existing equipment log by ID. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "replaceEquipmentLog",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Equipment log ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EquipmentLogUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated equipment log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentLogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Equipment Logs"],
+        "summary": "Partially update an equipment log entry",
+        "description": "Merges the provided fields into the existing equipment log. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "patchEquipmentLog",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Equipment log ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EquipmentLogUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated equipment log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentLogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Equipment Logs"],
+        "summary": "Delete an equipment log entry by ID",
+        "description": "Removes an equipment log entry from the store. Broadcasts the change to all connected LocalStorage Sync WebSocket clients.",
+        "operationId": "deleteEquipmentLog",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Equipment log ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted equipment log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["deleted", "id"],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
       }
     },
     "/api/localstorage-sync": {
@@ -1092,6 +1629,144 @@
           },
           "400": {
             "$ref": "#/components/responses/Error400"
+          }
+        }
+      },
+      "put": {
+        "tags": ["PointForge"],
+        "summary": "Replace a PointForge export (full update)",
+        "operationId": "replacePointForgeExport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Export ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PointForgeExportCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["export"],
+                  "properties": {
+                    "export": {
+                      "$ref": "#/components/schemas/PointForgeExport"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["PointForge"],
+        "summary": "Partially update a PointForge export",
+        "operationId": "patchPointForgeExport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Export ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PointForgeExportCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["export"],
+                  "properties": {
+                    "export": {
+                      "$ref": "#/components/schemas/PointForgeExport"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["PointForge"],
+        "summary": "Delete a PointForge export by ID",
+        "operationId": "deletePointForgeExport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Export ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["deleted", "id"],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [true]
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         }
       }
@@ -4667,6 +5342,16 @@
           "minLength": 1
         },
         "description": "Project ID"
+      },
+      "projectIdPath": {
+        "name": "projectId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Project ID (path segment)"
       },
       "projectNameOptional": {
         "name": "projectName",
@@ -8548,6 +9233,210 @@
         "required": [
           "records"
         ]
+      },
+      "Project": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "address",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "client": {
+            "type": "string",
+            "default": ""
+          },
+          "clientContact": {
+            "type": "string",
+            "default": ""
+          },
+          "billingRate": {
+            "type": "string",
+            "default": ""
+          },
+          "address": {
+            "type": "string"
+          },
+          "tsr": {
+            "type": "string",
+            "description": "Township-Section-Range string",
+            "default": ""
+          },
+          "section": {
+            "type": "string",
+            "default": ""
+          },
+          "sections": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "description": {
+            "type": "string",
+            "default": ""
+          },
+          "townshipRange": {
+            "type": "string",
+            "default": ""
+          },
+          "aliquotLabel": {
+            "type": "string",
+            "default": ""
+          },
+          "plssDescription": {
+            "type": "string",
+            "default": ""
+          },
+          "surveyIndex": {
+            "type": "string",
+            "default": ""
+          },
+          "manualPlssOverride": {
+            "type": "boolean",
+            "default": false
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Proposed",
+              "Researched",
+              "Calculated",
+              "Tied",
+              "Drafted",
+              "Pin Set",
+              "Final Drafted",
+              "Submitted",
+              "Recorded",
+              "Billed",
+              "Paid",
+              "Archived"
+            ],
+            "default": "Proposed"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectSummary": {
+        "type": "object",
+        "description": "Lightweight project summary returned by the list endpoint.",
+        "required": [
+          "id",
+          "name",
+          "address",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "client": { "type": "string" },
+          "address": { "type": "string" },
+          "status": { "type": "string" },
+          "tsr": { "type": "string" },
+          "section": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ProjectCreate": {
+        "type": "object",
+        "required": ["name", "address"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Optional project ID; auto-generated if omitted"
+          },
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "client": { "type": "string" },
+          "clientContact": { "type": "string" },
+          "billingRate": { "type": "string" },
+          "tsr": { "type": "string" },
+          "section": { "type": "string" },
+          "sections": { "type": "array", "items": { "type": "string" } },
+          "description": { "type": "string" },
+          "townshipRange": { "type": "string" },
+          "aliquotLabel": { "type": "string" },
+          "plssDescription": { "type": "string" },
+          "surveyIndex": { "type": "string" },
+          "manualPlssOverride": { "type": "boolean" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Proposed", "Researched", "Calculated", "Tied", "Drafted",
+              "Pin Set", "Final Drafted", "Submitted", "Recorded",
+              "Billed", "Paid", "Archived"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectUpdate": {
+        "type": "object",
+        "description": "Partial update payload. All fields are optional; provided fields are merged into the existing project.",
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "client": { "type": "string" },
+          "clientContact": { "type": "string" },
+          "billingRate": { "type": "string" },
+          "tsr": { "type": "string" },
+          "section": { "type": "string" },
+          "sections": { "type": "array", "items": { "type": "string" } },
+          "description": { "type": "string" },
+          "townshipRange": { "type": "string" },
+          "aliquotLabel": { "type": "string" },
+          "plssDescription": { "type": "string" },
+          "surveyIndex": { "type": "string" },
+          "manualPlssOverride": { "type": "boolean" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Proposed", "Researched", "Calculated", "Tied", "Drafted",
+              "Pin Set", "Final Drafted", "Submitted", "Recorded",
+              "Billed", "Paid", "Archived"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectListResponse": {
+        "type": "object",
+        "required": ["projects"],
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectSummary"
+            }
+          }
+        }
+      },
+      "ProjectResponse": {
+        "type": "object",
+        "required": ["project"],
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          }
+        }
       }
     }
   }
