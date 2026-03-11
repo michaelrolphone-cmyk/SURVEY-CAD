@@ -7,6 +7,7 @@ import {
   closureRatio,
   formatDms,
   azimuthToBearing,
+  buildTraverseCsvPNEZD,
   LINEAR_CLOSURE_TOLERANCE,
 } from '../src/boundarylab.js';
 
@@ -88,4 +89,19 @@ test('formatDms renders angular errors in DMS text with rollover-safe precision'
   assert.equal(formatDms(12.5), `12°30'00.00"`);
   assert.equal(formatDms(12.9999999), `13°00'00.00"`);
   assert.equal(formatDms(Number.NaN), '—');
+});
+
+test('buildTraverseCsvPNEZD exports easting before northing for PointForge import', () => {
+  const csv = buildTraverseCsvPNEZD([
+    { x: 1234.5, y: 6789.25 },
+    { x: 2000, y: 3000 },
+  ], { startPointNumber: 10 });
+
+  assert.equal(
+    csv,
+    [
+      '10,1234.500,6789.250,0.000,TRAV',
+      '11,2000.000,3000.000,0.000,TRAV',
+    ].join('\n'),
+  );
 });

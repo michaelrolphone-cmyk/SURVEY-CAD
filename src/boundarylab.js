@@ -170,9 +170,9 @@ export function buildTraverseCsvPNEZD(points, { startPointNumber = 1 } = {}) {
     const pt = points[i];
     if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
     const num = startPointNumber + i;
-    const northing = pt.y.toFixed(3);
     const easting = pt.x.toFixed(3);
-    lines.push(`${num},${northing},${easting},0.000,TRAV`);
+    const northing = pt.y.toFixed(3);
+    lines.push(`${num},${easting},${northing},0.000,TRAV`);
   }
   return lines.join('\n');
 }
