@@ -20,6 +20,10 @@ test('RecordQuarry builds subdivision plat doc-id index and caps nearby subdivis
   assert.ok(html.includes("const fileMatch = raw.match(/[A-Za-z0-9._\\\\/ -]+\\.(?:pdf|jpe?g|png|tiff?)/i);"), 'RecordQuarry should parse local SubPagesList plat paths that use backslash directory separators.');
   assert.match(html, /\/api\/project-files\/ros-thumbnail\?\$\{new URLSearchParams\(\{ source: sourceUrl \}\)\}/, 'RecordQuarry should route subdivision TIFF thumbnails through the ros-thumbnail API endpoint.');
   assert.match(html, /thumbnailUrl:\s*buildSubdivisionPlatThumbnailUrl\(platUrl\)/, 'RecordQuarry should derive subdivision card thumbnails from the normalized plat-thumbnail helper.');
+
+  assert.match(html, /function\s+buildSubdivisionPlatPdfUrl\s*\(/, 'RecordQuarry should derive a generated subdivision plat PDF URL helper for multipage EvidenceDesk browsing.');
+  assert.match(html, /platPdfUrl:\s*buildSubdivisionPlatPdfUrl\(platDocId\)/, 'RecordQuarry should persist generated subdivision plat PDF URLs alongside source page links.');
+  assert.match(html, /platPdfUrl:\s*String\(plat\?\.platPdfUrl\s*\|\|\s*''\)\.trim\(\)\s*\|\|\s*null/, 'RecordQuarry export metadata should include generated subdivision plat PDF URLs for EvidenceDesk print flows.');
   assert.match(html, /wrap\.innerHTML\s*=\s*buildSubdivisionThumbnailMarkup\(subdivisionName,\s*plat\.thumbnailUrl\);/, 'RecordQuarry subdivision cards should always render thumbnail markup via the shared subdivision thumbnail helper.');
   assert.match(html, /c\.classList\.add\('subdivision-card'\);/, 'RecordQuarry subdivision cards should mark cards with a subdivision class so card-specific layout rules can apply.');
   assert.match(html, /const\s+subdivisionThumb\s*=\s*c\.querySelector\('img\.subdivision-plat-thumb'\);[\s\S]*wrap\.className\s*=\s*'subdivision-thumb-float';[\s\S]*c\.insertBefore\(wrap,\s*c\.firstChild\);/, 'RecordQuarry should move subdivision thumbnails into a floating left wrapper so the thumbnail sits beside the header like ROS cards.');
